@@ -5,7 +5,10 @@ import {
   timestamp,
   jsonb,
   integer,
+  numeric,
+  boolean,
   primaryKey,
+  uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -88,4 +91,133 @@ export const characters = pgTable(
     index('idx_characters_user').on(table.userId),
     index('idx_characters_campaign').on(table.campaignId),
   ],
+);
+
+// ===========================================================================
+// COMPENDIUM — data importada desde 5etools.
+//
+// Convención por tabla:
+//   - id UUID PK auto-generado (para joins / FKs)
+//   - (slug, source) UNIQUE — clave natural ("longsword" + "PHB")
+//   - name TEXT NOT NULL — nombre tal cual aparece en 5etools
+//   - data JSONB NOT NULL — payload completo de 5etools
+//   - reprinted_as TEXT[] — si esta entidad fue reimpresa, slugs|source de los reemplazos
+//
+// La data se importa via `pnpm import:5etools` (idempotente, upsert por (slug, source)).
+// ===========================================================================
+
+export const compendiumRaces = pgTable(
+  'compendium_races',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+    isSubrace: boolean('is_subrace').notNull().default(false),
+    parentSlug: text('parent_slug'),
+    parentSource: text('parent_source'),
+  },
+  (t) => [
+    uniqueIndex('uq_races_slug_source').on(t.slug, t.source),
+    index('idx_races_name').on(t.name),
+  ],
+);
+
+export const compendiumClasses = pgTable(
+  'compendium_classes',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [uniqueIndex('uq_classes_slug_source').on(t.slug, t.source)],
+);
+
+export const compendiumSubclasses = pgTable(
+  'compendium_subclasses',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    classSlug: text('class_slug').notNull(),
+    classSource: text('class_source').notNull(),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_subclasses_slug_source').on(t.slug, t.source),
+    index('idx_subclasses_class').on(t.classSlug, t.classSource),
+  ],
+);
+
+export const compendiumBackgrounds = pgTable(
+  'compendium_backgrounds',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [uniqueIndex('uq_backgrounds_slug_source').on(t.slug, t.source)],
+);
+
+export const compendiumSpells = pgTable(
+  'compendium_spells',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    level: integer('level').notNull(), // 0 = cantrip
+    school: text('school').notNull(), // 'A' | 'C' | 'D' | 'E' | 'I' | 'N' | 'T' | 'V' (5etools codes)
+    classes: text('classes').array().notNull().default(sql`'{}'::text[]`),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_spells_slug_source').on(t.slug, t.source),
+    index('idx_spells_level').on(t.level),
+    index('idx_spells_school').on(t.school),
+    index('idx_spells_classes').using('gin', t.classes),
+  ],
+);
+
+export const compendiumItems = pgTable(
+  'compendium_items',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    type: text('type'), // weapon, armor, gear, etc. (puede ser null en magic variants)
+    weight: numeric('weight'), // libras
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_items_slug_source').on(t.slug, t.source),
+    index('idx_items_type').on(t.type),
+  ],
+);
+
+export const compendiumFeats = pgTable(
+  'compendium_feats',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    prerequisites: jsonb('prerequisites'), // array de objetos con ability / race / etc.
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [uniqueIndex('uq_feats_slug_source').on(t.slug, t.source)],
 );

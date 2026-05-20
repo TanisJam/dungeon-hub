@@ -12,9 +12,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "import:5etools": "tsx scripts/import-5etools.ts"
   },
   "dependencies": {
+    "@dungeon-hub/compendium-import": "workspace:*",
     "@dungeon-hub/domain": "workspace:*",
     "@fastify/cors": "^10.0.1",
     "@fastify/jwt": "^9.0.3",

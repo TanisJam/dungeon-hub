@@ -20,6 +20,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@dungeon-hub/compendium-import':
+        specifier: workspace:*
+        version: link:../../packages/compendium-import
       '@dungeon-hub/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -57,6 +60,12 @@ importers:
       drizzle-kit:
         specifier: ^0.30.1
         version: 0.30.6
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.19)
+
+  packages/compendium-import:
+    devDependencies:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.19)
