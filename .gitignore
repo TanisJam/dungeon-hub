@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Supabase self-hosted (gestionado por infra/supabase/bootstrap.sh)
+infra/supabase/docker-compose.yml
+infra/supabase/dev/
+infra/supabase/volumes/db/data/
+infra/supabase/volumes/storage/
+infra/supabase/volumes/api/
+infra/supabase/volumes/functions/
+infra/supabase/volumes/logs/
+infra/supabase/volumes/pooler/
+
+# 5etools data (gestionado por submodulo)
+data/5etools/
+
+# Test coverage
+coverage/
+
+# Misc
+*.swp
+*.swo

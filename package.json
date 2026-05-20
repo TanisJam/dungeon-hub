@@ -1,0 +1,27 @@
+{
+  "name": "dungeon-hub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.7.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @dungeon-hub/api dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "gen:keys": "node scripts/gen-keys.mjs",
+    "supabase:bootstrap": "./infra/supabase/bootstrap.sh",
+    "supabase:up": "cd infra/supabase && docker compose up -d",
+    "supabase:down": "cd infra/supabase && docker compose down",
+    "supabase:logs": "cd infra/supabase && docker compose logs -f"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "@types/node": "^22.10.5"
+  }
+}
