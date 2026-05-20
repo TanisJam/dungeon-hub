@@ -59,8 +59,10 @@ pnpm supabase:up
 pnpm --filter @dungeon-hub/api db:generate
 pnpm --filter @dungeon-hub/api db:migrate
 
-# 6. Aplicar el trigger de auth → public.users
-psql "$DATABASE_URL" -f apps/api/drizzle/custom/0001-auth-mirror-trigger.sql
+# 6. Aplicar el SQL custom (FK + trigger auth → public.users)
+#    Usamos el psql que viene en el container de Supabase, no necesitás instalarlo local
+sudo docker exec -i supabase-db psql -U postgres -d postgres \
+  < apps/api/drizzle/custom/0001-auth-mirror-trigger.sql
 
 # 7. Levantar el API
 pnpm dev
@@ -89,7 +91,9 @@ pnpm dev                # Arranca el API con hot reload
 | API | http://localhost:4000 | Backend de Dungeon Hub |
 | Supabase Studio | http://localhost:3000 | Dashboard de la DB |
 | Supabase Kong | http://localhost:8000 | Gateway de Auth y APIs |
-| Postgres | localhost:5432 | Conexión directa (Drizzle) |
+| Postgres (directo) | localhost:5433 | Conexión directa para Drizzle / DDL |
+| Supavisor (pooler) | localhost:5432 | Pooler de conexiones (para app en prod) |
+| Supavisor (transaction) | localhost:6543 | Pooler modo transaction |
 
 ---
 

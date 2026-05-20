@@ -19,6 +19,7 @@ echo "📂 Copying docker/ contents to ${SCRIPT_DIR}..."
 rsync -av \
   --exclude='.env' \
   --exclude='.env.example' \
+  --exclude='docker-compose.override.yml' \
   --exclude='volumes/db/data' \
   --exclude='volumes/storage' \
   "${TEMP_DIR}/supabase/docker/" \

@@ -1,11 +1,23 @@
 -- ---------------------------------------------------------------------------
--- Auto-mirror auth.users → public.users on signup.
+-- 1) FK public.users.id → auth.users.id
+--    (Drizzle no la genera porque no conoce la tabla auth.users)
+-- 2) Auto-mirror auth.users → public.users on signup (trigger)
 --
 -- Supabase GoTrue inserta en auth.users al hacer signup. Esta función crea
 -- automáticamente la fila correspondiente en public.users con valores default.
 --
 -- Aplicar DESPUÉS de las migraciones de drizzle, una vez que public.users existe.
 -- ---------------------------------------------------------------------------
+
+-- ---- FK ------------------------------------------------------------------
+ALTER TABLE public.users
+  DROP CONSTRAINT IF EXISTS users_id_fk_auth_users;
+
+ALTER TABLE public.users
+  ADD CONSTRAINT users_id_fk_auth_users
+  FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- ---- Trigger -------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
 RETURNS TRIGGER

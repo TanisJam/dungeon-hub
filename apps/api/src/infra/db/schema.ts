@@ -1,6 +1,5 @@
 import {
   pgTable,
-  pgSchema,
   uuid,
   text,
   timestamp,
@@ -12,23 +11,18 @@ import {
 import { sql } from 'drizzle-orm';
 
 // ---------------------------------------------------------------------------
-// auth.users — managed by Supabase GoTrue. We solo lo referenciamos.
-// ---------------------------------------------------------------------------
-const authSchema = pgSchema('auth');
-
-export const authUsers = authSchema.table('users', {
-  id: uuid('id').primaryKey(),
-  email: text('email'),
-});
-
-// ---------------------------------------------------------------------------
-// public.users — mirror with app-specific columns (role, username, etc.)
-// Se popula vía trigger SQL al hacer signup en GoTrue.
+// public.users — mirror de auth.users con columnas app-specific.
+//
+// La tabla auth.users la maneja Supabase GoTrue (otro schema, otros permisos).
+// La FK entre public.users.id → auth.users.id se aplica vía SQL manual en
+// apps/api/drizzle/custom/0001-auth-mirror-trigger.sql para no chocar con los
+// permisos del schema auth ni que Drizzle intente crearlo.
+//
+// La tabla se popula automáticamente al hacer signup en GoTrue gracias al
+// trigger definido en el mismo archivo custom.
 // ---------------------------------------------------------------------------
 export const users = pgTable('users', {
-  id: uuid('id')
-    .primaryKey()
-    .references(() => authUsers.id, { onDelete: 'cascade' }),
+  id: uuid('id').primaryKey(),
   username: text('username').notNull().unique(),
   discordId: text('discord_id').unique(),
   role: text('role', { enum: ['player', 'gm', 'admin'] }).notNull().default('player'),

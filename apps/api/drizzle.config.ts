@@ -8,6 +8,11 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },
+  // Solo administramos el schema `public`.
+  // `auth` lo maneja Supabase GoTrue y nuestro user `postgres` no tiene
+  // permisos para CREATE en él. La FK desde public.users → auth.users sigue
+  // funcionando porque es solo una referencia.
+  schemaFilter: ['public'],
   verbose: true,
   strict: true,
 });

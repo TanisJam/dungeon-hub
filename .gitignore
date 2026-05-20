@@ -26,15 +26,12 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Supabase self-hosted (gestionado por infra/supabase/bootstrap.sh)
-infra/supabase/docker-compose.yml
-infra/supabase/dev/
-infra/supabase/volumes/db/data/
-infra/supabase/volumes/storage/
-infra/supabase/volumes/api/
-infra/supabase/volumes/functions/
-infra/supabase/volumes/logs/
-infra/supabase/volumes/pooler/
+# Supabase self-hosted: TODO el contenido es upstream (gestionado por bootstrap.sh),
+# excepto los archivos que nosotros mantenemos (whitelisted abajo).
+infra/supabase/*
+infra/supabase/.[!.]*
+!infra/supabase/bootstrap.sh
+!infra/supabase/docker-compose.override.yml
 
 # 5etools data (gestionado por submodulo)
 data/5etools/

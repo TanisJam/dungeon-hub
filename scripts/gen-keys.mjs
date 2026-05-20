@@ -57,7 +57,7 @@ console.log(`SECRET_KEY_BASE=${secretKeyBase}`);
 console.log(`VAULT_ENC_KEY=${vaultEncKey}`);
 console.log('');
 console.log('# Y para apps/api/.env:');
-console.log(`DATABASE_URL=postgres://postgres:${postgresPassword}@localhost:5432/postgres`);
+console.log(`DATABASE_URL=postgres://postgres:${postgresPassword}@localhost:5433/postgres`);
 console.log(`SUPABASE_JWT_SECRET=${jwtSecret}`);
 console.log(`SUPABASE_URL=http://localhost:8000`);
 console.log(`SUPABASE_ANON_KEY=${anonKey}`);
