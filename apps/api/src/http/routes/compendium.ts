@@ -279,6 +279,27 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
   });
 
+  app.get('/compendium/spells/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumSpells)
+      .where(
+        and(
+          eq(compendiumSpells.slug, slug),
+          source ? eq(compendiumSpells.source, source) : undefined,
+        ),
+      )
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
+
   // ---- ITEMS ---------------------------------------------------------------
   const ItemsQuery = PaginationQuery.extend({
     type: z.string().min(1).optional(),
