@@ -3,6 +3,7 @@ import type {
   RaceCompendiumData,
   SubraceCompendiumData,
 } from '@dungeon-hub/domain/character/race';
+import type { RaceSheetData } from '@dungeon-hub/domain/character/sheet';
 import { db } from '../../infra/db/client.js';
 import { compendiumRaces } from '../../infra/db/schema.js';
 
@@ -72,4 +73,67 @@ export async function loadRaceAndSubrace(input: {
   }
 
   return { race, subrace };
+}
+
+/**
+ * Variante para el sheet: trae `speed`, `size`, `languageProficiencies`
+ * además del shape básico. Combina race + subrace (subrace puede agregar
+ * idiomas, ej. High Elf da +1 lang).
+ */
+export async function loadRaceSheetData(input: {
+  raceSlug: string;
+  raceSource: string;
+  subraceSlug?: string | null;
+  subraceSource?: string | null;
+}): Promise<RaceSheetData | null> {
+  const rows = await db
+    .select()
+    .from(compendiumRaces)
+    .where(
+      and(
+        eq(compendiumRaces.slug, input.raceSlug),
+        eq(compendiumRaces.source, input.raceSource),
+        eq(compendiumRaces.isSubrace, false),
+      ),
+    )
+    .limit(1);
+  const raceRow = rows[0];
+  if (!raceRow) return null;
+  const raceData = raceRow.data as Record<string, unknown>;
+
+  let result: RaceSheetData = {
+    speed: raceData.speed as RaceSheetData['speed'],
+    size: raceData.size as RaceSheetData['size'],
+    languageProficiencies: raceData.languageProficiencies as RaceSheetData['languageProficiencies'],
+  };
+
+  // Mergeamos languageProficiencies de la subrace si existe
+  if (input.subraceSlug && input.subraceSource) {
+    const subRows = await db
+      .select()
+      .from(compendiumRaces)
+      .where(
+        and(
+          eq(compendiumRaces.slug, input.subraceSlug),
+          eq(compendiumRaces.source, input.subraceSource),
+          eq(compendiumRaces.isSubrace, true),
+        ),
+      )
+      .limit(1);
+    const subRow = subRows[0];
+    if (subRow) {
+      const subData = subRow.data as Record<string, unknown>;
+      const subLangs = subData.languageProficiencies as
+        | RaceSheetData['languageProficiencies']
+        | undefined;
+      if (subLangs && subLangs.length > 0) {
+        result = {
+          ...result,
+          languageProficiencies: [...(result.languageProficiencies ?? []), ...subLangs],
+        };
+      }
+    }
+  }
+
+  return result;
 }

@@ -7,6 +7,7 @@ import { validateClassSelection } from '@dungeon-hub/domain/character/class';
 import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
+import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
@@ -19,7 +20,7 @@ import {
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
-import { loadRaceAndSubrace } from '../../use-cases/characters/load-race-data.js';
+import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import { loadBackgroundData } from '../../use-cases/characters/load-background-data.js';
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
@@ -178,7 +179,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
   });
 
   // ---- GET /characters/:id/sheet ------------------------------------------
-  // Por ahora es un echo de la data — el calculator de stats viene en Fase 1.5.
+  // Ficha calculada: PB, modifiers, AC, HP, saves, skills, passive perception,
+  // initiative, carrying capacity, spellcasting DC/attack, hit dice, speed.
   app.get('/characters/:id/sheet', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
     const userId = request.user!.sub;
@@ -189,11 +191,36 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const access = await getCharacterAccess(character, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    // TODO Fase 1.5: stats calculados (AC, HP, Spell DC, etc.)
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const raceField = data.race as { slug: string; source: string } | null | undefined;
+    const subraceField = data.subrace as { slug: string; source: string } | null | undefined;
+
+    const raceData = raceField
+      ? await loadRaceSheetData({
+          raceSlug: raceField.slug,
+          raceSource: raceField.source,
+          subraceSlug: subraceField?.slug ?? null,
+          subraceSource: subraceField?.source ?? null,
+        })
+      : null;
+
+    const sheet = computeCharacterSheet({
+      character: {
+        name: character.name,
+        baseStats: data.baseStats as never,
+        asisApplied: data.asisApplied as never,
+        classes: data.classes as never,
+        background: data.background as never,
+        feats: data.feats as never,
+        race: raceField ?? null,
+        subrace: subraceField ?? null,
+      },
+      raceData,
+    });
+
     return {
-      character,
-      calculated: null,
-      note: 'Stats calculados no implementados aún — disponibles en Fase 1.5.',
+      character: { id: character.id, userId: character.userId, campaignId: character.campaignId, status: character.status, xp: character.xp },
+      sheet,
     };
   });
 

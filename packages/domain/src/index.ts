@@ -7,3 +7,4 @@ export * from './character/class/index.js';
 export * from './character/background/index.js';
 export * from './character/multiclass/index.js';
 export * from './character/feat/index.js';
+export * from './character/sheet/index.js';

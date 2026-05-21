@@ -171,7 +171,7 @@ describe('characters CRUD', () => {
     expect(after.statusCode).toBe(404);
   });
 
-  it('sheet endpoint devuelve el personaje (sin stats calculados por ahora)', async () => {
+  it('sheet endpoint devuelve la ficha calculada para un draft vacío', async () => {
     const app = await getTestApp();
 
     const created = await app
@@ -191,6 +191,9 @@ describe('characters CRUD', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.character.id).toBe(created.id);
-    expect(body.calculated).toBeNull(); // se implementa en Fase 1.5
+    // Draft sin stats: defaults a 10 en todo, AC 10, HP 0, total level 0.
+    expect(body.sheet.proficiencyBonus).toBe(2);
+    expect(body.sheet.armorClass.value).toBe(10);
+    expect(body.sheet.identity.totalLevel).toBe(0);
   });
 });
