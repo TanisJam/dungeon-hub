@@ -1,0 +1,1 @@
+ALTER TABLE "compendium_spells" ADD COLUMN "subclass_grants" jsonb DEFAULT '[]'::jsonb NOT NULL;

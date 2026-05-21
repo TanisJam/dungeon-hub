@@ -109,10 +109,22 @@ export interface NormalizedSubclass extends NormalizedRecord {
   classSource: string;
 }
 
+export interface SubclassGrant {
+  classSlug: string;
+  classSource: string;
+  subclassSlug: string;
+  subclassSource: string;
+  /** Nombre original del subclass (para display). Ej. "Light Domain". */
+  subclassName: string;
+}
+
 export interface NormalizedSpell extends NormalizedRecord {
   level: number;
   school: string;
+  /** Solo clases BASE que tienen el spell en su lista canónica. */
   classes: string[];
+  /** Subclases que otorgan el spell como bonus (NO está en la lista base). */
+  subclassGrants: SubclassGrant[];
 }
 
 export interface NormalizedItem extends NormalizedRecord {

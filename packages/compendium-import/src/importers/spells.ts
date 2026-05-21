@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { listFiles, readJson } from '../reader.js';
 import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
-import type { FiveeToolsSpell, NormalizedSpell } from '../types.js';
+import type { FiveeToolsSpell, NormalizedSpell, SubclassGrant } from '../types.js';
 
 interface SpellsFile {
   spell?: FiveeToolsSpell[];
@@ -35,11 +35,15 @@ type SpellSourceLookup = Record<
 const SKIP_SPELL_FILES = new Set(['index.json', 'sources.json', 'foundry.json']);
 
 /**
- * Devuelve la lista única de clases que pueden castear este spell.
- * Combina: clases que lo tienen en su lista directa + clases con subclases que lo dan.
- * Excluye entries que provienen de sources que descartamos (XPHB, UA*).
+ * Devuelve solo las clases BASE que tienen el spell en su lista canónica
+ * (Appendix B del PHB / class spell list). NO incluye clases que lo obtienen
+ * via subclase (eso es `extractSubclassGrants`).
+ *
+ * Por qué separar: "Fireball es spell de Cleric" es falso — Cleric base NO
+ * tiene Fireball; solo Light/Arcana Domain lo otorgan como bonus. Mezclarlas
+ * confunde a quien consulta el spell.
  */
-function extractClasses(
+function extractBaseClasses(
   slug: string,
   source: string,
   lookup: SpellSourceLookup,
@@ -48,24 +52,64 @@ function extractClasses(
   if (!entry) return [];
 
   const classes = new Set<string>();
-
-  // class.<classSource>.<ClassName>: true
   for (const [classSource, classMap] of Object.entries(entry.class ?? {})) {
     if (isExcludedSource(classSource)) continue;
     for (const className of Object.keys(classMap)) {
       classes.add(slugify(className));
     }
   }
+  return Array.from(classes).sort();
+}
 
-  // subclass.<classSource>.<ClassName>.<subclassSource>.<SubclassName>: { ... }
-  for (const [classSource, classMap] of Object.entries(entry.subclass ?? {})) {
+/**
+ * Devuelve las subclases que otorgan el spell como bonus/extra (typicamente
+ * domain spells, oath spells, patron spells, etc.).
+ *
+ * Lookup file shape:
+ *   subclass.<classSource>.<ClassName>.<subclassSource>.<SubclassName>: { ... }
+ *
+ * Excluimos entries de classSource O subclassSource excluidos (XPHB, UA*).
+ */
+function extractSubclassGrants(
+  slug: string,
+  source: string,
+  lookup: SpellSourceLookup,
+): SubclassGrant[] {
+  const entry = lookup[source.toLowerCase()]?.[slug];
+  if (!entry?.subclass) return [];
+
+  const grants: SubclassGrant[] = [];
+  for (const [classSource, classMap] of Object.entries(entry.subclass)) {
     if (isExcludedSource(classSource)) continue;
-    for (const className of Object.keys(classMap)) {
-      classes.add(slugify(className));
+    for (const [className, subclassSourceMap] of Object.entries(classMap)) {
+      for (const [subclassSource, subclassMap] of Object.entries(subclassSourceMap)) {
+        if (isExcludedSource(subclassSource)) continue;
+        for (const subclassName of Object.keys(subclassMap)) {
+          grants.push({
+            classSlug: slugify(className),
+            classSource,
+            subclassSlug: slugify(subclassName),
+            subclassSource,
+            subclassName,
+          });
+        }
+      }
     }
   }
-
-  return Array.from(classes).sort();
+  // Dedup por (classSlug + subclassSlug + classSource + subclassSource).
+  const seen = new Set<string>();
+  return grants
+    .filter((g) => {
+      const k = `${g.classSlug}|${g.subclassSlug}|${g.classSource}|${g.subclassSource}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .sort((a, b) =>
+      a.classSlug === b.classSlug
+        ? a.subclassSlug.localeCompare(b.subclassSlug)
+        : a.classSlug.localeCompare(b.classSlug),
+    );
 }
 
 export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> {
@@ -99,7 +143,8 @@ export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> 
       if (isExcludedSource(s.source)) continue;
 
       const slug = slugify(s.name);
-      const classes = extractClasses(slug, s.source, lookup);
+      const classes = extractBaseClasses(slug, s.source, lookup);
+      const subclassGrants = extractSubclassGrants(slug, s.source, lookup);
 
       out.push({
         slug,
@@ -110,6 +155,7 @@ export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> 
         level: s.level,
         school: s.school,
         classes,
+        subclassGrants,
       });
     }
   }

@@ -267,6 +267,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           level: compendiumSpells.level,
           school: compendiumSpells.school,
           classes: compendiumSpells.classes,
+          subclassGrants: compendiumSpells.subclassGrants,
         })
         .from(compendiumSpells)
         .where(conds)

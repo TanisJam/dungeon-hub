@@ -1445,9 +1445,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const abilityMod = abilityModifier(effective[ability]);
 
       // Cargar el universo de spells permitidos para esta clase (ya filtrado por
-      // el Rules Profile).
+      // el Rules Profile). Incluye bonus spells del subclass del PJ si tiene uno
+      // elegido (Light Domain Cleric obtiene Fireball, etc.).
       const availableSpells = await loadClassSpells({
         classSlug,
+        ...(appliedClass.subclass?.slug ? { subclassSlug: appliedClass.subclass.slug } : {}),
         rulesProfile: campaign.rulesProfile,
       });
 

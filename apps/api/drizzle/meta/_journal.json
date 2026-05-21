@@ -71,6 +71,13 @@
       "when": 1779396948785,
       "tag": "0009_third_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779402484060,
+      "tag": "0010_flippant_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

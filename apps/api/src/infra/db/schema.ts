@@ -593,7 +593,20 @@ export const compendiumSpells = pgTable(
     name: text('name').notNull(),
     level: integer('level').notNull(), // 0 = cantrip
     school: text('school').notNull(), // 'A' | 'C' | 'D' | 'E' | 'I' | 'N' | 'T' | 'V' (5etools codes)
+    /**
+     * Clases BASE que tienen el spell en su lista canónica (PHB Appendix B / class
+     * spell list). Ej. Fireball → ['sorcerer', 'wizard']. NO incluye subclases
+     * que lo otorgan como bonus spell (eso vive en subclassGrants).
+     */
     classes: text('classes').array().notNull().default(sql`'{}'::text[]`),
+    /**
+     * Subclases que otorgan el spell como bonus/extra (NO está en la lista
+     * base de la clase). Ej. Fireball → [{classSlug: 'cleric', subclassSlug:
+     * 'light', subclassName: 'Light Domain', ...}, ...].
+     * Shape de cada entry:
+     *   { classSlug, classSource, subclassSlug, subclassSource, subclassName }
+     */
+    subclassGrants: jsonb('subclass_grants').notNull().default(sql`'[]'::jsonb`),
     data: jsonb('data').notNull(),
     reprintedAs: text('reprinted_as').array(),
   },
