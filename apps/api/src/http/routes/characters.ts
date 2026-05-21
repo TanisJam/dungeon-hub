@@ -5,10 +5,12 @@ import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
 import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
-import { validateMulticlassAddition } from '@dungeon-hub/domain/character/multiclass';
+import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
+import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
+import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
 import {
@@ -20,6 +22,7 @@ import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import { loadBackgroundData } from '../../use-cases/characters/load-background-data.js';
+import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
 
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
 
@@ -52,6 +55,13 @@ const SetStatsBody = z.object({
     wis: z.number().int(),
     cha: z.number().int(),
   }),
+});
+
+const AddFeatBody = z.object({
+  feat: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  asiChoice: z
+    .array(z.object({ ability: z.string().min(1), bonus: z.number().int() }))
+    .optional(),
 });
 
 const AddMulticlassBody = z.object({
@@ -531,6 +541,90 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .update(characters)
       .set({
         data: { ...charData, classes: updatedClasses },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return reply.code(201).send(updated);
+  });
+
+  // ---- POST /characters/:id/feats -----------------------------------------
+  // Agrega un feat al personaje. Valida prereqs (ability/proficiency/race/
+  // spellcasting), aplica el ASI del feat (fijo o elegido).
+  app.post('/characters/:id/feats', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = AddFeatBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const featData = await loadFeatData({ slug: body.feat.slug, source: body.feat.source });
+    if (!featData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'FEAT_NOT_FOUND', feat: body.feat }],
+      });
+    }
+
+    // Construir el context del personaje a partir de character.data
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const baseStats = charData.baseStats as AbilityScores | undefined;
+    if (!baseStats) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'NO_BASE_STATS', hint: 'Setea baseStats antes de tomar feats.' }],
+      });
+    }
+
+    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+    const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
+    // Sumamos también las ASIs ya aplicadas por feats anteriores para los effective scores
+    const featAsis = existingFeats.flatMap((f) =>
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    );
+    const effectiveScores = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+
+    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const armorProficiencies = classes.flatMap((c) => c.armorProficiencies);
+    const weaponProficiencies = classes.flatMap((c) => c.weaponProficiencies);
+    const hasSpellcasting = classes.some((c) => classGrantsSpellcasting(c.slug));
+
+    const raceField = charData.race as { slug: string; source: string } | null | undefined;
+
+    const result = validateFeatSelection({
+      featData,
+      rulesProfile: campaign.rulesProfile,
+      ctx: {
+        effectiveScores,
+        race: raceField ? { slug: raceField.slug } : null,
+        armorProficiencies,
+        weaponProficiencies,
+        hasSpellcasting,
+        existingFeats: existingFeats.map((f) => ({ slug: f.slug, source: f.source })),
+      },
+      asiChoice: body.asiChoice,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const updatedFeats = [...existingFeats, result.appliedFeat];
+
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...charData, feats: updatedFeats },
         updatedAt: new Date(),
       })
       .where(eq(characters.id, id))

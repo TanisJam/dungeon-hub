@@ -13,6 +13,7 @@
     "./character/class": "./src/character/class/index.ts",
     "./character/background": "./src/character/background/index.ts",
     "./character/multiclass": "./src/character/multiclass/index.ts",
+    "./character/feat": "./src/character/feat/index.ts",
     "./entities": "./src/entities/index.ts",
     "./constraints": "./src/constraints/index.ts",
     "./calculations": "./src/calculations/index.ts",
