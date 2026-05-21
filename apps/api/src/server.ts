@@ -9,6 +9,7 @@ import { compendiumRoute } from './http/routes/compendium.js';
 import { charactersRoute } from './http/routes/characters.js';
 import { sessionsRoute } from './http/routes/sessions.js';
 import { mapRoute } from './http/routes/map.js';
+import { worldRoute } from './http/routes/world.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -33,6 +34,7 @@ export async function buildServer() {
       await api.register(charactersRoute);
       await api.register(sessionsRoute);
       await api.register(mapRoute);
+      await api.register(worldRoute);
     },
     { prefix: '/api/v1' },
   );

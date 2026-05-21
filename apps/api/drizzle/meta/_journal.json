@@ -50,6 +50,20 @@
       "when": 1779394994115,
       "tag": "0006_nappy_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779396002940,
+      "tag": "0007_flat_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779396472329,
+      "tag": "0008_small_ultimates",
+      "breakpoints": true
     }
   ]
 }

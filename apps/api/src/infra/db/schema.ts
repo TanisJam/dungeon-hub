@@ -347,6 +347,130 @@ export const pois = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// factions — grupos políticos / organizaciones del mundo.
+//
+// Reputation es per-CAMPAÑA (relación compartida del party con la facción),
+// no per-character. Es un int signado: positivo = aliados, negativo = enemigos.
+// El DM lo mueve manualmente; no hay auto-update por eventos en este slice.
+//
+// Visibility (igual que hex/POI):
+//   - DM ve todo, incluyendo dmNotes.
+//   - Players ven name, description, state, reputation. NUNCA dmNotes.
+// ---------------------------------------------------------------------------
+export const factions = pgTable(
+  'factions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    dmNotes: text('dm_notes'),
+    state: text('state', {
+      enum: ['active', 'dormant', 'destroyed', 'disbanded'],
+    })
+      .notNull()
+      .default('active'),
+    /** Reputación del party con la facción. Signed: + aliados, - enemigos. */
+    reputation: integer('reputation').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_factions_campaign').on(t.campaignId)],
+);
+
+// ---------------------------------------------------------------------------
+// npcs — personajes no-jugadores del mundo.
+//
+// `factionId` y `hexId` son FK opcionales:
+//   - factionId NULL = NPC independiente (no afiliado).
+//   - factionId → faction: ON DELETE SET NULL (borrar facción no borra al NPC,
+//     el NPC sobrevive sin afiliación).
+//   - hexId = última ubicación conocida. ON DELETE SET NULL (si el DM borra
+//     el hex, el NPC queda "sin ubicación", no se pierde el NPC).
+//
+// `status` ('alive' default) puede cambiar con eventos del mundo.
+// `worldX/Y` para futuro pin en render continuo.
+// ---------------------------------------------------------------------------
+export const npcs = pgTable(
+  'npcs',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    race: text('race'),
+    description: text('description'),
+    dmNotes: text('dm_notes'),
+    factionId: uuid('faction_id').references(() => factions.id, { onDelete: 'set null' }),
+    hexId: uuid('hex_id').references(() => hexes.id, { onDelete: 'set null' }),
+    status: text('status', {
+      enum: ['alive', 'dead', 'missing', 'unknown'],
+    })
+      .notNull()
+      .default('alive'),
+    worldX: doublePrecision('world_x'),
+    worldY: doublePrecision('world_y'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_npcs_campaign').on(t.campaignId),
+    index('idx_npcs_faction').on(t.factionId),
+    index('idx_npcs_hex').on(t.hexId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// world_events — timeline DURABLE de cambios del mundo por campaña.
+//
+// IMPORTANTE: distintos de session_events.
+//   - session_events: per-sesión, en-game, ruido fino (HP changes, notes,
+//     hex_revealed, etc.). Vive y muere con la sesión.
+//   - world_events: per-campaña, persistentes, "historia oficial" del mundo.
+//     Una sesión que cierra puede generar 0+ world_events vía el field
+//     `worldChanges` en session.complete.
+//
+// Cada world event puede tener `sourceSessionId` (FK nullable, SET NULL) que
+// apunta a la sesión que lo gatilló. NULL = creado manualmente por el DM
+// fuera de partida (e.g. "los reyes firmaron una tregua").
+//
+// `tags` array es free-form: ['faction', 'death', 'discovery', 'war', ...].
+// El frontend puede filtrar por tag para renderizar timelines temáticos.
+// ---------------------------------------------------------------------------
+export const worldEvents = pgTable(
+  'world_events',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    dmNotes: text('dm_notes'),
+    /** Cuándo pasó (in-world o real-time, lo decide el DM). */
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Sesión que lo gatilló. NULL = creado manual fuera de partida. */
+    sourceSessionId: uuid('source_session_id').references(() => sessions.id, {
+      onDelete: 'set null',
+    }),
+    visibility: text('visibility', { enum: ['public', 'dm-only'] })
+      .notNull()
+      .default('public'),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_world_events_campaign_time').on(t.campaignId, t.occurredAt),
+    index('idx_world_events_source').on(t.sourceSessionId),
+    index('idx_world_events_tags').using('gin', t.tags),
+  ],
+);
+
 // ===========================================================================
 // COMPENDIUM — data importada desde 5etools.
 //
