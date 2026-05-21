@@ -1,0 +1,168 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../../infra/db/client.js';
+import { characters } from '../../infra/db/schema.js';
+import {
+  assertCampaignMembership,
+  getCharacterAccess,
+  loadCharacter,
+} from '../../use-cases/characters/load-character.js';
+
+const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
+
+const CreateBody = z.object({
+  campaignId: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  /** data libre por ahora — el constraint engine de Fase 1.4 le va a dar shape. */
+  data: z.record(z.string(), z.unknown()).default({}),
+});
+
+const UpdateBody = z.object({
+  name: z.string().min(1).max(120).optional(),
+  status: CharacterStatus.optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+  xp: z.number().int().min(0).optional(),
+});
+
+const ParamsWithId = z.object({ id: z.string().uuid() });
+const ListQuery = z.object({
+  campaign: z.string().uuid().optional(),
+});
+
+export const charactersRoute: FastifyPluginAsync = async (app) => {
+  // ---- POST /characters ----------------------------------------------------
+  app.post('/characters', { preHandler: app.authenticate }, async (request, reply) => {
+    const body = CreateBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    // El user tiene que ser miembro de la campaña.
+    const campaign = await assertCampaignMembership(body.campaignId, userId);
+    if (!campaign) {
+      return reply
+        .code(403)
+        .send({ error: 'NOT_CAMPAIGN_MEMBER', campaignId: body.campaignId });
+    }
+
+    const [created] = await db
+      .insert(characters)
+      .values({
+        userId,
+        campaignId: body.campaignId,
+        name: body.name,
+        data: body.data,
+        // status default 'draft', inventory default '[]', xp default 0 (schema)
+      })
+      .returning();
+
+    return reply.code(201).send(created);
+  });
+
+  // ---- GET /characters -----------------------------------------------------
+  // Lista los personajes del user actual. Opcional ?campaign=:id para filtrar.
+  app.get('/characters', { preHandler: app.authenticate }, async (request) => {
+    const userId = request.user!.sub;
+    const { campaign } = ListQuery.parse(request.query);
+
+    const whereExpr = campaign
+      ? and(eq(characters.userId, userId), eq(characters.campaignId, campaign))
+      : eq(characters.userId, userId);
+
+    const rows = await db
+      .select({
+        id: characters.id,
+        campaignId: characters.campaignId,
+        name: characters.name,
+        status: characters.status,
+        xp: characters.xp,
+        createdAt: characters.createdAt,
+        updatedAt: characters.updatedAt,
+      })
+      .from(characters)
+      .where(whereExpr)
+      .orderBy(characters.createdAt);
+
+    return { data: rows };
+  });
+
+  // ---- GET /characters/:id -------------------------------------------------
+  app.get('/characters/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+    return character;
+  });
+
+  // ---- GET /characters/:id/sheet ------------------------------------------
+  // Por ahora es un echo de la data — el calculator de stats viene en Fase 1.5.
+  app.get('/characters/:id/sheet', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+    // TODO Fase 1.5: stats calculados (AC, HP, Spell DC, etc.)
+    return {
+      character,
+      calculated: null,
+      note: 'Stats calculados no implementados aún — disponibles en Fase 1.5.',
+    };
+  });
+
+  // ---- PATCH /characters/:id ----------------------------------------------
+  // Solo el owner puede editar (campaign members tienen read-only).
+  app.patch('/characters/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = UpdateBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const updates: Partial<typeof characters.$inferInsert> = { updatedAt: new Date() };
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.data !== undefined) updates.data = body.data;
+    if (body.xp !== undefined) updates.xp = body.xp;
+
+    const [updated] = await db
+      .update(characters)
+      .set(updates)
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
+  });
+
+  // ---- DELETE /characters/:id ----------------------------------------------
+  app.delete('/characters/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede borrar' });
+    }
+
+    await db.delete(characters).where(eq(characters.id, id));
+    return reply.code(204).send();
+  });
+};

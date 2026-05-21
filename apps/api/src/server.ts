@@ -6,6 +6,7 @@ import supabaseAuth from './infra/auth/verify-jwt.js';
 import { healthRoute } from './http/routes/health.js';
 import { campaignsRoute } from './http/routes/campaigns.js';
 import { compendiumRoute } from './http/routes/compendium.js';
+import { charactersRoute } from './http/routes/characters.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -27,6 +28,7 @@ export async function buildServer() {
       await api.register(healthRoute);
       await api.register(campaignsRoute);
       await api.register(compendiumRoute);
+      await api.register(charactersRoute);
     },
     { prefix: '/api/v1' },
   );
