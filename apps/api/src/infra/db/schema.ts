@@ -471,6 +471,43 @@ export const worldEvents = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// journal_entries — wiki/lore interna del mundo, per-campaña.
+//
+// El DM documenta historia, geografía, facciones, rumores. Cada entry tiene
+// visibility ('public' visible para todos los miembros, 'dm-only' visible
+// solo para GMs).
+//
+// `tags` array libre: ['geography', 'history', 'faction', 'lore', 'rumor', ...].
+// `authorUserId` track quién escribió (típicamente el GM creador).
+//
+// No hay versioning/history en MVP — el body se sobreescribe en PATCH.
+// ---------------------------------------------------------------------------
+export const journalEntries = pgTable(
+  'journal_entries',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    body: text('body'),
+    visibility: text('visibility', { enum: ['public', 'dm-only'] })
+      .notNull()
+      .default('public'),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_journal_campaign_updated').on(t.campaignId, t.updatedAt),
+    index('idx_journal_tags').using('gin', t.tags),
+  ],
+);
+
 // ===========================================================================
 // COMPENDIUM — data importada desde 5etools.
 //
