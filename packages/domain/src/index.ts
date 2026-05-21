@@ -4,3 +4,4 @@ export * from './rules-profile/index.js';
 export * from './character/stats/index.js';
 export * from './character/race/index.js';
 export * from './character/class/index.js';
+export * from './character/background/index.js';

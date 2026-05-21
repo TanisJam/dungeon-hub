@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
+import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
 import {
@@ -14,6 +15,7 @@ import {
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
+import { loadBackgroundData } from '../../use-cases/characters/load-background-data.js';
 
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
 
@@ -46,6 +48,13 @@ const SetStatsBody = z.object({
     wis: z.number().int(),
     cha: z.number().int(),
   }),
+});
+
+const SetBackgroundBody = z.object({
+  background: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  skillChoices: z.array(z.string().min(1)).optional(),
+  languageChoices: z.array(z.string().min(1)).optional(),
+  toolChoices: z.record(z.string(), z.array(z.string().min(1))).optional(),
 });
 
 const SetClassBody = z.object({
@@ -384,6 +393,61 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           // Multiclass agregará/editará entradas de este array.
           classes: [result.appliedClass],
         },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
+  });
+
+  // ---- PUT /characters/:id/background -------------------------------------
+  // Aplica un background: skills + languages + tools.
+  // Starting equipment se hace en un slice aparte (selector a/b).
+  app.put('/characters/:id/background', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = SetBackgroundBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const backgroundData = await loadBackgroundData({
+      slug: body.background.slug,
+      source: body.background.source,
+    });
+    if (!backgroundData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'BACKGROUND_NOT_FOUND', background: body.background }],
+      });
+    }
+
+    const result = validateBackgroundSelection({
+      backgroundData,
+      rulesProfile: campaign.rulesProfile,
+      skillChoices: body.skillChoices,
+      languageChoices: body.languageChoices,
+      toolChoices: body.toolChoices,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...data, background: result.appliedBackground },
         updatedAt: new Date(),
       })
       .where(eq(characters.id, id))
