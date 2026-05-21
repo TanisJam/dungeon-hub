@@ -10,6 +10,7 @@
     "./rules-profile": "./src/rules-profile/index.ts",
     "./character/stats": "./src/character/stats/index.ts",
     "./character/race": "./src/character/race/index.ts",
+    "./character/class": "./src/character/class/index.ts",
     "./entities": "./src/entities/index.ts",
     "./constraints": "./src/constraints/index.ts",
     "./calculations": "./src/calculations/index.ts",

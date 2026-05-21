@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
+import { validateClassSelection } from '@dungeon-hub/domain/character/class';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../use-cases/characters/load-character.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace } from '../../use-cases/characters/load-race-data.js';
+import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
 
@@ -44,6 +46,16 @@ const SetStatsBody = z.object({
     wis: z.number().int(),
     cha: z.number().int(),
   }),
+});
+
+const SetClassBody = z.object({
+  class: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  level: z.number().int().min(1).max(20),
+  subclass: z
+    .object({ slug: z.string().min(1), source: z.string().min(1) })
+    .nullable()
+    .optional(),
+  skillChoices: z.array(z.string().min(1)).optional(),
 });
 
 const AbilityKeyEnum = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
@@ -302,6 +314,75 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           subrace: body.subrace ?? null,
           asisApplied: result.appliedAsis,
           usedTashasCustomOrigin: result.usedTashasCustomOrigin,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
+  });
+
+  // ---- PUT /characters/:id/class ------------------------------------------
+  // Setea la clase principal + level + subclass (si está desbloqueada) + skill choices.
+  // En este slice: una sola clase. Multiclass entra en 1.4e.
+  app.put('/characters/:id/class', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = SetClassBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const { classData, subclassData } = await loadClassAndSubclass({
+      classSlug: body.class.slug,
+      classSource: body.class.source,
+      subclassSlug: body.subclass?.slug ?? null,
+      subclassSource: body.subclass?.source ?? null,
+    });
+
+    if (!classData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'CLASS_NOT_FOUND', class: body.class }],
+      });
+    }
+    if (body.subclass && !subclassData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SUBCLASS_NOT_FOUND', subclass: body.subclass }],
+      });
+    }
+
+    const result = validateClassSelection({
+      classData,
+      subclassData,
+      level: body.level,
+      skillChoices: body.skillChoices,
+      rulesProfile: campaign.rulesProfile,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: {
+          ...data,
+          // Reemplaza la lista entera de clases con la nueva selección (single class por ahora).
+          // Multiclass agregará/editará entradas de este array.
+          classes: [result.appliedClass],
         },
         updatedAt: new Date(),
       })
