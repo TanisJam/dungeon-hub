@@ -177,14 +177,165 @@ describe('validateRaceSelection — MPMM convention (ability: null)', () => {
 });
 
 describe('validateRaceSelection — choose blocks (1.4b.2)', () => {
-  it('rechaza razas con `choose` con error claro', () => {
+  // ---- Half-Elf: +2 CHA fixed + choose 2 stats no-CHA (+1 c/u) ----------
+  it('Half-Elf: pide appliedAsis cuando hay choose', () => {
     const res = validateRaceSelection({
       raceData: PHB_HALF_ELF,
       rulesProfile: PROFILE_TASHAS_OFF,
     });
     expect(res.ok).toBe(false);
     if (res.ok) return;
-    expect(res.issues[0]?.code).toBe('RACE_CHOOSE_SHAPE_UNSUPPORTED');
+    expect(res.issues[0]?.code).toBe('ASI_REQUIRED');
+  });
+
+  it('Half-Elf: acepta +2 CHA + 2 picks de +1 a stats distintos no-CHA', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedAsis).toHaveLength(3);
+  });
+
+  it('Half-Elf: rechaza pick a CHA (ya tiene fixed → OVERLAP_WITH_FIXED)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+        { ability: 'str', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    // Detecta el duplicate o el overlap; ambos son válidos para fallar acá.
+    const codes = res.issues.map((i) => i.code);
+    expect(
+      codes.includes('ASI_DUPLICATE_ABILITY') || codes.includes('RACE_ASI_OVERLAP_WITH_FIXED'),
+    ).toBe(true);
+  });
+
+  it('Half-Elf: rechaza bonus distinto al esperado (count=2 amount default=1)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'str', bonus: 2, source: 'race' }, // debe ser +1
+        { ability: 'dex', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'RACE_ASI_CHOOSE_WRONG_BONUS')).toBe(true);
+  });
+
+  // ---- Tiefling variant: +1 INT fixed + choose 1 stat (+2) -----------
+  it('Tiefling variant: count=1 amount=2 acepta el pick correcto', () => {
+    const TIEFLING_VARIANT: RaceCompendiumData = {
+      slug: 'tiefling',
+      source: 'PHB',
+      ability: [{ int: 1, choose: { from: ['dex', 'cha'], count: 1, amount: 2 } }],
+    };
+    const res = validateRaceSelection({
+      raceData: TIEFLING_VARIANT,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 2, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('Tiefling variant: rechaza pick fuera de `from`', () => {
+    const TIEFLING_VARIANT: RaceCompendiumData = {
+      slug: 'tiefling',
+      source: 'PHB',
+      ability: [{ int: 1, choose: { from: ['dex', 'cha'], count: 1, amount: 2 } }],
+    };
+    const res = validateRaceSelection({
+      raceData: TIEFLING_VARIANT,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'str', bonus: 2, source: 'race' }, // str no está en from
+      ],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'RACE_ASI_CHOOSE_INVALID_ABILITY')).toBe(true);
+  });
+
+  // ---- Custom Lineage: amount alone (distribuir 2 puntos) ------------
+  it('Custom Lineage: amount=2 alone, acepta +2 a una ability', () => {
+    const CUSTOM_LINEAGE: RaceCompendiumData = {
+      slug: 'custom-lineage',
+      source: 'TCE',
+      ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 2 } }],
+    };
+    const res = validateRaceSelection({
+      raceData: CUSTOM_LINEAGE,
+      rulesProfile: { ...PROFILE_TASHAS_OFF, sources: { ...PROFILE_TASHAS_OFF.sources, TCE: true } },
+      appliedAsis: [{ ability: 'cha', bonus: 2, source: 'race' }],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('Custom Lineage: acepta +1 + +1 a dos abilities distintas', () => {
+    const CUSTOM_LINEAGE: RaceCompendiumData = {
+      slug: 'custom-lineage',
+      source: 'TCE',
+      ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 2 } }],
+    };
+    const res = validateRaceSelection({
+      raceData: CUSTOM_LINEAGE,
+      rulesProfile: { ...PROFILE_TASHAS_OFF, sources: { ...PROFILE_TASHAS_OFF.sources, TCE: true } },
+      appliedAsis: [
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('Custom Lineage: rechaza si los puntos no suman 2', () => {
+    const CUSTOM_LINEAGE: RaceCompendiumData = {
+      slug: 'custom-lineage',
+      source: 'TCE',
+      ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 2 } }],
+    };
+    const res = validateRaceSelection({
+      raceData: CUSTOM_LINEAGE,
+      rulesProfile: { ...PROFILE_TASHAS_OFF, sources: { ...PROFILE_TASHAS_OFF.sources, TCE: true } },
+      appliedAsis: [{ ability: 'cha', bonus: 1, source: 'race' }], // total 1, esperaba 2
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'RACE_ASI_CHOOSE_WRONG_TOTAL')).toBe(true);
+  });
+
+  // ---- Half-Elf bajo Tasha's ON: redistribuye el bag {+2, +1, +1} ----
+  it("Half-Elf con Tasha's ON: redistribuye {+2, +1, +1} a stats arbitrarios", () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      rulesProfile: PROFILE_TASHAS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 2, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.usedTashasCustomOrigin).toBe(true);
   });
 });
 

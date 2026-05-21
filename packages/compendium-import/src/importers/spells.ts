@@ -69,12 +69,21 @@ function extractClasses(
 }
 
 export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> {
-  // Cargar el lookup una sola vez
+  // Cargar el lookup una sola vez. El archivo de 5etools usa los NOMBRES de
+  // spell como keys ("fire bolt") pero nosotros buscamos por slug ("fire-bolt"),
+  // así que re-mapeamos al cargar.
   let lookup: SpellSourceLookup = {};
   try {
-    lookup = await readJson<SpellSourceLookup>(
+    const raw = await readJson<SpellSourceLookup>(
       join(dataDir, 'generated', 'gendata-spell-source-lookup.json'),
     );
+    for (const [src, byName] of Object.entries(raw)) {
+      const remapped: SpellSourceLookup[string] = {};
+      for (const [name, entry] of Object.entries(byName)) {
+        remapped[slugify(name)] = entry;
+      }
+      lookup[src] = remapped;
+    }
   } catch {
     // Sin lookup, no podemos popular `classes[]`. No bloqueamos el import.
   }

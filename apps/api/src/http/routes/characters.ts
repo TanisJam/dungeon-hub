@@ -7,7 +7,31 @@ import { validateClassSelection } from '@dungeon-hub/domain/character/class';
 import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
+import { computeSubclassUnlockLevel } from '@dungeon-hub/domain/character/class';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
+import {
+  addItemToInventory,
+  consumeInventoryItem,
+  rechargeInventoryItems,
+  removeItemFromInventory,
+  updateInventoryItem,
+  type InventoryItem,
+} from '@dungeon-hub/domain/character/inventory';
+import {
+  SPELLCASTING_ABILITY,
+  validateClassSpells,
+  type AppliedClassSpells,
+} from '@dungeon-hub/domain/character/spellcasting';
+import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
+import {
+  canReachLevel,
+  hpDeltaForLevelUp,
+  hitDiceRecoveredOnLongRest,
+  hitDiceTotalsByDie,
+  hitDieFaces,
+  rollHitDie,
+  type HpMethod,
+} from '@dungeon-hub/domain/character/level-up';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
@@ -24,6 +48,45 @@ import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/character
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import { loadBackgroundData } from '../../use-cases/characters/load-background-data.js';
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
+import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
+import { recordSessionEventForCharacter } from '../../use-cases/sessions/events.js';
+import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
+import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
+import { loadFeatureProgression } from '../../use-cases/characters/load-feature-progression.js';
+import {
+  resolveFeatureSlots,
+  validateClassFeaturePicks,
+  type FeaturePicks,
+} from '@dungeon-hub/domain/character/class-features';
+
+const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
+
+/**
+ * Crea una InventoryItem para el spellbook del wizard si todavía no tiene uno.
+ * Se invoca al setear Wizard como primera clase o al multiclassear a Wizard.
+ *
+ * Pre-condition: `inventory` no tiene un item con itemSlug='spellbook'.
+ * Post-condition: devuelve el inventory con el spellbook agregado.
+ */
+function ensureWizardSpellbook(inventory: InventoryItem[]): InventoryItem[] {
+  const already = inventory.some(
+    (it) => it.itemSlug === SPELLBOOK_REF.slug && it.itemSource === SPELLBOOK_REF.source,
+  );
+  if (already) return inventory;
+  return [
+    ...inventory,
+    {
+      instanceId: globalThis.crypto.randomUUID(),
+      itemSlug: SPELLBOOK_REF.slug,
+      itemSource: SPELLBOOK_REF.source,
+      quantity: 1,
+      state: 'carried',
+      attuned: false,
+      customName: null,
+      notes: '',
+    },
+  ];
+}
 
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
 
@@ -38,7 +101,11 @@ const UpdateBody = z.object({
   name: z.string().min(1).max(120).optional(),
   status: CharacterStatus.optional(),
   data: z.record(z.string(), z.unknown()).optional(),
-  xp: z.number().int().min(0).optional(),
+});
+
+const AwardXpBody = z.object({
+  /** Delta signado. Negativo permite correcciones / penalty del DM. */
+  award: z.number().int(),
 });
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
@@ -91,7 +158,116 @@ const SetClassBody = z.object({
   skillChoices: z.array(z.string().min(1)).optional(),
 });
 
-const AbilityKeyEnum = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+const AddInventoryItemBody = z.object({
+  item: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  quantity: z.number().int().min(1).optional(),
+  state: z.enum(['equipped', 'carried', 'stowed']).optional(),
+  attuned: z.boolean().optional(),
+  customName: z.string().min(1).max(120).nullable().optional(),
+  notes: z.string().max(1000).optional(),
+  equipHand: z.enum(['main', 'off', 'both']).nullable().optional(),
+  charges: z.number().int().min(0).nullable().optional(),
+  containerId: z.string().uuid().nullable().optional(),
+});
+
+const ConsumeInventoryBody = z
+  .object({ count: z.number().int().min(1).optional() })
+  .optional();
+
+const InventoryInstanceParams = z.object({
+  id: z.string().uuid(),
+  instanceId: z.string().uuid(),
+});
+
+const SpellRefSchema = z.object({
+  slug: z.string().min(1),
+  source: z.string().min(1),
+});
+
+const CopySpellBody = z.object({
+  spell: SpellRefSchema,
+});
+
+const AbilityKeyEnumDef = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+
+const AsiChoiceSchema = z.object({
+  ability: AbilityKeyEnumDef,
+  bonus: z.number().int(),
+});
+
+const ShortRestBody = z.object({
+  hitDiceToSpend: z.record(z.string().regex(/^d\d+$/), z.number().int().min(1)).optional(),
+  rolls: z.record(z.string().regex(/^d\d+$/), z.array(z.number().int().min(1))).optional(),
+});
+
+const LongRestBody = z.object({});
+
+const LevelUpBody = z
+  .object({
+    hpMethod: z.enum(['roll', 'average']),
+    hpRoll: z.number().int().min(1).optional(),
+    subclass: z
+      .object({ slug: z.string().min(1), source: z.string().min(1) })
+      .nullable()
+      .optional(),
+    asi: z.object({ choices: z.array(AsiChoiceSchema).min(1).max(2) }).optional(),
+    feat: z
+      .object({
+        slug: z.string().min(1),
+        source: z.string().min(1),
+        asiChoice: z.array(AsiChoiceSchema).optional(),
+      })
+      .optional(),
+    wizardFreeSpells: z.array(SpellRefSchema).optional(),
+  })
+  .refine((b) => !(b.asi && b.feat), {
+    message: 'Pasá solo asi o feat, no ambos',
+  });
+
+const ClassSpellsBody = z.object({
+  cantrips: z.array(SpellRefSchema).optional(),
+  known: z.array(SpellRefSchema).optional(),
+  prepared: z.array(SpellRefSchema).optional(),
+});
+
+const ClassSpellsParams = z.object({
+  id: z.string().uuid(),
+  classSlug: z.string().min(1),
+});
+
+const ClassFeaturesBody = z.object({
+  /** Picks indexados por featureType: { "FS:F": [{slug, source}], "MV:B": [...] }. */
+  picks: z.record(z.string().min(1), z.array(SpellRefSchema)),
+});
+
+const CurrencyDeltaBody = z
+  .object({
+    cp: z.number().int().optional(),
+    sp: z.number().int().optional(),
+    ep: z.number().int().optional(),
+    gp: z.number().int().optional(),
+    pp: z.number().int().optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), {
+    message: 'Al menos una moneda debe estar presente',
+  });
+
+const UpdateInventoryItemBody = z
+  .object({
+    quantity: z.number().int().min(1).optional(),
+    state: z.enum(['equipped', 'carried', 'stowed']).optional(),
+    attuned: z.boolean().optional(),
+    customName: z.string().min(1).max(120).nullable().optional(),
+    notes: z.string().max(1000).optional(),
+    equipHand: z.enum(['main', 'off', 'both']).nullable().optional(),
+    charges: z.number().int().min(0).nullable().optional(),
+    containerId: z.string().uuid().nullable().optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), {
+    message: 'Al menos un campo debe estar presente',
+  });
+
+const AbilityKeyEnum = AbilityKeyEnumDef;
 const SetRaceBody = z.object({
   race: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
   subrace: z
@@ -191,6 +367,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const access = await getCharacterAccess(character, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
     const data = (character.data as Record<string, unknown> | null) ?? {};
     const raceField = data.race as { slug: string; source: string } | null | undefined;
     const subraceField = data.subrace as { slug: string; source: string } | null | undefined;
@@ -204,18 +383,33 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         })
       : null;
 
+    const inventory = (character.inventory as InventoryItem[] | null) ?? [];
+    const itemWeights = inventory.length
+      ? await loadItemDataMany(
+          inventory.map((it) => ({ slug: it.itemSlug, source: it.itemSource })),
+        )
+      : [];
+
     const sheet = computeCharacterSheet({
       character: {
         name: character.name,
         baseStats: data.baseStats as never,
         asisApplied: data.asisApplied as never,
+        levelUpAsis: data.levelUpAsis as never,
         classes: data.classes as never,
         background: data.background as never,
         feats: data.feats as never,
         race: raceField ?? null,
         subrace: subraceField ?? null,
+        inventory,
+        currency: data.currency as never,
+        spells: data.spells as never,
+        exhaustion: data.exhaustion as never,
+        classFeatures: data.classFeatures as never,
       },
       raceData,
+      itemWeights,
+      encumbranceVariant: campaign.rulesProfile.variantRules.encumbranceVariant,
     });
 
     return {
@@ -243,7 +437,6 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (body.name !== undefined) updates.name = body.name;
     if (body.status !== undefined) updates.status = body.status;
     if (body.data !== undefined) updates.data = body.data;
-    if (body.xp !== undefined) updates.xp = body.xp;
 
     const [updated] = await db
       .update(characters)
@@ -252,6 +445,51 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .returning();
 
     return updated;
+  });
+
+  // ---- POST /characters/:id/xp --------------------------------------------
+  // Otorga (o resta) XP. Solo el GM de la campaña del personaje puede usarlo.
+  // El owner del personaje NO puede modificar su propio XP — eso lo gestiona el DM.
+  // El delta puede ser negativo (correcciones / penalty). Resultado < 0 → 400.
+  app.post('/characters/:id/xp', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = AwardXpBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    if (campaign.gmUserId !== userId) {
+      return reply
+        .code(403)
+        .send({ error: 'FORBIDDEN', message: 'Solo el DM de la campaña puede otorgar XP' });
+    }
+
+    const next = character.xp + body.award;
+    if (next < 0) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'XP_NEGATIVE', current: character.xp, award: body.award, result: next }],
+      });
+    }
+
+    const [updated] = await db
+      .update(characters)
+      .set({ xp: next, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'xp_award',
+      payload: { characterId: id, before: character.xp, award: body.award, after: next },
+    });
+
+    return { character: updated, xp: next, award: body.award };
   });
 
   // ---- DELETE /characters/:id ----------------------------------------------
@@ -434,6 +672,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
+    // Si es Wizard, auto-agrega el spellbook (PHB p.114). Idempotente.
+    const inventoryAfter = result.appliedClass.slug === 'wizard'
+      ? ensureWizardSpellbook((character.inventory as InventoryItem[] | null) ?? [])
+      : (character.inventory as InventoryItem[] | null) ?? [];
+
     const [updated] = await db
       .update(characters)
       .set({
@@ -443,6 +686,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           // Multiclass agregará/editará entradas de este array.
           classes: [result.appliedClass],
         },
+        inventory: inventoryAfter,
         updatedAt: new Date(),
       })
       .where(eq(characters.id, id))
@@ -564,10 +808,16 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const updatedClasses = [...existingClasses, result.appliedClass];
 
+    // Si la nueva clase es Wizard y todavía no tiene spellbook, lo agregamos.
+    const inventoryAfter = result.appliedClass.slug === 'wizard'
+      ? ensureWizardSpellbook((character.inventory as InventoryItem[] | null) ?? [])
+      : (character.inventory as InventoryItem[] | null) ?? [];
+
     const [updated] = await db
       .update(characters)
       .set({
         data: { ...charData, classes: updatedClasses },
+        inventory: inventoryAfter,
         updatedAt: new Date(),
       })
       .where(eq(characters.id, id))
@@ -659,4 +909,1317 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send(updated);
   });
+
+  // ---- POST /characters/:id/inventory -------------------------------------
+  // Agrega un ítem al inventario. Hard rule: attune cap 3.
+  // Warnings (no bloquean): encumbrance, equip sin proficiencia.
+  app.post('/characters/:id/inventory', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = AddInventoryItemBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const itemData = await loadItemData({ slug: body.item.slug, source: body.item.source });
+    if (!itemData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'ITEM_NOT_FOUND', item: body.item }],
+      });
+    }
+
+    const ctx = await buildInventoryContext(character);
+    const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+
+    // Cargamos los pesos de todo el inventario actual + el nuevo en una sola query.
+    const allRefs = [
+      ...existingInventory.map((it) => ({ slug: it.itemSlug, source: it.itemSource })),
+      { slug: itemData.slug, source: itemData.source },
+    ];
+    const weights = await loadItemDataMany(allRefs);
+
+    const result = addItemToInventory({
+      inventory: existingInventory,
+      itemData,
+      input: {
+        quantity: body.quantity,
+        state: body.state,
+        attuned: body.attuned,
+        customName: body.customName,
+        notes: body.notes,
+        equipHand: body.equipHand,
+        charges: body.charges,
+        containerId: body.containerId,
+      },
+      weights,
+      ctx,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const [updated] = await db
+      .update(characters)
+      .set({ inventory: result.inventory, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'inventory_add',
+      payload: {
+        characterId: id,
+        instanceId: result.addedInstanceId,
+        itemSlug: itemData.slug,
+        itemSource: itemData.source,
+        quantity: body.quantity ?? 1,
+        state: body.state ?? 'carried',
+      },
+    });
+
+    return reply.code(201).send({
+      character: updated,
+      addedInstanceId: result.addedInstanceId,
+      warnings: result.warnings,
+    });
+  });
+
+  // ---- PATCH /characters/:id/currency -------------------------------------
+  // Aplica deltas signados a cada moneda. Si una resta deja una moneda negativa
+  // → 400 INSUFFICIENT_FUNDS. Sin conversión automática entre monedas.
+  app.patch('/characters/:id/currency', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = CurrencyDeltaBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const current = (data.currency as Record<string, number> | undefined) ?? {
+      cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+    };
+
+    const next: Record<string, number> = { ...current };
+    const issues: Array<{ code: string; coin: string; current: number; delta: number; result: number }> = [];
+    for (const coin of ['cp', 'sp', 'ep', 'gp', 'pp'] as const) {
+      const delta = body[coin];
+      if (delta === undefined) continue;
+      const result = (current[coin] ?? 0) + delta;
+      if (result < 0) {
+        issues.push({ code: 'INSUFFICIENT_FUNDS', coin, current: current[coin] ?? 0, delta, result });
+      }
+      next[coin] = result;
+    }
+
+    if (issues.length > 0) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues });
+    }
+
+    const [updated] = await db
+      .update(characters)
+      .set({ data: { ...data, currency: next }, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    const deltas: Record<string, number> = {};
+    for (const coin of ['cp', 'sp', 'ep', 'gp', 'pp'] as const) {
+      if (body[coin] !== undefined) deltas[coin] = body[coin] as number;
+    }
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'currency_change',
+      payload: { characterId: id, deltas, before: current, after: next },
+    });
+
+    return { character: updated, currency: next };
+  });
+
+  // ---- PATCH /characters/:id/inventory/:instanceId ------------------------
+  // Patch parcial. Hard rule: attune false→true respeta cap 3.
+  // Warnings: encumbrance, equip sin proficiencia.
+  app.patch(
+    '/characters/:id/inventory/:instanceId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, instanceId } = InventoryInstanceParams.parse(request.params);
+      const body = UpdateInventoryItemBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+      const target = existingInventory.find((it) => it.instanceId === instanceId);
+      if (!target) {
+        return reply.code(404).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'INSTANCE_NOT_FOUND', instanceId }],
+        });
+      }
+
+      const itemData = await loadItemData({
+        slug: target.itemSlug,
+        source: target.itemSource,
+      });
+      if (!itemData) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'ITEM_NOT_FOUND', item: { slug: target.itemSlug, source: target.itemSource } }],
+        });
+      }
+
+      const ctx = await buildInventoryContext(character);
+      const allRefs = existingInventory.map((it) => ({ slug: it.itemSlug, source: it.itemSource }));
+      const weights = await loadItemDataMany(allRefs);
+
+      const result = updateInventoryItem({
+        inventory: existingInventory,
+        instanceId,
+        patch: {
+          quantity: body.quantity,
+          state: body.state,
+          attuned: body.attuned,
+          customName: body.customName,
+          notes: body.notes,
+          equipHand: body.equipHand,
+          charges: body.charges,
+          containerId: body.containerId,
+        },
+        itemData,
+        weights,
+        ctx,
+      });
+
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const [updated] = await db
+        .update(characters)
+        .set({ inventory: result.inventory, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      const patchKeys = Object.keys(body).filter(
+        (k) => (body as Record<string, unknown>)[k] !== undefined,
+      );
+      await recordSessionEventForCharacter({
+        characterId: id,
+        actorUserId: userId,
+        eventType: 'inventory_update',
+        payload: {
+          characterId: id,
+          instanceId,
+          itemSlug: target.itemSlug,
+          itemSource: target.itemSource,
+          patch: patchKeys.reduce<Record<string, unknown>>((acc, k) => {
+            acc[k] = (body as Record<string, unknown>)[k];
+            return acc;
+          }, {}),
+        },
+      });
+
+      return { character: updated, warnings: result.warnings };
+    },
+  );
+
+  // ---- POST /characters/:id/inventory/:instanceId/consume -----------------
+  // Consume cargas o uses. Si el ítem tiene charges (wand, lodestone) →
+  // decrementa charges. Si es potion/scroll (type P/SC) → decrementa quantity
+  // y elimina la instancia cuando llega a 0. Sino → ITEM_NOT_CONSUMABLE.
+  app.post(
+    '/characters/:id/inventory/:instanceId/consume',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, instanceId } = InventoryInstanceParams.parse(request.params);
+      const body = ConsumeInventoryBody.parse(request.body ?? {});
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+      const target = existingInventory.find((it) => it.instanceId === instanceId);
+      if (!target) {
+        return reply.code(404).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'INSTANCE_NOT_FOUND', instanceId }],
+        });
+      }
+
+      const itemData = await loadItemData({
+        slug: target.itemSlug,
+        source: target.itemSource,
+      });
+      if (!itemData) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [
+            { code: 'ITEM_NOT_FOUND', item: { slug: target.itemSlug, source: target.itemSource } },
+          ],
+        });
+      }
+
+      const result = consumeInventoryItem({
+        inventory: existingInventory,
+        instanceId,
+        itemData,
+        count: body?.count,
+      });
+
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const [updated] = await db
+        .update(characters)
+        .set({ inventory: result.inventory, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      await recordSessionEventForCharacter({
+        characterId: id,
+        actorUserId: userId,
+        eventType: 'consume',
+        payload: {
+          characterId: id,
+          instanceId,
+          itemSlug: target.itemSlug,
+          itemSource: target.itemSource,
+          ...result.consumed,
+        },
+      });
+
+      return { character: updated, consumed: result.consumed };
+    },
+  );
+
+  // ---- DELETE /characters/:id/inventory/:instanceId -----------------------
+  app.delete(
+    '/characters/:id/inventory/:instanceId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, instanceId } = InventoryInstanceParams.parse(request.params);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+      const target = existingInventory.find((it) => it.instanceId === instanceId);
+      const result = removeItemFromInventory({ inventory: existingInventory, instanceId });
+
+      if (!result.ok) {
+        return reply.code(404).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const [updated] = await db
+        .update(characters)
+        .set({ inventory: result.inventory, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      if (target) {
+        await recordSessionEventForCharacter({
+          characterId: id,
+          actorUserId: userId,
+          eventType: 'inventory_remove',
+          payload: {
+            characterId: id,
+            instanceId,
+            itemSlug: target.itemSlug,
+            itemSource: target.itemSource,
+            quantity: target.quantity,
+          },
+        });
+      }
+
+      return { character: updated, warnings: result.warnings };
+    },
+  );
+
+  // ---- POST /characters/:id/spellbook/copy -------------------------------
+  // Copia un spell al spellbook del Wizard. Cuesta 50 gp × nivel del spell
+  // (PHB p.114). Cantrips NO se copian con este endpoint (no van al spellbook).
+  // Devuelve el personaje actualizado + el time en horas que tomaría (2 × nivel).
+  app.post('/characters/:id/spellbook/copy', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = CopySpellBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const wizard = classes.find((c) => c.slug === 'wizard');
+    if (!wizard) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'NO_WIZARD_CLASS' }],
+      });
+    }
+
+    // Cargar la lista de spells de wizard filtrada por Rules Profile.
+    const wizardSpells = await loadClassSpells({
+      classSlug: 'wizard',
+      rulesProfile: campaign.rulesProfile,
+    });
+    const spellLite = wizardSpells.find(
+      (s) => s.slug === body.spell.slug && s.source === body.spell.source,
+    );
+    if (!spellLite) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SPELL_NOT_IN_CLASS_LIST', spell: body.spell, classSlug: 'wizard' }],
+      });
+    }
+
+    if (spellLite.level === 0) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'CANTRIP_NOT_COPYABLE', spell: body.spell }],
+      });
+    }
+
+    // ¿Ya lo tiene en el spellbook?
+    const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+    const wizardSpellsState: AppliedClassSpells =
+      allSpells.wizard ?? { cantrips: [], known: [], prepared: [] };
+    const alreadyKnown = wizardSpellsState.known.some(
+      (s) => s.slug === body.spell.slug && s.source === body.spell.source,
+    );
+    if (alreadyKnown) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SPELL_ALREADY_IN_SPELLBOOK', spell: body.spell }],
+      });
+    }
+
+    // Costo en gold: 50 × nivel.
+    const costGp = 50 * spellLite.level;
+    const currency = (charData.currency as Record<string, number> | undefined) ?? {
+      cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+    };
+    if ((currency.gp ?? 0) < costGp) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [
+          {
+            code: 'INSUFFICIENT_GOLD',
+            costGp,
+            availableGp: currency.gp ?? 0,
+            spellLevel: spellLite.level,
+          },
+        ],
+      });
+    }
+
+    const nextCurrency = { ...currency, gp: (currency.gp ?? 0) - costGp };
+    const nextWizardSpells: AppliedClassSpells = {
+      ...wizardSpellsState,
+      known: [...wizardSpellsState.known, { slug: body.spell.slug, source: body.spell.source }],
+    };
+    const nextSpells = { ...allSpells, wizard: nextWizardSpells };
+
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...charData, currency: nextCurrency, spells: nextSpells },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'spellbook_copy',
+      payload: {
+        characterId: id,
+        spellSlug: body.spell.slug,
+        spellSource: body.spell.source,
+        spellLevel: spellLite.level,
+        costGp,
+      },
+    });
+
+    return reply.code(201).send({
+      character: updated,
+      cost: { gp: costGp, hours: 2 * spellLite.level },
+      spell: body.spell,
+    });
+  });
+
+  // ---- PUT /characters/:id/classes/:classSlug/spells ----------------------
+  // Setea la selección de spells (cantrips + known + prepared) para UNA clase.
+  // Las reglas dependen de la clase:
+  //   - Cleric/Druid/Paladin/Artificer: prep desde lista, sin `known`.
+  //   - Wizard: prep desde spellbook (`known` = spellbook).
+  //   - Bard/Sorc/Warlock/Ranger/EK/AT: `known` fijo, sin `prepared`.
+  // Persiste en character.data.spells[classSlug].
+  app.put(
+    '/characters/:id/classes/:classSlug/spells',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const body = ClassSpellsBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const campaign = await loadCampaign(character.campaignId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const appliedClass = classes.find((c) => c.slug === classSlug);
+      if (!appliedClass) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+
+      // Calcular abilityMod del personaje según la spellcasting ability de la clase.
+      const ability = SPELLCASTING_ABILITY[appliedClass.slug];
+      if (!ability) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_CASTER', classSlug }],
+        });
+      }
+
+      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+        str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+      };
+      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+      );
+      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+      const abilityMod = abilityModifier(effective[ability]);
+
+      // Cargar el universo de spells permitidos para esta clase (ya filtrado por
+      // el Rules Profile).
+      const availableSpells = await loadClassSpells({
+        classSlug,
+        rulesProfile: campaign.rulesProfile,
+      });
+
+      const result = validateClassSpells({
+        appliedClass,
+        abilityMod,
+        availableSpells,
+        input: {
+          cantrips: body.cantrips,
+          known: body.known,
+          prepared: body.prepared,
+        },
+      });
+
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const existingSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const nextSpells = { ...existingSpells, [classSlug]: result.applied };
+
+      const [updated] = await db
+        .update(characters)
+        .set({ data: { ...charData, spells: nextSpells }, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      return { character: updated, limits: result.limits };
+    },
+  );
+
+  // ---- POST /characters/:id/rest/short -----------------------------------
+  // Short rest (PHB p.186). Gasta hit dice para recuperar HP.
+  // Body: { hitDiceToSpend: { d8: 2 }, rolls?: { d8: [5, 6] } }
+  // Si rolls está, server usa esos (validados). Si no, server rollea.
+  // Recupera Warlock pact slots (data.warlockSlotsUsed = 0).
+  app.post('/characters/:id/rest/short', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = ShortRestBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+
+    // CON mod efectivo.
+    const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+    };
+    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+    const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    );
+    const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+    const conMod = abilityModifier(effective.con);
+
+    // Auto-init hit dice si no existe.
+    const totalsFromClasses = hitDiceTotalsByDie(classes);
+    const existingHitDice = (charData.hitDice as Record<string, { total: number; available: number }> | undefined);
+    const hitDice: Record<string, { total: number; available: number }> = {};
+    for (const [die, total] of Object.entries(totalsFromClasses)) {
+      hitDice[die] = existingHitDice?.[die] ?? { total, available: total };
+    }
+
+    // Validar y consumir hit dice + rollear.
+    const spend = body.hitDiceToSpend ?? {};
+    const providedRolls = body.rolls ?? {};
+    const rollsUsed: Record<string, number[]> = {};
+    let hpRecovered = 0;
+
+    for (const [die, countToSpend] of Object.entries(spend)) {
+      if (!hitDice[die]) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HIT_DIE_NOT_AVAILABLE', die }],
+        });
+      }
+      if (hitDice[die].available < countToSpend) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{
+            code: 'NOT_ENOUGH_HIT_DICE',
+            die,
+            requested: countToSpend,
+            available: hitDice[die].available,
+          }],
+        });
+      }
+      const faces = hitDieFaces(die);
+      const provided = providedRolls[die] ?? [];
+      const rollsForDie: number[] = [];
+      for (let i = 0; i < countToSpend; i++) {
+        let roll: number;
+        if (provided[i] !== undefined) {
+          if (provided[i]! < 1 || provided[i]! > faces) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{
+                code: 'HIT_DIE_ROLL_OUT_OF_RANGE',
+                die,
+                roll: provided[i],
+                min: 1,
+                max: faces,
+              }],
+            });
+          }
+          roll = provided[i]!;
+        } else {
+          roll = rollHitDie(die);
+        }
+        rollsForDie.push(roll);
+        hpRecovered += Math.max(1, roll + conMod);
+      }
+      hitDice[die] = { ...hitDice[die], available: hitDice[die].available - countToSpend };
+      rollsUsed[die] = rollsForDie;
+    }
+
+    // Auto-init HP si falta. Si no hay max, computamos vía sheet calculator
+    // (simple: bypass usando el snapshot).
+    const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+    if (existingHp.max == null) {
+      // Computar max desde la composición de clases. Reusamos lo del sheet:
+      // L1 de primera clase = faces + con; L2+ = avg + con.
+      let max = 0;
+      let first = true;
+      for (const c of classes) {
+        const faces = hitDieFaces(c.hitDie);
+        const avg = ({ d6: 4, d8: 5, d10: 6, d12: 7 } as Record<string, number>)[c.hitDie] ?? Math.floor(faces / 2) + 1;
+        if (first) {
+          max += faces + conMod;
+          if (c.level > 1) max += (avg + conMod) * (c.level - 1);
+          first = false;
+        } else {
+          max += (avg + conMod) * c.level;
+        }
+      }
+      existingHp.max = Math.max(1, max);
+    }
+    if (existingHp.current == null) existingHp.current = existingHp.max;
+
+    const newCurrent = Math.min(existingHp.max, existingHp.current + hpRecovered);
+    const newHp = { current: newCurrent, max: existingHp.max, temp: existingHp.temp ?? 0 };
+
+    const nextData = {
+      ...charData,
+      hp: newHp,
+      hitDice,
+      warlockSlotsUsed: 0,
+    };
+
+    const [updated] = await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'rest_short',
+      payload: {
+        characterId: id,
+        hpRecovered,
+        hpBefore: existingHp.current - hpRecovered,
+        hpAfter: newCurrent,
+        rollsUsed,
+      },
+    });
+
+    return {
+      character: updated,
+      shortRest: {
+        hpRecovered,
+        rollsUsed,
+        newHp,
+      },
+    };
+  });
+
+  // ---- POST /characters/:id/rest/long ------------------------------------
+  // Long rest (PHB p.186). HP full, slots full, hit dice + floor(level/2),
+  // reset death saves, -1 exhaustion, reset warlock slots.
+  app.post('/characters/:id/rest/long', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    LongRestBody.parse(request.body ?? {});
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+
+    // CON mod para auto-init de HP si falta.
+    const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+    };
+    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+    const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    );
+    const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+    const conMod = abilityModifier(effective.con);
+
+    // HP max auto-init si falta.
+    let max = (charData.hp as { max?: number } | undefined)?.max;
+    if (max == null) {
+      let m = 0;
+      let first = true;
+      for (const c of classes) {
+        const faces = hitDieFaces(c.hitDie);
+        const avg = ({ d6: 4, d8: 5, d10: 6, d12: 7 } as Record<string, number>)[c.hitDie] ?? Math.floor(faces / 2) + 1;
+        if (first) {
+          m += faces + conMod;
+          if (c.level > 1) m += (avg + conMod) * (c.level - 1);
+          first = false;
+        } else {
+          m += (avg + conMod) * c.level;
+        }
+      }
+      max = Math.max(1, m);
+    }
+
+    // Hit dice: recuperás floor(totalLevel/2) mín 1, distribuidos en el die
+    // que más usaste. RAW: el player elige, pero para MVP recargamos hacia
+    // los dice con más spent count (siempre que respete el total).
+    const totalLevel = classes.reduce((acc, c) => acc + c.level, 0);
+    const totalsFromClasses = hitDiceTotalsByDie(classes);
+    const existingHitDice = (charData.hitDice as Record<string, { total: number; available: number }> | undefined);
+    const hitDice: Record<string, { total: number; available: number }> = {};
+    for (const [die, total] of Object.entries(totalsFromClasses)) {
+      hitDice[die] = existingHitDice?.[die] ?? { total, available: total };
+    }
+
+    const recoverCount = hitDiceRecoveredOnLongRest(totalLevel);
+    let remaining = recoverCount;
+    // Distribuir: primero a los más gastados.
+    const dice = Object.entries(hitDice).sort((a, b) => {
+      const spentA = a[1].total - a[1].available;
+      const spentB = b[1].total - b[1].available;
+      return spentB - spentA;
+    });
+    for (const [die, state] of dice) {
+      if (remaining === 0) break;
+      const canRecover = Math.min(remaining, state.total - state.available);
+      hitDice[die] = { ...state, available: state.available + canRecover };
+      remaining -= canRecover;
+    }
+
+    // Death saves reset.
+    const deathSaves = { successes: 0, failures: 0 };
+
+    // Exhaustion -1 (mínimo 0).
+    const exhaustion = Math.max(0, ((charData.exhaustion as number | undefined) ?? 0) - 1);
+
+    const newHp = { current: max, max, temp: 0 };
+
+    // Inventory recharge — items con compendium.recharge='dawn' vuelven al máximo.
+    const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+    const inventoryRefs = existingInventory.map((it) => ({
+      slug: it.itemSlug,
+      source: it.itemSource,
+    }));
+    const inventoryWeights =
+      inventoryRefs.length === 0 ? [] : await loadItemDataMany(inventoryRefs);
+    const rechargeResult = rechargeInventoryItems({
+      inventory: existingInventory,
+      weights: inventoryWeights,
+    });
+
+    const nextData = {
+      ...charData,
+      hp: newHp,
+      hitDice,
+      deathSaves,
+      exhaustion,
+      // Spell slots y pact magic full → trackeamos uso a 0.
+      spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      warlockSlotsUsed: 0,
+    };
+
+    const [updated] = await db
+      .update(characters)
+      .set({ data: nextData, inventory: rechargeResult.inventory, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'rest_long',
+      payload: {
+        characterId: id,
+        hpAfter: newHp.current,
+        hpMax: newHp.max,
+        hitDiceRecovered: recoverCount,
+        exhaustionAfter: exhaustion,
+        itemsRecharged: rechargeResult.recharged,
+      },
+    });
+
+    return {
+      character: updated,
+      longRest: {
+        hitDiceRecovered: recoverCount,
+        deathSavesReset: true,
+        exhaustionAfter: exhaustion,
+        newHp,
+        itemsRecharged: rechargeResult.recharged,
+      },
+    };
+  });
+
+  // ---- POST /characters/:id/classes/:classSlug/level-up -------------------
+  // Sube un nivel en una clase específica. Atomic: valida XP, calcula HP delta,
+  // exige subclass si unlock, exige ASI/feat a 4/8/12/16/19, exige 2 Wizard
+  // free spells si es Wizard L2+.
+  app.post(
+    '/characters/:id/classes/:classSlug/level-up',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const body = LevelUpBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const campaign = await loadCampaign(character.campaignId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const classIdx = classes.findIndex((c) => c.slug === classSlug);
+      if (classIdx === -1) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+      const currentClass = classes[classIdx]!;
+
+      const currentTotalLevel = classes.reduce((acc, c) => acc + c.level, 0);
+      const newTotalLevel = currentTotalLevel + 1;
+      const newClassLevel = currentClass.level + 1;
+
+      if (newTotalLevel > 20) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'MAX_LEVEL_REACHED', totalLevel: currentTotalLevel }],
+        });
+      }
+
+      // XP gate.
+      const xpCheck = canReachLevel(character.xp, newTotalLevel);
+      if (xpCheck) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'INSUFFICIENT_XP', ...xpCheck, targetLevel: newTotalLevel }],
+        });
+      }
+
+      // CON mod efectivo para el HP delta.
+      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+        str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+      };
+      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+      const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+      );
+      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+      const conMod = abilityModifier(effective.con);
+
+      // HP delta.
+      let hpRoll: number | undefined = body.hpRoll;
+      if (body.hpMethod === 'roll' && hpRoll === undefined) {
+        // Server rollea si el cliente no mandó.
+        hpRoll = rollHitDie(currentClass.hitDie);
+      }
+      const hpResult = hpDeltaForLevelUp({
+        hitDie: currentClass.hitDie,
+        conMod,
+        method: body.hpMethod as HpMethod,
+        roll: hpRoll ?? null,
+      });
+      if (!hpResult.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: hpResult.issues });
+      }
+
+      // Subclass unlock — necesitamos la classData del compendio.
+      const { classData, subclassData } = await loadClassAndSubclass({
+        classSlug: currentClass.slug,
+        classSource: currentClass.source,
+        subclassSlug: body.subclass?.slug ?? null,
+        subclassSource: body.subclass?.source ?? null,
+      });
+      if (!classData) {
+        return reply.code(500).send({ error: 'CLASS_DATA_MISSING' });
+      }
+      const unlockLevel = computeSubclassUnlockLevel(classData) ?? 3;
+      const wasSubclassUnlocked = currentClass.level >= unlockLevel;
+      const isNowSubclassUnlocked = newClassLevel >= unlockLevel;
+      let newSubclass: { slug: string; source: string } | null = currentClass.subclass;
+      if (!wasSubclassUnlocked && isNowSubclassUnlocked) {
+        // Recién desbloqueada — exigimos selección.
+        if (!body.subclass) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'SUBCLASS_REQUIRED', classSlug, unlockLevel }],
+          });
+        }
+        if (!subclassData) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'SUBCLASS_NOT_FOUND', subclass: body.subclass }],
+          });
+        }
+        newSubclass = { slug: subclassData.slug, source: subclassData.source };
+      }
+
+      // ASI levels (4/8/12/16/19) — requiere asi o feat.
+      const ASI_LEVELS = new Set([4, 8, 12, 16, 19]);
+      const isAsiLevel = ASI_LEVELS.has(newClassLevel);
+      let asiToApply: AppliedAsi[] = [];
+      let featToApply: AppliedFeat | null = null;
+      if (isAsiLevel) {
+        if (!body.asi && !body.feat) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'ASI_OR_FEAT_REQUIRED', classSlug, level: newClassLevel }],
+          });
+        }
+        if (body.asi) {
+          // Validar: total de bonus <= 2, ningún ability +>2.
+          const total = body.asi.choices.reduce((acc, c) => acc + c.bonus, 0);
+          if (total !== 2) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ASI_TOTAL_MUST_BE_2', got: total }],
+            });
+          }
+          // Cada ability resultante no puede pasar 20 (cap RAW).
+          for (const choice of body.asi.choices) {
+            if (choice.bonus < 1 || choice.bonus > 2) {
+              return reply.code(400).send({
+                error: 'VALIDATION_FAILED',
+                issues: [{ code: 'ASI_BONUS_INVALID', choice }],
+              });
+            }
+            const projectedScore = effective[choice.ability] + choice.bonus;
+            if (projectedScore > 20) {
+              return reply.code(400).send({
+                error: 'VALIDATION_FAILED',
+                issues: [{
+                  code: 'ASI_WOULD_EXCEED_CAP',
+                  ability: choice.ability,
+                  current: effective[choice.ability],
+                  bonus: choice.bonus,
+                  cap: 20,
+                }],
+              });
+            }
+          }
+          asiToApply = body.asi.choices.map((c) => ({
+            ability: c.ability,
+            bonus: c.bonus,
+            source: 'race' as const,
+          }));
+        } else if (body.feat) {
+          if (!campaign.rulesProfile.variantRules.feats) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'FEATS_DISABLED' }],
+            });
+          }
+          const featData = await loadFeatData({ slug: body.feat.slug, source: body.feat.source });
+          if (!featData) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'FEAT_NOT_FOUND', feat: body.feat }],
+            });
+          }
+          // Reusar el validador de feats existente.
+          const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
+          const armorProfs = classes.flatMap((c) => c.armorProficiencies);
+          const weaponProfs = classes.flatMap((c) => c.weaponProficiencies);
+          const hasSpellcasting = classes.some((c) => classGrantsSpellcasting(c.slug));
+          const raceField = charData.race as { slug: string; source: string } | null | undefined;
+          const featResult = validateFeatSelection({
+            featData,
+            rulesProfile: campaign.rulesProfile,
+            ctx: {
+              effectiveScores: effective,
+              race: raceField ? { slug: raceField.slug } : null,
+              armorProficiencies: armorProfs,
+              weaponProficiencies: weaponProfs,
+              hasSpellcasting,
+              existingFeats: existingFeats.map((f) => ({ slug: f.slug, source: f.source })),
+            },
+            asiChoice: body.feat.asiChoice,
+          });
+          if (!featResult.ok) {
+            return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: featResult.issues });
+          }
+          featToApply = featResult.appliedFeat;
+        }
+      } else if (body.asi || body.feat) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'ASI_OR_FEAT_NOT_ALLOWED_AT_THIS_LEVEL', level: newClassLevel }],
+        });
+      }
+
+      // Wizard free spells: 2 spells del nivel max accesible, agregados al spellbook.
+      // Aplica a nivel up de Wizard (L2 en adelante).
+      let wizardFreeAdded: Array<{ slug: string; source: string }> = [];
+      if (currentClass.slug === 'wizard' && newClassLevel >= 2) {
+        if (!body.wizardFreeSpells || body.wizardFreeSpells.length !== 2) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'WIZARD_FREE_SPELLS_REQUIRED', expected: 2 }],
+          });
+        }
+        const wizardSpells = await loadClassSpells({
+          classSlug: 'wizard',
+          rulesProfile: campaign.rulesProfile,
+        });
+        const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+        const currentKnown = allSpells.wizard?.known ?? [];
+        const knownKeys = new Set(currentKnown.map((s) => `${s.slug}|${s.source}`));
+        for (const fs of body.wizardFreeSpells) {
+          const found = wizardSpells.find((s) => s.slug === fs.slug && s.source === fs.source);
+          if (!found) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'SPELL_NOT_IN_CLASS_LIST', spell: fs, classSlug: 'wizard' }],
+            });
+          }
+          if (found.level === 0) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'WIZARD_FREE_SPELL_MUST_NOT_BE_CANTRIP', spell: fs }],
+            });
+          }
+          if (knownKeys.has(`${fs.slug}|${fs.source}`)) {
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'SPELL_ALREADY_IN_SPELLBOOK', spell: fs }],
+            });
+          }
+          knownKeys.add(`${fs.slug}|${fs.source}`);
+        }
+        wizardFreeAdded = body.wizardFreeSpells;
+      }
+
+      // ---- Persist atomic --------------------------------------------------
+      const updatedClasses = [...classes];
+      updatedClasses[classIdx] = { ...currentClass, level: newClassLevel, subclass: newSubclass };
+
+      const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+      const newMax = (existingHp.max ?? 0) + hpResult.delta;
+      const newCurrent = (existingHp.current ?? existingHp.max ?? 0) + hpResult.delta;
+      const newHp = { current: newCurrent, max: newMax, temp: existingHp.temp ?? 0 };
+
+      const newLevelUpAsis = [...levelUpAsis, ...asiToApply];
+      const newFeats = featToApply
+        ? [...((charData.feats as AppliedFeat[] | undefined) ?? []), featToApply]
+        : (charData.feats as AppliedFeat[] | undefined);
+
+      const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const newSpells = wizardFreeAdded.length > 0
+        ? {
+            ...allSpells,
+            wizard: {
+              cantrips: allSpells.wizard?.cantrips ?? [],
+              known: [...(allSpells.wizard?.known ?? []), ...wizardFreeAdded],
+              prepared: allSpells.wizard?.prepared ?? [],
+            },
+          }
+        : allSpells;
+
+      const nextData: Record<string, unknown> = {
+        ...charData,
+        classes: updatedClasses,
+        levelUpAsis: newLevelUpAsis,
+        hp: newHp,
+        ...(newFeats !== undefined ? { feats: newFeats } : {}),
+        ...(wizardFreeAdded.length > 0 ? { spells: newSpells } : {}),
+      };
+
+      const [updated] = await db
+        .update(characters)
+        .set({ data: nextData, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      await recordSessionEventForCharacter({
+        characterId: id,
+        actorUserId: userId,
+        eventType: 'level_up',
+        payload: {
+          characterId: id,
+          classSlug,
+          newClassLevel,
+          newTotalLevel,
+          hpDelta: hpResult.delta,
+          subclassSelected: newSubclass !== currentClass.subclass ? newSubclass : null,
+          asiApplied: asiToApply.length > 0 ? asiToApply : null,
+          featApplied: featToApply ? { slug: featToApply.slug, source: featToApply.source } : null,
+        },
+      });
+
+      return {
+        character: updated,
+        levelUp: {
+          classSlug,
+          newClassLevel,
+          newTotalLevel,
+          hpDelta: hpResult.delta,
+          hpMethod: hpResult.method,
+          hpRollUsed: hpResult.rollUsed,
+          subclassSelected: newSubclass !== currentClass.subclass ? newSubclass : null,
+          asiApplied: asiToApply.length > 0 ? asiToApply : null,
+          featApplied: featToApply ? { slug: featToApply.slug, source: featToApply.source } : null,
+          wizardFreeSpellsAdded: wizardFreeAdded.length > 0 ? wizardFreeAdded : null,
+        },
+      };
+    },
+  );
+
+  // ---- PUT /characters/:id/classes/:classSlug/features --------------------
+  // Setea las picks de class features (fighting styles, eldritch invocations,
+  // battle master maneuvers, etc.) para UNA clase del personaje.
+  //
+  // Body: `{ picks: { [featureType]: [{slug, source}] } }`.
+  // El validador computa los slots a este nivel (class + subclass) y verifica:
+  //   - Cantidad por featureType.
+  //   - Cada feature existe + está habilitada por el Rules Profile.
+  //   - El featureType del pick coincide con el que se reclama.
+  app.put(
+    '/characters/:id/classes/:classSlug/features',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const body = ClassFeaturesBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+      }
+
+      const campaign = await loadCampaign(character.campaignId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const charClasses = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const appliedClass = charClasses.find((c) => c.slug === classSlug);
+      if (!appliedClass) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+
+      const progression = await loadFeatureProgression({
+        classSlug: appliedClass.slug,
+        classSource: appliedClass.source,
+        subclassSlug: appliedClass.subclass?.slug ?? null,
+        subclassSource: appliedClass.subclass?.source ?? null,
+      });
+      if (!progression) {
+        return reply.code(500).send({ error: 'CLASS_DATA_MISSING' });
+      }
+
+      const slots = resolveFeatureSlots({
+        classData: progression.classData,
+        subclassData: progression.subclassData,
+        classLevel: appliedClass.level,
+      });
+
+      // Universo de features permitidas: filtrar por todos los featureTypes
+      // que aparecen en los slots — agarra exactamente lo relevante.
+      const allFeatureTypes = Array.from(new Set(slots.flatMap((s) => s.featureType)));
+      const available = await loadOptionalFeatures({
+        rulesProfile: campaign.rulesProfile,
+        featureTypes: allFeatureTypes,
+      });
+
+      const result = validateClassFeaturePicks({
+        picks: body.picks as FeaturePicks,
+        slots,
+        available,
+        classSlug: appliedClass.slug,
+        classLevel: appliedClass.level,
+      });
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const existing = (charData.classFeatures as Record<string, FeaturePicks> | undefined) ?? {};
+      const nextClassFeatures = { ...existing, [classSlug]: result.applied };
+
+      const [updated] = await db
+        .update(characters)
+        .set({
+          data: { ...charData, classFeatures: nextClassFeatures },
+          updatedAt: new Date(),
+        })
+        .where(eq(characters.id, id))
+        .returning();
+
+      return { character: updated, slots, applied: result.applied };
+    },
+  );
 };
+
+/**
+ * Arma el contexto de inventario (STR efectivo + profs combinadas de todas las
+ * clases) a partir del estado persistido en character.data.
+ *
+ * STR efectivo = baseStats.str + sumatoria de ASIs (race + feats). Si todavía
+ * no se setearon stats, asumimos 10 (mod 0) para que las warnings de carga
+ * sean conservadoras hasta que el builder complete.
+ */
+async function buildInventoryContext(character: typeof characters.$inferSelect): Promise<{
+  strScore: number;
+  armorProficiencies: string[];
+  weaponProficiencies: string[];
+}> {
+  const charData = (character.data as Record<string, unknown> | null) ?? {};
+  const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+  };
+  const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+  const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+  );
+  const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+  const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+
+  return {
+    strScore: effective.str,
+    armorProficiencies: classes.flatMap((c) => c.armorProficiencies),
+    weaponProficiencies: classes.flatMap((c) => c.weaponProficiencies),
+  };
+}

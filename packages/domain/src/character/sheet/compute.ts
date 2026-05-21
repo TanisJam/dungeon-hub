@@ -6,12 +6,83 @@ import {
 import type { AppliedAsi } from '../race/types.js';
 import {
   ALL_SKILLS,
+  EMPTY_CURRENCY,
   SKILL_TO_ABILITY,
   type CharacterSheet,
   type CharacterSnapshot,
   type RaceSheetData,
   type SkillView,
 } from './types.js';
+import {
+  buildWeightLookup,
+  carryingCapacity,
+  evaluateEncumbrance,
+  totalWeight,
+  ATTUNEMENT_MAX,
+  type EncumbranceView,
+} from '../inventory/index.js';
+import type { ItemCompendiumLite } from '../inventory/types.js';
+import {
+  computeSpellSlots,
+  computeSpellLimits,
+  SPELLCASTING_ABILITY,
+} from '../spellcasting/index.js';
+import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSlotsView } from './types.js';
+
+/**
+ * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
+ * PHB p.291.
+ */
+function exhaustionEffectsFor(level: number): ExhaustionEffect[] {
+  const out: ExhaustionEffect[] = [];
+  if (level >= 1) out.push('disadvantage-ability-checks');
+  if (level >= 2) out.push('speed-halved');
+  if (level >= 3) out.push('disadvantage-attacks-and-saves');
+  if (level >= 4) out.push('hp-max-halved');
+  if (level >= 5) out.push('speed-zero');
+  if (level >= 6) out.push('dead');
+  return out;
+}
+
+/**
+ * Resta `penalty` pies a cada componente de speed, sin bajar de 0.
+ * Usado para encumbrance variant (encumbered -10, heavily -20).
+ */
+function applySpeedPenalty(
+  speed: { walk: number; fly?: number; swim?: number; climb?: number },
+  penalty: number,
+): { walk: number; fly?: number; swim?: number; climb?: number } {
+  if (penalty <= 0) return speed;
+  const sub = (v: number) => Math.max(0, v - penalty);
+  const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: sub(speed.walk) };
+  if (speed.fly !== undefined) out.fly = sub(speed.fly);
+  if (speed.swim !== undefined) out.swim = sub(speed.swim);
+  if (speed.climb !== undefined) out.climb = sub(speed.climb);
+  return out;
+}
+
+/** Aplica los efectos de exhaustion que mutan números (speed + HP max). */
+function applyExhaustionToSpeed(
+  speed: { walk: number; fly?: number; swim?: number; climb?: number },
+  effects: ExhaustionEffect[],
+): { walk: number; fly?: number; swim?: number; climb?: number } {
+  if (effects.includes('speed-zero')) {
+    const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: 0 };
+    if (speed.fly !== undefined) out.fly = 0;
+    if (speed.swim !== undefined) out.swim = 0;
+    if (speed.climb !== undefined) out.climb = 0;
+    return out;
+  }
+  if (effects.includes('speed-halved')) {
+    const half = (v: number) => Math.floor(v / 2);
+    const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: half(speed.walk) };
+    if (speed.fly !== undefined) out.fly = half(speed.fly);
+    if (speed.swim !== undefined) out.swim = half(speed.swim);
+    if (speed.climb !== undefined) out.climb = half(speed.climb);
+    return out;
+  }
+  return speed;
+}
 
 /** PB por nivel total — PHB p.15. */
 export function proficiencyBonus(totalLevel: number): number {
@@ -75,6 +146,13 @@ function extractRaceLanguages(race: RaceSheetData): string[] {
 interface ComputeInput {
   character: CharacterSnapshot;
   raceData?: RaceSheetData | null;
+  /**
+   * Lite del compendio para cada ítem del inventory. El caller arma este array
+   * con loadItemDataMany. Si falta un slug, su peso cuenta como 0.
+   */
+  itemWeights?: ReadonlyArray<ItemCompendiumLite>;
+  /** Si el Rules Profile tiene encumbranceVariant ON, los 3 umbrales aplican. */
+  encumbranceVariant?: boolean;
 }
 
 export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
@@ -86,10 +164,11 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
   };
   const racialAsis: AppliedAsi[] = character.asisApplied ?? [];
+  const levelUpAsis: AppliedAsi[] = character.levelUpAsis ?? [];
   const featAsis: AppliedAsi[] = (character.feats ?? []).flatMap((f) =>
     f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
   );
-  const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+  const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
 
   // ---- Niveles y PB -----------------------------------------------------
   const classes = character.classes ?? [];
@@ -215,6 +294,24 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };
   const size = raceData?.size?.[0] ?? DEFAULT_SIZE;
 
+  // ---- Encumbrance (con o sin variant) ----------------------------------
+  const totalCarryWeight = totalWeight(
+    character.inventory ?? [],
+    buildWeightLookup(input.itemWeights ?? []),
+  );
+  const encumbranceView: EncumbranceView = evaluateEncumbrance(
+    totalCarryWeight,
+    effective.str,
+    input.encumbranceVariant === true,
+  );
+
+  // ---- Speed final: aplicar penalty de encumbrance, después exhaustion ---
+  const speedAfterEncumbrance = applySpeedPenalty(speed, encumbranceView.speedPenalty);
+  const speedFinal = applyExhaustionToSpeed(
+    speedAfterEncumbrance,
+    exhaustionEffectsFor(character.exhaustion ?? 0),
+  );
+
   return {
     identity: {
       name: character.name,
@@ -241,9 +338,15 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     passivePerception,
     initiative: dexMod,
     armorClass: { value: acValue, formula: acFormula },
-    hitPoints: { max: hpMax, formula: hpFormula },
+    hitPoints: ((): { max: number; formula: string } => {
+      const effects = exhaustionEffectsFor(character.exhaustion ?? 0);
+      if (effects.includes('hp-max-halved')) {
+        return { max: Math.floor(hpMax / 2), formula: `${hpFormula}  [/2 by exhaustion ≥4]` };
+      }
+      return { max: hpMax, formula: hpFormula };
+    })(),
     hitDice: hitDiceTotal,
-    speed,
+    speed: speedFinal,
     size,
     carryingCapacity: effective.str * 15,
     proficiencies: {
@@ -254,5 +357,45 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     },
     feats: (character.feats ?? []).map((f) => ({ slug: f.slug, source: f.source })),
     spellcasting,
+    currency: character.currency ?? { ...EMPTY_CURRENCY },
+    encumbrance: encumbranceView,
+    attunement: {
+      used: (character.inventory ?? []).reduce((acc, it) => acc + (it.attuned ? 1 : 0), 0),
+      max: ATTUNEMENT_MAX,
+    },
+    exhaustion: ((): ExhaustionView => {
+      const level = Math.max(0, Math.min(6, character.exhaustion ?? 0));
+      return { level, effects: exhaustionEffectsFor(level) };
+    })(),
+    classFeatures: character.classFeatures ?? {},
+    spellSlots: ((): SpellSlotsView => {
+      const r = computeSpellSlots(classes);
+      return { slots: r.slots, pactMagic: r.pactMagic };
+    })(),
+    spellsByClass: classes.flatMap((c): ClassSpellSummary[] => {
+      const ability = SPELLCASTING_ABILITY[c.slug];
+      if (!ability) return [];
+      const mod = abilityModifier(effective[ability]);
+      const lim = computeSpellLimits(c, mod);
+      const spellsForClass = character.spells?.[c.slug];
+      const cantripsCount = spellsForClass?.cantrips.length ?? 0;
+      const knownCount = spellsForClass?.known.length ?? 0;
+      const preparedCount = spellsForClass?.prepared.length ?? 0;
+      const view: ClassSpellSummary = {
+        classSlug: c.slug,
+        classSource: c.source,
+        cantripsKnown: { count: cantripsCount, max: lim.cantripsKnown },
+        spellsKnown:
+          lim.spellsKnown !== null
+            ? { count: knownCount, max: lim.spellsKnown }
+            : null,
+        spellsPrepared:
+          lim.spellsPrepared !== null
+            ? { count: preparedCount, max: lim.spellsPrepared }
+            : null,
+      };
+      if (lim.wizardSpellbookSize !== undefined) view.wizardSpellbookSize = lim.wizardSpellbookSize;
+      return [view];
+    }),
   };
 }

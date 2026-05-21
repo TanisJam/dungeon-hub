@@ -124,6 +124,17 @@ export interface NormalizedFeat extends NormalizedRecord {
   prerequisites: unknown | null;
 }
 
+export interface FiveeToolsOptionalFeature extends FiveeToolsBase {
+  featureType?: string[];
+  prerequisite?: Array<Record<string, unknown>>;
+  entries?: unknown[];
+}
+
+export interface NormalizedOptionalFeature extends NormalizedRecord {
+  featureType: string[];
+  prerequisites: unknown | null;
+}
+
 export interface ImportResult {
   races: NormalizedRace[];
   classes: NormalizedRecord[];
@@ -132,5 +143,6 @@ export interface ImportResult {
   spells: NormalizedSpell[];
   items: NormalizedItem[];
   feats: NormalizedFeat[];
+  optionalFeatures: NormalizedOptionalFeature[];
   warnings: string[];
 }

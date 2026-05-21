@@ -112,17 +112,18 @@ describe('characters CRUD', () => {
       })
       .then((r) => r.json());
 
-    // Alice puede editar
+    // Alice puede editar (sin tocar xp — eso es exclusivo del DM via POST /xp)
     const patch = await app.inject({
       method: 'PATCH',
       url: `/api/v1/characters/${created.id}`,
       headers: { authorization: `Bearer ${alice.accessToken}` },
-      payload: { name: 'Edited', xp: 300, status: 'active' },
+      payload: { name: 'Edited', status: 'active' },
     });
     expect(patch.statusCode).toBe(200);
     expect(patch.json().name).toBe('Edited');
-    expect(patch.json().xp).toBe(300);
     expect(patch.json().status).toBe('active');
+    // xp NO se modifica via PATCH
+    expect(patch.json().xp).toBe(0);
 
     // Bob NO puede editar (ni siquiera leer, no es miembro)
     const bobPatch = await app.inject({

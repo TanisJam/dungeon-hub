@@ -58,7 +58,7 @@ describe('PUT /characters/:id/race', () => {
     expect(c.data.usedTashasCustomOrigin).toBe(false);
   });
 
-  it('rechaza Half-Elf por choose-shape no soportado todavía', async () => {
+  it('Half-Elf: requiere appliedAsis cuando hay choose en el block', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'PUT',
@@ -68,8 +68,30 @@ describe('PUT /characters/:id/race', () => {
     });
 
     expect(res.statusCode).toBe(400);
-    const issue = res.json().issues[0];
-    expect(issue.code).toBe('RACE_CHOOSE_SHAPE_UNSUPPORTED');
+    expect(res.json().issues[0].code).toBe('ASI_REQUIRED');
+  });
+
+  it('Half-Elf: acepta +2 CHA + 2 picks de +1 a stats no-CHA', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'half-elf', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'cha', bonus: 2, source: 'race' },
+          { ability: 'dex', bonus: 1, source: 'race' },
+          { ability: 'con', bonus: 1, source: 'race' },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'half-elf', source: 'PHB' });
+    expect(c.data.asisApplied).toHaveLength(3);
+    expect(c.data.asisApplied).toContainEqual({ ability: 'cha', bonus: 2, source: 'race' });
   });
 
   it("requiere appliedAsis cuando Tasha's está ON, y los redistribuye", async () => {

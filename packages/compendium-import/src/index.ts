@@ -5,6 +5,7 @@ import { importBackgrounds } from './importers/backgrounds.js';
 import { importSpells } from './importers/spells.js';
 import { importItems } from './importers/items.js';
 import { importFeats } from './importers/feats.js';
+import { importOptionalFeatures } from './importers/optional-features.js';
 import type { ImportResult } from './types.js';
 
 export * from './types.js';
@@ -43,13 +44,14 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
   assertDataDir(dataDir);
   const warnings: string[] = [];
 
-  const [races, classesResult, backgrounds, spells, items, feats] = await Promise.all([
+  const [races, classesResult, backgrounds, spells, items, feats, optionalFeatures] = await Promise.all([
     importRaces(dataDir, warnings),
     importClassesAndSubclasses(dataDir, warnings),
     importBackgrounds(dataDir),
     importSpells(dataDir),
     importItems(dataDir),
     importFeats(dataDir),
+    importOptionalFeatures(dataDir),
   ]);
 
   return {
@@ -60,6 +62,7 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
     spells: dedup(spells, 'spell', warnings),
     items: dedup(items, 'item', warnings),
     feats: dedup(feats, 'feat', warnings),
+    optionalFeatures: dedup(optionalFeatures, 'optional-feature', warnings),
     warnings,
   };
 }

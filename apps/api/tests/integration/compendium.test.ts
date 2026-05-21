@@ -26,6 +26,65 @@ describe('compendium', () => {
     await closeTestApp();
   });
 
+  it('lista optional features (PHB Fighting Styles, etc.) sin TCE por default', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/optional-features?campaign=${campaignId}&featureType=FS:F`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data, total } = res.json();
+    expect(total).toBeGreaterThan(0);
+    // Archery, Defense, Dueling, Great Weapon Fighting, etc. son PHB.
+    const slugs = data.map((d: { slug: string }) => d.slug);
+    expect(slugs).toContain('archery');
+  });
+
+  it('toggle TCE OFF: excluye fighting styles TCE como Blessed Warrior', async () => {
+    const app = await getTestApp();
+    // Default profile tiene tashasOptionalClassFeatures = false.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/optional-features?campaign=${campaignId}&q=blessed%20warrior`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().total).toBe(0);
+  });
+
+  it('toggle TCE ON: incluye fighting styles TCE como Blessed Warrior', async () => {
+    const app = await getTestApp();
+    // Habilitar el toggle vía PATCH del campaign.
+    const c = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/campaigns/${campaignId}`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/campaigns/${campaignId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        rulesProfile: {
+          ...c.rulesProfile,
+          variantRules: { ...c.rulesProfile.variantRules, tashasOptionalClassFeatures: true },
+        },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/optional-features?campaign=${campaignId}&q=blessed%20warrior`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().total).toBeGreaterThan(0);
+  });
+
   it('returns 13 classes with the default Rules Profile (PHB + TCE Artificer)', async () => {
     const app = await getTestApp();
     const res = await app.inject({

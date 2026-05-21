@@ -16,6 +16,7 @@ const DisabledEntitiesSchema = z.object({
   spells: z.array(z.string()).default([]),
   items: z.array(z.string()).default([]),
   feats: z.array(z.string()).default([]),
+  optionalFeatures: z.array(z.string()).default([]),
 });
 
 const VariantRulesSchema = z.object({

@@ -221,3 +221,33 @@ export const compendiumFeats = pgTable(
   },
   (t) => [uniqueIndex('uq_feats_slug_source').on(t.slug, t.source)],
 );
+
+// ---------------------------------------------------------------------------
+// compendium_optional_features — TCE Optional Class Features + invocations,
+// fighting styles, maneuvers, arcane shots, etc.
+//
+// `featureType` es un array de tags (5etools) tipo "FS:F" (Fighting Style:
+// Fighter), "MV:B" (Maneuver: Battle Master), "EI" (Eldritch Invocation).
+// Una feature puede aplicar a varios types (ej. "Archery" está en FS:F y FS:R).
+//
+// El Rules Profile filtra por source habilitada Y, para entries con
+// `source: 'TCE'`, también requiere `variantRules.tashasOptionalClassFeatures = true`.
+// ---------------------------------------------------------------------------
+export const compendiumOptionalFeatures = pgTable(
+  'compendium_optional_features',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    /** Tags de tipo (FS:F, MV:B, EI, etc.). GIN-indexed para filtros. */
+    featureType: text('feature_type').array().notNull(),
+    prerequisites: jsonb('prerequisites'), // mismo shape que feats
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_optfeats_slug_source').on(t.slug, t.source),
+    index('idx_optfeats_feature_type').using('gin', t.featureType),
+  ],
+);

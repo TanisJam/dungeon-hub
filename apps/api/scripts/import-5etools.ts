@@ -17,6 +17,7 @@ import {
   compendiumSpells,
   compendiumItems,
   compendiumFeats,
+  compendiumOptionalFeatures,
 } from '../src/infra/db/schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,6 +50,7 @@ async function main() {
   console.log(`   - spells:       ${fmt(result.spells.length)}`);
   console.log(`   - items:        ${fmt(result.items.length)}`);
   console.log(`   - feats:        ${fmt(result.feats.length)}`);
+  console.log(`   - opt-features: ${fmt(result.optionalFeatures.length)}`);
   if (result.warnings.length > 0) {
     console.log(`\n⚠️  ${result.warnings.length} warnings:`);
     for (const w of result.warnings.slice(0, 10)) console.log(`   - ${w}`);
@@ -233,6 +235,32 @@ async function main() {
           target: [compendiumFeats.slug, compendiumFeats.source],
           set: {
             name: sqlExcluded('name'),
+            prerequisites: sqlExcluded('prerequisites'),
+            data: sqlExcluded('data'),
+            reprintedAs: sqlExcluded('reprinted_as'),
+          },
+        });
+    }
+
+    if (result.optionalFeatures.length > 0) {
+      await tx
+        .insert(compendiumOptionalFeatures)
+        .values(
+          result.optionalFeatures.map((f) => ({
+            slug: f.slug,
+            source: f.source,
+            name: f.name,
+            featureType: f.featureType,
+            prerequisites: f.prerequisites,
+            data: f.data,
+            reprintedAs: f.reprintedAs ?? undefined,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [compendiumOptionalFeatures.slug, compendiumOptionalFeatures.source],
+          set: {
+            name: sqlExcluded('name'),
+            featureType: sqlExcluded('feature_type'),
             prerequisites: sqlExcluded('prerequisites'),
             data: sqlExcluded('data'),
             reprintedAs: sqlExcluded('reprinted_as'),

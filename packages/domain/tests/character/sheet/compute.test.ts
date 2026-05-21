@@ -230,3 +230,331 @@ describe('computeCharacterSheet — multiclass HP y saves', () => {
     expect(sheet.hitDice.d10).toBe(1);
   });
 });
+
+describe('sheet: inventory views (1.6c)', () => {
+  it('defaults: currency en 0, encumbrance ok con peso 0, attunement 0/3', () => {
+    const sheet = computeCharacterSheet({ character: { name: 'Empty' } });
+    expect(sheet.currency).toEqual({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 });
+    expect(sheet.encumbrance.status).toBe('ok');
+    expect(sheet.encumbrance.weight).toBe(0);
+    expect(sheet.attunement).toEqual({ used: 0, max: 3 });
+  });
+
+  it('encumbrance.status = "over" cuando weight > STR × 15', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Heavy',
+        baseStats: { str: 8, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [
+          {
+            instanceId: 'i1',
+            itemSlug: 'plate-armor',
+            itemSource: 'PHB',
+            quantity: 2,
+            state: 'stowed',
+            attuned: false,
+            customName: null,
+            notes: '',
+          },
+        ],
+      },
+      itemWeights: [
+        { slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 },
+      ],
+    });
+    expect(sheet.encumbrance.max).toBe(120);
+    expect(sheet.encumbrance.weight).toBe(130);
+    expect(sheet.encumbrance.status).toBe('over');
+  });
+
+  it('attunement.used cuenta solo los ítems con attuned=true', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Attuner',
+        inventory: [
+          {
+            instanceId: 'a',
+            itemSlug: 'ring',
+            itemSource: 'DMG',
+            quantity: 1,
+            state: 'carried',
+            attuned: true,
+            customName: null,
+            notes: '',
+          },
+          {
+            instanceId: 'b',
+            itemSlug: 'cloak',
+            itemSource: 'DMG',
+            quantity: 1,
+            state: 'carried',
+            attuned: false,
+            customName: null,
+            notes: '',
+          },
+        ],
+      },
+    });
+    expect(sheet.attunement.used).toBe(1);
+  });
+
+  it('spellSlots: Wizard L5 → [4,3,2,0,...], pactMagic null', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Wiz5',
+        baseStats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+        classes: [{
+          slug: 'wizard', source: 'PHB', level: 5,
+          subclass: null, hitDie: 'd6',
+          savingThrows: ['int', 'wis'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+      },
+    });
+    expect(sheet.spellSlots.slots).toEqual([4, 3, 2, 0, 0, 0, 0, 0, 0]);
+    expect(sheet.spellSlots.pactMagic).toBeNull();
+    expect(sheet.spellsByClass[0]?.spellsPrepared?.max).toBe(7); // INT mod 2 + level 5
+  });
+
+  it('spellSlots: Warlock L5 → pactMagic 2 slots level 3', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Wlock5',
+        baseStats: { str: 8, dex: 14, con: 13, int: 10, wis: 12, cha: 15 },
+        classes: [{
+          slug: 'warlock', source: 'PHB', level: 5,
+          subclass: null, hitDie: 'd8',
+          savingThrows: ['wis', 'cha'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+      },
+    });
+    expect(sheet.spellSlots.pactMagic).toEqual({ slotCount: 2, slotLevel: 3 });
+    expect(sheet.spellSlots.slots).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  // ---- Encumbrance variant ---------------------------------------------
+  it('encumbrance variant: sin peso → status ok, speedPenalty 0', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Light',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      },
+      encumbranceVariant: true,
+    });
+    expect(sheet.encumbrance.status).toBe('ok');
+    expect(sheet.encumbrance.speedPenalty).toBe(0);
+    expect(sheet.speed.walk).toBe(30);
+  });
+
+  it('encumbrance variant: weight > STR×5 → encumbered, speed -10', () => {
+    // STR 10 → encumbered en 50, heavy en 100, max en 150.
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Carrying',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [{
+          instanceId: 'a', itemSlug: 'plate-armor', itemSource: 'PHB',
+          quantity: 1, state: 'stowed', attuned: false, customName: null, notes: '',
+        }],
+      },
+      itemWeights: [{ slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 }],
+      encumbranceVariant: true,
+    });
+    expect(sheet.encumbrance.status).toBe('encumbered');
+    expect(sheet.encumbrance.speedPenalty).toBe(10);
+    expect(sheet.speed.walk).toBe(20); // 30 - 10
+  });
+
+  it('encumbrance variant: weight > STR×10 → heavily, speed -20', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Burdened',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [{
+          instanceId: 'a', itemSlug: 'plate-armor', itemSource: 'PHB',
+          quantity: 2, state: 'stowed', attuned: false, customName: null, notes: '',
+        }],
+      },
+      itemWeights: [{ slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 }],
+      encumbranceVariant: true,
+    });
+    expect(sheet.encumbrance.status).toBe('heavily-encumbered');
+    expect(sheet.speed.walk).toBe(10); // 30 - 20
+  });
+
+  it('sin variant: weight grande pero < STR×15 → ok, sin penalty', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Carrying',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [{
+          instanceId: 'a', itemSlug: 'plate-armor', itemSource: 'PHB',
+          quantity: 1, state: 'stowed', attuned: false, customName: null, notes: '',
+        }],
+      },
+      itemWeights: [{ slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 }],
+      encumbranceVariant: false,
+    });
+    expect(sheet.encumbrance.status).toBe('ok');
+    expect(sheet.speed.walk).toBe(30);
+  });
+
+  it('encumbrance variant + exhaustion: penalties stackean (encumbered -10 + halved)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Worst Day',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [{
+          instanceId: 'a', itemSlug: 'plate-armor', itemSource: 'PHB',
+          quantity: 1, state: 'stowed', attuned: false, customName: null, notes: '',
+        }],
+        exhaustion: 2,
+      },
+      itemWeights: [{ slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 }],
+      encumbranceVariant: true,
+    });
+    // (30 - 10) / 2 = 10
+    expect(sheet.speed.walk).toBe(10);
+  });
+
+  // ---- Exhaustion (PHB p.291) -----------------------------------------
+  it('exhaustion 0: sin efectos, speed/HP intactos', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Fresh',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+      },
+    });
+    expect(sheet.exhaustion).toEqual({ level: 0, effects: [] });
+    expect(sheet.speed.walk).toBe(30);
+  });
+
+  it('exhaustion 1: disadvantage ability checks (flag, sin mutar números)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Tired',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+        exhaustion: 1,
+      },
+    });
+    expect(sheet.exhaustion.effects).toContain('disadvantage-ability-checks');
+    expect(sheet.speed.walk).toBe(30);
+    expect(sheet.hitPoints.max).toBeGreaterThan(0);
+  });
+
+  it('exhaustion 2: speed halved', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Slow',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+        exhaustion: 2,
+      },
+    });
+    expect(sheet.exhaustion.effects).toContain('speed-halved');
+    expect(sheet.speed.walk).toBe(15);
+  });
+
+  it('exhaustion 4: HP max halved (round down)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Broken',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+        exhaustion: 4,
+      },
+    });
+    // Fighter L3 CON 14: 10+2 + 2×(6+2) = 28. /2 = 14
+    expect(sheet.hitPoints.max).toBe(14);
+    expect(sheet.exhaustion.effects).toContain('hp-max-halved');
+    // 4 incluye 1, 2, 3, 4
+    expect(sheet.exhaustion.effects).toContain('speed-halved');
+    expect(sheet.speed.walk).toBe(15);
+  });
+
+  it('exhaustion 5: speed forzado a 0', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Frozen',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+        exhaustion: 5,
+      },
+    });
+    expect(sheet.speed.walk).toBe(0);
+    expect(sheet.exhaustion.effects).toContain('speed-zero');
+  });
+
+  it('exhaustion 6: incluye dead flag', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Dead',
+        baseStats: { str: 10, dex: 14, con: 14, int: 10, wis: 10, cha: 10 },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 3,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [], weaponProficiencies: [],
+          toolProficiencies: [], skillChoices: [],
+        }],
+        exhaustion: 6,
+      },
+    });
+    expect(sheet.exhaustion.effects).toContain('dead');
+  });
+
+  it('exhaustion clamp: 9 → 6', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Cheat',
+        exhaustion: 9,
+      },
+    });
+    expect(sheet.exhaustion.level).toBe(6);
+  });
+
+  it('currency: pasa los valores tal cual desde character.currency', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Rich',
+        currency: { cp: 0, sp: 5, ep: 0, gp: 100, pp: 2 },
+      },
+    });
+    expect(sheet.currency).toEqual({ cp: 0, sp: 5, ep: 0, gp: 100, pp: 2 });
+  });
+});

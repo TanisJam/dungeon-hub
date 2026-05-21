@@ -10,6 +10,7 @@ import {
   compendiumSpells,
   compendiumItems,
   compendiumFeats,
+  compendiumOptionalFeatures,
 } from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { profileFilterConditions } from '../../use-cases/compendium/profile-filter.js';
@@ -352,6 +353,95 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumFeats).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  // ---- OPTIONAL FEATURES ---------------------------------------------------
+  // Tasha's OCF + invocations + fighting styles + maneuvers + arcane shots, etc.
+  //
+  // Filtros aplicados:
+  //   - Source habilitada en Rules Profile.
+  //   - slug|source no en disabledEntities.optionalFeatures.
+  //   - Source TCE solo si variantRules.tashasOptionalClassFeatures = true.
+  //
+  // Query params:
+  //   - featureType: filtra por tag (FS:F, MV:B, EI, etc.).
+  //   - class: filtra por clase consumidora — útil para "qué fighting styles
+  //     puedo elegir como Fighter L1". Acepta el slug de clase (ej. "fighter"),
+  //     y matchea contra el sufijo del featureType (FS:F → fighter, FS:R → ranger).
+  const OptFeatsQuery = PaginationQuery.extend({
+    featureType: z.string().min(1).optional(),
+    class: z.string().min(1).optional(),
+  });
+  app.get('/compendium/optional-features', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q, featureType, class: classSlug } = OptFeatsQuery.parse(request.query);
+
+    const baseFilter = profileFilterConditions({
+      profile: campaign.rulesProfile,
+      kind: 'optionalFeatures',
+      slugCol: compendiumOptionalFeatures.slug,
+      sourceCol: compendiumOptionalFeatures.source,
+    });
+    if (!baseFilter) return { data: [], total: 0 };
+
+    const where: SQL[] = [baseFilter];
+
+    // TCE gate: si el toggle está OFF, excluir TODOS los entries TCE.
+    if (!campaign.rulesProfile.variantRules.tashasOptionalClassFeatures) {
+      where.push(sql`${compendiumOptionalFeatures.source} != 'TCE'`);
+    }
+
+    if (q) where.push(ilike(compendiumOptionalFeatures.name, `%${q}%`));
+    if (featureType) {
+      where.push(sql`${featureType} = ANY(${compendiumOptionalFeatures.featureType})`);
+    }
+    if (classSlug) {
+      // Convención: el sufijo del featureType ":X" se mapea al slug de clase con
+      // la inicial. Ej: fighter → FS:F. No es trivial generalizar, por ahora
+      // matcheamos via texto:
+      //   fighter → FS:F, MV:B (BM), AS:AA (Arcane Archer)
+      //   ranger  → FS:R, HP:R (hunter prey)
+      //   warlock → EI, PB
+      const tagsByClass: Record<string, string[]> = {
+        fighter: ['FS:F', 'MV:B', 'AS:AA'],
+        ranger: ['FS:R', 'HP:R', 'DT:R'],
+        paladin: ['FS:P'],
+        warlock: ['EI', 'PB'],
+        rogue: [],
+        artificer: ['IWM:A'],
+        cleric: [],
+        bard: ['BJK'],
+        monk: [],
+        druid: [],
+        sorcerer: [],
+        wizard: [],
+      };
+      const tags = tagsByClass[classSlug] ?? [];
+      if (tags.length === 0) return { data: [], total: 0 };
+      const tagsLiteral = sql.join(tags.map((t) => sql`${t}`), sql`, `);
+      where.push(sql`${compendiumOptionalFeatures.featureType} && ARRAY[${tagsLiteral}]::text[]`);
+    }
+
+    const conds = and(...where)!;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumOptionalFeatures.id,
+          slug: compendiumOptionalFeatures.slug,
+          source: compendiumOptionalFeatures.source,
+          name: compendiumOptionalFeatures.name,
+          featureType: compendiumOptionalFeatures.featureType,
+        })
+        .from(compendiumOptionalFeatures)
+        .where(conds)
+        .orderBy(compendiumOptionalFeatures.name)
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumOptionalFeatures).where(conds),
     ]);
     return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
   });

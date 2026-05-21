@@ -3,6 +3,13 @@ import type { AppliedClass } from '../class/types.js';
 import type { AppliedFeat } from '../feat/types.js';
 import type { AppliedBackground } from '../background/types.js';
 import type { AppliedAsi } from '../race/types.js';
+import type { InventoryItem } from '../inventory/types.js';
+
+export const CURRENCY_KEYS = ['cp', 'sp', 'ep', 'gp', 'pp'] as const;
+export type CurrencyKey = (typeof CURRENCY_KEYS)[number];
+export type Currency = Record<CurrencyKey, number>;
+
+export const EMPTY_CURRENCY: Currency = { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
 
 /** Mapeo standard skill → ability (PHB p.174). */
 export const SKILL_TO_ABILITY: Readonly<Record<string, AbilityKey>> = Object.freeze({
@@ -41,6 +48,16 @@ export interface CharacterSnapshot {
   feats?: AppliedFeat[];
   race?: { slug: string; source: string } | null;
   subrace?: { slug: string; source: string } | null;
+  inventory?: InventoryItem[];
+  currency?: Currency;
+  /** ASIs aplicados via level-up (4/8/12/16/19). Independiente de los raciales. */
+  levelUpAsis?: AppliedAsi[];
+  /** Nivel de exhaustion (0-6, PHB p.291). Default 0. */
+  exhaustion?: number;
+  /** Picks de class features (TCE OCF, fighting styles, invocations, maneuvers) por classSlug. */
+  classFeatures?: Record<string, Record<string, Array<{ slug: string; source: string }>>>;
+  /** Selección persistida de spells por clase. */
+  spells?: Record<string, { cantrips: Array<{ slug: string; source: string }>; known: Array<{ slug: string; source: string }>; prepared: Array<{ slug: string; source: string }> }>;
 }
 
 /**
@@ -80,6 +97,40 @@ export interface SpellcastingView {
   ability: AbilityKey;
   saveDC: number;
   attackBonus: number;
+}
+
+/**
+ * Efectos de exhaustion (PHB p.291). Acumulativos: nivel N incluye los
+ * efectos 1..N.
+ */
+export type ExhaustionEffect =
+  | 'disadvantage-ability-checks'
+  | 'speed-halved'
+  | 'disadvantage-attacks-and-saves'
+  | 'hp-max-halved'
+  | 'speed-zero'
+  | 'dead';
+
+export interface ExhaustionView {
+  level: number;
+  /** Efectos activos para este level. Vacío si level=0. */
+  effects: ExhaustionEffect[];
+}
+
+export interface SpellSlotsView {
+  /** 9 valores correspondientes a 1st..9th level slots. */
+  slots: readonly [number, number, number, number, number, number, number, number, number];
+  /** Pact magic separado (Warlock). */
+  pactMagic: { slotLevel: number; slotCount: number } | null;
+}
+
+export interface ClassSpellSummary {
+  classSlug: string;
+  classSource: string;
+  cantripsKnown: { count: number; max: number };
+  spellsKnown: { count: number; max: number } | null;
+  spellsPrepared: { count: number; max: number } | null;
+  wizardSpellbookSize?: number;
 }
 
 export interface CharacterSheet {
@@ -123,4 +174,12 @@ export interface CharacterSheet {
   };
   feats: Array<{ slug: string; source: string }>;
   spellcasting: SpellcastingView[];
+  currency: Currency;
+  encumbrance: { weight: number; max: number; status: 'ok' | 'over' };
+  attunement: { used: number; max: number };
+  spellSlots: SpellSlotsView;
+  spellsByClass: ClassSpellSummary[];
+  exhaustion: ExhaustionView;
+  /** Picks de class features mostrados por classSlug + featureType. */
+  classFeatures: Record<string, Record<string, Array<{ slug: string; source: string }>>>;
 }

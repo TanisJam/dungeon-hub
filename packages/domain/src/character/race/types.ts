@@ -62,13 +62,48 @@ export type RaceValidationIssue =
   | { code: 'ASI_UNKNOWN_ABILITY'; ability: string }
   | {
       /**
-       * El race o subrace usa una "choose" block (Half-Elf, Custom Lineage, etc.).
-       * Soporte para estas razas viene en una iteración posterior (1.4b.2).
+       * El race o subrace usa una "choose" block con shape no soportado
+       * (ej: `weighted`, que no hay en compendio actual).
        */
       code: 'RACE_CHOOSE_SHAPE_UNSUPPORTED';
       where: 'race' | 'subrace';
       slug: string;
       source: string;
+    }
+  | {
+      /** El user picó una ability que no está en la lista `from` del choose. */
+      code: 'RACE_ASI_CHOOSE_INVALID_ABILITY';
+      where: 'race' | 'subrace';
+      ability: string;
+      allowed: AbilityKey[];
+    }
+  | {
+      /** Cantidad incorrecta de picks para un choose con `count` fijo. */
+      code: 'RACE_ASI_CHOOSE_WRONG_COUNT';
+      where: 'race' | 'subrace';
+      expected: number;
+      got: number;
+    }
+  | {
+      /** El bonus de un pick no coincide con el `amount` esperado del choose. */
+      code: 'RACE_ASI_CHOOSE_WRONG_BONUS';
+      where: 'race' | 'subrace';
+      ability: AbilityKey;
+      expected: number;
+      got: number;
+    }
+  | {
+      /** Los picks suman distinto al `amount` esperado (modo distribuir N puntos). */
+      code: 'RACE_ASI_CHOOSE_WRONG_TOTAL';
+      where: 'race' | 'subrace';
+      expected: number;
+      got: number;
+    }
+  | {
+      /** El user picó una ability que YA estaba con fixed en ese mismo block. */
+      code: 'RACE_ASI_OVERLAP_WITH_FIXED';
+      where: 'race' | 'subrace';
+      ability: AbilityKey;
     };
 
 export type RaceValidationResult =

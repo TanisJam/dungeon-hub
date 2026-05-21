@@ -31,6 +31,7 @@ export const DEFAULT_RULES_PROFILE: RulesProfile = {
     spells: [],
     items: [],
     feats: [],
+    optionalFeatures: [],
   },
   variantRules: {
     multiclassing: true,
