@@ -6,15 +6,7 @@ import {
 import { api, ApiError } from '../api-client.js';
 import { env } from '../env.js';
 import { buildSpellEmbed, type SpellRow } from '../embeds/spell.js';
-
-function slugify(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/['']/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import { slugify } from '../utils.js';
 
 interface SpellListResponse {
   data: Array<{ slug: string; source: string; name: string; level: number; school: string }>;

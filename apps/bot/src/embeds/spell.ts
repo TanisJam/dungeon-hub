@@ -29,8 +29,12 @@ function titleCase(s: string): string {
 }
 
 function formatSubclassGrant(g: SubclassGrant): string {
-  // "Light Domain" → "Light" para evitar redundancia con "Cleric" ("Light Domain Cleric" se lee mejor como "Light Cleric").
+  // 5etools mete el source code entre paréntesis cuando hay versiones del mismo
+  // subclass en distintas fuentes (e.g. "Zeal (PSA)"). Limpiamos eso primero.
+  // Luego strip-eamos sufijos genéricos ("Domain", "Patron", etc.) para que
+  // "Light Domain Cleric" quede como "Light Cleric".
   const trimmed = g.subclassName
+    .replace(/\s*\([A-Z0-9]+\)\s*$/i, '')
     .replace(/\s+Domain$/i, '')
     .replace(/\s+Patron$/i, '')
     .replace(/\s+Tradition$/i, '')

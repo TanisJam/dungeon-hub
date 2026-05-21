@@ -342,6 +342,27 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
   });
 
+  app.get('/compendium/items/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumItems)
+      .where(
+        and(
+          eq(compendiumItems.slug, slug),
+          source ? eq(compendiumItems.source, source) : undefined,
+        ),
+      )
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
+
   // ---- FEATS ---------------------------------------------------------------
   app.get('/compendium/feats', { preHandler: app.authenticate }, async (request, reply) => {
     const campaign = await resolveProfile(request, reply);
@@ -377,6 +398,27 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumFeats).where(conds),
     ]);
     return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/feats/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumFeats)
+      .where(
+        and(
+          eq(compendiumFeats.slug, slug),
+          source ? eq(compendiumFeats.source, source) : undefined,
+        ),
+      )
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
   });
 
   // ---- OPTIONAL FEATURES ---------------------------------------------------

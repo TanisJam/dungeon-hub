@@ -75,6 +75,13 @@ Sin guild ID, los comandos se registran globalmente y pueden tardar hasta 1h en 
 
 | Comando | Descripción |
 |---------|-------------|
-| `/spell <name>` | Muestra detalles de un hechizo (descripción, slots, components, classes, etc.) |
+| `/spell <name>` | Detalles de un hechizo (casting time, range, components, classes, bonus subclasses, descripción) |
+| `/feat <name>` | Detalles de un feat (prerequisite, ASI grant, descripción) |
+| `/item <name>` | Detalles de un item (type, weight, cost, properties, damage/AC, magic effects) |
+| `/race <name>` | Detalles de una race o subrace (size, speed, ASIs, languages, traits) |
+| `/class <name> [level]` | Detalles de una clase (hit die, saves, proficiencies, features por nivel) |
 
-Más comandos pendientes — ver roadmap en el PRD.
+Pendientes — ver roadmap en el PRD:
+- `/monster <name>` (necesita importer de bestiary)
+- Comandos de personaje (`/character show`, `/character hp`, `/character rest`)
+- Comandos West Marches (`/session list`, `/world events`, `/lore`, `/map reveal`)
