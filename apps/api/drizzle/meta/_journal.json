@@ -22,6 +22,20 @@
       "when": 1779377628138,
       "tag": "0002_workable_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779388426697,
+      "tag": "0003_first_runaways",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779389777276,
+      "tag": "0004_perpetual_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

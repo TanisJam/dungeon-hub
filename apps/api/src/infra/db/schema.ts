@@ -93,6 +93,146 @@ export const characters = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// sessions — West Marches Session Manager.
+//
+// Una sesión es una entidad VIVA (no metadata pasiva): el DM la crea como
+// draft/scheduled, la pone active al empezar a jugar, pause/resume durante,
+// y completed cuando termina (con distribución de rewards en ese cierre).
+//
+// State machine:
+//   scheduled → active ⇄ paused → completed
+//                          ↘ cancelled
+//
+// Campos privados al DM: `dm_notes` (preparación, encuentros, secretos).
+// Las respuestas filtran este campo según el rol del caller.
+//
+// Constraint runtime (no DB — para evitar partial-unique-index complejo):
+//   un mismo character_id puede tener ≤ 1 fila en session_participants
+//   cuyo session.status ∈ (active, paused) AND left_at IS NULL.
+// ---------------------------------------------------------------------------
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    gmUserId: uuid('gm_user_id')
+      .notNull()
+      .references(() => users.id),
+    title: text('title').notNull(),
+    /** Descripción pública (qué se sabe de la sesión ANTES de jugarla). */
+    description: text('description'),
+    /** Notas privadas del DM (preparación, secretos). NUNCA en respuestas non-GM. */
+    dmNotes: text('dm_notes'),
+    status: text('status', {
+      enum: ['scheduled', 'active', 'paused', 'completed', 'cancelled'],
+    })
+      .notNull()
+      .default('scheduled'),
+    /** Fecha planeada. Nullable para drafts. */
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    /** Cuándo arrancó (state → active la primera vez). */
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    /** Cuándo cerró (state → completed/cancelled). */
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    /** Mínimo nivel sugerido para participar. Soft, solo informativo. */
+    levelMin: integer('level_min'),
+    levelMax: integer('level_max'),
+    /** Tope de jugadores. Hard: el join falla si se alcanza. Nullable = sin tope. */
+    maxPlayers: integer('max_players'),
+    /** Hex ID del mapa donde sucede. Soft FK (el map vive aparte, slice futuro). */
+    locationHexId: text('location_hex_id'),
+    /** Resumen post-cierre. Se genera/edita en `complete`. */
+    summary: text('summary'),
+    /** Rewards distribuidos al cerrar: { xpPerPlayer, goldPerPlayer, items: [{characterId, slug, source}] } */
+    rewards: jsonb('rewards'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_sessions_campaign').on(t.campaignId),
+    index('idx_sessions_status').on(t.status),
+    index('idx_sessions_gm').on(t.gmUserId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// session_participants — link de characters a una sesión.
+//
+// `leftAt` permite que un jugador drop mid-session sin perder el historial.
+// El char "activo" en la sesión es el que tiene left_at IS NULL.
+// ---------------------------------------------------------------------------
+export const sessionParticipants = pgTable(
+  'session_participants',
+  {
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    /** Denormalizado de characters.user_id para queries (acceso, visibility). */
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp('left_at', { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sessionId, t.characterId] }),
+    index('idx_sp_character').on(t.characterId),
+    index('idx_sp_session').on(t.sessionId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// session_events — log append-only de eventos durante una sesión.
+//
+// Cada event captura algo que pasó: notas, descubrimientos, cambios de HP,
+// XP otorgada, items granted, hexes revelados, viajes, etc.
+//
+// `actorUserId` es null en system events (auto-generados por rewards on
+// complete, recharges, etc.).
+//
+// `visibility`:
+//   - 'public': visible para todos los participants + campaign members.
+//   - 'dm-only': visible solo para el GM de la sesión.
+//
+// El log es APPEND-ONLY. No hay PATCH ni DELETE de events — son historia.
+// Si el DM tipea mal, agrega un event nuevo de tipo 'note' aclarando.
+// ---------------------------------------------------------------------------
+export const sessionEvents = pgTable(
+  'session_events',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    /** Cuándo pasó (puede ser != createdAt si se logueó post-facto). */
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Quién lo registró. null = system event (auto-generado). */
+    actorUserId: uuid('actor_user_id').references(() => users.id),
+    /**
+     * Tipo de event. Canonical types: 'note', 'hex_revealed', 'poi_discovered',
+     * 'npc_met', 'travel', 'xp_award', 'gold_grant', 'item_grant', 'hp_change',
+     * 'rest_short', 'rest_long', 'level_up', 'condition', 'inventory_change',
+     * 'consume', 'spell_slot_used'. Open-ended — el caller puede mandar otros.
+     */
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').notNull().default(sql`'{}'::jsonb`),
+    visibility: text('visibility', { enum: ['public', 'dm-only'] })
+      .notNull()
+      .default('public'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_session_events_timeline').on(t.sessionId, t.occurredAt),
+    index('idx_session_events_type').on(t.sessionId, t.eventType),
+  ],
+);
+
 // ===========================================================================
 // COMPENDIUM — data importada desde 5etools.
 //

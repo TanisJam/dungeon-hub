@@ -7,6 +7,7 @@ import { healthRoute } from './http/routes/health.js';
 import { campaignsRoute } from './http/routes/campaigns.js';
 import { compendiumRoute } from './http/routes/compendium.js';
 import { charactersRoute } from './http/routes/characters.js';
+import { sessionsRoute } from './http/routes/sessions.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -29,6 +30,7 @@ export async function buildServer() {
       await api.register(campaignsRoute);
       await api.register(compendiumRoute);
       await api.register(charactersRoute);
+      await api.register(sessionsRoute);
     },
     { prefix: '/api/v1' },
   );
