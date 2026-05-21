@@ -5,3 +5,4 @@ export * from './character/stats/index.js';
 export * from './character/race/index.js';
 export * from './character/class/index.js';
 export * from './character/background/index.js';
+export * from './character/multiclass/index.js';

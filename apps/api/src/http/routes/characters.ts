@@ -5,6 +5,10 @@ import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
 import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
+import { validateMulticlassAddition } from '@dungeon-hub/domain/character/multiclass';
+import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
+import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
+import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
 import {
@@ -48,6 +52,15 @@ const SetStatsBody = z.object({
     wis: z.number().int(),
     cha: z.number().int(),
   }),
+});
+
+const AddMulticlassBody = z.object({
+  class: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  subclass: z
+    .object({ slug: z.string().min(1), source: z.string().min(1) })
+    .nullable()
+    .optional(),
+  skillChoices: z.array(z.string().min(1)).optional(),
 });
 
 const SetBackgroundBody = z.object({
@@ -454,5 +467,75 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .returning();
 
     return updated;
+  });
+
+  // ---- POST /characters/:id/classes ---------------------------------------
+  // Agrega una nueva clase como multiclass (level 1). Prereqs PHB p.163 + profs
+  // reducidas PHB p.164. Para subir nivel de clase existente: Fase 1.8.
+  app.post('/characters/:id/classes', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = AddMulticlassBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const { classData, subclassData } = await loadClassAndSubclass({
+      classSlug: body.class.slug,
+      classSource: body.class.source,
+      subclassSlug: body.subclass?.slug ?? null,
+      subclassSource: body.subclass?.source ?? null,
+    });
+
+    if (!classData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'CLASS_NOT_FOUND', class: body.class }],
+      });
+    }
+    if (body.subclass && !subclassData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SUBCLASS_NOT_FOUND', subclass: body.subclass }],
+      });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const existingClasses = (charData.classes as AppliedClass[] | undefined) ?? [];
+
+    const result = validateMulticlassAddition({
+      rulesProfile: campaign.rulesProfile,
+      baseStats: (charData.baseStats as AbilityScores | undefined) ?? null,
+      asisApplied: (charData.asisApplied as AppliedAsi[] | undefined) ?? [],
+      existingClasses: existingClasses.map((c) => ({ slug: c.slug, source: c.source })),
+      newClassData: classData,
+      newSubclassData: subclassData,
+      skillChoices: body.skillChoices,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const updatedClasses = [...existingClasses, result.appliedClass];
+
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...charData, classes: updatedClasses },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return reply.code(201).send(updated);
   });
 };
