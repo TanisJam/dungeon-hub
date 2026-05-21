@@ -4,6 +4,8 @@ import sensible from '@fastify/sensible';
 import { env } from './env.js';
 import supabaseAuth from './infra/auth/verify-jwt.js';
 import { healthRoute } from './http/routes/health.js';
+import { campaignsRoute } from './http/routes/campaigns.js';
+import { compendiumRoute } from './http/routes/compendium.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -23,6 +25,8 @@ export async function buildServer() {
   await app.register(
     async (api) => {
       await api.register(healthRoute);
+      await api.register(campaignsRoute);
+      await api.register(compendiumRoute);
     },
     { prefix: '/api/v1' },
   );
