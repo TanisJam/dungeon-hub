@@ -36,6 +36,20 @@
       "when": 1779389777276,
       "tag": "0004_perpetual_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779394523048,
+      "tag": "0005_good_hiroim",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779394994115,
+      "tag": "0006_nappy_xorn",
+      "breakpoints": true
     }
   ]
 }

@@ -6,10 +6,12 @@ import {
   jsonb,
   integer,
   numeric,
+  doublePrecision,
   boolean,
   primaryKey,
   uniqueIndex,
   index,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -230,6 +232,118 @@ export const sessionEvents = pgTable(
   (t) => [
     index('idx_session_events_timeline').on(t.sessionId, t.occurredAt),
     index('idx_session_events_type').on(t.sessionId, t.eventType),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// hexes — Hexcrawl Map. Una world map implícita por campaña (no `maps` table
+// aparte, YAGNI). Si más adelante hay dungeons/settlements como mapas
+// separados, agregamos `mapId`.
+//
+// Modelo parent-child para soportar subdivisión (region → sub-region → local
+// → city, etc.):
+//   - parentHexId NULL = hex top-level (mapa regional global de la campaña).
+//   - parentHexId != NULL = sub-hex DENTRO del padre. (q, r) son locales al padre.
+//
+// Coordenadas:
+//   - (q, r) axiales — quantized, para travel/exploration rules de D&D.
+//   - (worldX, worldY) FLOAT opcionales — coords continuas para futuro
+//     render Google Maps-style (Leaflet/MapLibre overlay). El backend razona
+//     en (q, r); el frontend lee (worldX, worldY) si quiere posicionar pins
+//     en un plano continuo.
+//
+// Status (libre, el DM decide, pero progresión sugerida):
+//   unexplored → rumored → explored → cleared
+//
+// Visibility:
+//   - DM ve todos los hexes (incluyendo unexplored + dmNotes).
+//   - Players solo ven status != 'unexplored', NUNCA dmNotes. Sub-hexes de
+//     un parent oculto también quedan ocultos (cascade en la query).
+// ---------------------------------------------------------------------------
+export const hexes = pgTable(
+  'hexes',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    /** NULL = top-level. Self-FK con cascade: borrar un parent borra sus hijos. */
+    parentHexId: uuid('parent_hex_id').references((): AnyPgColumn => hexes.id, {
+      onDelete: 'cascade',
+    }),
+    /** Etiqueta semántica abierta: 'region', 'sub-region', 'local', 'city', etc. */
+    scale: text('scale'),
+    /** Coords axiales — locales al parent si tiene; globales en campaña si NULL. */
+    q: integer('q').notNull(),
+    r: integer('r').notNull(),
+    /** Coords continuas opcionales para render continuo (Leaflet, etc.). */
+    worldX: doublePrecision('world_x'),
+    worldY: doublePrecision('world_y'),
+    name: text('name'),
+    /** Terrain libre: 'forest', 'mountain', 'plains', 'town', 'ruins'... */
+    terrain: text('terrain'),
+    status: text('status', {
+      enum: ['unexplored', 'rumored', 'explored', 'cleared'],
+    })
+      .notNull()
+      .default('unexplored'),
+    /** Notas DM-only. NUNCA en responses para non-GM. */
+    dmNotes: text('dm_notes'),
+    /** Notas visibles para players (lo que "saben" del hex). */
+    playerNotes: text('player_notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // El unique sobre (campaignId, parentHexId, q, r) con NULLS NOT DISTINCT
+    // se aplica via custom SQL migration (drizzle 0.38 no expone .nullsNotDistinct()).
+    // Ver apps/api/drizzle/custom/0002-hexes-unique-nulls-not-distinct.sql
+    index('idx_hexes_campaign_parent').on(t.campaignId, t.parentHexId),
+    index('idx_hexes_status').on(t.status),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// pois — Points of Interest dentro de un hex.
+//
+// Status canonical (DM lo setea libremente, sugerido):
+//   unknown → discovered → cleared
+//
+// Visibility (sigue el patrón de hex):
+//   - DM ve todos los POIs (incluyendo unknown + dmNotes).
+//   - Players solo ven `status != 'unknown'`, NUNCA `dmNotes`.
+//   - Cascade: si el hex parent NO es visible al player, los POIs tampoco.
+//
+// Coords (worldX, worldY) opcionales — pin placement fino dentro del hex
+// cuando llegue el render continuo (Leaflet/MapLibre). Usualmente caen dentro
+// del bbox del hex pero no es hard-rule.
+// ---------------------------------------------------------------------------
+export const pois = pgTable(
+  'pois',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    hexId: uuid('hex_id')
+      .notNull()
+      .references(() => hexes.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** Descripción visible para players (lo que se sabe del POI). */
+    description: text('description'),
+    /** Notas DM-only (secretos, encounters planeados, loot tables). */
+    dmNotes: text('dm_notes'),
+    status: text('status', {
+      enum: ['unknown', 'discovered', 'cleared'],
+    })
+      .notNull()
+      .default('unknown'),
+    /** Pin coords opcionales para el render continuo (Leaflet). */
+    worldX: doublePrecision('world_x'),
+    worldY: doublePrecision('world_y'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_pois_hex').on(t.hexId),
+    index('idx_pois_status').on(t.status),
   ],
 );
 

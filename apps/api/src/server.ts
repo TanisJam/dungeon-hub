@@ -8,6 +8,7 @@ import { campaignsRoute } from './http/routes/campaigns.js';
 import { compendiumRoute } from './http/routes/compendium.js';
 import { charactersRoute } from './http/routes/characters.js';
 import { sessionsRoute } from './http/routes/sessions.js';
+import { mapRoute } from './http/routes/map.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -31,6 +32,7 @@ export async function buildServer() {
       await api.register(compendiumRoute);
       await api.register(charactersRoute);
       await api.register(sessionsRoute);
+      await api.register(mapRoute);
     },
     { prefix: '/api/v1' },
   );
