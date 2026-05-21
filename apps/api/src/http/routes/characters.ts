@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
+import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
 import {
@@ -8,6 +9,7 @@ import {
   getCharacterAccess,
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
+import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
 
@@ -28,6 +30,18 @@ const UpdateBody = z.object({
 const ParamsWithId = z.object({ id: z.string().uuid() });
 const ListQuery = z.object({
   campaign: z.string().uuid().optional(),
+});
+
+const SetStatsBody = z.object({
+  method: z.enum(['standard-array', 'point-buy', 'roll']),
+  scores: z.object({
+    str: z.number().int(),
+    dex: z.number().int(),
+    con: z.number().int(),
+    int: z.number().int(),
+    wis: z.number().int(),
+    cha: z.number().int(),
+  }),
 });
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
@@ -164,5 +178,44 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     await db.delete(characters).where(eq(characters.id, id));
     return reply.code(204).send();
+  });
+
+  // ---- PUT /characters/:id/stats ------------------------------------------
+  // Primer paso del builder: setear baseStats (pre-racial).
+  // Valida contra el método elegido + lo permitido por el Rules Profile de la campaña.
+  app.put('/characters/:id/stats', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = SetStatsBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadCampaign(character.campaignId);
+    if (!campaign) {
+      return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+    }
+
+    const result = validateStats(body.scores, body.method, campaign.rulesProfile.statGeneration);
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+    }
+
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...data, baseStats: body.scores, statMethod: body.method },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
   });
 };
