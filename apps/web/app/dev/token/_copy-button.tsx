@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui';
 
 export function CopyTokenButton({ token }: { token: string }) {
   const [copied, setCopied] = useState(false);
@@ -12,11 +13,10 @@ export function CopyTokenButton({ token }: { token: string }) {
   }
 
   return (
-    <button
-      onClick={handle}
-      className="mt-4 inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 transition"
-    >
-      {copied ? 'Copied ✓' : 'Copy to clipboard'}
-    </button>
+    <div className="mt-4">
+      <Button tone="ghost" size="sm" onClick={handle}>
+        {copied ? 'Copiado ✓' : 'Copiar al portapapeles'}
+      </Button>
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { createCharacter, type CreateState } from './actions';
+import { Button } from '@/components/ui';
 
 type Campaign = { id: string; name: string };
 const INITIAL: CreateState = { error: null };
@@ -12,18 +13,18 @@ export function NewCharacterForm({ campaigns }: { campaigns: Campaign[] }) {
   return (
     <form action={action} className="space-y-5">
       <div>
-        <label htmlFor="campaignId" className="block text-sm font-medium text-zinc-300">
-          Campaign
+        <label htmlFor="campaignId" className="block text-sm font-semibold text-ink-soft">
+          Campaña
         </label>
         <select
           id="campaignId"
           name="campaignId"
           required
           defaultValue=""
-          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none transition-colors"
         >
           <option value="" disabled>
-            Pick a campaign…
+            Elegí una campaña…
           </option>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -34,8 +35,8 @@ export function NewCharacterForm({ campaigns }: { campaigns: Campaign[] }) {
       </div>
 
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-zinc-300">
-          Character name
+        <label htmlFor="name" className="block text-sm font-semibold text-ink-soft">
+          Nombre del personaje
         </label>
         <input
           id="name"
@@ -43,22 +44,24 @@ export function NewCharacterForm({ campaigns }: { campaigns: Campaign[] }) {
           type="text"
           required
           maxLength={60}
-          placeholder="Thorgar the Unyielding"
-          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+          placeholder="Thorgar el Inquebrantable"
+          className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none transition-colors"
         />
       </div>
 
       {state.error && (
-        <p className="text-sm text-red-400">{state.error}</p>
+        <p className="text-sm text-warning-deep">{state.error}</p>
       )}
 
-      <button
+      <Button
         type="submit"
+        tone="green"
+        size="md"
         disabled={pending}
-        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition"
+        className="w-full"
       >
-        {pending ? 'Creating…' : 'Create character'}
-      </button>
+        {pending ? 'Creando…' : 'Crear personaje'}
+      </Button>
     </form>
   );
 }

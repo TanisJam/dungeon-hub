@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { api, ApiError } from '@/lib/api';
+import { Button } from '@/components/ui';
 
 export function ConfirmLinkButton({ token }: { token: string }) {
   const router = useRouter();
@@ -32,22 +33,23 @@ export function ConfirmLinkButton({ token }: { token: string }) {
 
   if (state === 'done') {
     return (
-      <p className="text-emerald-400">
-        ✓ Linked. You can close this tab and head back to Discord.
+      <p className="text-success font-semibold">
+        ✓ Vinculado. Podés cerrar esta pestaña y volver a Discord.
       </p>
     );
   }
 
   return (
     <div className="space-y-3">
-      <button
+      <Button
+        tone="green"
+        size="md"
         onClick={handle}
         disabled={state === 'loading'}
-        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition"
       >
-        {state === 'loading' ? 'Linking…' : 'Confirm link'}
-      </button>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+        {state === 'loading' ? 'Vinculando…' : 'Confirmar vínculo'}
+      </Button>
+      {error && <p className="text-sm text-warning-deep">{error}</p>}
     </div>
   );
 }

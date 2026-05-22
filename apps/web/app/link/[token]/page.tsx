@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { Card } from '@/components/ui';
 import { SignInButton } from '@/app/_components/sign-in-button';
 import { SignOutButton } from '@/app/_components/sign-out-button';
 import { ConfirmLinkButton } from './_confirm-button';
@@ -20,8 +21,8 @@ export default async function LinkTokenPage({ params }: Props) {
 
   if (!session) {
     return (
-      <Shell title="Link your Discord account">
-        <p className="text-zinc-400">Sign in with Discord to confirm this link.</p>
+      <Shell title="Vinculá tu cuenta de Discord">
+        <p className="text-ink-soft">Iniciá sesión con Discord para confirmar este vínculo.</p>
         <div className="mt-6">
           <SignInButton redirectTo={`/link/${token}`} />
         </div>
@@ -49,13 +50,13 @@ export default async function LinkTokenPage({ params }: Props) {
 
   if (mismatch) {
     return (
-      <Shell title="Wrong account">
-        <p className="text-zinc-300">
-          This link is for <strong className="font-mono">{status.discord_username}</strong>.
+      <Shell title="Cuenta incorrecta">
+        <p className="text-ink-soft">
+          Este vínculo es para <strong className="font-mono">{status.discord_username}</strong>.
         </p>
-        <p className="mt-2 text-zinc-400">
-          You are signed in as <span className="font-mono">{sessionDiscordName}</span>. Sign out
-          and sign back in with the right Discord account to continue.
+        <p className="mt-2 text-sm text-ink-mute">
+          Estás conectado como <span className="font-mono">{sessionDiscordName}</span>. Cerrá sesión
+          e ingresá con la cuenta de Discord correcta para continuar.
         </p>
         <div className="mt-6">
           <SignOutButton />
@@ -65,13 +66,13 @@ export default async function LinkTokenPage({ params }: Props) {
   }
 
   return (
-    <Shell title="Confirm link">
-      <p className="text-zinc-300">
-        Link this account to Discord user{' '}
+    <Shell title="Confirmar vínculo">
+      <p className="text-ink-soft">
+        ¿Vincular esta cuenta al usuario de Discord{' '}
         <strong className="font-mono">{status.discord_username}</strong>?
       </p>
-      <p className="mt-1 text-xs text-zinc-500">
-        Token expires {new Date(status.expires_at).toLocaleString()}.
+      <p className="mt-1 text-xs text-ink-mute">
+        El token vence el {new Date(status.expires_at).toLocaleString()}.
       </p>
       <div className="mt-6">
         <ConfirmLinkButton token={token} />
@@ -82,11 +83,13 @@ export default async function LinkTokenPage({ params }: Props) {
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <main className="mx-auto max-w-xl px-6 py-24">
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <div className="mt-6">{children}</div>
-      <Link href="/" className="mt-12 inline-block text-xs text-zinc-500 hover:text-zinc-300">
-        ← Home
+    <main className="mx-auto max-w-sm px-4 py-16">
+      <Card variant="surface" className="p-6">
+        <h1 className="font-display text-xl font-bold text-ink">{title}</h1>
+        <div className="mt-4">{children}</div>
+      </Card>
+      <Link href="/" className="mt-6 inline-block text-xs text-ink-mute hover:text-ink transition-colors">
+        ← Inicio
       </Link>
     </main>
   );
@@ -98,10 +101,10 @@ function ErrorShell({ status, body }: { status: number; body: unknown }) {
       ? String((body as { message: unknown }).message)
       : `HTTP ${status}`;
   return (
-    <Shell title="Link unavailable">
-      <p className="text-zinc-300">{message}</p>
-      <p className="mt-2 text-xs text-zinc-500">
-        Ask the bot for a new link with <code>/link</code> on Discord.
+    <Shell title="Vínculo no disponible">
+      <p className="text-ink-soft">{message}</p>
+      <p className="mt-2 text-xs text-ink-mute">
+        Pedile al bot un vínculo nuevo con <code>/link</code> en Discord.
       </p>
     </Shell>
   );

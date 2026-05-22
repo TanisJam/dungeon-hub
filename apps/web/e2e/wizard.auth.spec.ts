@@ -22,7 +22,7 @@ test.describe('character builder wizard', () => {
     await test.step('submit name + campaign → land on stats step', async () => {
       await page.selectOption('select[name="campaignId"]', { label: 'E2E Test Campaign' });
       await page.fill('input[name="name"]', charName);
-      await page.getByRole('button', { name: /create character/i }).click();
+      await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
     });
 

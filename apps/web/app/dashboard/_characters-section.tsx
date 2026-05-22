@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Pill, SectionHead, Card } from '@/components/ui';
+import type { PillTone } from '@/components/ui';
 
 type CharacterRow = {
   id: string;
@@ -9,32 +11,47 @@ type CharacterRow = {
   updatedAt: string;
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
-  active: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
-  retired: 'bg-zinc-500/15 text-zinc-300 ring-zinc-500/30',
-  dead: 'bg-red-500/15 text-red-300 ring-red-500/30',
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Borrador',
+  active: 'Activo',
+  retired: 'Retirado',
+  dead: 'Muerto',
+  pending_approval: 'Pendiente',
 };
+
+const STATUS_TONES: Record<string, PillTone> = {
+  draft: 'stone',
+  active: 'green',
+  retired: 'ink',
+  dead: 'ink',
+  pending_approval: 'amber',
+};
+
+function getCharacterHref(character: CharacterRow): string {
+  if (character.status === 'draft') {
+    return `/characters/${character.id}/wizard`;
+  }
+  // active, pending_approval, retired, dead → sheet (Phase D will add /characters/[id] page)
+  return `/characters/${character.id}/wizard`;
+}
 
 export function CharactersSection({ characters }: { characters: CharacterRow[] }) {
   return (
     <section>
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
-          Your Characters
-        </h2>
+      <div className="flex items-center justify-between mb-4">
+        <SectionHead num={characters.length || undefined} title="Tus Personajes" />
         <Link
           href="/characters/new"
-          className="text-xs text-indigo-400 hover:text-indigo-300"
+          className="text-xs font-semibold text-primary hover:text-primary-deep transition-colors"
         >
-          + New
+          + Nuevo
         </Link>
       </div>
 
       {characters.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {characters.map((c) => (
             <CharacterCard key={c.id} character={c} />
           ))}
@@ -45,26 +62,22 @@ export function CharactersSection({ characters }: { characters: CharacterRow[] }
 }
 
 function CharacterCard({ character }: { character: CharacterRow }) {
-  const statusClass = STATUS_STYLES[character.status] ?? STATUS_STYLES.retired;
-  // Draft characters jump back into the wizard; later we'll route active chars to a sheet page.
-  const href = `/characters/${character.id}/wizard`;
+  const statusTone: PillTone = STATUS_TONES[character.status] ?? 'stone';
+  const statusLabel = STATUS_LABELS[character.status] ?? character.status;
+  const href = getCharacterHref(character);
+
   return (
     <li>
-      <Link
-        href={href}
-        className="block rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3 transition hover:border-zinc-700"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-medium">{character.name}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">XP {character.xp.toLocaleString()}</p>
+      <Link href={href} className="block transition-opacity hover:opacity-80">
+        <Card variant="surface" className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-ink">{character.name}</p>
+              <p className="mt-0.5 text-xs text-ink-mute">XP {character.xp.toLocaleString()}</p>
+            </div>
+            <Pill tone={statusTone} size="sm">{statusLabel}</Pill>
           </div>
-          <span
-            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${statusClass}`}
-          >
-            {character.status}
-          </span>
-        </div>
+        </Card>
       </Link>
     </li>
   );
@@ -72,13 +85,13 @@ function CharacterCard({ character }: { character: CharacterRow }) {
 
 function EmptyState() {
   return (
-    <div className="mt-4 rounded-lg border border-dashed border-zinc-800 px-4 py-8 text-center">
-      <p className="text-sm text-zinc-500">You don&apos;t have any characters yet.</p>
+    <div className="rounded-md border border-dashed border-line px-4 py-8 text-center">
+      <p className="text-sm text-ink-mute">Todavía no tenés personajes.</p>
       <Link
         href="/characters/new"
-        className="mt-3 inline-block text-xs text-indigo-400 hover:text-indigo-300"
+        className="mt-3 inline-block text-xs font-semibold text-primary hover:text-primary-deep transition-colors"
       >
-        + Create your first character
+        + Crear tu primer personaje
       </Link>
     </div>
   );

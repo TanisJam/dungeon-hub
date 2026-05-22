@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { CrowMark } from '@/components/ui';
 import { SignInButton } from './_components/sign-in-button';
 
 export default async function HomePage() {
@@ -8,11 +9,19 @@ export default async function HomePage() {
   if (user) redirect('/dashboard');
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-24">
-      <h1 className="text-4xl font-bold tracking-tight">Dungeon Hub</h1>
-      <p className="mt-3 text-zinc-400">D&D campaign manager.</p>
+    <main className="mx-auto max-w-sm px-4 py-16 flex flex-col items-center text-center">
+      <div className="mb-6">
+        <CrowMark />
+      </div>
 
-      <div className="mt-12">
+      <h1 className="font-display text-4xl font-bold tracking-tight text-ink">
+        Dungeon Hub
+      </h1>
+      <p className="mt-3 text-sm text-ink-mute">
+        Tu gremio en un solo lugar.
+      </p>
+
+      <div className="mt-10 w-full">
         <SignInButton redirectTo="/dashboard" />
       </div>
     </main>

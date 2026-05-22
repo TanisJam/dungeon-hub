@@ -56,14 +56,14 @@ export default async function DashboardPage() {
     | undefined;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-sm px-4 py-6">
       <IdentityHeader
         me={me}
         avatarUrl={avatarUrl}
         signOut={<SignOutButton />}
       />
 
-      <div className="mt-12 grid gap-12 md:grid-cols-2">
+      <div className="mt-8 flex flex-col gap-10">
         <CharactersSection characters={characters} />
         <CampaignsSection campaigns={campaigns} currentUserId={me.id} />
       </div>
@@ -75,9 +75,9 @@ function FatalError({ error }: { error: unknown }) {
   const message =
     error instanceof ApiError ? `API ${error.status}: ${error.message}` : String(error);
   return (
-    <main className="mx-auto max-w-2xl px-6 py-24">
-      <h1 className="text-2xl font-semibold text-red-400">Failed to load dashboard</h1>
-      <p className="mt-3 font-mono text-sm text-zinc-400">{message}</p>
+    <main className="mx-auto max-w-sm px-4 py-16 text-center">
+      <h1 className="font-display text-2xl font-semibold text-ink">Error al cargar el panel</h1>
+      <p className="mt-3 font-mono text-xs text-ink-mute">{message}</p>
     </main>
   );
 }

@@ -1,13 +1,22 @@
+import { Pill } from '@/components/ui';
+import type { PillTone } from '@/components/ui';
+
 type Me = {
   username: string;
   role: 'admin' | 'dm' | 'player' | string;
   discordUsername: string | null;
 };
 
-const ROLE_STYLES: Record<string, string> = {
-  admin: 'bg-red-500/15 text-red-300 ring-red-500/30',
-  dm: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
-  player: 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/30',
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  dm: 'DM',
+  player: 'Jugador',
+};
+
+const ROLE_TONES: Record<string, PillTone> = {
+  admin: 'coral',
+  dm: 'amber',
+  player: 'green',
 };
 
 export function IdentityHeader({
@@ -19,34 +28,33 @@ export function IdentityHeader({
   avatarUrl?: string;
   signOut: React.ReactNode;
 }) {
-  const roleClass = ROLE_STYLES[me.role] ?? ROLE_STYLES.player;
+  const roleTone: PillTone = ROLE_TONES[me.role] ?? 'stone';
+  const roleLabel = ROLE_LABELS[me.role] ?? me.role;
 
   return (
-    <header className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
+    <header className="flex items-center justify-between gap-4 py-4">
+      <div className="flex items-center gap-3">
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={avatarUrl}
             alt=""
-            className="h-14 w-14 rounded-full ring-1 ring-zinc-700"
+            className="h-12 w-12 rounded-full ring-2 ring-line"
           />
         ) : (
-          <div className="grid h-14 w-14 place-items-center rounded-full bg-zinc-800 text-zinc-400">
+          <div className="grid h-12 w-12 place-items-center rounded-full bg-surface border border-line text-ink-soft font-display font-bold text-lg">
             {me.username.charAt(0).toUpperCase()}
           </div>
         )}
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold">{me.username}</h1>
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${roleClass}`}
-            >
-              {me.role}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-display font-semibold text-lg text-ink leading-tight">
+              {me.username}
             </span>
+            <Pill tone={roleTone} size="sm">{roleLabel}</Pill>
           </div>
           {me.discordUsername && (
-            <p className="text-xs text-zinc-500">@{me.discordUsername} · Discord</p>
+            <p className="text-xs text-ink-mute mt-0.5">@{me.discordUsername} · Discord</p>
           )}
         </div>
       </div>

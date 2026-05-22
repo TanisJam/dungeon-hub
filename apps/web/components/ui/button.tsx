@@ -78,11 +78,11 @@ export function Button(props: ButtonProps) {
     );
   }
 
-  const { asChild: _asChild, tone: _tone, size: _size, children: _children, ...rest } = props as ButtonAsButtonProps;
+  const { asChild: _asChild, tone: _tone, size: _size, children: _children, className: _className, ...rest } = props as ButtonAsButtonProps;
   return (
     <button
       type={rest.type ?? 'button'}
-      className={buildClasses(tone, size, rest.className)}
+      className={buildClasses(tone, size, _className)}
       {...rest}
     >
       {children}

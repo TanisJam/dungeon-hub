@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { Card } from '@/components/ui';
 import { CopyTokenButton } from './_copy-button';
 
 // Dev-only route: muestra el access_token del usuario actual para seeding/scripts.
@@ -12,15 +13,17 @@ export default async function DevTokenPage() {
   const token = session!.access_token;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-xl font-semibold">Dev: access token</h1>
-      <p className="mt-2 text-sm text-zinc-400">
-        Para usar en scripts via <code className="text-zinc-300">TEST_JWT=…</code>.
+    <main className="mx-auto max-w-sm px-4 py-8">
+      <h1 className="font-display text-xl font-bold text-ink">Dev: access token</h1>
+      <p className="mt-2 text-sm text-ink-mute">
+        Para usar en scripts via <code className="font-mono text-ink-soft">TEST_JWT=…</code>.
       </p>
       <CopyTokenButton token={token} />
-      <pre className="mt-4 max-h-72 overflow-auto rounded-md bg-zinc-900 p-4 text-xs text-zinc-300">
-        {token}
-      </pre>
+      <Card variant="surface-soft" className="mt-4 p-4">
+        <pre className="max-h-72 overflow-auto text-xs text-ink-soft font-mono break-all whitespace-pre-wrap">
+          {token}
+        </pre>
+      </Card>
     </main>
   );
 }

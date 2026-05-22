@@ -1,3 +1,6 @@
+import { Pill, SectionHead, Card } from '@/components/ui';
+import type { PillTone } from '@/components/ui';
+
 type CampaignRow = {
   id: string;
   name: string;
@@ -5,9 +8,14 @@ type CampaignRow = {
   memberRole: 'gm' | 'player' | string;
 };
 
-const ROLE_STYLES: Record<string, string> = {
-  gm: 'bg-amber-500/15 text-amber-300 ring-amber-500/30',
-  player: 'bg-indigo-500/15 text-indigo-300 ring-indigo-500/30',
+const ROLE_LABELS: Record<string, string> = {
+  gm: 'DM',
+  player: 'Jugador',
+};
+
+const ROLE_TONES: Record<string, PillTone> = {
+  gm: 'amber',
+  player: 'green',
 };
 
 export function CampaignsSection({
@@ -19,14 +27,14 @@ export function CampaignsSection({
 }) {
   return (
     <section>
-      <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
-        Your Campaigns
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <SectionHead num={campaigns.length || undefined} title="Tus Campañas" />
+      </div>
 
       {campaigns.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul className="mt-4 space-y-2">
+        <ul className="space-y-2">
           {campaigns.map((c) => (
             <CampaignCard key={c.id} campaign={c} isGm={c.gmUserId === currentUserId} />
           ))}
@@ -44,25 +52,25 @@ function CampaignCard({
   isGm: boolean;
 }) {
   const role = isGm ? 'gm' : campaign.memberRole;
-  const roleClass = ROLE_STYLES[role] ?? ROLE_STYLES.player;
+  const roleTone: PillTone = ROLE_TONES[role] ?? 'stone';
+  const roleLabel = ROLE_LABELS[role] ?? role;
+
   return (
-    <li className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3 transition hover:border-zinc-700">
-      <div className="flex items-center justify-between gap-3">
-        <p className="truncate font-medium">{campaign.name}</p>
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${roleClass}`}
-        >
-          {role}
-        </span>
-      </div>
+    <li>
+      <Card variant="surface" className="px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="truncate font-semibold text-ink">{campaign.name}</p>
+          <Pill tone={roleTone} size="sm">{roleLabel}</Pill>
+        </div>
+      </Card>
     </li>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="mt-4 rounded-lg border border-dashed border-zinc-800 px-4 py-8 text-center">
-      <p className="text-sm text-zinc-500">You&apos;re not in any campaign yet.</p>
+    <div className="rounded-md border border-dashed border-line px-4 py-8 text-center">
+      <p className="text-sm text-ink-mute">Todavía no estás en ninguna campaña.</p>
     </div>
   );
 }

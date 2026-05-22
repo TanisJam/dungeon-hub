@@ -1,6 +1,8 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui';
+import { DiscordIcon } from '@/components/ui';
 
 export function SignInButton({ redirectTo }: { redirectTo?: string }) {
   async function handle() {
@@ -15,11 +17,9 @@ export function SignInButton({ redirectTo }: { redirectTo?: string }) {
   }
 
   return (
-    <button
-      onClick={handle}
-      className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2 text-sm font-medium text-white hover:bg-[#4752c4] transition"
-    >
-      Sign in with Discord
-    </button>
+    <Button tone="green" size="md" onClick={handle}>
+      <DiscordIcon />
+      Iniciar sesión con Discord
+    </Button>
   );
 }
