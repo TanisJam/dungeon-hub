@@ -26,40 +26,53 @@ interface ResumenTabProps {
 }
 
 export function ResumenTab({ sheet }: ResumenTabProps) {
-  const abilityEntries = Object.entries(sheet.abilityScores) as Array<[string, { score: number; modifier: number }]>;
-
   return (
     <div className="space-y-4">
-      {/* Ability scores */}
+      {/* Atributos */}
       <Card variant="surface" className="p-4">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-          Atributos
-        </p>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+            Atributos
+          </p>
+          <span className="text-[10px] font-semibold text-ink-soft">
+            Comp. {fmtMod(sheet.proficiencyBonus)}
+          </span>
+        </div>
         <AbilityScoreGrid scores={sheet.abilityScores} />
       </Card>
 
-      {/* Saving throws */}
+      {/* Salvaciones — 2-col grid of cards */}
       <Card variant="surface" className="p-4">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
           Salvaciones
         </p>
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {sheet.savingThrows.map((st) => (
-            <div key={st.ability} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className={[
-                    'h-3.5 w-3.5 rounded-full border flex-shrink-0',
-                    st.proficient
-                      ? 'bg-primary border-primary-deep'
-                      : 'bg-paper-soft border-line',
-                  ].join(' ')}
-                />
-                <span className="text-sm text-ink">
+            <div
+              key={st.ability}
+              className="flex items-center gap-2 rounded-sm border border-line bg-surface px-3 py-2"
+            >
+              {/* Proficiency dot */}
+              <span
+                className={[
+                  'h-3 w-3 flex-shrink-0 rounded-full border',
+                  st.proficient
+                    ? 'bg-primary border-primary-deep'
+                    : 'bg-surface border-line',
+                ].join(' ')}
+              />
+              <div className="min-w-0 flex-1">
+                <span className="block truncate text-xs text-ink leading-tight">
                   {ABILITY_LONG_ES[st.ability] ?? st.ability}
                 </span>
+                <span className="text-[9px] text-ink-mute">{ABILITY_ES[st.ability] ?? st.ability.toUpperCase()}</span>
               </div>
-              <span className={['text-sm font-semibold', st.proficient ? 'text-primary-deep' : 'text-ink-soft'].join(' ')}>
+              <span
+                className={[
+                  'text-xs font-bold flex-shrink-0',
+                  st.proficient ? 'text-primary-deep' : 'text-ink-soft',
+                ].join(' ')}
+              >
                 {fmtMod(st.modifier)}
               </span>
             </div>
@@ -84,7 +97,10 @@ export function ResumenTab({ sheet }: ResumenTabProps) {
       </Card>
 
       {/* Proficiencies */}
-      {(sheet.proficiencies.languages.length > 0 || sheet.proficiencies.tools.length > 0) && (
+      {(sheet.proficiencies.languages.length > 0 ||
+        sheet.proficiencies.armor.length > 0 ||
+        sheet.proficiencies.weapons.length > 0 ||
+        sheet.proficiencies.tools.length > 0) && (
         <Card variant="surface" className="p-4">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
             Competencias
@@ -125,7 +141,56 @@ export function ResumenTab({ sheet }: ResumenTabProps) {
           </div>
         </Card>
       )}
+
+      {/* Rasgos de clase */}
+      <RasgosSection sheet={sheet} />
     </div>
+  );
+}
+
+function RasgosSection({ sheet }: { sheet: CharacterSheet }) {
+  const { classes } = sheet.identity;
+  if (classes.length === 0) return null;
+
+  // Collect subclass labels for the section subtitle
+  const subclassSlugs = classes
+    .flatMap((c) => (c.subclass ? [titleCase(c.subclass.slug)] : []));
+  const sectionSubtitle = subclassSlugs.length > 0 ? subclassSlugs.join(', ') : null;
+
+  return (
+    <Card variant="surface" className="p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          Rasgos de clase
+        </p>
+        {sectionSubtitle && (
+          <span className="text-[10px] text-ink-soft truncate ml-2">
+            {sectionSubtitle}
+          </span>
+        )}
+      </div>
+      <div className="space-y-2">
+        {classes.map((cls) => (
+          <div
+            key={cls.slug}
+            className="rounded-sm border border-line bg-surface px-3 py-3"
+          >
+            <p className="text-sm font-semibold text-ink">
+              {titleCase(cls.slug)}{' '}
+              <span className="font-normal text-ink-mute">nivel {cls.level}</span>
+            </p>
+            {cls.subclass && (
+              <p className="mt-0.5 text-xs text-ink-soft">
+                Subclase: {titleCase(cls.subclass.slug)}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-ink-mute italic">
+              Próximamente: descripciones detalladas de rasgos.
+            </p>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

@@ -21,19 +21,27 @@ export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
       {TABS.map(({ slug, label }) => {
         const isActive = activeTab === slug;
         return (
-          <Link
-            key={slug}
-            href={`/characters/${characterId}?tab=${slug}`}
-            className={[
-              'flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
-              isActive
-                ? 'bg-ink text-surface'
-                : 'bg-surface border border-line text-ink-mute hover:text-ink hover:bg-paper-soft',
-            ].join(' ')}
-            aria-current={isActive ? 'page' : undefined}
-          >
-            {label}
-          </Link>
+          <div key={slug} className="flex-shrink-0 flex flex-col items-center gap-0.5">
+            <Link
+              href={`/characters/${characterId}?tab=${slug}`}
+              className={[
+                'rounded-pill px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
+                isActive
+                  ? 'bg-ink text-surface'
+                  : 'bg-surface border border-line text-ink-mute hover:text-ink hover:bg-paper-soft',
+              ].join(' ')}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              {label}
+            </Link>
+            {/* Accent underline indicator */}
+            <div
+              className={[
+                'h-0.5 w-4 rounded-full transition-opacity duration-200',
+                isActive ? 'bg-accent opacity-100' : 'opacity-0',
+              ].join(' ')}
+            />
+          </div>
         );
       })}
     </nav>

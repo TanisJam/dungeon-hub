@@ -6,7 +6,7 @@ import type { SheetResponse, CharacterStatus } from '@/lib/sheet-types';
 import { AppShell } from '@/components/layout/app-shell';
 import { Pill } from '@/components/ui';
 import { Banner } from '@/components/sheet/banner';
-import { SheetHero } from '@/components/sheet/sheet-hero';
+import { SheetHero, xpForLevel } from '@/components/sheet/sheet-hero';
 import { VitalGrid } from '@/components/sheet/vital-grid';
 import { SheetTabs, type SheetTab } from '@/components/sheet/sheet-tabs';
 import { ResumenTab } from './_tabs/resumen';
@@ -85,9 +85,19 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   const statusBanner = getStatusBanner(character.status);
   const isActive = character.status === 'active';
 
+  // Hero props
+  const { identity } = sheet;
+  const totalLevel = identity.totalLevel;
+  const firstClass = identity.classes[0] ?? null;
+  const raceLabel = identity.race?.slug ?? undefined;
+  const classLabel = firstClass?.slug ?? undefined;
+  const subclassLabel = firstClass?.subclass?.slug ?? undefined;
+  const xpCurrent = character.xp;
+  const xpNextThreshold = xpForLevel(totalLevel + 1);
+
   return (
     <AppShell
-      title={sheet.identity.name}
+      title={identity.name}
       subtitle={classSummary.toUpperCase()}
       rightAction={
         isActive ? (
@@ -102,14 +112,21 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         )}
 
         <SheetHero
-          name={sheet.identity.name}
-          classSummary={classSummary}
+          name={identity.name}
+          raceLabel={raceLabel}
+          classLabel={classLabel}
+          subclassLabel={subclassLabel}
+          level={totalLevel}
+          xpCurrent={xpCurrent}
+          xpNextThreshold={xpNextThreshold}
         />
 
         <VitalGrid
           hp={{ current: currentHp, max: sheet.hitPoints.max }}
           ac={sheet.armorClass.value}
           initiative={sheet.initiative}
+          armorFormula={sheet.armorClass.formula}
+          walkSpeed={sheet.speed.walk}
         />
 
         <SheetTabs activeTab={tab} characterId={id} />
