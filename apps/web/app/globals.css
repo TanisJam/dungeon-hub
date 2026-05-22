@@ -1,11 +1,149 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: dark;
+/* ============================================================
+   TOKEN CONVENTION — READ BEFORE EDITING
+   ============================================================
+   REQUIRED utilities (use these):
+     bg-paper, bg-paper-soft, bg-surface, bg-surface-soft
+     bg-primary, bg-primary-deep, bg-primary-soft
+     bg-accent, bg-accent-deep, bg-accent-soft
+     bg-secondary, bg-secondary-deep, bg-secondary-soft
+     bg-ink, bg-success, bg-warning, bg-warning-soft, bg-warning-deep
+     text-ink, text-ink-soft, text-ink-mute
+     border-line, border-line-soft
+     font-display, font-sans
+     rounded-sm (10px), rounded-md (14px), rounded-lg (20px), rounded-pill (999px)
+     shadow-stamp-sm, shadow-stamp-md, shadow-stamp-lg
+
+   FORBIDDEN utilities (do NOT use):
+     text-zinc-*, text-gray-*, text-slate-*, text-indigo-*
+     bg-zinc-*, bg-gray-*, bg-slate-*, bg-stone-*, bg-neutral-*
+     border-zinc-*, border-gray-*, border-slate-*
+     Any raw Tailwind color utility (amber-500, blue-600, etc.)
+   ============================================================ */
+
+@theme {
+  /* ── Colors: Crepúsculo defaults ── */
+  --color-paper:         #F4EEE5;
+  --color-paper-soft:    #EBE2D2;
+  --color-surface:       #FFFFFF;
+  --color-surface-soft:  #FBF6EE;
+  --color-ink:           #271E33;
+  --color-ink-soft:      #574A6B;
+  --color-ink-mute:      #8A7E9D;
+  --color-line:          #E5DCC8;
+  --color-line-soft:     #F1E9DB;
+  --color-primary:       #6F86C9;
+  --color-primary-deep:  #4C63A6;
+  --color-primary-soft:  #E0E6F4;
+  --color-accent:        #E8946F;
+  --color-accent-deep:   #C46F4A;
+  --color-accent-soft:   #FBE5D8;
+  --color-secondary:     #B6829F;
+  --color-secondary-deep:#8E5C77;
+  --color-secondary-soft:#F3E1EA;
+  --color-success:       #79A07A;
+  --color-warning:       #D9B95E;
+  --color-warning-soft:  #FBF0D2;
+  --color-warning-deep:  #A8842A;
+
+  /* ── Typography ── */
+  --font-display: var(--font-bricolage);
+  --font-sans:    var(--font-manrope);
+
+  /* ── Border radius ── */
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   20px;
+  --radius-pill: 999px;
+
+  /* ── Shadows (modern soft style) ── */
+  --shadow-stamp-sm: 0 1px 2px rgba(39, 30, 51, 0.06), 0 1px 1px rgba(39, 30, 51, 0.04);
+  --shadow-stamp-md: 0 6px 16px rgba(39, 30, 51, 0.10), 0 2px 4px rgba(39, 30, 51, 0.06);
+  --shadow-stamp-lg: 0 16px 40px rgba(39, 30, 51, 0.14);
 }
 
-html, body {
-  background: #0b0d12;
-  color: #e6e8ec;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/* ── Palette: Crepúsculo (default) ── */
+:root[data-palette="crepusculo"],
+:root:not([data-palette]) {
+  --color-paper:         #F4EEE5;
+  --color-paper-soft:    #EBE2D2;
+  --color-surface:       #FFFFFF;
+  --color-surface-soft:  #FBF6EE;
+  --color-ink:           #271E33;
+  --color-ink-soft:      #574A6B;
+  --color-ink-mute:      #8A7E9D;
+  --color-line:          #E5DCC8;
+  --color-line-soft:     #F1E9DB;
+  --color-primary:       #6F86C9;
+  --color-primary-deep:  #4C63A6;
+  --color-primary-soft:  #E0E6F4;
+  --color-accent:        #E8946F;
+  --color-accent-deep:   #C46F4A;
+  --color-accent-soft:   #FBE5D8;
+  --color-secondary:     #B6829F;
+  --color-secondary-deep:#8E5C77;
+  --color-secondary-soft:#F3E1EA;
+  --color-success:       #79A07A;
+  --color-warning:       #D9B95E;
+  --color-warning-soft:  #FBF0D2;
+  --color-warning-deep:  #A8842A;
+}
+
+/* ── Palette: Bosque ── */
+[data-palette="bosque"] {
+  --color-paper:         #EEF0E5;
+  --color-paper-soft:    #DDE2CE;
+  --color-surface:       #FAFBF6;
+  --color-surface-soft:  #F1F3E8;
+  --color-ink:           #1F2A22;
+  --color-ink-soft:      #3F5343;
+  --color-ink-mute:      #6E8475;
+  --color-line:          #D2DAC2;
+  --color-line-soft:     #E4EAD8;
+  --color-primary:       #5B8C5A;
+  --color-primary-deep:  #3A6539;
+  --color-primary-soft:  #DDE9D6;
+  --color-accent:        #C97A4B;
+  --color-accent-deep:   #9E5B30;
+  --color-accent-soft:   #F4DDC8;
+  --color-secondary:     #8E7351;
+  --color-secondary-deep:#634F33;
+  --color-secondary-soft:#E8DEC6;
+  --color-warning-soft:  #F4DDC8;
+  --color-warning-deep:  #9E5B30;
+}
+
+/* ── Palette: Reposo ── */
+[data-palette="reposo"] {
+  --color-paper:         #F5EFE5;
+  --color-paper-soft:    #E7DEC9;
+  --color-surface:       #FBF7EE;
+  --color-surface-soft:  #F3ECDA;
+  --color-ink:           #2A2926;
+  --color-ink-soft:      #5A554D;
+  --color-ink-mute:      #8C8478;
+  --color-line:          #DDD2BC;
+  --color-line-soft:     #EAE0CC;
+  --color-primary:       #58804F;
+  --color-primary-deep:  #3E5E37;
+  --color-primary-soft:  #D8E2CE;
+  --color-accent:        #B83E3E;
+  --color-accent-deep:   #8C2E2E;
+  --color-accent-soft:   #F1D4D4;
+  --color-secondary:     #C97DA0;
+  --color-secondary-deep:#95577A;
+  --color-secondary-soft:#F0D9E3;
+  --color-warning-soft:  #F1D4D4;
+  --color-warning-deep:  #8C2E2E;
+}
+
+/* ── Base styles ── */
+html,
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
