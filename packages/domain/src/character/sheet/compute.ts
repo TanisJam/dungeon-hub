@@ -143,6 +143,36 @@ function extractRaceLanguages(race: RaceSheetData): string[] {
   return out;
 }
 
+/**
+ * Normaliza una entry de proficiency a string limpia.
+ *
+ * 5etools usa formato mixto:
+ *   - `"light"` (string)
+ *   - `{ proficiency: "light", full: "light armor" }` (object)
+ *   - `"{@item club|phb|clubs}"` (string con inline tag)
+ *
+ * Devolvemos una sola string display-ready (sin tags 5etools).
+ */
+function normalizeProf(x: unknown): string {
+  if (typeof x === 'string') return stripInlineTag(x);
+  if (x && typeof x === 'object') {
+    const obj = x as { full?: unknown; proficiency?: unknown };
+    if (typeof obj.full === 'string') return stripInlineTag(obj.full);
+    if (typeof obj.proficiency === 'string') return stripInlineTag(obj.proficiency);
+  }
+  return '—';
+}
+
+/**
+ * Strippea inline tags 5etools del estilo `{@item club|phb|clubs}` quedándose
+ * con el display text (último segment después del pipe, fallback al primero).
+ */
+function stripInlineTag(s: string): string {
+  return s.replace(/\{@\w+\s+([^|}]+)(?:\|[^}]*?\|([^}]+))?(?:\|[^}]*)?\}/g, (_, first, last) => {
+    return (last ?? first).trim();
+  });
+}
+
 interface ComputeInput {
   character: CharacterSnapshot;
   raceData?: RaceSheetData | null;
@@ -277,18 +307,23 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     });
 
   // ---- Proficiencies consolidadas ---------------------------------------
+  // 5etools serializa proficiency entries como `string | { proficiency, full }`.
+  // El AppliedClass copia tal cual del compendium, así que acá normalizamos para
+  // que el shape final del sheet sea siempre string[]. También strippeamos los
+  // inline tags 5etools (`{@item club|phb|clubs}` → `clubs`) que aparecen en
+  // weaponProficiencies en particular.
   const armor = new Set<string>();
   const weapons = new Set<string>();
   const tools = new Set<string>();
   const languages = new Set<string>();
   for (const c of classes) {
-    for (const x of c.armorProficiencies) armor.add(x);
-    for (const x of c.weaponProficiencies) weapons.add(x);
-    for (const x of c.toolProficiencies) tools.add(x);
+    for (const x of c.armorProficiencies) armor.add(normalizeProf(x));
+    for (const x of c.weaponProficiencies) weapons.add(normalizeProf(x));
+    for (const x of c.toolProficiencies) tools.add(normalizeProf(x));
   }
-  for (const x of character.background?.tools ?? []) tools.add(x);
-  for (const x of character.background?.languages ?? []) languages.add(x);
-  if (raceData) for (const x of extractRaceLanguages(raceData)) languages.add(x);
+  for (const x of character.background?.tools ?? []) tools.add(normalizeProf(x));
+  for (const x of character.background?.languages ?? []) languages.add(normalizeProf(x));
+  if (raceData) for (const x of extractRaceLanguages(raceData)) languages.add(normalizeProf(x));
 
   // ---- Speed + size desde race ------------------------------------------
   const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };
