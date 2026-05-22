@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
-import { parseAsis, type AbilityKey, type RaceData } from './_parsers';
+import { effectiveAsiSlots, type AbilityKey, type RaceData } from './_parsers';
 import { RacePicker, type RaceEntry } from './_picker';
 
 type RaceRow = {
@@ -42,24 +42,35 @@ function deriveChosenAsis(
   selected: RaceEntry,
 ): Record<string, AbilityKey[]> {
   const out: Record<string, AbilityKey[]> = {};
+  const { raceSlots, subraceSlots } = effectiveAsiSlots({
+    parentAbility: parent?.data.ability,
+    selectedAbility: selected.data.ability,
+    selectedIsSubrace: selected.isSubrace,
+  });
 
-  const buckets: Array<{ entry: RaceEntry; source: 'race' | 'subrace' }> = [];
-  if (parent) buckets.push({ entry: parent, source: 'race' });
-  buckets.push({ entry: selected, source: selected.isSubrace ? 'subrace' : 'race' });
+  const buckets: Array<{ slots: typeof raceSlots; source: 'race' | 'subrace' }> = [
+    { slots: raceSlots, source: 'race' },
+    { slots: subraceSlots, source: 'subrace' },
+  ];
 
-  for (const { entry, source } of buckets) {
-    const slots = parseAsis(entry.data.ability);
+  for (const { slots, source } of buckets) {
+    const consumed = new Set<number>();
     slots.forEach((slot, idx) => {
       if (slot.kind !== 'choose') return;
-      const picks = asisApplied
-        .filter(
-          (a) =>
-            a.source === source &&
-            a.bonus === slot.amount &&
-            slot.from.includes(a.ability.toLowerCase() as AbilityKey),
-        )
-        .map((a) => a.ability.toLowerCase() as AbilityKey)
-        .slice(0, slot.count);
+      const picks: AbilityKey[] = [];
+      for (let i = 0; i < asisApplied.length; i++) {
+        if (picks.length >= slot.count) break;
+        if (consumed.has(i)) continue;
+        const a = asisApplied[i]!;
+        if (
+          a.source === source &&
+          a.bonus === slot.amount &&
+          slot.from.includes(a.ability.toLowerCase() as AbilityKey)
+        ) {
+          picks.push(a.ability.toLowerCase() as AbilityKey);
+          consumed.add(i);
+        }
+      }
       if (picks.length > 0) out[`${source}:${idx}`] = picks;
     });
   }

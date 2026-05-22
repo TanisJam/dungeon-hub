@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import {
   ABILITY_KEYS,
+  effectiveAsiSlots,
   formatAsisSummary,
   formatLanguages,
   formatSize,
@@ -99,10 +100,15 @@ export function RacePicker({
     const subracePart =
       selected.isSubrace ? { slug: selected.slug, source: selected.source } : null;
 
-    // Expand ASIs: fixed + choose (filled by user).
+    // Slots efectivos (handles MPMM/2024 case where ability data is empty).
+    const { raceSlots, subraceSlots } = effectiveAsiSlots({
+      parentAbility: parent?.data.ability,
+      selectedAbility: selected.data.ability,
+      selectedIsSubrace: selected.isSubrace,
+    });
+
     const appliedAsis: Array<{ ability: AbilityKey; bonus: number; source: 'race' | 'subrace' }> = [];
-    const collect = (data: RaceData, source: 'race' | 'subrace') => {
-      const slots = parseAsis(data.ability);
+    const consume = (slots: AsiSlot[], source: 'race' | 'subrace') => {
       slots.forEach((slot, idx) => {
         if (slot.kind === 'fixed') {
           appliedAsis.push({ ability: slot.ability, bonus: slot.bonus, source });
@@ -120,11 +126,20 @@ export function RacePicker({
     };
 
     try {
-      if (parent) collect(parent.data, 'race');
-      if (selected.isSubrace) collect(selected.data, 'subrace');
-      else collect(selected.data, 'race');
+      consume(raceSlots, 'race');
+      consume(subraceSlots, 'subrace');
     } catch {
-      return; // setError ya hizo lo suyo
+      return;
+    }
+
+    // Anti-duplicate: el validator rechaza el mismo ability con +2 y +1.
+    const seen = new Set<string>();
+    for (const a of appliedAsis) {
+      if (seen.has(a.ability)) {
+        setError(`Each ability score can only be increased once. Got ${a.ability.toUpperCase()} twice.`);
+        return;
+      }
+      seen.add(a.ability);
     }
 
     startTransition(async () => {
@@ -253,12 +268,9 @@ function RaceDetailPanel({
         {size} · Speed {speed} · {entry.source}
       </p>
 
-      {parent && (
-        <AsiBlock data={parent.data} source="race" chosen={chosenAsis} setChosen={setChosenAsis} />
-      )}
-      <AsiBlock
-        data={entry.data}
-        source={entry.isSubrace ? 'subrace' : 'race'}
+      <AsiSection
+        parent={parent}
+        entry={entry}
         chosen={chosenAsis}
         setChosen={setChosenAsis}
       />
@@ -287,25 +299,70 @@ function RaceDetailPanel({
   );
 }
 
-function AsiBlock({
-  data,
-  source,
+function AsiSection({
+  parent,
+  entry,
   chosen,
   setChosen,
 }: {
-  data: RaceData;
-  source: 'race' | 'subrace';
+  parent: RaceEntry | null;
+  entry: RaceEntry;
   chosen: Record<string, AbilityKey[]>;
   setChosen: (next: Record<string, AbilityKey[]>) => void;
 }) {
-  const slots = parseAsis(data.ability);
+  const { raceSlots, subraceSlots } = effectiveAsiSlots({
+    parentAbility: parent?.data.ability,
+    selectedAbility: entry.data.ability,
+    selectedIsSubrace: entry.isSubrace,
+  });
+
+  const parentAbilityEmpty =
+    parent && !(parent.data.ability && parent.data.ability.length > 0);
+  const entryAbilityEmpty = !(entry.data.ability && entry.data.ability.length > 0);
+  const isMpmmSynthetic = parentAbilityEmpty && entryAbilityEmpty;
+
+  return (
+    <>
+      {raceSlots.length > 0 && (
+        <AsiBlock
+          slots={raceSlots}
+          source="race"
+          label={isMpmmSynthetic ? 'Ability Score Increase (2024 / MPMM)' : 'Ability Score Increase'}
+          chosen={chosen}
+          setChosen={setChosen}
+        />
+      )}
+      {subraceSlots.length > 0 && (
+        <AsiBlock
+          slots={subraceSlots}
+          source="subrace"
+          label="Ability Score Increase (subrace)"
+          chosen={chosen}
+          setChosen={setChosen}
+        />
+      )}
+    </>
+  );
+}
+
+function AsiBlock({
+  slots,
+  source,
+  label,
+  chosen,
+  setChosen,
+}: {
+  slots: AsiSlot[];
+  source: 'race' | 'subrace';
+  label: string;
+  chosen: Record<string, AbilityKey[]>;
+  setChosen: (next: Record<string, AbilityKey[]>) => void;
+}) {
   if (slots.length === 0) return null;
 
   return (
     <div className="mt-4">
-      <p className="text-xs uppercase tracking-wide text-zinc-500">
-        Ability Score Increase {source === 'subrace' && '(subrace)'}
-      </p>
+      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
       <div className="mt-2 space-y-2">
         {slots.map((slot, idx) => {
           if (slot.kind === 'fixed') {

@@ -48,6 +48,43 @@ export function formatSpeed(speed: RaceData['speed']): string {
   return parts.join(', ');
 }
 
+/**
+ * MPMM "Custom Origin" default bag — `+2` y `+1` libres a abilities distintas.
+ * El validator del API espera este bag cuando race y subrace no tienen el
+ * field `ability` (convención 5etools post-2024 + MPMM).
+ */
+export function mpmmSyntheticSlots(): AsiSlot[] {
+  return [
+    { kind: 'choose', from: [...ABILITY_KEYS], amount: 2, count: 1 },
+    { kind: 'choose', from: [...ABILITY_KEYS], amount: 1, count: 1 },
+  ];
+}
+
+/**
+ * Slots efectivos de ASI considerando la combinación race + subrace.
+ *
+ * Si parent y selected no tienen ability data (raza estilo MPMM/2024), devuelve
+ * los slots sintéticos +2/+1 en el bucket 'race'. Esto matchea la lógica del
+ * validator del API (`raceIsEmpty && !subraceHasChoose`).
+ */
+export function effectiveAsiSlots(input: {
+  parentAbility: RaceData['ability'];
+  selectedAbility: RaceData['ability'];
+  selectedIsSubrace: boolean;
+}): { raceSlots: AsiSlot[]; subraceSlots: AsiSlot[] } {
+  const parentSlots = parseAsis(input.parentAbility);
+  const selectedSlots = parseAsis(input.selectedAbility);
+
+  if (parentSlots.length + selectedSlots.length === 0) {
+    return { raceSlots: mpmmSyntheticSlots(), subraceSlots: [] };
+  }
+
+  if (input.selectedIsSubrace) {
+    return { raceSlots: parentSlots, subraceSlots: selectedSlots };
+  }
+  return { raceSlots: selectedSlots, subraceSlots: [] };
+}
+
 export function parseAsis(
   ability: RaceData['ability'],
 ): AsiSlot[] {
