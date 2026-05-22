@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import type { SheetResponse, CharacterStatus } from '@/lib/sheet-types';
+import { AppShell } from '@/components/layout/app-shell';
+import { Pill } from '@/components/ui';
 import { Banner } from '@/components/sheet/banner';
 import { SheetHero } from '@/components/sheet/sheet-hero';
 import { VitalGrid } from '@/components/sheet/vital-grid';
@@ -55,22 +57,20 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
       if (err.status === 404) notFound();
       if (err.status === 403) {
         return (
-          <main className="mx-auto max-w-sm px-4 py-10 text-center">
-            <p className="text-sm font-semibold text-ink">No tenés acceso a este personaje.</p>
-            <Link href="/dashboard" className="mt-4 inline-block text-xs text-primary-deep hover:underline">
-              ← Volver al inicio
-            </Link>
-          </main>
+          <AppShell title="Ficha" constructorHref="/characters/new">
+            <div className="py-10 text-center">
+              <p className="text-sm font-semibold text-ink">No tenés acceso a este personaje.</p>
+            </div>
+          </AppShell>
         );
       }
     }
     return (
-      <main className="mx-auto max-w-sm px-4 py-10 text-center">
-        <p className="text-sm font-semibold text-ink">Error al cargar la ficha.</p>
-        <Link href="/dashboard" className="mt-4 inline-block text-xs text-primary-deep hover:underline">
-          ← Volver al inicio
-        </Link>
-      </main>
+      <AppShell title="Ficha" constructorHref="/characters/new">
+        <div className="py-10 text-center">
+          <p className="text-sm font-semibold text-ink">Error al cargar la ficha.</p>
+        </div>
+      </AppShell>
     );
   }
 
@@ -83,34 +83,46 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
 
   const classSummary = buildClassSummary(data);
   const statusBanner = getStatusBanner(character.status);
+  const isActive = character.status === 'active';
 
   return (
-    <main className="mx-auto max-w-sm px-4 py-5 space-y-4">
-      {statusBanner && (
-        <Banner tone={statusBanner.tone}>{statusBanner.text}</Banner>
-      )}
+    <AppShell
+      title={sheet.identity.name}
+      subtitle={classSummary.toUpperCase()}
+      rightAction={
+        isActive ? (
+          <Pill tone="green" size="sm">Activo</Pill>
+        ) : undefined
+      }
+      constructorHref={`/characters/${id}/wizard/stats`}
+    >
+      <div className="space-y-4">
+        {statusBanner && (
+          <Banner tone={statusBanner.tone}>{statusBanner.text}</Banner>
+        )}
 
-      <SheetHero
-        name={sheet.identity.name}
-        classSummary={classSummary}
-      />
+        <SheetHero
+          name={sheet.identity.name}
+          classSummary={classSummary}
+        />
 
-      <VitalGrid
-        hp={{ current: currentHp, max: sheet.hitPoints.max }}
-        ac={sheet.armorClass.value}
-        initiative={sheet.initiative}
-      />
+        <VitalGrid
+          hp={{ current: currentHp, max: sheet.hitPoints.max }}
+          ac={sheet.armorClass.value}
+          initiative={sheet.initiative}
+        />
 
-      <SheetTabs activeTab={tab} characterId={id} />
+        <SheetTabs activeTab={tab} characterId={id} />
 
-      <div>
-        {tab === 'resumen' && <ResumenTab sheet={sheet} />}
-        {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
-        {tab === 'hechizos' && <HechizosTab sheet={sheet} />}
-        {tab === 'inventario' && <InventarioTab inventory={inventory} />}
-        {tab === 'notas' && <NotasTab />}
+        <div>
+          {tab === 'resumen' && <ResumenTab sheet={sheet} />}
+          {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
+          {tab === 'hechizos' && <HechizosTab sheet={sheet} />}
+          {tab === 'inventario' && <InventarioTab inventory={inventory} />}
+          {tab === 'notas' && <NotasTab />}
+        </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
 

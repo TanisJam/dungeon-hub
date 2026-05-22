@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
+import { AppShell } from '@/components/layout/app-shell';
 import { Card } from '@/components/ui';
 import { NewCharacterForm } from './_form';
 
@@ -17,13 +18,23 @@ export default async function NewCharacterPage() {
     session!.access_token,
   );
 
+  const exitLink = (
+    <Link
+      href="/dashboard"
+      className="text-xs font-semibold text-ink-mute hover:text-ink transition-colors"
+    >
+      ← Salir
+    </Link>
+  );
+
   return (
-    <main className="mx-auto max-w-sm px-4 py-8">
-      <Link href="/dashboard" className="text-xs font-semibold text-ink-mute hover:text-ink transition-colors">
-        ← Inicio
-      </Link>
-      <h1 className="mt-4 font-display text-2xl font-bold text-ink">Nuevo personaje</h1>
-      <p className="mt-2 text-sm text-ink-mute">
+    <AppShell
+      title="Constructor"
+      subtitle="NUEVO PERSONAJE"
+      rightAction={exitLink}
+      constructorHref="/characters/new"
+    >
+      <p className="text-sm text-ink-mute">
         Elegí una campaña y un nombre. Después configuramos atributos, linaje, clase y trasfondo.
       </p>
 
@@ -38,6 +49,6 @@ export default async function NewCharacterPage() {
           <NewCharacterForm campaigns={campaigns} />
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

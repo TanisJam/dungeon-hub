@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { AppShell } from '@/components/layout/app-shell';
 import { Stepper } from '@/components/layout/stepper';
 import { Pill } from '@/components/ui';
 import { Card } from '@/components/ui';
+import { StepSubtitle } from './_step-subtitle';
 
 type Character = { id: string; name: string; status: string; campaignId: string };
 
@@ -39,38 +41,43 @@ export default async function BuildLayout({ children, params }: Props) {
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       return (
-        <main className="mx-auto max-w-sm px-4 py-16">
+        <AppShell title="Constructor" constructorHref="/characters/new">
           <Card variant="surface" className="p-6 text-center">
             <p className="text-ink font-semibold">Personaje no encontrado</p>
-            <Link href="/dashboard" className="mt-4 inline-block text-sm text-primary-deep hover:underline">
-              ← Inicio
-            </Link>
           </Card>
-        </main>
+        </AppShell>
       );
     }
     throw err;
   }
 
-  const statusLabel = STATUS_LABELS[character.status] ?? character.status;
   const statusTone = STATUS_TONES[character.status] ?? 'stone';
+  const statusLabel = STATUS_LABELS[character.status] ?? character.status;
+
+  const exitLink = (
+    <Link
+      href="/dashboard"
+      className="text-xs font-semibold text-ink-mute hover:text-ink transition-colors"
+    >
+      ← Salir
+    </Link>
+  );
 
   return (
-    <main className="mx-auto max-w-sm px-4 py-6">
-      <Link href="/dashboard" className="text-xs text-ink-mute hover:text-ink-soft transition">
-        ← Inicio
-      </Link>
-
-      <header className="mt-3 flex items-center gap-2">
+    <AppShell
+      title="Constructor"
+      subtitle={<StepSubtitle />}
+      rightAction={exitLink}
+      constructorHref={`/characters/${id}/wizard`}
+    >
+      <div className="flex items-center gap-2 mb-4">
         <h1 className="font-display text-xl font-bold text-ink">{character.name}</h1>
         <Pill tone={statusTone} size="sm">{statusLabel}</Pill>
-      </header>
-
-      <div className="mt-4">
-        <Stepper characterId={id} />
       </div>
 
+      <Stepper characterId={id} />
+
       <div className="mt-8">{children}</div>
-    </main>
+    </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { SignOutButton } from '@/app/_components/sign-out-button';
+import { AppShell } from '@/components/layout/app-shell';
 import { IdentityHeader } from './_identity-header';
 import { CharactersSection } from './_characters-section';
 import { CampaignsSection } from './_campaigns-section';
@@ -56,7 +57,7 @@ export default async function DashboardPage() {
     | undefined;
 
   return (
-    <main className="mx-auto max-w-sm px-4 py-6">
+    <AppShell title="Dungeon Hub" subtitle="TU GREMIO" constructorHref="/characters/new">
       <IdentityHeader
         me={me}
         avatarUrl={avatarUrl}
@@ -67,7 +68,7 @@ export default async function DashboardPage() {
         <CharactersSection characters={characters} />
         <CampaignsSection campaigns={campaigns} currentUserId={me.id} />
       </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -75,9 +76,11 @@ function FatalError({ error }: { error: unknown }) {
   const message =
     error instanceof ApiError ? `API ${error.status}: ${error.message}` : String(error);
   return (
-    <main className="mx-auto max-w-sm px-4 py-16 text-center">
-      <h1 className="font-display text-2xl font-semibold text-ink">Error al cargar el panel</h1>
-      <p className="mt-3 font-mono text-xs text-ink-mute">{message}</p>
-    </main>
+    <AppShell title="Dungeon Hub" subtitle="TU GREMIO">
+      <div className="py-12 text-center">
+        <h1 className="font-display text-2xl font-semibold text-ink">Error al cargar el panel</h1>
+        <p className="mt-3 font-mono text-xs text-ink-mute">{message}</p>
+      </div>
+    </AppShell>
   );
 }

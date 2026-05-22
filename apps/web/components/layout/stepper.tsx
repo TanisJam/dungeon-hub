@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useSelectedLayoutSegment } from 'next/navigation';
+import { Icon } from '@/components/ui/icon';
 
 const STEPS = [
   { segment: 'stats',      label: 'Atributos' },
@@ -60,6 +61,8 @@ export function Stepper({ characterId }: { characterId: string }) {
                     </span>
                     <span className="text-xs font-semibold">{step.label}</span>
                   </>
+                ) : done ? (
+                  <Icon name="check" size={14} className="text-primary-deep" strokeWidth={2.5} />
                 ) : (
                   <span>{i + 1}</span>
                 )}

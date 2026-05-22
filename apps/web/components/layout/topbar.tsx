@@ -2,17 +2,17 @@ import type { ReactNode } from 'react';
 import { CrowMark } from '@/components/ui/crow-mark';
 
 interface TopBarProps {
-  title?: string;
-  sub?: string;
+  title: string;
+  subtitle?: ReactNode;
   right?: ReactNode;
 }
 
 /**
  * TopBar — sticky app header.
  * Sticky, white-blur backdrop, crow mark + title + optional subtitle + right slot.
- * Server component.
+ * Server component (subtitle/right can be client islands).
  */
-export function TopBar({ title = 'Dungeon Hub', sub, right }: TopBarProps) {
+export function TopBar({ title, subtitle, right }: TopBarProps) {
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 px-4 py-3 bg-surface/90 backdrop-blur-md border-b border-line">
       <CrowMark />
@@ -20,9 +20,9 @@ export function TopBar({ title = 'Dungeon Hub', sub, right }: TopBarProps) {
         <span className="font-display font-bold text-base leading-tight tracking-tight text-ink truncate">
           {title}
         </span>
-        {sub && (
+        {subtitle && (
           <span className="text-[11px] font-semibold text-ink-mute tracking-wide uppercase">
-            {sub}
+            {subtitle}
           </span>
         )}
       </div>
