@@ -90,7 +90,7 @@ test.describe('character builder wizard', () => {
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
     });
 
-    await test.step('revisión: verificar completitud + activar', async () => {
+    await test.step('revisión: verificar completitud + publicar', async () => {
       // Las 4 secciones aparecen (los labels pueden duplicarse entre completeness
       // y section headers — basta confirmar al menos una instancia).
       await expect(page.locator('text=Atributos').first()).toBeVisible();
@@ -98,15 +98,17 @@ test.describe('character builder wizard', () => {
       await expect(page.locator('text=Clase').first()).toBeVisible();
       await expect(page.locator('text=Trasfondo').first()).toBeVisible();
 
-      // Activate
-      await page.getByRole('button', { name: /activar personaje/i }).click();
+      // Publish — button text changed to "Publicar para aprobación"
+      await page.getByRole('button', { name: /publicar para aprobación/i }).click();
+
+      // Splash is shown — wait for it to appear then auto-redirect (4s) + buffer
       await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
     });
 
-    await test.step('dashboard shows new character as active', async () => {
+    await test.step('dashboard shows new character as pending', async () => {
       const charCard = page.locator('li').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
-      await expect(charCard).toContainText('Activo');
+      await expect(charCard).toContainText('Pendiente');
     });
   });
 });
