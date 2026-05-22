@@ -121,6 +121,14 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           {tab === 'inventario' && <InventarioTab inventory={inventory} />}
           {tab === 'notas' && <NotasTab />}
         </div>
+
+        <Link
+          href={`/characters/${id}/wizard/stats`}
+          className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-ink-mute hover:text-ink-soft transition-colors"
+        >
+          <span aria-hidden>✎</span>
+          Editar personaje en el constructor
+        </Link>
       </div>
     </AppShell>
   );
