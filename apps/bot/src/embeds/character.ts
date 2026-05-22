@@ -4,7 +4,7 @@ export interface CharacterRow {
   id: string;
   campaignId: string;
   name: string;
-  status: 'draft' | 'active' | 'retired' | 'dead';
+  status: 'draft' | 'active' | 'retired' | 'dead' | 'pending_approval';
   xp: number;
   createdAt: string;
   updatedAt: string;
@@ -100,6 +100,7 @@ const STATUS_BADGE: Record<CharacterRow['status'], string> = {
   active: '🟢 active',
   retired: '🪶 retired',
   dead: '💀 dead',
+  pending_approval: '⏳ Pendiente',
 };
 
 function shortId(uuid: string): string {
@@ -251,7 +252,11 @@ export function buildCharacterSheetEmbed(
       `*${raceLine} · ${classLine} · Lvl ${identity.totalLevel}*\n` +
         `${STATUS_BADGE[detail.status]} · ${detail.xp} XP`,
     )
-    .setColor(detail.status === 'dead' ? 0x7f8c8d : 0xe67e22);
+    .setColor(
+      detail.status === 'dead' || detail.status === 'retired' ? 0x7f8c8d
+      : detail.status === 'pending_approval' ? 0xe6a942
+      : 0xe67e22,
+    );
 
   // ---- Combat stats inline ----
   embed.addFields(

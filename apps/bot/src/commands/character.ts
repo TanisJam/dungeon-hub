@@ -98,10 +98,11 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
   }
   const focused = interaction.options.getFocused().toLowerCase().trim();
   try {
+    // SCN-BOT-05: autocomplete should only surface active characters for players.
     const list = await api.getAs<{ data: CharacterRow[] }>(
       interaction.user.id,
       '/api/v1/characters',
-      { campaign: env.CAMPAIGN_ID },
+      { campaign: env.CAMPAIGN_ID, status: 'active' },
     );
     const filtered = focused
       ? list.data.filter((c) => c.name.toLowerCase().includes(focused))
@@ -175,10 +176,11 @@ async function resolveCharacterId(
 async function runList(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
+    // SCN-BOT-01: players see only active characters. No GM context in bot v1.
     const list = await api.getAs<{ data: CharacterRow[] }>(
       interaction.user.id,
       '/api/v1/characters',
-      { campaign: env.CAMPAIGN_ID },
+      { campaign: env.CAMPAIGN_ID, status: 'active' },
     );
     await interaction.editReply({ embeds: [buildCharactersListEmbed(list.data)] });
   } catch (err) {
