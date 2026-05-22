@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq, ilike, sql, type SQL } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import { db } from '../../infra/db/client.js';
 import {
   compendiumRaces,
@@ -30,6 +31,36 @@ async function resolveProfile(request: { query: unknown }, reply: { code: (n: nu
     return null;
   }
   return loaded;
+}
+
+/**
+ * Cuando un slug existe en varios sources (ej. `elf` en PHB, LFL, ...), priorizamos
+ * los oficiales para que el detail endpoint sin ?source= devuelva siempre el "core".
+ * Aplicar como ORDER BY en queries por slug sin source explícito.
+ */
+function sourcePriorityOrder(sourceCol: PgColumn): SQL {
+  return sql`CASE ${sourceCol}
+    WHEN 'XPHB' THEN 0
+    WHEN 'PHB' THEN 1
+    WHEN 'XDMG' THEN 2
+    WHEN 'DMG' THEN 3
+    WHEN 'XMM' THEN 4
+    WHEN 'MM' THEN 5
+    WHEN 'TCE' THEN 6
+    WHEN 'XGE' THEN 7
+    ELSE 99
+  END`;
+}
+
+/**
+ * Boostea matches "starts-with" sobre "substring" para que el autocomplete devuelva
+ * resultados intuitivos. Si q="ring" → "Ring of Protection" (boost 0) antes que
+ * "Bag of Devouring" (boost 1).
+ *
+ * Solo aplica si hay query. Caller debe `if (q) orderBy.push(nameStartsWithBoost(...))`.
+ */
+function nameStartsWithBoost(nameCol: PgColumn, q: string): SQL {
+  return sql`CASE WHEN ${nameCol} ILIKE ${q + '%'} THEN 0 ELSE 1 END`;
 }
 
 export const compendiumRoute: FastifyPluginAsync = async (app) => {
@@ -66,7 +97,11 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         })
         .from(compendiumRaces)
         .where(conds)
-        .orderBy(compendiumRaces.name)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumRaces.name, q)] : []),
+          sourcePriorityOrder(compendiumRaces.source),
+          compendiumRaces.name,
+        )
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumRaces).where(conds),
@@ -90,6 +125,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           source ? eq(compendiumRaces.source, source) : undefined,
         ),
       )
+      .orderBy(sourcePriorityOrder(compendiumRaces.source))
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
@@ -124,7 +160,11 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         })
         .from(compendiumClasses)
         .where(conds)
-        .orderBy(compendiumClasses.name)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumClasses.name, q)] : []),
+          sourcePriorityOrder(compendiumClasses.source),
+          compendiumClasses.name,
+        )
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumClasses).where(conds),
@@ -147,6 +187,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           source ? eq(compendiumClasses.source, source) : undefined,
         ),
       )
+      .orderBy(sourcePriorityOrder(compendiumClasses.source))
       .limit(1);
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
     return rows[0];
@@ -271,7 +312,12 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         })
         .from(compendiumSpells)
         .where(conds)
-        .orderBy(compendiumSpells.level, compendiumSpells.name)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumSpells.name, q)] : []),
+          compendiumSpells.level,
+          sourcePriorityOrder(compendiumSpells.source),
+          compendiumSpells.name,
+        )
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumSpells).where(conds),
@@ -294,6 +340,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           source ? eq(compendiumSpells.source, source) : undefined,
         ),
       )
+      .orderBy(sourcePriorityOrder(compendiumSpells.source))
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
@@ -334,7 +381,11 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         })
         .from(compendiumItems)
         .where(conds)
-        .orderBy(compendiumItems.name)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumItems.name, q)] : []),
+          sourcePriorityOrder(compendiumItems.source),
+          compendiumItems.name,
+        )
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumItems).where(conds),
@@ -357,6 +408,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           source ? eq(compendiumItems.source, source) : undefined,
         ),
       )
+      .orderBy(sourcePriorityOrder(compendiumItems.source))
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
@@ -392,7 +444,11 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         })
         .from(compendiumFeats)
         .where(conds)
-        .orderBy(compendiumFeats.name)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumFeats.name, q)] : []),
+          sourcePriorityOrder(compendiumFeats.source),
+          compendiumFeats.name,
+        )
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumFeats).where(conds),
@@ -415,6 +471,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           source ? eq(compendiumFeats.source, source) : undefined,
         ),
       )
+      .orderBy(sourcePriorityOrder(compendiumFeats.source))
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
