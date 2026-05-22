@@ -69,7 +69,8 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
       }),
     );
 
-    // Class Wizard 1 with arcana + investigation
+    // Class Wizard 1 with investigation + religion
+    // (avoid arcana/history — Sage background grants those as fixed, would dup)
     await expectOk(
       'class',
       await app.inject({
@@ -79,7 +80,7 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
         payload: {
           class: { slug: 'wizard', source: 'PHB' },
           level: 1,
-          skillChoices: ['arcana', 'investigation'],
+          skillChoices: ['investigation', 'religion'],
         },
       }),
     );
@@ -136,8 +137,8 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
     expect(sheet.savingThrows.find((s: { ability: string }) => s.ability === 'int').proficient).toBe(true);
     expect(sheet.savingThrows.find((s: { ability: string }) => s.ability === 'wis').proficient).toBe(true);
 
-    // Skills proficient: arcana + investigation (class) + arcana + history (background)
-    // → arcana, investigation, history proficient
+    // Skills proficient: investigation + religion (class) + arcana + history (background)
+    // → investigation, religion, arcana, history proficient
     const arcana = sheet.skills.find((s: { name: string }) => s.name === 'arcana');
     expect(arcana.proficient).toBe(true);
     expect(arcana.modifier).toBe(3 + 2); // INT mod + PB
