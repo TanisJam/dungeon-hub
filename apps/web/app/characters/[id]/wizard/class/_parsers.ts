@@ -22,7 +22,23 @@ export type ClassData = {
     skills?: Array<{ choose?: { from?: string[]; count?: number } } | string>;
   };
   classFeatures?: Array<string | { classFeature: string }>;
+  subclassTitle?: string;
 };
+
+/**
+ * Detecta si esta clase requiere elegir subclass al level 1 (Cleric/Sorcerer/
+ * Warlock en PHB). Lógica: el classFeatures incluye un ref con el mismo nombre
+ * que `subclassTitle` a level 1. Ej. Cleric tiene "Divine Domain|Cleric||1".
+ */
+export function requiresL1Subclass(data: ClassData): boolean {
+  if (!data.subclassTitle) return false;
+  return (data.classFeatures ?? []).some((ref) => {
+    const s = typeof ref === 'string' ? ref : ref.classFeature;
+    if (!s) return false;
+    const parts = s.split('|');
+    return parts[0] === data.subclassTitle && parts[3] === '1';
+  });
+}
 
 export function formatHitDie(hd: ClassData['hd']): string {
   return hd ? `d${hd.faces}` : '—';

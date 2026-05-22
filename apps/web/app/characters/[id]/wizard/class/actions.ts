@@ -11,6 +11,7 @@ export async function saveClass(
   klass: { slug: string; source: string },
   level: number,
   skillChoices: string[],
+  subclass: { slug: string; source: string } | null,
 ): Promise<ClassState> {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -19,16 +20,19 @@ export async function saveClass(
   try {
     await api.put(
       `/characters/${characterId}/class`,
-      { class: klass, level, skillChoices },
+      { class: klass, level, skillChoices, subclass },
       session.access_token,
     );
   } catch (err) {
     if (err instanceof ApiError) {
       const body = err.body as
-        | { message?: string; error?: string; issues?: Array<{ code: string }> }
+        | { message?: string; error?: string; issues?: Array<{ code: string; note?: string }> }
         | null;
       if (body?.issues?.length) {
-        return { error: `Validation failed: ${body.issues.map((i) => i.code).join(', ')}` };
+        const detail = body.issues
+          .map((i) => (i.note ? `${i.code}: ${i.note}` : i.code))
+          .join(' · ');
+        return { error: `Validation failed: ${detail}` };
       }
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }

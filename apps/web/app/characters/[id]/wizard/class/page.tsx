@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
-import type { ClassData } from './_parsers';
-import { ClassPicker, type ClassEntry } from './_picker';
+import { requiresL1Subclass, type ClassData } from './_parsers';
+import { ClassPicker, type ClassEntry, type SubclassRow } from './_picker';
 
 type ClassRow = { id: string; slug: string; source: string; name: string };
 type ClassDetail = ClassRow & { data: ClassData };
@@ -49,6 +49,21 @@ export default async function ClassStepPage({ params }: Props) {
     ),
   );
 
+  // Para clases que requieren L1 subclass (Cleric/Sorcerer/Warlock en PHB),
+  // pre-fetcheamos la lista de subclasses para que el picker pueda mostrarlas
+  // sin un round-trip extra al seleccionar.
+  const l1SubclassClasses = detailed.filter((d) => requiresL1Subclass(d.data));
+  const subclassEntries = await Promise.all(
+    l1SubclassClasses.map(async (klass) => {
+      const { data } = await api.get<{ data: SubclassRow[] }>(
+        `/compendium/subclasses?campaign=${character.campaignId}&class=${klass.slug}&limit=100`,
+        token,
+      );
+      return [`${klass.slug}|${klass.source}`, data] as const;
+    }),
+  );
+  const subclassesByClass: Record<string, SubclassRow[]> = Object.fromEntries(subclassEntries);
+
   const entries: ClassEntry[] = detailed.map((d) => ({
     slug: d.slug,
     source: d.source,
@@ -67,6 +82,7 @@ export default async function ClassStepPage({ params }: Props) {
         <ClassPicker
           characterId={id}
           entries={entries}
+          subclassesByClass={subclassesByClass}
           lockedSkills={(character.data?.background?.skills ?? []).map((s) => s.toLowerCase())}
           initialSelection={(() => {
             const primary = character.data?.classes?.[0];
@@ -75,6 +91,7 @@ export default async function ClassStepPage({ params }: Props) {
                   slug: primary.slug,
                   source: primary.source,
                   skillChoices: primary.skillChoices ?? [],
+                  subclass: primary.subclass,
                 }
               : null;
           })()}

@@ -7,6 +7,7 @@ import {
   formatProfs,
   formatSaves,
   getSkillChoice,
+  requiresL1Subclass,
   titleCase,
   type ClassData,
 } from './_parsers';
@@ -19,10 +20,20 @@ export type ClassEntry = {
   data: ClassData;
 };
 
+export type SubclassRow = {
+  id: string;
+  slug: string;
+  source: string;
+  name: string;
+  classSlug: string;
+  classSource: string;
+};
+
 type Initial = {
   slug: string;
   source: string;
   skillChoices: string[];
+  subclass: { slug: string; source: string } | null;
 };
 
 function entryKey(e: { slug: string; source: string }): string {
@@ -32,11 +43,13 @@ function entryKey(e: { slug: string; source: string }): string {
 export function ClassPicker({
   characterId,
   entries,
+  subclassesByClass,
   initialSelection,
   lockedSkills = [],
 }: {
   characterId: string;
   entries: ClassEntry[];
+  subclassesByClass: Record<string, SubclassRow[]>;
   initialSelection: Initial | null;
   lockedSkills?: string[];
 }) {
@@ -46,6 +59,11 @@ export function ClassPicker({
     initialSelection ? `${initialSelection.slug}|${initialSelection.source}` : null,
   );
   const [skills, setSkills] = useState<string[]>(initialSelection?.skillChoices ?? []);
+  const [subclassKey, setSubclassKey] = useState<string | null>(
+    initialSelection?.subclass
+      ? `${initialSelection.subclass.slug}|${initialSelection.subclass.source}`
+      : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -67,6 +85,16 @@ export function ClassPicker({
     [selected],
   );
 
+  const needsSubclass = useMemo(
+    () => (selected ? requiresL1Subclass(selected.data) : false),
+    [selected],
+  );
+
+  const subclassOptions: SubclassRow[] = useMemo(() => {
+    if (!selected || !needsSubclass) return [];
+    return subclassesByClass[`${selected.slug}|${selected.source}`] ?? [];
+  }, [selected, needsSubclass, subclassesByClass]);
+
   function toggleSkill(skill: string) {
     if (!skillChoice) return;
     if (lockedSet.has(skill.toLowerCase())) return;
@@ -85,7 +113,18 @@ export function ClassPicker({
       setError(`Pick exactly ${skillChoice.count} skills.`);
       return;
     }
+    if (needsSubclass && !subclassKey) {
+      setError(`Pick a ${selected.data.subclassTitle ?? 'subclass'}.`);
+      return;
+    }
     setError(null);
+
+    const subclass = subclassKey
+      ? (() => {
+          const [slug, source] = subclassKey.split('|');
+          return slug && source ? { slug, source } : null;
+        })()
+      : null;
 
     startTransition(async () => {
       const res = await saveClass(
@@ -93,6 +132,7 @@ export function ClassPicker({
         { slug: selected.slug, source: selected.source },
         1,
         skills,
+        subclass,
       );
       if (res.error) setError(res.error);
     });
@@ -120,8 +160,11 @@ export function ClassPicker({
                   type="button"
                   onClick={() => {
                     setSelectedKey(key);
-                    // reset skills if changing class
-                    if (key !== selectedKey) setSkills([]);
+                    // reset skills + subclass if changing class
+                    if (key !== selectedKey) {
+                      setSkills([]);
+                      setSubclassKey(null);
+                    }
                     setError(null);
                   }}
                   className={`w-full rounded-md border px-3 py-2 text-left transition ${
@@ -151,13 +194,26 @@ export function ClassPicker({
         {!selected ? (
           <p className="text-sm text-zinc-500">Pick a class to see its details.</p>
         ) : (
-          <ClassDetailPanel
-            entry={selected}
-            skillChoice={skillChoice}
-            selectedSkills={skills}
-            toggleSkill={toggleSkill}
-            lockedSkills={lockedSet}
-          />
+          <>
+            <ClassDetailPanel
+              entry={selected}
+              skillChoice={skillChoice}
+              selectedSkills={skills}
+              toggleSkill={toggleSkill}
+              lockedSkills={lockedSet}
+            />
+            {needsSubclass && (
+              <SubclassPicker
+                title={selected.data.subclassTitle ?? 'Subclass'}
+                options={subclassOptions}
+                selectedKey={subclassKey}
+                onSelect={(k) => {
+                  setSubclassKey(k);
+                  setError(null);
+                }}
+              />
+            )}
+          </>
         )}
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
@@ -242,6 +298,58 @@ function ClassDetailPanel({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function SubclassPicker({
+  title,
+  options,
+  selectedKey,
+  onSelect,
+}: {
+  title: string;
+  options: SubclassRow[];
+  selectedKey: string | null;
+  onSelect: (key: string | null) => void;
+}) {
+  if (options.length === 0) {
+    return (
+      <div className="mt-5 rounded-md border border-red-500/30 bg-red-500/5 p-3">
+        <p className="text-xs text-red-300">
+          {title} required at L1, but no options found in the compendium.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5">
+      <p className="text-xs uppercase tracking-wide text-zinc-500">{title} — pick 1</p>
+      <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        {options.map((sc) => {
+          const k = `${sc.slug}|${sc.source}`;
+          const isOn = k === selectedKey;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onSelect(isOn ? null : k)}
+              className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+                isOn
+                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
+                  : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="truncate font-medium">{sc.name}</span>
+                <span className="shrink-0 text-[10px] uppercase text-zinc-500">
+                  {sc.source}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
