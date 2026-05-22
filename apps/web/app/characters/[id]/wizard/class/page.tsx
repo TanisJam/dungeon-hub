@@ -7,13 +7,20 @@ import { ClassPicker, type ClassEntry } from './_picker';
 type ClassRow = { id: string; slug: string; source: string; name: string };
 type ClassDetail = ClassRow & { data: ClassData };
 
+type AppliedClass = {
+  slug: string;
+  source: string;
+  level: number;
+  subclass: { slug: string; source: string } | null;
+  skillChoices: string[];
+};
+
 type Character = {
   id: string;
   campaignId: string;
   data: {
-    class?: { slug: string; source: string };
-    level?: number;
-    skillChoices?: string[];
+    classes?: AppliedClass[];
+    background?: { skills?: string[] };
   } | null;
 };
 
@@ -60,15 +67,17 @@ export default async function ClassStepPage({ params }: Props) {
         <ClassPicker
           characterId={id}
           entries={entries}
-          initialSelection={
-            character.data?.class
+          lockedSkills={(character.data?.background?.skills ?? []).map((s) => s.toLowerCase())}
+          initialSelection={(() => {
+            const primary = character.data?.classes?.[0];
+            return primary
               ? {
-                  slug: character.data.class.slug,
-                  source: character.data.class.source,
-                  skillChoices: character.data.skillChoices ?? [],
+                  slug: primary.slug,
+                  source: primary.source,
+                  skillChoices: primary.skillChoices ?? [],
                 }
-              : null
-          }
+              : null;
+          })()}
         />
       </div>
     </section>

@@ -41,10 +41,12 @@ export function RacePicker({
   characterId,
   entries,
   initialSelection,
+  initialChosenAsis = {},
 }: {
   characterId: string;
   entries: RaceEntry[];
   initialSelection: Selection | null;
+  initialChosenAsis?: Record<string, AbilityKey[]>;
 }) {
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
@@ -54,7 +56,7 @@ export function RacePicker({
       : `${initialSelection.raceSlug}|${initialSelection.raceSource}`;
     return k;
   });
-  const [chosenAsis, setChosenAsis] = useState<Record<string, AbilityKey[]>>({});
+  const [chosenAsis, setChosenAsis] = useState<Record<string, AbilityKey[]>>(initialChosenAsis);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
