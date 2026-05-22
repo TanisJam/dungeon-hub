@@ -36,7 +36,10 @@ const TAG_HANDLERS: Record<string, (rest: string) => string> = {
 
   // Tags de DC + saving throws
   dc: (r) => `DC ${takeDisplay(r)}`,
-  filter: (r) => takeDisplay(r),
+  // `{@filter display|page|filter1|filter2|...}` — el display es SIEMPRE parts[0],
+  // los siguientes son criterios de filtrado (ej. "level=0", "class=Wizard").
+  filter: (r) => takeFirstSegment(r),
+  quickref: (r) => mapQuickref(r),
 
   // Tags de meta (formato): mostramos el contenido sin marcar
   b: (r) => `**${takeDisplay(r)}**`,
@@ -66,6 +69,32 @@ function takeDisplay(rest: string): string {
 
 function takeFirstSegment(rest: string): string {
   return rest.split('|')[0] ?? '';
+}
+
+/**
+ * `{@quickref Cover||3||1}` → "half cover", "||2" → "three-quarters cover", "||3" → "total cover".
+ * Si hay displayText (parts[3]), lo usamos. Si no, lowercase del reference.
+ * Formato: `{@quickref reference|book|chapter|displayText|chapterHash|index}`.
+ */
+function mapQuickref(rest: string): string {
+  // Formato 5etools: {@quickref reference|book|chapter|chapterHash|displayText}
+  // El displayText (parts[4]) es lo más legible cuando existe — viene como
+  // "half cover", "three-quarters cover", etc. para Cover.
+  const parts = rest.split('|');
+  const display = parts[4] || parts[3];
+  if (display) return display;
+
+  // Fallback: si solo viene índice numérico (algunos textos abrevian),
+  // mapeamos a la descripción humana para Cover.
+  const ref = parts[0] ?? '';
+  if (ref === 'Cover') {
+    const idx = parts[5] || parts[3] || '';
+    if (idx === '1') return 'half cover';
+    if (idx === '2') return 'three-quarters cover';
+    if (idx === '3') return 'total cover';
+  }
+
+  return ref.toLowerCase();
 }
 
 function mapAttackTag(code: string): string {

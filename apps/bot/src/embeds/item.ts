@@ -171,7 +171,8 @@ export function buildItemEmbed(item: ItemRow): EmbedBuilder {
   if (d.stealth) embed.addFields({ name: 'Stealth', value: 'Disadvantage', inline: true });
 
   if (d.entries) {
-    const desc = flattenEntries(d.entries, 1800);
+    // Discord embed field value cap is 1024 chars — dejamos margen para no romper.
+    const desc = flattenEntries(d.entries, 1020);
     if (desc) embed.addFields({ name: 'Description', value: desc });
   }
 

@@ -94,12 +94,14 @@ function formatLanguages(langs: FiveeRaceData['languageProficiencies']): string 
 }
 
 /**
- * Si entries tiene bloques nombrados (`{type:entries, name, entries}`), los
- * extraemos como pares (header, text). Si no, devolvemos un único bloque "desc".
+ * Si entries tiene bloques nombrados, los extraemos como pares (header, text).
+ * Si no, devolvemos un único bloque "desc". Aceptamos los tres tipos que 5etools
+ * usa indistintamente como contenedores: `entries`, `inset`, `section`.
  */
 function extractTraits(entries: unknown[] | undefined): Array<{ name: string; text: string }> {
   if (!entries) return [];
   const traits: Array<{ name: string; text: string }> = [];
+  const NAMED_BLOCK_TYPES = new Set(['entries', 'inset', 'section']);
   for (const e of entries) {
     if (e == null) continue;
     if (typeof e === 'string') {
@@ -110,7 +112,8 @@ function extractTraits(entries: unknown[] | undefined): Array<{ name: string; te
     }
     if (typeof e !== 'object') continue;
     const obj = e as Record<string, unknown>;
-    if (obj['type'] === 'entries' && typeof obj['name'] === 'string') {
+    const type = typeof obj['type'] === 'string' ? (obj['type'] as string) : '';
+    if (NAMED_BLOCK_TYPES.has(type) && typeof obj['name'] === 'string') {
       const text = flattenEntries(obj['entries'] ?? [], 600);
       if (text) traits.push({ name: obj['name'] as string, text });
     }
@@ -123,11 +126,15 @@ export function buildRaceEmbed(race: RaceRow): EmbedBuilder {
   const size = formatSize(d.size);
   const speed = formatSpeed(d.speed);
 
+  // Subraces vienen con name corto ("High") + raceName ("Elf"). Concatenamos
+  // para que el title se lea natural ("High Elf") y no haga falta el "(subrace of X)".
+  const displayTitle =
+    race.isSubrace && d.raceName ? `${race.name} ${d.raceName}` : race.name;
   const subraceMarker =
     race.isSubrace && d.raceName ? ` *(subrace of ${d.raceName})*` : '';
 
   const embed = new EmbedBuilder()
-    .setTitle(race.name)
+    .setTitle(displayTitle)
     .setDescription(`*${size} race · Speed ${speed}*${subraceMarker}`)
     .setColor(0x27ae60); // green
 

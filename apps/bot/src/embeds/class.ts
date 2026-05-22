@@ -1,4 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
+import { renderInline } from '../render-5etools.js';
 import { titleCase } from '../utils.js';
 
 export interface ClassRow {
@@ -64,8 +65,8 @@ function formatProficiencyList(
   if (!items || items.length === 0) return 'none';
   return items
     .map((it) => {
-      if (typeof it === 'string') return it;
-      return it.full ?? it.proficiency ?? '—';
+      if (typeof it === 'string') return renderInline(it);
+      return renderInline(it.full ?? it.proficiency ?? '—');
     })
     .join(', ');
 }
