@@ -7,7 +7,7 @@ export class ApiError extends Error {
 }
 
 type Init = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   accessToken?: string;
 };
@@ -40,4 +40,8 @@ export const api = {
   get: <T>(path: string, accessToken?: string) => request<T>(path, { accessToken }),
   post: <T>(path: string, body?: unknown, accessToken?: string) =>
     request<T>(path, { method: 'POST', body, accessToken }),
+  put: <T>(path: string, body?: unknown, accessToken?: string) =>
+    request<T>(path, { method: 'PUT', body, accessToken }),
+  patch: <T>(path: string, body?: unknown, accessToken?: string) =>
+    request<T>(path, { method: 'PATCH', body, accessToken }),
 };
