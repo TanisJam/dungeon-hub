@@ -98,14 +98,16 @@ test.describe('character builder wizard', () => {
       await expect(page.locator('text=Clase').first()).toBeVisible();
       await expect(page.locator('text=Trasfondo').first()).toBeVisible();
 
-      // Publish — button text changed to "Publicar ✓"
+      // Publish
       await page.getByRole('button', { name: /^publicar/i }).click();
 
-      // Splash is shown — wait for it to appear then auto-redirect (4s) + buffer
-      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
+      // Splash is shown — click "Ir al perfil" to navigate (no auto-redirect)
+      await page.getByRole('link', { name: /ir al perfil/i }).click();
+      await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
     await test.step('dashboard shows new character as pending', async () => {
+      await page.goto('/dashboard');
       const charCard = page.locator('li').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
       await expect(charCard).toContainText('Pendiente');

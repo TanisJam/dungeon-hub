@@ -275,7 +275,14 @@ export default async function ReviewStepPage({ params }: Props) {
             </p>
           </Card>
         ) : (
-          <ActivateForm characterId={character.id} characterName={character.name} canActivate={allComplete} />
+          <ActivateForm
+            characterId={character.id}
+            characterName={character.name}
+            raceLabel={d.subrace ? `${d.race?.slug} — ${d.subrace.slug}` : d.race?.slug}
+            classLabel={primaryClass?.slug}
+            level={primaryClass?.level ?? 1}
+            canActivate={allComplete}
+          />
         )}
       </div>
     </section>

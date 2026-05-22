@@ -11,17 +11,31 @@ const INITIAL: PublishState = { error: null, success: false };
 export function ActivateForm({
   characterId,
   characterName,
+  raceLabel,
+  classLabel,
+  level,
   canActivate,
 }: {
   characterId: string;
   characterName: string;
+  raceLabel?: string;
+  classLabel?: string;
+  level: number;
   canActivate: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(publishCharacter, INITIAL);
 
   if (state.success) {
-    return <PublishedSplash characterName={characterName} />;
+    return (
+      <PublishedSplash
+        characterId={characterId}
+        characterName={characterName}
+        raceLabel={raceLabel}
+        classLabel={classLabel}
+        level={level}
+      />
+    );
   }
 
   return (
