@@ -679,6 +679,21 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
+
+    // Cross-step: class skill choices no pueden duplicar las que da el background.
+    // Background.skills incluye fixed + chosen (appliedBackground).
+    const bgSkills = ((data as { background?: { skills?: string[] } }).background?.skills ?? []).map(
+      (s) => s.toLowerCase(),
+    );
+    const classSkills = result.appliedClass.skillChoices.map((s) => s.toLowerCase());
+    const skillOverlap = classSkills.filter((s) => bgSkills.includes(s));
+    if (skillOverlap.length > 0) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SKILL_DUPLICATE_WITH_BACKGROUND', skills: skillOverlap }],
+      });
+    }
+
     // Si es Wizard, auto-agrega el spellbook (PHB p.114). Idempotente.
     const inventoryAfter = result.appliedClass.slug === 'wizard'
       ? ensureWizardSpellbook((character.inventory as InventoryItem[] | null) ?? [])
@@ -745,6 +760,22 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
+
+    // Cross-step: background skills no pueden duplicar las que ya da la clase.
+    // PHB p.125: "If a character would gain the same proficiency from two different
+    // sources, he or she can choose a different proficiency of the same kind instead."
+    const classSkills = ((data as { classes?: Array<{ skillChoices?: string[] }> }).classes?.[0]?.skillChoices ?? []).map(
+      (s) => s.toLowerCase(),
+    );
+    const bgSkills = result.appliedBackground.skills.map((s) => s.toLowerCase());
+    const skillOverlap = bgSkills.filter((s) => classSkills.includes(s));
+    if (skillOverlap.length > 0) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SKILL_DUPLICATE_WITH_CLASS', skills: skillOverlap }],
+      });
+    }
+
     const [updated] = await db
       .update(characters)
       .set({
