@@ -45,11 +45,14 @@ export function BackgroundPicker({
   characterId,
   entries,
   initialSelection,
+  lockedSkills = [],
 }: {
   characterId: string;
   entries: BackgroundEntry[];
   initialSelection: Initial | null;
+  lockedSkills?: string[];
 }) {
+  const lockedSet = new Set(lockedSkills.map((s) => s.toLowerCase()));
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(
     initialSelection ? `${initialSelection.slug}|${initialSelection.source}` : null,
@@ -85,6 +88,7 @@ export function BackgroundPicker({
 
   function toggleSkill(skill: string) {
     if (!parsed?.skillChoose) return;
+    if (lockedSet.has(skill.toLowerCase())) return;
     const has = skills.includes(skill);
     if (has) setSkills(skills.filter((s) => s !== skill));
     else if (skills.length >= parsed.skillChoose.count) return;
@@ -211,6 +215,7 @@ export function BackgroundPicker({
             setLangsForKind={setLangsForKind}
             tools={tools}
             setToolsForKind={setToolsForKind}
+            lockedSkills={lockedSet}
           />
         )}
 
@@ -240,6 +245,7 @@ function BackgroundDetailPanel({
   setLangsForKind,
   tools,
   setToolsForKind,
+  lockedSkills,
 }: {
   entry: BackgroundEntry;
   parsed: ParsedBackground;
@@ -249,6 +255,7 @@ function BackgroundDetailPanel({
   setLangsForKind: (k: string, vals: string[]) => void;
   tools: Record<string, string[]>;
   setToolsForKind: (k: string, vals: string[]) => void;
+  lockedSkills: Set<string>;
 }) {
   return (
     <div className="space-y-4">
@@ -273,6 +280,7 @@ function BackgroundDetailPanel({
             selected={skills}
             count={parsed.skillChoose.count}
             onToggle={toggleSkill}
+            lockedSkills={lockedSkills}
           />
         )}
       </div>
@@ -342,30 +350,37 @@ function ChooseGroup({
   selected,
   count,
   onToggle,
+  lockedSkills,
 }: {
   label: string;
   pool: string[];
   selected: string[];
   count: number;
   onToggle: (v: string) => void;
+  lockedSkills?: Set<string>;
 }) {
+  const hasLocked = lockedSkills && Array.from(lockedSkills).some((s) => pool.includes(s));
   return (
     <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
       <p className="text-xs text-amber-300">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((s) => {
           const isOn = selected.includes(s);
-          const disabled = !isOn && selected.length >= count;
+          const isLocked = lockedSkills?.has(s.toLowerCase()) ?? false;
+          const disabled = isLocked || (!isOn && selected.length >= count);
           return (
             <button
               key={s}
               type="button"
               onClick={() => onToggle(s)}
               disabled={disabled}
+              title={isLocked ? 'Already given by your class' : undefined}
               className={`rounded px-2 py-1 text-xs ring-1 ring-inset transition ${
-                isOn
-                  ? 'bg-amber-500/20 text-amber-200 ring-amber-500/50'
-                  : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
+                isLocked
+                  ? 'bg-zinc-800/50 text-zinc-600 ring-zinc-800 line-through cursor-not-allowed'
+                  : isOn
+                    ? 'bg-amber-500/20 text-amber-200 ring-amber-500/50'
+                    : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
               }`}
             >
               {titleCase(s)}
@@ -373,6 +388,11 @@ function ChooseGroup({
           );
         })}
       </div>
+      {hasLocked && (
+        <p className="mt-2 text-xs text-zinc-500">
+          Struck-through skills are already given by your class.
+        </p>
+      )}
     </div>
   );
 }

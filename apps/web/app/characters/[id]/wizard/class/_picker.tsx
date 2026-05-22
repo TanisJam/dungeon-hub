@@ -33,11 +33,14 @@ export function ClassPicker({
   characterId,
   entries,
   initialSelection,
+  lockedSkills = [],
 }: {
   characterId: string;
   entries: ClassEntry[];
   initialSelection: Initial | null;
+  lockedSkills?: string[];
 }) {
+  const lockedSet = new Set(lockedSkills.map((s) => s.toLowerCase()));
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(
     initialSelection ? `${initialSelection.slug}|${initialSelection.source}` : null,
@@ -66,6 +69,7 @@ export function ClassPicker({
 
   function toggleSkill(skill: string) {
     if (!skillChoice) return;
+    if (lockedSet.has(skill.toLowerCase())) return;
     const has = skills.includes(skill);
     if (has) setSkills(skills.filter((s) => s !== skill));
     else if (skills.length >= skillChoice.count) return;
@@ -152,6 +156,7 @@ export function ClassPicker({
             skillChoice={skillChoice}
             selectedSkills={skills}
             toggleSkill={toggleSkill}
+            lockedSkills={lockedSet}
           />
         )}
 
@@ -177,11 +182,13 @@ function ClassDetailPanel({
   skillChoice,
   selectedSkills,
   toggleSkill,
+  lockedSkills,
 }: {
   entry: ClassEntry;
   skillChoice: ReturnType<typeof getSkillChoice>;
   selectedSkills: string[];
   toggleSkill: (s: string) => void;
+  lockedSkills: Set<string>;
 }) {
   const d = entry.data;
   return (
@@ -206,17 +213,21 @@ function ClassDetailPanel({
           <div className="mt-2 flex flex-wrap gap-1.5">
             {skillChoice.from.map((s) => {
               const isOn = selectedSkills.includes(s);
-              const disabled = !isOn && selectedSkills.length >= skillChoice.count;
+              const isLocked = lockedSkills.has(s.toLowerCase());
+              const disabled = isLocked || (!isOn && selectedSkills.length >= skillChoice.count);
               return (
                 <button
                   key={s}
                   type="button"
                   onClick={() => toggleSkill(s)}
                   disabled={disabled}
+                  title={isLocked ? 'Already granted by your background' : undefined}
                   className={`rounded px-2 py-1 text-xs ring-1 ring-inset transition ${
-                    isOn
-                      ? 'bg-indigo-500/20 text-indigo-200 ring-indigo-500/50'
-                      : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
+                    isLocked
+                      ? 'bg-zinc-800/50 text-zinc-600 ring-zinc-800 line-through cursor-not-allowed'
+                      : isOn
+                        ? 'bg-indigo-500/20 text-indigo-200 ring-indigo-500/50'
+                        : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
                   }`}
                 >
                   {titleCase(s)}
@@ -224,6 +235,11 @@ function ClassDetailPanel({
               );
             })}
           </div>
+          {lockedSkills.size > 0 && (
+            <p className="mt-2 text-xs text-zinc-500">
+              Struck-through skills are already given by your background.
+            </p>
+          )}
         </div>
       )}
     </div>
