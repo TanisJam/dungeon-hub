@@ -13,7 +13,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
-    "import:5etools": "tsx scripts/import-5etools.ts"
+    "import:5etools": "tsx scripts/import-5etools.ts",
+    "seed-test-character": "tsx scripts/seed-test-character.ts"
   },
   "dependencies": {
     "@dungeon-hub/compendium-import": "workspace:*",
