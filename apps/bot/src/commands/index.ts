@@ -17,6 +17,7 @@ import * as wmap from './map.js';
 import * as link from './link.js';
 import * as whoami from './whoami.js';
 import * as character from './character.js';
+import * as monster from './monster.js';
 
 /**
  * Discord.js v14 separa los builders por shape — los simples sin subcomandos son
@@ -48,4 +49,5 @@ export const commands: Record<string, Command> = {
   [link.data.name]: link,
   [whoami.data.name]: whoami,
   [character.data.name]: character,
+  [monster.data.name]: monster,
 };

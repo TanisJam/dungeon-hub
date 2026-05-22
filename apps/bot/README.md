@@ -82,6 +82,7 @@ Sin guild ID, los comandos se registran globalmente y pueden tardar hasta 1h en 
 | `/item <name>` | Detalles de un item (type, weight, cost, properties, damage/AC, magic effects) |
 | `/race <name>` | Detalles de una race o subrace (size, speed, ASIs, languages, traits) |
 | `/class <name> [level]` | Detalles de una clase (hit die, saves, proficiencies, features por nivel) |
+| `/monster <name> [cr]` | Statblock completo (CR, AC, HP, abilities, saves, immunities, actions, legendary). Filtro `cr` opcional: `5`, `1/4`, `5-10`, `<=2`, `>=20`. |
 
 Todos los comandos de compendium soportan autocompletado en vivo. Si tu query
 matchea varios entries, el bot muestra el primero con un dropdown abajo para
@@ -134,6 +135,4 @@ UPDATE public.users SET can_impersonate = true WHERE username = 'dungeonhub-bot'
 | `/map list [scope]` | Hexes (top-level por defecto, o todos los visibles) |
 | `/map show <hex>` | Hex + sus POIs |
 
-Pendientes:
-- `/monster <name>` (necesita importer de bestiary)
-- Comandos de personaje (`/character show`, `/character hp`, `/character rest`) — requieren impersonation auth
+Pendientes — ver roadmap en el PRD.

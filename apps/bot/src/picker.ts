@@ -14,6 +14,7 @@ import { buildFeatEmbed, type FeatRow } from './embeds/feat.js';
 import { buildItemEmbed, type ItemRow } from './embeds/item.js';
 import { buildRaceEmbed, type RaceRow } from './embeds/race.js';
 import { buildClassEmbed, type ClassRow } from './embeds/class.js';
+import { buildMonsterEmbed, type MonsterRow } from './embeds/monster.js';
 
 /**
  * Custom_id format para identificar el picker en MessageComponent interactions.
@@ -133,6 +134,10 @@ async function fetchAndBuildEmbed(
     case 'classes': {
       const row = await api.get<ClassRow>(base, query);
       return buildClassEmbed(row, null);
+    }
+    case 'monsters': {
+      const row = await api.get<MonsterRow>(base, query);
+      return buildMonsterEmbed(row);
     }
   }
 }

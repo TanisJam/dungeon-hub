@@ -29,9 +29,14 @@ interface SpellRow extends CommonRow {
   school: string;
 }
 
+interface MonsterRow extends CommonRow {
+  cr: string | null;
+  type: string | null;
+}
+
 type ListResponse<T> = { data: T[] };
 
-export type Resource = 'spells' | 'feats' | 'items' | 'races' | 'classes';
+export type Resource = 'spells' | 'feats' | 'items' | 'races' | 'classes' | 'monsters';
 
 const ENDPOINT: Record<Resource, string> = {
   spells: '/api/v1/compendium/spells',
@@ -39,6 +44,7 @@ const ENDPOINT: Record<Resource, string> = {
   items: '/api/v1/compendium/items',
   races: '/api/v1/compendium/races',
   classes: '/api/v1/compendium/classes',
+  monsters: '/api/v1/compendium/monsters',
 };
 
 /**
@@ -77,6 +83,12 @@ function labelForRow(resource: Resource, row: CommonRow): string {
     const r = row as RaceRow;
     const marker = r.isSubrace ? ' subrace' : '';
     return truncateLabel(`${r.name}${marker} (${r.source})`);
+  }
+  if (resource === 'monsters') {
+    const m = row as MonsterRow;
+    const cr = m.cr ? ` CR ${m.cr}` : '';
+    const type = m.type ? ` · ${m.type}` : '';
+    return truncateLabel(`${m.name}${cr}${type} (${m.source})`);
   }
   return truncateLabel(`${row.name} (${row.source})`);
 }
