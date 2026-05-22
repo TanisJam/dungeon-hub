@@ -19,7 +19,7 @@ export function profileFilterConditions(args: {
   const sources = enabledSources(args.profile);
   if (sources.length === 0) return null;
 
-  const disabledKeys = args.profile.disabledEntities[args.kind];
+  const disabledKeys = args.profile.disabledEntities[args.kind] ?? [];
 
   const conditions: SQL[] = [inArray(args.sourceCol, sources)];
 

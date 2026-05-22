@@ -85,6 +85,13 @@
       "when": 1779412335464,
       "tag": "0011_discord_link_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1779415819927,
+      "tag": "0012_monsters_table",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,7 @@ import {
   compendiumSpells,
   compendiumItems,
   compendiumFeats,
+  compendiumMonsters,
   compendiumOptionalFeatures,
 } from '../src/infra/db/schema.js';
 
@@ -51,6 +52,7 @@ async function main() {
   console.log(`   - items:        ${fmt(result.items.length)}`);
   console.log(`   - feats:        ${fmt(result.feats.length)}`);
   console.log(`   - opt-features: ${fmt(result.optionalFeatures.length)}`);
+  console.log(`   - monsters:     ${fmt(result.monsters.length)}`);
   if (result.warnings.length > 0) {
     console.log(`\n⚠️  ${result.warnings.length} warnings:`);
     for (const w of result.warnings.slice(0, 10)) console.log(`   - ${w}`);
@@ -269,6 +271,38 @@ async function main() {
           },
         });
     }
+
+    await chunkedInsert(tx, result.monsters, 1000, async (chunk) => {
+      await tx
+        .insert(compendiumMonsters)
+        .values(
+          chunk.map((m) => ({
+            slug: m.slug,
+            source: m.source,
+            name: m.name,
+            cr: m.cr,
+            // numeric() en drizzle se mapea a string para preservar precisión —
+            // serializamos el number a string acá.
+            crNumeric: m.crNumeric === null ? null : String(m.crNumeric),
+            type: m.type,
+            size: m.size,
+            data: m.data,
+            reprintedAs: m.reprintedAs ?? undefined,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [compendiumMonsters.slug, compendiumMonsters.source],
+          set: {
+            name: sqlExcluded('name'),
+            cr: sqlExcluded('cr'),
+            crNumeric: sqlExcluded('cr_numeric'),
+            type: sqlExcluded('type'),
+            size: sqlExcluded('size'),
+            data: sqlExcluded('data'),
+            reprintedAs: sqlExcluded('reprinted_as'),
+          },
+        });
+    });
   });
 
   console.log(`✅ Upsert completo en ${((Date.now() - tDb) / 1000).toFixed(1)}s`);

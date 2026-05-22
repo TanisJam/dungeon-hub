@@ -12,6 +12,7 @@ import {
   compendiumItems,
   compendiumFeats,
   compendiumOptionalFeatures,
+  compendiumMonsters,
 } from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { profileFilterConditions } from '../../use-cases/compendium/profile-filter.js';
@@ -472,6 +473,121 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         ),
       )
       .orderBy(sourcePriorityOrder(compendiumFeats.source))
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
+
+  // ---- MONSTERS ------------------------------------------------------------
+  // Query params:
+  //   - q: search por nombre (substring)
+  //   - cr: rango de CR. Acepta "5" (exacto), "5-10" (rango inclusive), "<=2"
+  //     o ">=10". CR fraccionales se aceptan: "1/4", "1/2-1".
+  //   - type: filtra por type primario (dragon, fiend, beast, etc.)
+  //   - size: filtra por size code (T/S/M/L/H/G)
+  const MonstersQuery = PaginationQuery.extend({
+    cr: z.string().min(1).optional(),
+    type: z.string().min(1).optional(),
+    size: z.string().min(1).max(2).optional(),
+  });
+
+  /** Parsea "1/4" → 0.25, "5" → 5, "1/2-1" → [0.5, 1], etc. */
+  function parseCrToken(token: string): number | null {
+    const t = token.trim();
+    if (t === '') return null;
+    if (t.includes('/')) {
+      const [num, den] = t.split('/').map(Number);
+      if (!Number.isFinite(num!) || !Number.isFinite(den!) || den === 0) return null;
+      return num! / den!;
+    }
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function buildCrFilter(raw: string): SQL | null {
+    if (raw.startsWith('<=')) {
+      const n = parseCrToken(raw.slice(2));
+      if (n === null) return null;
+      return sql`${compendiumMonsters.crNumeric} <= ${n}`;
+    }
+    if (raw.startsWith('>=')) {
+      const n = parseCrToken(raw.slice(2));
+      if (n === null) return null;
+      return sql`${compendiumMonsters.crNumeric} >= ${n}`;
+    }
+    if (raw.includes('-')) {
+      const [lo, hi] = raw.split('-').map(parseCrToken);
+      if (lo === null || hi === null) return null;
+      return sql`${compendiumMonsters.crNumeric} BETWEEN ${lo} AND ${hi}`;
+    }
+    const n = parseCrToken(raw);
+    if (n === null) return null;
+    return sql`${compendiumMonsters.crNumeric} = ${n}`;
+  }
+
+  app.get('/compendium/monsters', { preHandler: app.authenticate }, async (request, reply) => {
+    // Monsters NO se filtran por rules profile: son contenido del DM, no de PC.
+    // El DM agarra de cualquier bestiario sin que afecte las reglas de construcción
+    // de personajes. Duplicados entre ediciones (MM vs XMM) se distinguen por source
+    // en el label del autocomplete.
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q, cr, type, size } = MonstersQuery.parse(request.query);
+
+    const where: SQL[] = [];
+    if (q) where.push(ilike(compendiumMonsters.name, `%${q}%`));
+    if (type) where.push(eq(compendiumMonsters.type, type.toLowerCase()));
+    if (size) where.push(eq(compendiumMonsters.size, size.toUpperCase()));
+    if (cr) {
+      const crCond = buildCrFilter(cr);
+      if (crCond) where.push(crCond);
+    }
+    const conds = where.length > 0 ? and(...where) : undefined;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumMonsters.id,
+          slug: compendiumMonsters.slug,
+          source: compendiumMonsters.source,
+          name: compendiumMonsters.name,
+          cr: compendiumMonsters.cr,
+          crNumeric: compendiumMonsters.crNumeric,
+          type: compendiumMonsters.type,
+          size: compendiumMonsters.size,
+        })
+        .from(compendiumMonsters)
+        .where(conds)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumMonsters.name, q)] : []),
+          compendiumMonsters.crNumeric,
+          sourcePriorityOrder(compendiumMonsters.source),
+          compendiumMonsters.name,
+        )
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumMonsters).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/monsters/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumMonsters)
+      .where(
+        and(
+          eq(compendiumMonsters.slug, slug),
+          source ? eq(compendiumMonsters.source, source) : undefined,
+        ),
+      )
+      .orderBy(sourcePriorityOrder(compendiumMonsters.source))
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });

@@ -665,6 +665,35 @@ export const compendiumItems = pgTable(
   ],
 );
 
+export const compendiumMonsters = pgTable(
+  'compendium_monsters',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    /** CR como string para preservar fracciones: "0", "1/8", "1/4", "1/2", "1", ..., "30". */
+    cr: text('cr'),
+    /**
+     * CR numérico para filtrar/ordenar (1/8 = 0.125, 1/4 = 0.25, etc.). NULL si
+     * el monster no tiene CR definido (templates, summons sin CR fijo).
+     */
+    crNumeric: numeric('cr_numeric'),
+    /** Type primario: "dragon", "fiend", "beast", etc. Sin tags. */
+    type: text('type'),
+    /** Size code: "T", "S", "M", "L", "H", "G". Si el monster es multi-size, primero. */
+    size: text('size'),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_monsters_slug_source').on(t.slug, t.source),
+    index('idx_monsters_cr_numeric').on(t.crNumeric),
+    index('idx_monsters_type').on(t.type),
+    index('idx_monsters_name').on(t.name),
+  ],
+);
+
 export const compendiumFeats = pgTable(
   'compendium_feats',
   {
