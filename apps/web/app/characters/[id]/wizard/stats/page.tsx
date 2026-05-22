@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
+import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 import { StatsForm } from './_form';
 
 type StatGen = { standardArray: boolean; pointBuy: boolean; roll: boolean };
@@ -38,19 +39,19 @@ export default async function StatsStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="font-display text-xl font-bold text-ink">Atributos</h2>
-      <p className="mt-1 text-sm text-ink-mute">
-        Elegí tus seis atributos base. Los bonificadores raciales se aplican en el paso siguiente.
-      </p>
+      <NumberedSectionHead
+        num="01"
+        title="Atributos"
+        meta="Paso 1 de 5"
+        description="Asigná los seis atributos. Podés usar puntos, el arreglo estándar, o tirar 4d6 quitando el menor."
+      />
 
-      <div className="mt-6">
-        <StatsForm
-          characterId={id}
-          allowedMethods={allowedMethods}
-          initialMethod={character.data?.statMethod ?? allowedMethods[0] ?? 'point-buy'}
-          initialScores={character.data?.baseStats ?? null}
-        />
-      </div>
+      <StatsForm
+        characterId={id}
+        allowedMethods={allowedMethods}
+        initialMethod={character.data?.statMethod ?? allowedMethods[0] ?? 'point-buy'}
+        initialScores={character.data?.baseStats ?? null}
+      />
     </section>
   );
 }
