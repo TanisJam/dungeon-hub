@@ -1,19 +1,26 @@
 'use client';
 
 import { useActionState } from 'react';
-import { activateCharacter, type ActivateState } from './actions';
+import { publishCharacter, type PublishState } from './actions';
 import { Button } from '@/components/ui';
+import { PublishedSplash } from '@/components/wizard/published-splash';
 
-const INITIAL: ActivateState = { error: null };
+const INITIAL: PublishState = { error: null, success: false };
 
 export function ActivateForm({
   characterId,
+  characterName,
   canActivate,
 }: {
   characterId: string;
+  characterName: string;
   canActivate: boolean;
 }) {
-  const [state, action, pending] = useActionState(activateCharacter, INITIAL);
+  const [state, action, pending] = useActionState(publishCharacter, INITIAL);
+
+  if (state.success) {
+    return <PublishedSplash characterName={characterName} />;
+  }
 
   return (
     <form action={action} className="space-y-3">
@@ -21,7 +28,7 @@ export function ActivateForm({
 
       {!canActivate && (
         <p className="text-xs text-warning-deep">
-          Algunos pasos están incompletos. Podés activar igual, pero la ficha quedará incompleta.
+          Algunos pasos están incompletos. Podés publicar igual, pero la ficha quedará incompleta.
         </p>
       )}
 
@@ -32,7 +39,7 @@ export function ActivateForm({
         disabled={pending}
         className="w-full"
       >
-        {pending ? 'Activando…' : '✓ Activar personaje'}
+        {pending ? 'Publicando…' : '✓ Publicar para aprobación'}
       </Button>
 
       {state.error && <p className="text-sm text-warning-deep">{state.error}</p>}

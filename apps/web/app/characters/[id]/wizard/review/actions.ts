@@ -1,31 +1,30 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 
-export type ActivateState = { error: string | null };
+export type PublishState = { error: string | null; success: boolean };
 
-export async function activateCharacter(
-  _prev: ActivateState,
+export async function publishCharacter(
+  _prev: PublishState,
   formData: FormData,
-): Promise<ActivateState> {
+): Promise<PublishState> {
   const characterId = String(formData.get('characterId') ?? '');
-  if (!characterId) return { error: 'Missing characterId.' };
+  if (!characterId) return { error: 'Missing characterId.', success: false };
 
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { error: 'Not authenticated.' };
+  if (!session) return { error: 'Not authenticated.', success: false };
 
   try {
-    await api.patch(`/characters/${characterId}`, { status: 'active' }, session.access_token);
+    await api.patch(`/characters/${characterId}`, { status: 'pending_approval' }, session.access_token);
   } catch (err) {
     if (err instanceof ApiError) {
       const body = err.body as { message?: string; error?: string } | null;
-      return { error: body?.message ?? body?.error ?? `API ${err.status}` };
+      return { error: body?.message ?? body?.error ?? `API ${err.status}`, success: false };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: err instanceof Error ? err.message : 'Unknown error', success: false };
   }
 
-  redirect('/dashboard');
+  return { error: null, success: true };
 }

@@ -254,7 +254,7 @@ export default async function ReviewStepPage({ params }: Props) {
             </p>
           </Card>
         ) : (
-          <ActivateForm characterId={character.id} canActivate={allComplete} />
+          <ActivateForm characterId={character.id} characterName={character.name} canActivate={allComplete} />
         )}
       </div>
     </section>
