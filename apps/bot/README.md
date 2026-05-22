@@ -73,6 +73,8 @@ Sin guild ID, los comandos se registran globalmente y pueden tardar hasta 1h en 
 
 ## Comandos disponibles
 
+### Compendium (5e SRD)
+
 | Comando | Descripción |
 |---------|-------------|
 | `/spell <name>` | Detalles de un hechizo (casting time, range, components, classes, bonus subclasses, descripción) |
@@ -81,7 +83,24 @@ Sin guild ID, los comandos se registran globalmente y pueden tardar hasta 1h en 
 | `/race <name>` | Detalles de una race o subrace (size, speed, ASIs, languages, traits) |
 | `/class <name> [level]` | Detalles de una clase (hit die, saves, proficiencies, features por nivel) |
 
-Pendientes — ver roadmap en el PRD:
+Todos los comandos de compendium soportan autocompletado en vivo. Si tu query
+matchea varios entries, el bot muestra el primero con un dropdown abajo para
+saltar a los otros.
+
+### West Marches (campaign-scoped)
+
+| Comando | Descripción |
+|---------|-------------|
+| `/session list [status]` | Lista de sesiones, opcionalmente filtradas por status |
+| `/session show <session>` | Detalle de una sesión (fechas, level range, participants) |
+| `/world events [tag]` | Timeline de world events |
+| `/world factions` | Factions de la campaña |
+| `/world npcs [status]` | NPCs con status y faction/hex |
+| `/lore list [tag]` | Entries del journal/lore |
+| `/lore show <entry>` | Body completo de una entry |
+| `/map list [scope]` | Hexes (top-level por defecto, o todos los visibles) |
+| `/map show <hex>` | Hex + sus POIs |
+
+Pendientes:
 - `/monster <name>` (necesita importer de bestiary)
-- Comandos de personaje (`/character show`, `/character hp`, `/character rest`)
-- Comandos West Marches (`/session list`, `/world events`, `/lore`, `/map reveal`)
+- Comandos de personaje (`/character show`, `/character hp`, `/character rest`) — requieren impersonation auth
