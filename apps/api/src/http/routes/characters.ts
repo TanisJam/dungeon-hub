@@ -202,6 +202,13 @@ const ShortRestBody = z.object({
 
 const LongRestBody = z.object({});
 
+const HpDeltaBody = z.object({
+  /** Delta signado. Negativo daña (consume temp HP primero), positivo cura. */
+  delta: z.number().int(),
+  /** Nota opcional para el session event (ej. "fireball del lich"). */
+  note: z.string().max(200).optional(),
+});
+
 const LevelUpBody = z
   .object({
     hpMethod: z.enum(['roll', 'average']),
@@ -1773,6 +1780,99 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         exhaustionAfter: exhaustion,
         newHp,
         itemsRecharged: rechargeResult.recharged,
+      },
+    };
+  });
+
+  // ---- POST /characters/:id/hp ---------------------------------------------
+  // Aplica un delta a los HP del personaje. Positivo cura (cap en max),
+  // negativo daña. El daño consume temp HP primero (PHB p.198). Clampea a
+  // [0, max] — no maneja death saves automáticamente (eso lo decide el DM
+  // cambiando status='dead' via PATCH cuando corresponda).
+  //
+  // Solo el owner puede modificar su HP. El DM puede comunicar el daño y el
+  // jugador lo aplica — patrón natural de mesa.
+  app.post('/characters/:id/hp', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = HpDeltaBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede modificar HP' });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+
+    if (existingHp.max === undefined || existingHp.current === undefined) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'HP_NOT_INITIALIZED', note: 'El personaje no tiene HP max definido — corré /rest/long primero' }],
+      });
+    }
+
+    let current = existingHp.current;
+    let temp = existingHp.temp ?? 0;
+    let tempAbsorbed = 0;
+    let actualDamage = 0;
+    let actualHeal = 0;
+
+    if (body.delta < 0) {
+      const dmg = Math.abs(body.delta);
+      if (temp >= dmg) {
+        temp -= dmg;
+        tempAbsorbed = dmg;
+      } else {
+        tempAbsorbed = temp;
+        const remaining = dmg - temp;
+        temp = 0;
+        actualDamage = Math.min(current, remaining);
+        current = Math.max(0, current - remaining);
+      }
+    } else if (body.delta > 0) {
+      const before = current;
+      current = Math.min(existingHp.max, current + body.delta);
+      actualHeal = current - before;
+    }
+
+    const newHp = { current, max: existingHp.max, temp };
+    const nextData = { ...charData, hp: newHp };
+
+    const [updated] = await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: body.delta < 0 ? 'hp_damage' : 'hp_heal',
+      payload: {
+        characterId: id,
+        delta: body.delta,
+        actualDamage,
+        actualHeal,
+        tempAbsorbed,
+        before: { current: existingHp.current, temp: existingHp.temp ?? 0 },
+        after: newHp,
+        note: body.note ?? null,
+      },
+    });
+
+    return {
+      character: updated,
+      hp: {
+        before: { current: existingHp.current, temp: existingHp.temp ?? 0 },
+        after: newHp,
+        delta: body.delta,
+        actualDamage,
+        actualHeal,
+        tempAbsorbed,
       },
     };
   });
