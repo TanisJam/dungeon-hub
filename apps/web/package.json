@@ -6,7 +6,9 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "next": "^15.1.4",
@@ -22,6 +24,8 @@
     "typescript": "^5.7.2",
     "tailwindcss": "^4.0.0",
     "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.5.1"
+    "postcss": "^8.5.1",
+    "@playwright/test": "^1.49.1",
+    "dotenv": "^16.4.7"
   }
 }

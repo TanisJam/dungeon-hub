@@ -4,3 +4,9 @@ out
 *.tsbuildinfo
 .env.local
 .env*.local
+
+# Playwright
+/playwright-report
+/test-results
+/playwright/.cache
+e2e/.auth/
