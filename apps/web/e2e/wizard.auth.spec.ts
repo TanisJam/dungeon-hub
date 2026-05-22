@@ -90,13 +90,16 @@ test.describe('character builder wizard', () => {
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
     });
 
-    await test.step('revisión: verificar completitud + publicar', async () => {
-      // Las 4 secciones aparecen (los labels pueden duplicarse entre completeness
-      // y section headers — basta confirmar al menos una instancia).
+    await test.step('revisión: verificar contenido + publicar', async () => {
+      // El review (post-E.6) tiene: NumberedSectionHead "05 Revisión",
+      // ReviewBanner con character name, AbilityScoreGrid, y 3 NumberedReviewCards
+      // con los slugs (human/fighter/soldier — pre E.5 ES translations).
+      await expect(page.locator('text=Revisión').first()).toBeVisible();
       await expect(page.locator('text=Atributos').first()).toBeVisible();
-      await expect(page.locator('text=Linaje').first()).toBeVisible();
-      await expect(page.locator('text=Clase').first()).toBeVisible();
-      await expect(page.locator('text=Trasfondo').first()).toBeVisible();
+      await expect(page.getByText(charName, { exact: false }).first()).toBeVisible();
+      await expect(page.locator('text=human').first()).toBeVisible();
+      await expect(page.locator('text=fighter').first()).toBeVisible();
+      await expect(page.locator('text=soldier').first()).toBeVisible();
 
       // Publish
       await page.getByRole('button', { name: /^publicar/i }).click();
