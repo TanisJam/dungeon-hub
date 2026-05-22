@@ -6,6 +6,7 @@ import { importSpells } from './importers/spells.js';
 import { importItems } from './importers/items.js';
 import { importFeats } from './importers/feats.js';
 import { importOptionalFeatures } from './importers/optional-features.js';
+import { importMonsters } from './importers/monsters.js';
 import type { ImportResult } from './types.js';
 
 export * from './types.js';
@@ -44,15 +45,17 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
   assertDataDir(dataDir);
   const warnings: string[] = [];
 
-  const [races, classesResult, backgrounds, spells, items, feats, optionalFeatures] = await Promise.all([
-    importRaces(dataDir, warnings),
-    importClassesAndSubclasses(dataDir, warnings),
-    importBackgrounds(dataDir),
-    importSpells(dataDir),
-    importItems(dataDir),
-    importFeats(dataDir),
-    importOptionalFeatures(dataDir),
-  ]);
+  const [races, classesResult, backgrounds, spells, items, feats, optionalFeatures, monsters] =
+    await Promise.all([
+      importRaces(dataDir, warnings),
+      importClassesAndSubclasses(dataDir, warnings),
+      importBackgrounds(dataDir),
+      importSpells(dataDir),
+      importItems(dataDir),
+      importFeats(dataDir),
+      importOptionalFeatures(dataDir),
+      importMonsters(dataDir, warnings),
+    ]);
 
   return {
     races: dedup(races, 'race', warnings),
@@ -63,6 +66,7 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
     items: dedup(items, 'item', warnings),
     feats: dedup(feats, 'feat', warnings),
     optionalFeatures: dedup(optionalFeatures, 'optional-feature', warnings),
+    monsters: dedup(monsters, 'monster', warnings),
     warnings,
   };
 }

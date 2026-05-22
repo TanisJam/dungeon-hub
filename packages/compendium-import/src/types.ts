@@ -136,6 +136,30 @@ export interface NormalizedFeat extends NormalizedRecord {
   prerequisites: unknown | null;
 }
 
+/**
+ * Subset del shape de 5etools para monsters. El resto del payload se guarda
+ * tal cual en `data` JSONB.
+ */
+export interface FiveeToolsMonster extends FiveeToolsBase {
+  size?: string[];
+  type?: string | { type: string; tags?: string[] };
+  /** CR puede ser string "1/4" o un objeto {cr, lair?, coven?} con la base. */
+  cr?: string | { cr: string; lair?: string; coven?: string };
+  /** Cuando viene como _copy, el monster es una variante de otro (skip por ahora). */
+  _copy?: unknown;
+}
+
+export interface NormalizedMonster extends NormalizedRecord {
+  /** CR display ("1/8", "1/4", "10"). null si el monster no tiene CR fijo. */
+  cr: string | null;
+  /** CR numérico para sort/filter (0.125, 0.25, 10). null si cr es null. */
+  crNumeric: number | null;
+  /** Type primario lowercase, sin tags (ej. "dragon", "fiend"). null si missing. */
+  type: string | null;
+  /** Size code ("T"/"S"/"M"/"L"/"H"/"G"). Primer elemento si el monster es multi-size. */
+  size: string | null;
+}
+
 export interface FiveeToolsOptionalFeature extends FiveeToolsBase {
   featureType?: string[];
   prerequisite?: Array<Record<string, unknown>>;
@@ -156,5 +180,6 @@ export interface ImportResult {
   items: NormalizedItem[];
   feats: NormalizedFeat[];
   optionalFeatures: NormalizedOptionalFeature[];
+  monsters: NormalizedMonster[];
   warnings: string[];
 }
