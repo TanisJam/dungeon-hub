@@ -84,7 +84,7 @@ function extractSubclassGrants(
     for (const [className, subclassSourceMap] of Object.entries(classMap)) {
       for (const [subclassSource, subclassMap] of Object.entries(subclassSourceMap)) {
         if (isExcludedSource(subclassSource)) continue;
-        for (const subclassName of Object.keys(subclassMap)) {
+        for (const subclassName of Object.keys(subclassMap as Record<string, unknown>)) {
           grants.push({
             classSlug: slugify(className),
             classSource,
