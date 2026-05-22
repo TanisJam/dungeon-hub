@@ -1,8 +1,9 @@
 'use client';
 
+import { useRef } from 'react';
 import { useActionState } from 'react';
 import { publishCharacter, type PublishState } from './actions';
-import { Button } from '@/components/ui';
+import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 import { PublishedSplash } from '@/components/wizard/published-splash';
 
 const INITIAL: PublishState = { error: null, success: false };
@@ -16,6 +17,7 @@ export function ActivateForm({
   characterName: string;
   canActivate: boolean;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, action, pending] = useActionState(publishCharacter, INITIAL);
 
   if (state.success) {
@@ -23,7 +25,7 @@ export function ActivateForm({
   }
 
   return (
-    <form action={action} className="space-y-3">
+    <form ref={formRef} action={action} className="space-y-3">
       <input type="hidden" name="characterId" value={characterId} />
 
       {!canActivate && (
@@ -32,17 +34,15 @@ export function ActivateForm({
         </p>
       )}
 
-      <Button
-        tone="cta"
-        size="lg"
-        type="submit"
-        disabled={pending}
-        className="w-full"
-      >
-        {pending ? 'Publicando…' : '✓ Publicar para aprobación'}
-      </Button>
-
       {state.error && <p className="text-sm text-warning-deep">{state.error}</p>}
+
+      <WizardFooterNav
+        backHref={`/characters/${characterId}/wizard/background`}
+        nextLabel="Publicar"
+        nextIcon="check"
+        onNext={() => formRef.current?.requestSubmit()}
+        pending={pending}
+      />
     </form>
   );
 }

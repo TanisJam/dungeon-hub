@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { saveStats } from './actions';
 import { StatTile } from '@/components/wizard/stat-tile';
-import { Button } from '@/components/ui';
+import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 import { nextValueForTile } from '@/lib/stat-tile-cycle';
 import type { NullableScores, AbilityKey } from '@/lib/stat-tile-cycle';
 
@@ -170,15 +170,11 @@ export function StatsForm({
 
       {error && <p className="text-sm text-warning-deep">{error}</p>}
 
-      <Button
-        tone="green"
-        size="md"
-        onClick={handleSubmit}
-        disabled={pending || !canContinue}
-        className="w-full"
-      >
-        {pending ? 'Guardando…' : 'Guardar y seguir →'}
-      </Button>
+      <WizardFooterNav
+        onNext={handleSubmit}
+        pending={pending}
+        disabled={!canContinue}
+      />
     </div>
   );
 }

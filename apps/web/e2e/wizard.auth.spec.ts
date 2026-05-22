@@ -38,8 +38,8 @@ test.describe('character builder wizard', () => {
         await tileButtons.nth(i).click();
       }
       // Wait until save button is enabled
-      await expect(page.getByRole('button', { name: /guardar y seguir/i })).toBeEnabled({ timeout: 3000 });
-      await page.getByRole('button', { name: /guardar y seguir/i }).click();
+      await expect(page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 3000 });
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
     });
 
@@ -59,7 +59,7 @@ test.describe('character builder wizard', () => {
       //   - CON del segundo bloque (+1)
       await page.getByRole('button', { name: 'STR', exact: true }).first().click();
       await page.getByRole('button', { name: 'CON', exact: true }).last().click();
-      await page.getByRole('button', { name: /guardar y seguir/i }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
 
@@ -73,7 +73,7 @@ test.describe('character builder wizard', () => {
       // Skill picker — buttons en el detail panel
       await page.getByRole('button', { name: 'Acrobatics', exact: true }).click();
       await page.getByRole('button', { name: 'Survival', exact: true }).click();
-      await page.getByRole('button', { name: /guardar y seguir/i }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
     });
 
@@ -86,7 +86,7 @@ test.describe('character builder wizard', () => {
         .click();
       // Tool choice: anyGamingSet → pick "Dice Set"
       await page.getByRole('button', { name: 'Dice Set', exact: true }).click();
-      await page.getByRole('button', { name: /guardar y seguir/i }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
     });
 
@@ -98,8 +98,8 @@ test.describe('character builder wizard', () => {
       await expect(page.locator('text=Clase').first()).toBeVisible();
       await expect(page.locator('text=Trasfondo').first()).toBeVisible();
 
-      // Publish — button text changed to "Publicar para aprobación"
-      await page.getByRole('button', { name: /publicar para aprobación/i }).click();
+      // Publish — button text changed to "Publicar ✓"
+      await page.getByRole('button', { name: /^publicar/i }).click();
 
       // Splash is shown — wait for it to appear then auto-redirect (4s) + buffer
       await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });

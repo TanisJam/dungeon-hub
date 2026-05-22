@@ -14,7 +14,7 @@ import {
 import { saveClass } from './actions';
 import { ChoiceList } from '@/components/wizard/choice-list';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
-import { Button } from '@/components/ui';
+import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 
 export type ClassEntry = {
   slug: string;
@@ -210,15 +210,12 @@ export function ClassPicker({
 
       {error && <p className="text-sm text-warning-deep">{error}</p>}
 
-      <Button
-        tone="green"
-        size="md"
-        onClick={handleContinue}
-        disabled={pending || !selected}
-        className="w-full"
-      >
-        {pending ? 'Guardando…' : 'Guardar y seguir →'}
-      </Button>
+      <WizardFooterNav
+        backHref={`/characters/${characterId}/wizard/race`}
+        onNext={handleContinue}
+        pending={pending}
+        disabled={!selected}
+      />
     </div>
   );
 }

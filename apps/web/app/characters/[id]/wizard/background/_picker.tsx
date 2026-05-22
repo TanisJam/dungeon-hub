@@ -6,7 +6,7 @@ import { poolFor, titleCase } from './_options';
 import { saveBackground } from './actions';
 import { ChoiceList } from '@/components/wizard/choice-list';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
-import { Button } from '@/components/ui';
+import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 
 export type BackgroundEntry = {
   slug: string;
@@ -213,15 +213,12 @@ export function BackgroundPicker({
 
       {error && <p className="text-sm text-warning-deep">{error}</p>}
 
-      <Button
-        tone="green"
-        size="md"
-        onClick={handleContinue}
-        disabled={pending || !selected}
-        className="w-full"
-      >
-        {pending ? 'Guardando…' : 'Guardar y seguir →'}
-      </Button>
+      <WizardFooterNav
+        backHref={`/characters/${characterId}/wizard/class`}
+        onNext={handleContinue}
+        pending={pending}
+        disabled={!selected}
+      />
     </div>
   );
 }
