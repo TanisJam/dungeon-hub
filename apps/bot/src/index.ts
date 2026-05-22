@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { env } from './env.js';
 import { commands } from './commands/index.js';
 import { api } from './api-client.js';
+import { handlePickerInteraction, isPickerCustomId } from './picker.js';
 
 const client = new Client({
   // Solo necesitamos guild interactions para slash commands. No leemos contenido
@@ -23,6 +24,31 @@ client.once(Events.ClientReady, async (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Autocomplete: Discord da 3s para responder, no podemos defer. Delegamos
+  // al handler del comando si existe; si no, silencio (Discord muestra "loading").
+  if (interaction.isAutocomplete()) {
+    const command = commands[interaction.commandName];
+    if (!command?.autocomplete) return;
+    try {
+      await command.autocomplete(interaction);
+    } catch (err) {
+      console.error(`[bot] autocomplete ${interaction.commandName} failed:`, err);
+      // Best-effort: respondemos vacío para no dejar el dropdown colgado.
+      await interaction.respond([]).catch(() => {});
+    }
+    return;
+  }
+
+  // Picker select menu: user clickeó otra opción del dropdown de candidates.
+  if (interaction.isStringSelectMenu() && isPickerCustomId(interaction.customId)) {
+    try {
+      await handlePickerInteraction(interaction);
+    } catch (err) {
+      console.error(`[bot] picker ${interaction.customId} failed:`, err);
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = commands[interaction.commandName];
