@@ -109,7 +109,7 @@ export const characters = pgTable(
       .notNull()
       .references(() => campaigns.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    status: text('status', { enum: ['draft', 'active', 'retired', 'dead'] })
+    status: text('status', { enum: ['draft', 'active', 'retired', 'dead', 'pending_approval'] })
       .notNull()
       .default('draft'),
     data: jsonb('data').notNull(),

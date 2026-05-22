@@ -38,6 +38,7 @@ import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
 import { characters } from '../../infra/db/schema.js';
+import { inArray } from 'drizzle-orm';
 import {
   assertCampaignMembership,
   getCharacterAccess,
@@ -88,7 +89,7 @@ function ensureWizardSpellbook(inventory: InventoryItem[]): InventoryItem[] {
   ];
 }
 
-const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead']);
+const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead', 'pending_approval']);
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -111,6 +112,11 @@ const AwardXpBody = z.object({
 const ParamsWithId = z.object({ id: z.string().uuid() });
 const ListQuery = z.object({
   campaign: z.string().uuid().optional(),
+  status: z
+    .string()
+    .optional()
+    .transform((s) => (s ? s.split(',').filter(Boolean) : undefined))
+    .pipe(z.array(CharacterStatus).optional()),
 });
 
 const SetStatsBody = z.object({
@@ -322,13 +328,18 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
   // ---- GET /characters -----------------------------------------------------
   // Lista los personajes del user actual. Opcional ?campaign=:id para filtrar.
+  // Opcional ?status=active,pending_approval (CSV) para filtrar por status.
   app.get('/characters', { preHandler: app.authenticate }, async (request) => {
     const userId = request.user!.sub;
-    const { campaign } = ListQuery.parse(request.query);
+    const { campaign, status: statusFilter } = ListQuery.parse(request.query);
 
-    const whereExpr = campaign
-      ? and(eq(characters.userId, userId), eq(characters.campaignId, campaign))
-      : eq(characters.userId, userId);
+    const conditions = [eq(characters.userId, userId)];
+    if (campaign) conditions.push(eq(characters.campaignId, campaign));
+    if (statusFilter && statusFilter.length > 0) {
+      conditions.push(inArray(characters.status, statusFilter));
+    }
+
+    const whereExpr = conditions.length === 1 ? conditions[0] : and(...conditions);
 
     const rows = await db
       .select({
@@ -419,9 +430,17 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       encumbranceVariant: campaign.rulesProfile.variantRules.encumbranceVariant,
     });
 
+    // Augmented fields for sheet page (D.4):
+    // currentHp: from character.data.hp.current (live HP tracking), falls back to null.
+    // inventory: the raw inventory array from the character row.
+    const hpData = (data as { hp?: { current?: number; max?: number } } | null)?.hp;
+    const currentHp = hpData?.current ?? null;
+
     return {
       character: { id: character.id, userId: character.userId, campaignId: character.campaignId, status: character.status, xp: character.xp },
       sheet,
+      currentHp,
+      inventory,
     };
   });
 
@@ -438,6 +457,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const access = await getCharacterAccess(character, userId);
     if (access !== 'owner') {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    // Transition guard: pending_approval is only legal from draft.
+    if (body.status === 'pending_approval' && character.status !== 'draft') {
+      return reply.code(422).send({
+        error: 'ILLEGAL_TRANSITION',
+        from: character.status,
+        to: 'pending_approval',
+      });
     }
 
     const updates: Partial<typeof characters.$inferInsert> = { updatedAt: new Date() };
