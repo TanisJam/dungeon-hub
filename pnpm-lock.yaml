@@ -89,7 +89,7 @@ importers:
         specifier: ^2.47.10
         version: 2.106.1
       next:
-        specifier: ^15.1.4
+        specifier: ^15.5.18
         version: 15.5.18(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react:
         specifier: ^19.0.0

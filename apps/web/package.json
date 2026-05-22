@@ -11,21 +11,21 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "next": "^15.1.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
-    "@supabase/ssr": "^0.5.2"
+    "next": "^15.5.18",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
-    "typescript": "^5.7.2",
-    "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0",
+    "dotenv": "^16.4.7",
     "postcss": "^8.5.1",
-    "@playwright/test": "^1.49.1",
-    "dotenv": "^16.4.7"
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2"
   }
 }
