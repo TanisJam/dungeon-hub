@@ -110,9 +110,9 @@ export default async function BackgroundStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Background</h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Pick your character&apos;s background.
+      <h2 className="font-display text-xl font-bold text-ink">Trasfondo</h2>
+      <p className="mt-1 text-sm text-ink-mute">
+        Elegí el trasfondo de tu personaje.
       </p>
 
       <div className="mt-6">

@@ -4,6 +4,9 @@ import { useMemo, useState, useTransition } from 'react';
 import { parseBackground, type BackgroundData, type ParsedBackground } from './_parsers';
 import { poolFor, titleCase } from './_options';
 import { saveBackground } from './actions';
+import { ChoiceList } from '@/components/wizard/choice-list';
+import type { ChoiceOption } from '@/components/wizard/choice-list';
+import { Button } from '@/components/ui';
 
 export type BackgroundEntry = {
   slug: string;
@@ -33,12 +36,12 @@ const TOOL_CHOOSE_KEYS = [
 ] as const;
 
 const KIND_LABEL: Record<string, string> = {
-  anyStandard: 'Standard language',
-  anyExotic: 'Exotic language',
-  any: 'Any',
-  anyGamingSet: 'Gaming set',
-  anyArtisansTool: "Artisan's tool",
-  anyMusicalInstrument: 'Musical instrument',
+  anyStandard: 'Idioma estándar',
+  anyExotic: 'Idioma exótico',
+  any: 'Cualquiera',
+  anyGamingSet: 'Juego de azar',
+  anyArtisansTool: 'Herramienta de artesano',
+  anyMusicalInstrument: 'Instrumento musical',
 };
 
 export function BackgroundPicker({
@@ -96,8 +99,6 @@ export function BackgroundPicker({
   }
 
   function setLangsForKind(kind: string, vals: string[]) {
-    // En vez de hold per-kind, mantenemos un array plano. El kind solo dicta el pool.
-    // Mantenemos los seleccionados de OTROS kinds + los nuevos.
     const otherSelected = langs.filter((l) => !poolFor(kind).includes(l));
     setLangs([...otherSelected, ...vals]);
   }
@@ -112,31 +113,28 @@ export function BackgroundPicker({
 
   function handleContinue() {
     if (!selected || !parsed) {
-      setError('Pick a background first.');
+      setError('Elegí un trasfondo primero.');
       return;
     }
     setError(null);
 
-    // Validar skill count
     if (parsed.skillChoose && skills.length !== parsed.skillChoose.count) {
-      setError(`Pick ${parsed.skillChoose.count} skill${parsed.skillChoose.count > 1 ? 's' : ''}.`);
+      setError(`Elegí ${parsed.skillChoose.count} habilidad${parsed.skillChoose.count > 1 ? 'es' : ''}.`);
       return;
     }
 
-    // Validar language counts
     for (const [kind, count] of Object.entries(parsed.languageChooseCounts)) {
       const got = getLangsForKind(kind).length;
       if (got !== count) {
-        setError(`Pick ${count} ${KIND_LABEL[kind] ?? kind}${count > 1 ? 's' : ''}.`);
+        setError(`Elegí ${count} ${KIND_LABEL[kind] ?? kind}${count > 1 ? 's' : ''}.`);
         return;
       }
     }
 
-    // Validar tool counts
     for (const [kind, count] of Object.entries(parsed.toolChooseCounts)) {
       const got = (tools[kind] ?? []).length;
       if (got !== count) {
-        setError(`Pick ${count} ${KIND_LABEL[kind] ?? kind}${count > 1 ? 's' : ''}.`);
+        setError(`Elegí ${count} ${KIND_LABEL[kind] ?? kind}${count > 1 ? 's' : ''}.`);
         return;
       }
     }
@@ -153,90 +151,86 @@ export function BackgroundPicker({
     });
   }
 
-  return (
-    <div className="grid gap-6 md:grid-cols-[1fr,1.3fr]">
-      <div>
-        <input
-          type="search"
-          placeholder="Search backgrounds…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+  // Build ChoiceList options
+  const options: ChoiceOption<string>[] = filtered.map((e) => {
+    const key = entryKey(e);
+    const p = parseBackground(e.data);
+    const skillSummary = [
+      ...p.fixedSkills.map(titleCase),
+      p.skillChoose && `+${p.skillChoose.count} elección`,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const isThisSelected = key === selectedKey;
+    const currentParsed = isThisSelected ? parsed : p;
+
+    return {
+      key,
+      title: e.name,
+      sub: skillSummary || undefined,
+      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      detail: currentParsed ? (
+        <BackgroundDetailInline
+          entry={e}
+          parsed={currentParsed}
+          skills={isThisSelected ? skills : []}
+          toggleSkill={toggleSkill}
+          getLangsForKind={getLangsForKind}
+          setLangsForKind={setLangsForKind}
+          tools={isThisSelected ? tools : {}}
+          setToolsForKind={setToolsForKind}
+          lockedSkills={lockedSet}
         />
-        <ul className="mt-3 max-h-[60vh] space-y-1 overflow-y-auto pr-1">
-          {filtered.map((e) => {
-            const key = entryKey(e);
-            const isSelected = key === selectedKey;
-            const p = parseBackground(e.data);
-            const skillSummary = [
-              ...p.fixedSkills.map(titleCase),
-              p.skillChoose && `+${p.skillChoose.count} choice`,
-            ]
-              .filter(Boolean)
-              .join(', ');
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedKey(key);
-                    if (key !== selectedKey) reset();
-                  }}
-                  className={`w-full rounded-md border px-3 py-2 text-left transition ${
-                    isSelected
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{e.name}</p>
-                    <span className="shrink-0 text-[10px] uppercase text-zinc-500">
-                      {e.source}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-zinc-500">{skillSummary || '—'}</p>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      ) : null,
+    };
+  });
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-        {!selected || !parsed ? (
-          <p className="text-sm text-zinc-500">Pick a background to see its details.</p>
-        ) : (
-          <BackgroundDetailPanel
-            entry={selected}
-            parsed={parsed}
-            skills={skills}
-            toggleSkill={toggleSkill}
-            getLangsForKind={getLangsForKind}
-            setLangsForKind={setLangsForKind}
-            tools={tools}
-            setToolsForKind={setToolsForKind}
-            lockedSkills={lockedSet}
-          />
-        )}
+  return (
+    <div className="space-y-4">
+      <input
+        type="search"
+        placeholder="Buscar trasfondo…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+      />
 
-        {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={pending || !selected}
-            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition"
-          >
-            {pending ? 'Saving…' : 'Save & continue →'}
-          </button>
+      {filtered.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-mute">
+          Sin resultados.
         </div>
-      </div>
+      ) : (
+        <ChoiceList
+          options={options}
+          selectedKey={selectedKey}
+          onSelect={(key) => {
+            if (key !== selectedKey) reset();
+            setSelectedKey(key);
+          }}
+        />
+      )}
+
+      {error && <p className="text-sm text-warning-deep">{error}</p>}
+
+      <Button
+        tone="green"
+        size="md"
+        onClick={handleContinue}
+        disabled={pending || !selected}
+        className="w-full"
+      >
+        {pending ? 'Guardando…' : 'Guardar y seguir →'}
+      </Button>
     </div>
   );
 }
 
-function BackgroundDetailPanel({
+// ---------------------------------------------------------------------------
+// Background detail inline
+// ---------------------------------------------------------------------------
+
+function BackgroundDetailInline({
   entry,
   parsed,
   skills,
@@ -258,24 +252,21 @@ function BackgroundDetailPanel({
   lockedSkills: Set<string>;
 }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold">{entry.name}</h3>
-        <p className="mt-0.5 text-xs text-zinc-500">{entry.source}</p>
-      </div>
+    <div className="space-y-3">
+      <p className="text-[10px] text-ink-mute">{entry.source}</p>
 
       {/* Skills */}
       <div>
-        <p className="text-xs uppercase tracking-wide text-zinc-500">Skills</p>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Habilidades</p>
         {parsed.fixedSkills.length > 0 && (
-          <p className="mt-1 text-sm">
-            <span className="text-zinc-500">Granted:</span>{' '}
-            {parsed.fixedSkills.map(titleCase).join(', ')}
+          <p className="mt-1 text-xs">
+            <span className="text-ink-mute">Otorgadas:</span>{' '}
+            <span className="text-ink">{parsed.fixedSkills.map(titleCase).join(', ')}</span>
           </p>
         )}
         {parsed.skillChoose && (
           <ChooseGroup
-            label={`Pick ${parsed.skillChoose.count}`}
+            label={`Elegí ${parsed.skillChoose.count}`}
             pool={parsed.skillChoose.from}
             selected={skills}
             count={parsed.skillChoose.count}
@@ -288,11 +279,11 @@ function BackgroundDetailPanel({
       {/* Languages */}
       {(parsed.fixedLanguages.length > 0 || Object.keys(parsed.languageChooseCounts).length > 0) && (
         <div>
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Languages</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Idiomas</p>
           {parsed.fixedLanguages.length > 0 && (
-            <p className="mt-1 text-sm">
-              <span className="text-zinc-500">Granted:</span>{' '}
-              {parsed.fixedLanguages.map(titleCase).join(', ')}
+            <p className="mt-1 text-xs">
+              <span className="text-ink-mute">Otorgados:</span>{' '}
+              <span className="text-ink">{parsed.fixedLanguages.map(titleCase).join(', ')}</span>
             </p>
           )}
           {LANG_CHOOSE_KEYS.map((kind) => {
@@ -302,7 +293,7 @@ function BackgroundDetailPanel({
             return (
               <MultiSelectChoose
                 key={kind}
-                label={`Pick ${count} ${KIND_LABEL[kind].toLowerCase()}${count > 1 ? 's' : ''}`}
+                label={`Elegí ${count} ${KIND_LABEL[kind].toLowerCase()}${count > 1 ? 's' : ''}`}
                 pool={poolFor(kind)}
                 selected={sel}
                 count={count}
@@ -316,11 +307,11 @@ function BackgroundDetailPanel({
       {/* Tools */}
       {(parsed.fixedTools.length > 0 || Object.keys(parsed.toolChooseCounts).length > 0) && (
         <div>
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Tools</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Herramientas</p>
           {parsed.fixedTools.length > 0 && (
-            <p className="mt-1 text-sm">
-              <span className="text-zinc-500">Granted:</span>{' '}
-              {parsed.fixedTools.map(titleCase).join(', ')}
+            <p className="mt-1 text-xs">
+              <span className="text-ink-mute">Otorgadas:</span>{' '}
+              <span className="text-ink">{parsed.fixedTools.map(titleCase).join(', ')}</span>
             </p>
           )}
           {TOOL_CHOOSE_KEYS.map((kind) => {
@@ -330,7 +321,7 @@ function BackgroundDetailPanel({
             return (
               <MultiSelectChoose
                 key={kind}
-                label={`Pick ${count} ${KIND_LABEL[kind].toLowerCase()}${count > 1 ? 's' : ''}`}
+                label={`Elegí ${count} ${KIND_LABEL[kind].toLowerCase()}${count > 1 ? 's' : ''}`}
                 pool={poolFor(kind)}
                 selected={sel}
                 count={count}
@@ -361,8 +352,8 @@ function ChooseGroup({
 }) {
   const hasLocked = lockedSkills && Array.from(lockedSkills).some((s) => pool.includes(s));
   return (
-    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-      <p className="text-xs text-amber-300">{label}</p>
+    <div className="mt-2 rounded-md border border-accent-soft bg-paper p-2.5">
+      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((s) => {
           const isOn = selected.includes(s);
@@ -374,14 +365,15 @@ function ChooseGroup({
               type="button"
               onClick={() => onToggle(s)}
               disabled={disabled}
-              title={isLocked ? 'Already given by your class' : undefined}
-              className={`rounded px-2 py-1 text-xs ring-1 ring-inset transition ${
+              title={isLocked ? 'Ya otorgada por tu clase' : undefined}
+              className={[
+                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
                 isLocked
-                  ? 'bg-zinc-800/50 text-zinc-600 ring-zinc-800 line-through cursor-not-allowed'
+                  ? 'bg-paper-soft text-ink-mute ring-line line-through cursor-not-allowed'
                   : isOn
-                    ? 'bg-amber-500/20 text-amber-200 ring-amber-500/50'
-                    : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
-              }`}
+                    ? 'bg-accent-soft text-accent-deep ring-accent'
+                    : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
+              ].join(' ')}
             >
               {titleCase(s)}
             </button>
@@ -389,8 +381,8 @@ function ChooseGroup({
         })}
       </div>
       {hasLocked && (
-        <p className="mt-2 text-xs text-zinc-500">
-          Struck-through skills are already given by your class.
+        <p className="mt-1.5 text-[10px] text-ink-mute">
+          Las habilidades tachadas ya fueron otorgadas por tu clase.
         </p>
       )}
     </div>
@@ -417,8 +409,8 @@ function MultiSelectChoose({
     else onChange([...selected, v]);
   }
   return (
-    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-      <p className="text-xs text-amber-300">{label}</p>
+    <div className="mt-2 rounded-md border border-accent-soft bg-paper p-2.5">
+      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((v) => {
           const isOn = selected.includes(v);
@@ -429,11 +421,12 @@ function MultiSelectChoose({
               type="button"
               onClick={() => toggle(v)}
               disabled={disabled}
-              className={`rounded px-2 py-1 text-xs ring-1 ring-inset transition ${
+              className={[
+                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
                 isOn
-                  ? 'bg-amber-500/20 text-amber-200 ring-amber-500/50'
-                  : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
-              }`}
+                  ? 'bg-accent-soft text-accent-deep ring-accent'
+                  : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
+              ].join(' ')}
             >
               {titleCase(v)}
             </button>

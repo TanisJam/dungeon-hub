@@ -15,6 +15,9 @@ import {
   type RaceData,
 } from './_parsers';
 import { saveRace } from './actions';
+import { ChoiceList } from '@/components/wizard/choice-list';
+import type { ChoiceOption } from '@/components/wizard/choice-list';
+import { Button } from '@/components/ui';
 
 export type RaceEntry = {
   slug: string;
@@ -33,9 +36,18 @@ type Selection = {
   subraceSource: string | null;
 };
 
-// La key UI única para una entry (cada subrace y cada parent es pickeable).
 function entryKey(e: { slug: string; source: string }): string {
   return `${e.slug}|${e.source}`;
+}
+
+function displayName(e: RaceEntry, all: RaceEntry[]): string {
+  if (e.isSubrace && e.parentSlug) {
+    const parent = all.find(
+      (p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace,
+    );
+    if (parent) return `${e.name} ${parent.name}`;
+  }
+  return e.name;
 }
 
 export function RacePicker({
@@ -52,10 +64,9 @@ export function RacePicker({
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
     if (!initialSelection) return null;
-    const k = initialSelection.subraceSlug
+    return initialSelection.subraceSlug
       ? `${initialSelection.subraceSlug}|${initialSelection.subraceSource}`
       : `${initialSelection.raceSlug}|${initialSelection.raceSource}`;
-    return k;
   });
   const [chosenAsis, setChosenAsis] = useState<Record<string, AbilityKey[]>>(initialChosenAsis);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +100,7 @@ export function RacePicker({
 
   function handleContinue() {
     if (!selected) {
-      setError('Pick a race first.');
+      setError('Elegí un linaje primero.');
       return;
     }
     setError(null);
@@ -100,7 +111,6 @@ export function RacePicker({
     const subracePart =
       selected.isSubrace ? { slug: selected.slug, source: selected.source } : null;
 
-    // Slots efectivos (handles MPMM/2024 case where ability data is empty).
     const { raceSlots, subraceSlots } = effectiveAsiSlots({
       parentAbility: parent?.data.ability,
       selectedAbility: selected.data.ability,
@@ -115,7 +125,7 @@ export function RacePicker({
         } else {
           const chosen = chosenAsis[`${source}:${idx}`] ?? [];
           if (chosen.length !== slot.count) {
-            setError(`Pick exactly ${slot.count} ability${slot.count > 1 ? ' choices' : ''}.`);
+            setError(`Elegí exactamente ${slot.count} atributo${slot.count > 1 ? 's' : ''}.`);
             throw new Error('asi-incomplete');
           }
           for (const a of chosen) {
@@ -132,11 +142,10 @@ export function RacePicker({
       return;
     }
 
-    // Anti-duplicate: el validator rechaza el mismo ability con +2 y +1.
     const seen = new Set<string>();
     for (const a of appliedAsis) {
       if (seen.has(a.ability)) {
-        setError(`Each ability score can only be increased once. Got ${a.ability.toUpperCase()} twice.`);
+        setError(`Cada atributo solo puede incrementarse una vez. ${a.ability.toUpperCase()} aparece dos veces.`);
         return;
       }
       seen.add(a.ability);
@@ -148,94 +157,83 @@ export function RacePicker({
     });
   }
 
-  return (
-    <div className="grid gap-6 md:grid-cols-[1fr,1.3fr]">
-      <div>
-        <input
-          type="search"
-          placeholder="Search races…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+  // Build ChoiceList options
+  const options: ChoiceOption<string>[] = filtered.map((e) => {
+    const key = entryKey(e);
+    const asis = parseAsis(e.data.ability);
+    const asiSummary = formatAsisSummary(asis);
+    const speedStr = formatSpeed(e.data.speed);
+    const sub = [asiSummary, speedStr ? `Velocidad ${speedStr}` : null]
+      .filter(Boolean)
+      .join(' · ');
+
+    const parentEntry = e.isSubrace && e.parentSlug
+      ? entries.find((p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace) ?? null
+      : null;
+
+    return {
+      key,
+      title: displayName(e, entries),
+      sub: sub || undefined,
+      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      detail: (
+        <RaceDetailPanel
+          entry={e}
+          parent={parentEntry}
+          chosenAsis={chosenAsis}
+          setChosenAsis={(next) => {
+            setChosenAsis(next);
+            setError(null);
+          }}
         />
-        <ul className="mt-3 max-h-[60vh] space-y-1 overflow-y-auto pr-1">
-          {filtered.map((e) => {
-            const key = entryKey(e);
-            const isSelected = key === selectedKey;
-            const asis = parseAsis(e.data.ability);
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedKey(key);
-                    setChosenAsis({});
-                    setError(null);
-                  }}
-                  className={`w-full rounded-md border px-3 py-2 text-left transition ${
-                    isSelected
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{displayName(e, entries)}</p>
-                    <span className="shrink-0 text-[10px] uppercase text-zinc-500">
-                      {e.source}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-zinc-500">{formatAsisSummary(asis)}</p>
-                </button>
-              </li>
-            );
-          })}
-          {filtered.length === 0 && (
-            <li className="rounded-md border border-dashed border-zinc-800 px-3 py-6 text-center text-xs text-zinc-500">
-              No matches.
-            </li>
-          )}
-        </ul>
-      </div>
+      ),
+    };
+  });
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-        {!selected ? (
-          <p className="text-sm text-zinc-500">Pick a race to see its details.</p>
-        ) : (
-          <RaceDetailPanel
-            entry={selected}
-            parent={parent}
-            chosenAsis={chosenAsis}
-            setChosenAsis={setChosenAsis}
-          />
-        )}
+  return (
+    <div className="space-y-4">
+      {/* Search */}
+      <input
+        type="search"
+        placeholder="Buscar linaje…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+      />
 
-        {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={pending || !selected}
-            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition"
-          >
-            {pending ? 'Saving…' : 'Save & continue →'}
-          </button>
+      {filtered.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-mute">
+          Sin resultados.
         </div>
-      </div>
+      ) : (
+        <ChoiceList
+          options={options}
+          selectedKey={selectedKey}
+          onSelect={(key) => {
+            if (key !== selectedKey) setChosenAsis({});
+            setSelectedKey(key);
+            setError(null);
+          }}
+        />
+      )}
+
+      {error && <p className="text-sm text-warning-deep">{error}</p>}
+
+      <Button
+        tone="green"
+        size="md"
+        onClick={handleContinue}
+        disabled={pending || !selected}
+        className="w-full"
+      >
+        {pending ? 'Guardando…' : 'Guardar y seguir →'}
+      </Button>
     </div>
   );
 }
 
-function displayName(e: RaceEntry, all: RaceEntry[]): string {
-  if (e.isSubrace && e.parentSlug) {
-    const parent = all.find(
-      (p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace,
-    );
-    if (parent) return `${e.name} ${parent.name}`;
-  }
-  return e.name;
-}
-
+// ---------------------------------------------------------------------------
+// Detail panel (moved inline into ChoiceCard)
 // ---------------------------------------------------------------------------
 
 function RaceDetailPanel({
@@ -260,12 +258,9 @@ function RaceDetailPanel({
   const speed = formatSpeed(entry.data.speed);
 
   return (
-    <div>
-      <h3 className="text-base font-semibold">
-        {entry.isSubrace && parent ? `${entry.name} ${parent.name}` : entry.name}
-      </h3>
-      <p className="mt-0.5 text-xs text-zinc-500">
-        {size} · Speed {speed} · {entry.source}
+    <div className="space-y-3">
+      <p className="text-xs text-ink-mute">
+        {size} · Velocidad {speed} · {entry.source}
       </p>
 
       <AsiSection
@@ -276,20 +271,20 @@ function RaceDetailPanel({
       />
 
       {langs && (
-        <div className="mt-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Languages</p>
-          <p className="mt-1 text-sm">{langs}</p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Idiomas</p>
+          <p className="mt-1 text-xs text-ink">{langs}</p>
         </div>
       )}
 
       {traits.length > 0 && (
-        <div className="mt-4">
-          <p className="text-xs uppercase tracking-wide text-zinc-500">Traits</p>
-          <ul className="mt-2 space-y-2 text-sm">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Rasgos</p>
+          <ul className="mt-1 space-y-1.5 text-xs">
             {traits.map((t, i) => (
               <li key={i}>
-                <span className="font-medium">{t.name}.</span>{' '}
-                <span className="text-zinc-300">{t.text}</span>
+                <span className="font-semibold text-ink">{t.name}.</span>{' '}
+                <span className="text-ink-soft">{t.text}</span>
               </li>
             ))}
           </ul>
@@ -316,8 +311,7 @@ function AsiSection({
     selectedIsSubrace: entry.isSubrace,
   });
 
-  const parentAbilityEmpty =
-    parent && !(parent.data.ability && parent.data.ability.length > 0);
+  const parentAbilityEmpty = parent && !(parent.data.ability && parent.data.ability.length > 0);
   const entryAbilityEmpty = !(entry.data.ability && entry.data.ability.length > 0);
   const isMpmmSynthetic = parentAbilityEmpty && entryAbilityEmpty;
 
@@ -327,7 +321,7 @@ function AsiSection({
         <AsiBlock
           slots={raceSlots}
           source="race"
-          label={isMpmmSynthetic ? 'Ability Score Increase (2024 / MPMM)' : 'Ability Score Increase'}
+          label={isMpmmSynthetic ? 'Incremento de atributo (2024 / MPMM)' : 'Incremento de atributo'}
           chosen={chosen}
           setChosen={setChosen}
         />
@@ -336,7 +330,7 @@ function AsiSection({
         <AsiBlock
           slots={subraceSlots}
           source="subrace"
-          label="Ability Score Increase (subrace)"
+          label="Incremento de atributo (sublinaje)"
           chosen={chosen}
           setChosen={setChosen}
         />
@@ -361,17 +355,16 @@ function AsiBlock({
   if (slots.length === 0) return null;
 
   return (
-    <div className="mt-4">
-      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
-      <div className="mt-2 space-y-2">
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">{label}</p>
+      <div className="mt-1 space-y-2">
         {slots.map((slot, idx) => {
           if (slot.kind === 'fixed') {
             const sign = slot.bonus >= 0 ? '+' : '';
             return (
-              <p key={idx} className="text-sm">
-                <span className="font-mono">
-                  {sign}
-                  {slot.bonus} {slot.ability.toUpperCase()}
+              <p key={idx} className="text-xs">
+                <span className="font-mono font-bold text-ink">
+                  {sign}{slot.bonus} {slot.ability.toUpperCase()}
                 </span>
               </p>
             );
@@ -416,9 +409,9 @@ function AsiChooser({
   const pool = slot.from.length > 0 ? slot.from : ABILITY_KEYS;
 
   return (
-    <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-      <p className="text-xs text-amber-300">
-        Choose {slot.count} ability{slot.count > 1 ? ' scores' : ''} to get +{slot.amount}:
+    <div className="rounded-md border border-accent-soft bg-paper p-2.5">
+      <p className="text-[10px] font-semibold text-accent-deep">
+        Elegí {slot.count} atributo{slot.count > 1 ? 's' : ''} para +{slot.amount}:
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((a) => {
@@ -430,11 +423,12 @@ function AsiChooser({
               type="button"
               onClick={() => toggle(a)}
               disabled={disabled}
-              className={`rounded px-2 py-1 text-xs font-mono ring-1 ring-inset transition ${
+              className={[
+                'rounded px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
                 isOn
-                  ? 'bg-amber-500/20 text-amber-200 ring-amber-500/50'
-                  : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
-              }`}
+                  ? 'bg-accent-soft text-accent-deep ring-accent'
+                  : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
+              ].join(' ')}
             >
               {a.toUpperCase()}
             </button>

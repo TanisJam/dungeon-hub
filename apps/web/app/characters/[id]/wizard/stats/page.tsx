@@ -38,12 +38,12 @@ export default async function StatsStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Stats</h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Set your six base ability scores. These are pre-racial; race bonuses come next.
+      <h2 className="font-display text-xl font-bold text-ink">Atributos</h2>
+      <p className="mt-1 text-sm text-ink-mute">
+        Elegí tus seis atributos base. Los bonificadores raciales se aplican en el paso siguiente.
       </p>
 
-      <div className="mt-8">
+      <div className="mt-6">
         <StatsForm
           characterId={id}
           allowedMethods={allowedMethods}

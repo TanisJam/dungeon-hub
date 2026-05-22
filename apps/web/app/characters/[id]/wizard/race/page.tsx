@@ -140,9 +140,9 @@ export default async function RaceStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Race</h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Pick a race. Sub-races and parent races are listed together.
+      <h2 className="font-display text-xl font-bold text-ink">Linaje</h2>
+      <p className="mt-1 text-sm text-ink-mute">
+        Elegí un linaje. Las subraza y las razas padre aparecen juntas.
       </p>
 
       <div className="mt-6">

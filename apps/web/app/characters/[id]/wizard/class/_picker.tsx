@@ -12,6 +12,9 @@ import {
   type ClassData,
 } from './_parsers';
 import { saveClass } from './actions';
+import { ChoiceList } from '@/components/wizard/choice-list';
+import type { ChoiceOption } from '@/components/wizard/choice-list';
+import { Button } from '@/components/ui';
 
 export type ClassEntry = {
   slug: string;
@@ -106,15 +109,15 @@ export function ClassPicker({
 
   function handleContinue() {
     if (!selected) {
-      setError('Pick a class first.');
+      setError('Elegí una clase primero.');
       return;
     }
     if (skillChoice && skills.length !== skillChoice.count) {
-      setError(`Pick exactly ${skillChoice.count} skills.`);
+      setError(`Elegí exactamente ${skillChoice.count} habilidades.`);
       return;
     }
     if (needsSubclass && !subclassKey) {
-      setError(`Pick a ${selected.data.subclassTitle ?? 'subclass'}.`);
+      setError(`Elegí un ${selected.data.subclassTitle ?? 'subclase'}.`);
       return;
     }
     setError(null);
@@ -138,133 +141,133 @@ export function ClassPicker({
     });
   }
 
-  return (
-    <div className="grid gap-6 md:grid-cols-[1fr,1.3fr]">
-      <div>
-        <input
-          type="search"
-          placeholder="Search classes…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+  // Build ChoiceList options
+  const options: ChoiceOption<string>[] = filtered.map((e) => {
+    const key = entryKey(e);
+    const hd = formatHitDie(e.data.hd);
+    const primary = formatPrimary(e.data.primaryAbility);
+
+    // These are captured as closures — they're the selected state from above
+    // which updates when this entry is selected via the outer state.
+    const isThisSelected = key === selectedKey;
+    const currentSkills = isThisSelected ? skills : [];
+    const currentSubclassKey = isThisSelected ? subclassKey : null;
+
+    return {
+      key,
+      title: e.name,
+      sub: [hd ? `HD ${hd}` : null, primary ? `Primary ${primary}` : null]
+        .filter(Boolean)
+        .join(' · ') || undefined,
+      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      detail: (
+        <ClassDetailInline
+          entry={e}
+          skillChoice={isThisSelected ? skillChoice : getSkillChoice(e.data)}
+          selectedSkills={currentSkills}
+          toggleSkill={toggleSkill}
+          lockedSkills={lockedSet}
+          needsSubclass={requiresL1Subclass(e.data)}
+          subclassOptions={subclassesByClass[key] ?? []}
+          subclassKey={currentSubclassKey}
+          onSubclassSelect={(k) => {
+            setSubclassKey(k);
+            setError(null);
+          }}
         />
-        <ul className="mt-3 max-h-[60vh] space-y-1 overflow-y-auto pr-1">
-          {filtered.map((e) => {
-            const key = entryKey(e);
-            const isSelected = key === selectedKey;
-            const hd = formatHitDie(e.data.hd);
-            const primary = formatPrimary(e.data.primaryAbility);
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedKey(key);
-                    // reset skills + subclass if changing class
-                    if (key !== selectedKey) {
-                      setSkills([]);
-                      setSubclassKey(null);
-                    }
-                    setError(null);
-                  }}
-                  className={`w-full rounded-md border px-3 py-2 text-left transition ${
-                    isSelected
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{e.name}</p>
-                    <span className="shrink-0 text-[10px] uppercase text-zinc-500">
-                      {e.source}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    Hit {hd}
-                    {primary && ` · Primary ${primary}`}
-                  </p>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      ),
+    };
+  });
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
-        {!selected ? (
-          <p className="text-sm text-zinc-500">Pick a class to see its details.</p>
-        ) : (
-          <>
-            <ClassDetailPanel
-              entry={selected}
-              skillChoice={skillChoice}
-              selectedSkills={skills}
-              toggleSkill={toggleSkill}
-              lockedSkills={lockedSet}
-            />
-            {needsSubclass && (
-              <SubclassPicker
-                title={selected.data.subclassTitle ?? 'Subclass'}
-                options={subclassOptions}
-                selectedKey={subclassKey}
-                onSelect={(k) => {
-                  setSubclassKey(k);
-                  setError(null);
-                }}
-              />
-            )}
-          </>
-        )}
+  return (
+    <div className="space-y-4">
+      <input
+        type="search"
+        placeholder="Buscar clase…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+      />
 
-        {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={pending || !selected}
-            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition"
-          >
-            {pending ? 'Saving…' : 'Save & continue →'}
-          </button>
+      {filtered.length === 0 ? (
+        <div className="rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-mute">
+          Sin resultados.
         </div>
-      </div>
+      ) : (
+        <ChoiceList
+          options={options}
+          selectedKey={selectedKey}
+          onSelect={(key) => {
+            if (key !== selectedKey) {
+              setSkills([]);
+              setSubclassKey(null);
+            }
+            setSelectedKey(key);
+            setError(null);
+          }}
+        />
+      )}
+
+      {error && <p className="text-sm text-warning-deep">{error}</p>}
+
+      <Button
+        tone="green"
+        size="md"
+        onClick={handleContinue}
+        disabled={pending || !selected}
+        className="w-full"
+      >
+        {pending ? 'Guardando…' : 'Guardar y seguir →'}
+      </Button>
     </div>
   );
 }
 
-function ClassDetailPanel({
+// ---------------------------------------------------------------------------
+// Class detail inline (inside ChoiceCard expand zone)
+// ---------------------------------------------------------------------------
+
+function ClassDetailInline({
   entry,
   skillChoice,
   selectedSkills,
   toggleSkill,
   lockedSkills,
+  needsSubclass,
+  subclassOptions,
+  subclassKey,
+  onSubclassSelect,
 }: {
   entry: ClassEntry;
   skillChoice: ReturnType<typeof getSkillChoice>;
   selectedSkills: string[];
   toggleSkill: (s: string) => void;
   lockedSkills: Set<string>;
+  needsSubclass: boolean;
+  subclassOptions: SubclassRow[];
+  subclassKey: string | null;
+  onSubclassSelect: (key: string | null) => void;
 }) {
   const d = entry.data;
   return (
-    <div>
-      <h3 className="text-base font-semibold">{entry.name}</h3>
-      <p className="mt-0.5 text-xs text-zinc-500">
-        Hit Die {formatHitDie(d.hd)} · Saves {formatSaves(d.proficiency)}
-        {formatPrimary(d.primaryAbility) && ` · Primary ${formatPrimary(d.primaryAbility)}`} · {entry.source}
+    <div className="space-y-3">
+      <p className="text-xs text-ink-mute">
+        Dado de golpe {formatHitDie(d.hd)} · Salvaciones {formatSaves(d.proficiency)}
+        {formatPrimary(d.primaryAbility) && ` · Primario ${formatPrimary(d.primaryAbility)}`}
       </p>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <Prof label="Armor" value={formatProfs(d.startingProficiencies?.armor)} />
-        <Prof label="Weapons" value={formatProfs(d.startingProficiencies?.weapons)} />
-        <Prof label="Tools" value={formatProfs(d.startingProficiencies?.tools)} />
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <Prof label="Armadura" value={formatProfs(d.startingProficiencies?.armor)} />
+        <Prof label="Armas" value={formatProfs(d.startingProficiencies?.weapons)} />
+        {d.startingProficiencies?.tools && (
+          <Prof label="Herramientas" value={formatProfs(d.startingProficiencies?.tools)} />
+        )}
       </div>
 
       {skillChoice && (
-        <div className="mt-5">
-          <p className="text-xs uppercase tracking-wide text-zinc-500">
-            Skills — pick {skillChoice.count}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+            Habilidades — elegí {skillChoice.count}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {skillChoice.from.map((s) => {
@@ -277,14 +280,15 @@ function ClassDetailPanel({
                   type="button"
                   onClick={() => toggleSkill(s)}
                   disabled={disabled}
-                  title={isLocked ? 'Already granted by your background' : undefined}
-                  className={`rounded px-2 py-1 text-xs ring-1 ring-inset transition ${
+                  title={isLocked ? 'Ya otorgada por tu trasfondo' : undefined}
+                  className={[
+                    'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
                     isLocked
-                      ? 'bg-zinc-800/50 text-zinc-600 ring-zinc-800 line-through cursor-not-allowed'
+                      ? 'bg-paper-soft text-ink-mute ring-line line-through cursor-not-allowed'
                       : isOn
-                        ? 'bg-indigo-500/20 text-indigo-200 ring-indigo-500/50'
-                        : 'text-zinc-400 ring-zinc-700 hover:ring-zinc-500 disabled:opacity-30'
-                  }`}
+                        ? 'bg-primary-soft text-primary-deep ring-primary'
+                        : 'text-ink-soft ring-line hover:ring-primary-soft disabled:opacity-30',
+                  ].join(' ')}
                 >
                   {titleCase(s)}
                 </button>
@@ -292,11 +296,20 @@ function ClassDetailPanel({
             })}
           </div>
           {lockedSkills.size > 0 && (
-            <p className="mt-2 text-xs text-zinc-500">
-              Struck-through skills are already given by your background.
+            <p className="mt-1 text-[10px] text-ink-mute">
+              Las habilidades tachadas ya fueron otorgadas por tu trasfondo.
             </p>
           )}
         </div>
+      )}
+
+      {needsSubclass && (
+        <SubclassPicker
+          title={d.subclassTitle ?? 'Subclase'}
+          options={subclassOptions}
+          selectedKey={subclassKey}
+          onSelect={onSubclassSelect}
+        />
       )}
     </div>
   );
@@ -315,17 +328,19 @@ function SubclassPicker({
 }) {
   if (options.length === 0) {
     return (
-      <div className="mt-5 rounded-md border border-red-500/30 bg-red-500/5 p-3">
-        <p className="text-xs text-red-300">
-          {title} required at L1, but no options found in the compendium.
+      <div className="rounded-md border border-warning-soft bg-warning-soft/30 p-2.5">
+        <p className="text-xs text-warning-deep">
+          {title} requerida en N1, pero no hay opciones en el compendium.
         </p>
       </div>
     );
   }
   return (
-    <div className="mt-5">
-      <p className="text-xs uppercase tracking-wide text-zinc-500">{title} — pick 1</p>
-      <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        {title} — elegí 1
+      </p>
+      <div className="mt-2 grid grid-cols-1 gap-1.5">
         {options.map((sc) => {
           const k = `${sc.slug}|${sc.source}`;
           const isOn = k === selectedKey;
@@ -334,17 +349,16 @@ function SubclassPicker({
               key={k}
               type="button"
               onClick={() => onSelect(isOn ? null : k)}
-              className={`rounded-md border px-3 py-2 text-left text-sm transition ${
+              className={[
+                'rounded-md border px-3 py-2 text-left text-xs transition',
                 isOn
-                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-200'
-                  : 'border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-700'
-              }`}
+                  ? 'border-accent bg-accent-soft text-accent-deep'
+                  : 'border-line bg-paper-soft text-ink-soft hover:border-accent-soft',
+              ].join(' ')}
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium">{sc.name}</span>
-                <span className="shrink-0 text-[10px] uppercase text-zinc-500">
-                  {sc.source}
-                </span>
+                <span className="shrink-0 text-[9px] uppercase text-ink-mute">{sc.source}</span>
               </div>
             </button>
           );
@@ -357,8 +371,8 @@ function SubclassPicker({
 function Prof({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-0.5 text-zinc-300">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">{label}</p>
+      <p className="mt-0.5 text-xs text-ink-soft">{value}</p>
     </div>
   );
 }

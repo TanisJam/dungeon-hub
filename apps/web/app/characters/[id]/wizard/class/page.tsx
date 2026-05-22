@@ -73,9 +73,9 @@ export default async function ClassStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold">Class</h2>
-      <p className="mt-1 text-sm text-zinc-400">
-        Pick your class. Starts at level 1; multiclass and level-up come later.
+      <h2 className="font-display text-xl font-bold text-ink">Clase</h2>
+      <p className="mt-1 text-sm text-ink-mute">
+        Elegí tu clase. Empieza en nivel 1; multiclase y subida de nivel vienen después.
       </p>
 
       <div className="mt-6">
