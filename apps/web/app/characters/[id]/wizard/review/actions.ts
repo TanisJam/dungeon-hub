@@ -28,3 +28,22 @@ export async function publishCharacter(
 
   return { error: null, success: true };
 }
+
+export async function updateCharacterName(
+  characterId: string,
+  name: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: 'Not authenticated' };
+  try {
+    await api.patch(`/characters/${characterId}`, { name }, session.access_token);
+    return { error: null };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string } | null;
+      return { error: body?.message ?? `API ${err.status}` };
+    }
+    return { error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}

@@ -5,6 +5,11 @@ import { api } from '@/lib/api';
 import { ActivateForm } from './_activate-form';
 import { Card } from '@/components/ui';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { ReviewBanner } from '@/components/wizard/review-banner';
+import { NumberedReviewCard } from '@/components/wizard/numbered-review-card';
+import { CharacterNameInput } from '@/components/wizard/character-name-input';
+import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
+import type { AbilityKey } from '@/lib/sheet-types';
 
 type AppliedClass = {
   slug: string;
@@ -40,18 +45,17 @@ type Character = {
 
 type Props = { params: Promise<{ id: string }> };
 
-const STAT_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+const STAT_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-const STAT_ES: Record<string, string> = {
-  str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
+const STAT_METHOD_LABEL: Record<string, string> = {
+  roll: 'Tirada',
+  pointbuy: 'Puntos',
+  standard: 'Estándar',
 };
 
-const STEP_LABELS: Record<string, string> = {
-  stats: 'Atributos',
-  race: 'Linaje',
-  class: 'Clase',
-  background: 'Trasfondo',
-};
+function calcModifier(score: number): number {
+  return Math.floor((score - 10) / 2);
+}
 
 export default async function ReviewStepPage({ params }: Props) {
   const { id } = await params;
@@ -72,6 +76,20 @@ export default async function ReviewStepPage({ params }: Props) {
     }
   }
 
+  // Build ability score grid entries
+  const abilityScores = finalStats
+    ? (Object.fromEntries(
+        STAT_KEYS.map((k) => [
+          k,
+          { score: finalStats[k], modifier: calcModifier(finalStats[k]) },
+        ]),
+      ) as Record<AbilityKey, { score: number; modifier: number }>)
+    : null;
+
+  const statTotal = finalStats
+    ? STAT_KEYS.reduce((sum, k) => sum + finalStats[k], 0)
+    : 0;
+
   const primaryClass = d.classes?.[0] ?? null;
 
   const completeness = {
@@ -81,8 +99,59 @@ export default async function ReviewStepPage({ params }: Props) {
     background: !!d.background,
   };
   const allComplete = Object.values(completeness).every(Boolean);
+  const missingSteps = (Object.keys(completeness) as Array<keyof typeof completeness>).filter(
+    (k) => !completeness[k],
+  );
   const alreadyActive = character.status === 'active';
   const alreadyPending = character.status === 'pending_approval';
+
+  // Banner pills
+  const levelPill = primaryClass ? { label: `Nivel ${primaryClass.level}` } : undefined;
+  const classPill = primaryClass ? { label: primaryClass.slug } : undefined;
+  const subclassPill =
+    primaryClass?.subclass ? { label: primaryClass.subclass.slug } : undefined;
+
+  // Race summary pills
+  const racePills = [];
+  if (d.asisApplied && d.asisApplied.length > 0) {
+    const groupedAsis: Record<string, number> = {};
+    for (const asi of d.asisApplied) {
+      groupedAsis[asi.ability] = (groupedAsis[asi.ability] ?? 0) + asi.bonus;
+    }
+    const asiLabel = Object.entries(groupedAsis)
+      .map(([ab, bonus]) => `+${bonus} ${ab.toUpperCase()}`)
+      .join(', ');
+    if (asiLabel) racePills.push({ label: asiLabel });
+  }
+
+  // Class pills
+  const classPills = [];
+  if (primaryClass) {
+    classPills.push({ label: `Hit Die: d${primaryClass.hitDie}` });
+    if (primaryClass.savingThrows?.length) {
+      classPills.push({ label: primaryClass.savingThrows.join(', ') });
+    }
+    if (primaryClass.skillChoices?.length) {
+      classPills.push({ label: primaryClass.skillChoices.join(', ') });
+    }
+  }
+
+  // Background pills
+  const bgPills: { label: string }[] = [];
+  if (d.background?.skills?.length) {
+    bgPills.push({ label: d.background.skills.join(', ') });
+  }
+  if (d.background?.languages?.length) {
+    bgPills.push({ label: d.background.languages.join(', ') });
+  }
+
+  const statMethodLabel = d.statMethod
+    ? (STAT_METHOD_LABEL[d.statMethod] ?? d.statMethod)
+    : null;
+
+  const raceClassSummary = [d.race?.slug, primaryClass?.slug]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <section>
@@ -92,153 +161,99 @@ export default async function ReviewStepPage({ params }: Props) {
         meta="Paso 5 de 5"
         description="Revisá tu personaje antes de enviarlo al DM."
       />
-      {allComplete && (
-        <div className="mb-4 -mt-2">
-          <span className="inline-flex items-center gap-1 rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-primary-deep">
-            ✓ LISTO
-          </span>
+
+      {/* Hero banner */}
+      <ReviewBanner
+        name={character.name}
+        aventureroOf="Aventurero del Reposo"
+        raceClassSummary={raceClassSummary || 'Personaje Incompleto'}
+        levelPill={levelPill}
+        classPill={classPill}
+        subclassPill={subclassPill}
+      />
+
+      {/* Completeness warnings */}
+      {!allComplete && (
+        <div className="mb-4 space-y-1">
+          {missingSteps.map((step) => (
+            <div key={step} className="flex items-center justify-between rounded-md bg-warning-soft px-3 py-1.5">
+              <span className="text-xs text-warning-deep">
+                Paso incompleto: <strong>{step}</strong>
+              </span>
+              <Link
+                href={`/characters/${id}/wizard/${step}`}
+                className="text-xs text-warning-deep underline"
+              >
+                Completar →
+              </Link>
+            </div>
+          ))}
         </div>
       )}
 
       <div className="space-y-3">
-        {/* Completeness overview */}
-        <Card variant="surface" className="p-4">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-            Completitud
-          </p>
-          <ul className="space-y-2">
-            {(Object.keys(completeness) as Array<keyof typeof completeness>).map((step) => (
-              <li key={step} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={[
-                      'inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px]',
-                      completeness[step]
-                        ? 'bg-primary-soft text-primary-deep'
-                        : 'bg-paper-soft text-ink-mute border border-line',
-                    ].join(' ')}
-                  >
-                    {completeness[step] ? '✓' : '○'}
-                  </span>
-                  <span className={completeness[step] ? 'text-sm text-ink' : 'text-sm text-ink-mute'}>
-                    {STEP_LABELS[step]}
-                  </span>
-                </div>
-                {!completeness[step] && (
-                  <Link
-                    href={`/characters/${id}/wizard/${step}`}
-                    className="text-xs text-primary-deep hover:underline"
-                  >
-                    Completar →
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* Ability scores */}
-        {baseStats && (
-          <Card variant="surface" className="p-4">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-              Atributos
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {STAT_KEYS.map((k) => {
-                const base = baseStats[k];
-                const final = finalStats?.[k] ?? base;
-                const racial = final - base;
-                return (
-                  <div
-                    key={k}
-                    className="flex flex-col items-center rounded-md bg-paper-soft p-2 text-center"
-                  >
-                    <span className="text-[10px] font-bold text-ink-mute">{STAT_ES[k]}</span>
-                    <span className="font-display text-xl font-bold text-ink leading-tight">{final}</span>
-                    {racial !== 0 && (
-                      <span className="text-[10px] text-primary-deep">
-                        {racial > 0 ? `+${racial}` : racial} racial
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+        {/* Atributos section */}
+        {abilityScores && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-display font-semibold text-[15px] text-ink">Atributos</span>
+              <Link
+                href={`/characters/${id}/wizard/stats`}
+                className="text-[11px] text-ink-mute hover:text-ink transition-colors"
+              >
+                ✎ Editar
+              </Link>
             </div>
-            {d.statMethod && (
-              <p className="mt-2 text-[10px] text-ink-mute">Método: {d.statMethod}</p>
-            )}
-          </Card>
+            <Card variant="surface" className="p-4">
+              <AbilityScoreGrid scores={abilityScores} />
+              {statMethodLabel && (
+                <p className="mt-2.5 text-[10px] text-ink-mute text-center">
+                  Método: {statMethodLabel} · Total {statTotal}
+                </p>
+              )}
+            </Card>
+          </div>
         )}
 
-        {/* Race */}
+        {/* Linaje (race) */}
         {d.race && (
-          <Card variant="surface" className="p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-              Linaje
-            </p>
-            <p className="text-sm text-ink">
-              <span className="font-semibold">{d.race.slug}</span>
-              <span className="text-ink-mute"> · {d.race.source}</span>
-              {d.subrace && (
-                <span className="text-ink-mute">
-                  {' / '}
-                  <span className="font-medium text-ink">{d.subrace.slug}</span>
-                </span>
-              )}
-            </p>
-          </Card>
+          <NumberedReviewCard
+            num="02"
+            title={d.subrace ? `${d.race.slug} — ${d.subrace.slug}` : d.race.slug}
+            subtitle={d.race.source}
+            pills={racePills}
+            editHref={`/characters/${id}/wizard/race`}
+          />
         )}
 
-        {/* Class */}
+        {/* Clase */}
         {primaryClass && (
-          <Card variant="surface" className="p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-              Clase
-            </p>
-            <p className="text-sm text-ink">
-              <span className="font-semibold">{primaryClass.slug}</span>
-              <span className="text-ink-mute"> · {primaryClass.source} · N{primaryClass.level}</span>
-              {primaryClass.subclass && (
-                <span className="text-ink-mute">
-                  {' / '}<span className="text-ink">{primaryClass.subclass.slug}</span>
-                </span>
-              )}
-            </p>
-            {primaryClass.skillChoices?.length > 0 && (
-              <p className="mt-1 text-xs text-ink-mute">
-                Habilidades: {primaryClass.skillChoices.join(', ')}
-              </p>
-            )}
-          </Card>
+          <NumberedReviewCard
+            num="03"
+            title={
+              primaryClass.subclass
+                ? `${primaryClass.slug} / ${primaryClass.subclass.slug}`
+                : primaryClass.slug
+            }
+            subtitle={`${primaryClass.source} · Nivel ${primaryClass.level}`}
+            pills={classPills}
+            editHref={`/characters/${id}/wizard/class`}
+          />
         )}
 
-        {/* Background */}
+        {/* Trasfondo */}
         {d.background && (
-          <Card variant="surface" className="p-4">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-              Trasfondo
-            </p>
-            <p className="text-sm text-ink">
-              <span className="font-semibold">{d.background.slug}</span>
-              <span className="text-ink-mute"> · {d.background.source}</span>
-            </p>
-            {d.background.skills && d.background.skills.length > 0 && (
-              <p className="mt-1 text-xs text-ink-mute">
-                Habilidades: {d.background.skills.join(', ')}
-              </p>
-            )}
-            {d.background.languages && d.background.languages.length > 0 && (
-              <p className="text-xs text-ink-mute">
-                Idiomas: {d.background.languages.join(', ')}
-              </p>
-            )}
-            {d.background.tools && d.background.tools.length > 0 && (
-              <p className="text-xs text-ink-mute">
-                Herramientas: {d.background.tools.join(', ')}
-              </p>
-            )}
-          </Card>
+          <NumberedReviewCard
+            num="04"
+            title={d.background.slug}
+            subtitle={d.background.source}
+            pills={bgPills}
+            editHref={`/characters/${id}/wizard/background`}
+          />
         )}
+
+        {/* Character name input */}
+        <CharacterNameInput characterId={character.id} initialName={character.name} />
       </div>
 
       {/* Activate / pending / already-active */}

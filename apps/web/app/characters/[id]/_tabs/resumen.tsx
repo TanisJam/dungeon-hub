@@ -1,5 +1,6 @@
 import type { CharacterSheet } from '@/lib/sheet-types';
 import { Card } from '@/components/ui';
+import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
 
 const ABILITY_ES: Record<string, string> = {
   str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
@@ -34,22 +35,7 @@ export function ResumenTab({ sheet }: ResumenTabProps) {
         <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
           Atributos
         </p>
-        <div className="grid grid-cols-3 gap-2">
-          {abilityEntries.map(([key, view]) => (
-            <div
-              key={key}
-              className="flex flex-col items-center rounded-md bg-paper-soft p-2.5 text-center"
-            >
-              <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
-                {ABILITY_ES[key] ?? key.toUpperCase()}
-              </span>
-              <span className="font-display text-2xl font-bold text-ink leading-tight">
-                {view.score}
-              </span>
-              <span className="text-xs text-ink-soft">{fmtMod(view.modifier)}</span>
-            </div>
-          ))}
-        </div>
+        <AbilityScoreGrid scores={sheet.abilityScores} />
       </Card>
 
       {/* Saving throws */}
