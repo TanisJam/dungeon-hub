@@ -14,6 +14,9 @@ import * as session from './session.js';
 import * as world from './world.js';
 import * as lore from './lore.js';
 import * as wmap from './map.js';
+import * as link from './link.js';
+import * as whoami from './whoami.js';
+import * as character from './character.js';
 
 /**
  * Discord.js v14 separa los builders por shape — los simples sin subcomandos son
@@ -42,4 +45,7 @@ export const commands: Record<string, Command> = {
   [world.data.name]: world,
   [lore.data.name]: lore,
   [wmap.data.name]: wmap,
+  [link.data.name]: link,
+  [whoami.data.name]: whoami,
+  [character.data.name]: character,
 };

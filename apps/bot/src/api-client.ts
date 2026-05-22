@@ -102,20 +102,66 @@ export class ApiClient {
   }
 
   async get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+    return this.request<T>('GET', path, { params });
+  }
+
+  async post<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('POST', path, { body });
+  }
+
+  /**
+   * Variantes "As" — agregan header X-Acting-As-Discord-Id para que el backend
+   * resuelva el usuario real (impersonation). El bot DEBE tener can_impersonate=true.
+   * Lanza LinkRequiredError si el backend responde DISCORD_USER_NOT_LINKED.
+   */
+  async getAs<T>(discordId: string, path: string, params?: Record<string, string | number>): Promise<T> {
+    return this.request<T>('GET', path, { params, actingAs: discordId });
+  }
+
+  async postAs<T>(discordId: string, path: string, body?: unknown): Promise<T> {
+    return this.request<T>('POST', path, { body, actingAs: discordId });
+  }
+
+  async patchAs<T>(discordId: string, path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PATCH', path, { body, actingAs: discordId });
+  }
+
+  private async request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    opts: {
+      params?: Record<string, string | number>;
+      body?: unknown;
+      actingAs?: string;
+    } = {},
+  ): Promise<T> {
     const token = await this.ensureToken();
     const url = new URL(`${env.API_BASE_URL}${path}`);
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
+    if (opts.params) {
+      for (const [k, v] of Object.entries(opts.params)) {
         url.searchParams.set(k, String(v));
       }
     }
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+    if (opts.actingAs) headers['X-Acting-As-Discord-Id'] = opts.actingAs;
+
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      method,
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
     if (!res.ok) {
       const text = await res.text();
+      // Distinguimos el caso "usuario no vinculó" porque tiene UX especial
+      // — el bot debe decir "hacé /link primero" en vez de un error genérico.
+      if (res.status === 403 && text.includes('DISCORD_USER_NOT_LINKED')) {
+        throw new LinkRequiredError(text);
+      }
       throw new ApiError(res.status, text);
     }
+    // Algunos endpoints (204) no devuelven body; guardamos contra ese caso.
+    if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   }
 }
@@ -126,6 +172,17 @@ export class ApiError extends Error {
     readonly body: string,
   ) {
     super(`API error ${status}: ${body}`);
+  }
+}
+
+/**
+ * Lanzado cuando el bot intenta actuar en nombre de un Discord user que aún
+ * no vinculó su account. El comando debe atrapar esto y responder con un
+ * mensaje user-friendly que invite a correr /link.
+ */
+export class LinkRequiredError extends Error {
+  constructor(readonly body: string) {
+    super('Discord user not linked');
   }
 }
 

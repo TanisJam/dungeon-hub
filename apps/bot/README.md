@@ -87,6 +87,37 @@ Todos los comandos de compendium soportan autocompletado en vivo. Si tu query
 matchea varios entries, el bot muestra el primero con un dropdown abajo para
 saltar a los otros.
 
+### Identity (vinculación de cuenta)
+
+| Comando | Descripción |
+|---------|-------------|
+| `/link` | Genera un link de un solo uso para vincular tu Discord con tu cuenta del backend |
+| `/whoami` | Muestra tu Discord ID + estado de vinculación |
+
+El primer uso de cualquier comando de personaje (`/character ...`) requiere
+hacer `/link` primero. El flow es:
+
+1. `/link` → el bot te manda una URL privada (ephemeral)
+2. Abrís la URL en el navegador, te logueás en la web app con tu cuenta de Supabase
+3. Confirmás la vinculación
+4. Ya podés usar todos los comandos de personaje
+
+**Setup inicial (una sola vez)**: el bot user en el backend tiene que tener el
+flag `can_impersonate=true`. Una vez tras crear el user en Supabase Studio:
+
+```sql
+UPDATE public.users SET can_impersonate = true WHERE username = 'dungeonhub-bot';
+-- O por id del auth.users, si preferís:
+-- UPDATE public.users SET can_impersonate = true WHERE id = '<bot-user-uuid>';
+```
+
+### Character (requiere vinculación)
+
+| Comando | Descripción |
+|---------|-------------|
+| `/character list` | Lista tus characters en la campaña |
+| `/character show <name>` | Ficha completa (HP, AC, abilities, saves, skills, slots) |
+
 ### West Marches (campaign-scoped)
 
 | Comando | Descripción |
