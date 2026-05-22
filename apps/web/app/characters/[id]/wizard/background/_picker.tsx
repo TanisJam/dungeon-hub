@@ -155,21 +155,27 @@ export function BackgroundPicker({
   const options: ChoiceOption<string>[] = filtered.map((e) => {
     const key = entryKey(e);
     const p = parseBackground(e.data);
-    const skillSummary = [
-      ...p.fixedSkills.map(titleCase),
-      p.skillChoose && `+${p.skillChoose.count} elección`,
-    ]
-      .filter(Boolean)
-      .join(', ');
 
     const isThisSelected = key === selectedKey;
     const currentParsed = isThisSelected ? parsed : p;
 
+    // Tag pills: one pill per fixed skill, then tools/languages summary, then source
+    const pills: ChoiceOption<string>['pills'] = [
+      ...p.fixedSkills.map((s) => ({ tone: 'green' as const, label: titleCase(s) })),
+      ...(p.skillChoose ? [{ tone: 'green' as const, label: `+${p.skillChoose.count} elección` }] : []),
+      ...(p.fixedTools.length > 0 || Object.keys(p.toolChooseCounts).length > 0
+        ? [{ tone: 'stone' as const, label: 'Herramientas' }]
+        : []),
+      ...(p.fixedLanguages.length > 0 || Object.keys(p.languageChooseCounts).length > 0
+        ? [{ tone: 'stone' as const, label: 'Idiomas' }]
+        : []),
+      { tone: 'stone' as const, label: e.source },
+    ];
+
     return {
       key,
       title: e.name,
-      sub: skillSummary || undefined,
-      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      pills,
       detail: currentParsed ? (
         <BackgroundDetailInline
           entry={e}

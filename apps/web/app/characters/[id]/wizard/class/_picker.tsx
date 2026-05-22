@@ -146,6 +146,7 @@ export function ClassPicker({
     const key = entryKey(e);
     const hd = formatHitDie(e.data.hd);
     const primary = formatPrimary(e.data.primaryAbility);
+    const saves = formatSaves(e.data.proficiency);
 
     // These are captured as closures — they're the selected state from above
     // which updates when this entry is selected via the outer state.
@@ -153,13 +154,17 @@ export function ClassPicker({
     const currentSkills = isThisSelected ? skills : [];
     const currentSubclassKey = isThisSelected ? subclassKey : null;
 
+    // Tag pills: hit die, primary ability, saving throws
+    const pills: ChoiceOption<string>['pills'] = [];
+    if (hd && hd !== '—') pills.push({ tone: 'amber', label: hd });
+    if (primary) pills.push({ tone: 'green', label: primary });
+    if (saves && saves !== '—') pills.push({ tone: 'stone', label: `Salv. ${saves}` });
+    pills.push({ tone: 'stone', label: e.source });
+
     return {
       key,
       title: e.name,
-      sub: [hd ? `HD ${hd}` : null, primary ? `Primary ${primary}` : null]
-        .filter(Boolean)
-        .join(' · ') || undefined,
-      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      pills,
       detail: (
         <ClassDetailInline
           entry={e}

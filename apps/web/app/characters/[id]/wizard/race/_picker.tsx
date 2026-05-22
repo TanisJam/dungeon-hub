@@ -163,9 +163,21 @@ export function RacePicker({
     const asis = parseAsis(e.data.ability);
     const asiSummary = formatAsisSummary(asis);
     const speedStr = formatSpeed(e.data.speed);
-    const sub = [asiSummary, speedStr ? `Velocidad ${speedStr}` : null]
-      .filter(Boolean)
-      .join(' · ');
+    const sizeStr = formatSize(e.data.size);
+
+    // Tag pills: ASI summary, size, speed
+    const pills: ChoiceOption<string>['pills'] = [];
+    if (asiSummary && asiSummary !== '—') {
+      pills.push({ tone: 'amber', label: asiSummary });
+    }
+    if (sizeStr) {
+      const SIZE_ES: Record<string, string> = { Tiny: 'Diminuto', Small: 'Pequeño', Medium: 'Mediano', Large: 'Grande', Huge: 'Enorme', Gargantuan: 'Gargantuesco' };
+      pills.push({ tone: 'stone', label: SIZE_ES[sizeStr] ?? sizeStr });
+    }
+    if (speedStr) {
+      pills.push({ tone: 'stone', label: speedStr });
+    }
+    pills.push({ tone: 'stone', label: e.source });
 
     const parentEntry = e.isSubrace && e.parentSlug
       ? entries.find((p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace) ?? null
@@ -174,8 +186,8 @@ export function RacePicker({
     return {
       key,
       title: displayName(e, entries),
-      sub: sub || undefined,
-      metaPills: [{ tone: 'stone' as const, label: e.source }],
+      subtitle: e.isSubrace && parentEntry ? `Sublinaje de ${parentEntry.name}` : undefined,
+      pills,
       detail: (
         <RaceDetailPanel
           entry={e}

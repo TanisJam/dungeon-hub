@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { parseBackground, type BackgroundData } from './_parsers';
 import { poolFor } from './_options';
 import { BackgroundPicker, type BackgroundEntry } from './_picker';
+import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type BgRow = { id: string; slug: string; source: string; name: string };
 type BgDetail = BgRow & { data: BackgroundData };
@@ -110,10 +111,12 @@ export default async function BackgroundStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="font-display text-xl font-bold text-ink">Trasfondo</h2>
-      <p className="mt-1 text-sm text-ink-mute">
-        Elegí el trasfondo de tu personaje.
-      </p>
+      <NumberedSectionHead
+        num="04"
+        title="Trasfondo"
+        meta="Paso 4 de 5"
+        description="Elegí el trasfondo de tu personaje."
+      />
 
       <div className="mt-6">
         <BackgroundPicker

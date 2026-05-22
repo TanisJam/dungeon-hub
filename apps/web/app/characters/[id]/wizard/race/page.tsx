@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { effectiveAsiSlots, type AbilityKey, type RaceData } from './_parsers';
 import { RacePicker, type RaceEntry } from './_picker';
+import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type RaceRow = {
   id: string;
@@ -140,10 +141,12 @@ export default async function RaceStepPage({ params }: Props) {
 
   return (
     <section>
-      <h2 className="font-display text-xl font-bold text-ink">Linaje</h2>
-      <p className="mt-1 text-sm text-ink-mute">
-        Elegí un linaje. Las subraza y las razas padre aparecen juntas.
-      </p>
+      <NumberedSectionHead
+        num="02"
+        title="Linaje"
+        meta="Paso 2 de 5"
+        description="Elegí el linaje de tu personaje. Las subrazas y razas padre aparecen juntas."
+      />
 
       <div className="mt-6">
         <RacePicker

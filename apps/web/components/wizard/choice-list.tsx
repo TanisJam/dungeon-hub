@@ -2,13 +2,19 @@
 
 import type { ReactNode } from 'react';
 import type { PillTone } from '@/components/ui';
+import type { IconName } from '@/components/ui';
 import { ChoiceCard } from './choice-card';
 
 export interface ChoiceOption<K extends string> {
   key: K;
   title: string;
+  /** @deprecated use subtitle */
   sub?: string;
+  subtitle?: string;
+  pills?: Array<{ tone?: PillTone; label: string }>;
+  /** @deprecated use pills */
   metaPills?: Array<{ tone?: PillTone; label: string }>;
+  iconName?: IconName;
   detail: ReactNode;
 }
 
@@ -30,14 +36,15 @@ export function ChoiceList<K extends string>({
         return (
           <ChoiceCard
             key={opt.key}
+            id={opt.key}
             title={opt.title}
-            sub={opt.sub}
-            metaPills={opt.metaPills}
+            subtitle={opt.subtitle ?? opt.sub}
+            pills={opt.pills ?? opt.metaPills}
+            iconName={opt.iconName}
             selected={isSelected}
             onClick={() => onSelect(isSelected ? null : opt.key)}
-          >
-            {opt.detail}
-          </ChoiceCard>
+            detail={opt.detail}
+          />
         );
       })}
     </div>

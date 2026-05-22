@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { ActivateForm } from './_activate-form';
 import { Card } from '@/components/ui';
+import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type AppliedClass = {
   slug: string;
@@ -85,14 +86,19 @@ export default async function ReviewStepPage({ params }: Props) {
 
   return (
     <section>
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-display text-xl font-bold text-ink">Revisión</h2>
-        {allComplete && (
+      <NumberedSectionHead
+        num="05"
+        title="Revisión"
+        meta="Paso 5 de 5"
+        description="Revisá tu personaje antes de enviarlo al DM."
+      />
+      {allComplete && (
+        <div className="mb-4 -mt-2">
           <span className="inline-flex items-center gap-1 rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-primary-deep">
             ✓ LISTO
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {/* Completeness overview */}
