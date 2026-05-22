@@ -1,7 +1,10 @@
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import fastifyJwt from '@fastify/jwt';
+import { and, eq } from 'drizzle-orm';
 import { env } from '../../env.js';
+import { db } from '../db/client.js';
+import { users } from '../db/schema.js';
 
 /**
  * Shape del JWT que firma Supabase GoTrue.
@@ -21,11 +24,19 @@ export interface SupabaseJwtPayload {
 declare module 'fastify' {
   interface FastifyRequest {
     user?: SupabaseJwtPayload;
+    /**
+     * Set cuando el request entró con header X-Acting-As-Discord-Id y la
+     * impersonation fue autorizada. Contiene el user_id del bot/servicio que
+     * inició la acción. `request.user.sub` apunta al user impersonado.
+     */
+    impersonatedBy?: string;
   }
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
+
+const IMPERSONATE_HEADER = 'x-acting-as-discord-id';
 
 const supabaseAuthPlugin: FastifyPluginAsync = async (app) => {
   await app.register(fastifyJwt, {
@@ -43,6 +54,47 @@ const supabaseAuthPlugin: FastifyPluginAsync = async (app) => {
     } catch {
       return reply.code(401).send({ error: 'UNAUTHORIZED', message: 'Invalid or missing token' });
     }
+
+    // ---- Impersonation via X-Acting-As-Discord-Id -----------------------
+    // Solo accounts con can_impersonate=true (típicamente el bot) pueden
+    // mandar este header. El backend reemplaza request.user.sub con el user
+    // real para que todos los handlers downstream apliquen el RBAC del usuario
+    // impersonado sin ningún cambio en su lógica.
+    const headerVal = request.headers[IMPERSONATE_HEADER];
+    const discordId = Array.isArray(headerVal) ? headerVal[0] : headerVal;
+    if (!discordId) return;
+
+    const requester = await db
+      .select({ id: users.id, canImpersonate: users.canImpersonate })
+      .from(users)
+      .where(eq(users.id, request.user.sub))
+      .limit(1);
+    const requesterRow = requester[0];
+
+    if (!requesterRow || !requesterRow.canImpersonate) {
+      return reply.code(403).send({
+        error: 'IMPERSONATION_NOT_ALLOWED',
+        message: 'Tu account no tiene permiso para actuar en nombre de otros users',
+      });
+    }
+
+    const target = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.discordId, discordId)))
+      .limit(1);
+    const targetRow = target[0];
+
+    if (!targetRow) {
+      return reply.code(403).send({
+        error: 'DISCORD_USER_NOT_LINKED',
+        message: `No hay ningún user backend vinculado al Discord ID "${discordId}". Hacé /link primero.`,
+      });
+    }
+
+    // Override: el rest del request corre como el user impersonado.
+    request.impersonatedBy = requesterRow.id;
+    request.user = { ...request.user, sub: targetRow.id };
   });
 };
 

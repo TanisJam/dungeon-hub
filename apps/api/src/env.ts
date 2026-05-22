@@ -14,6 +14,11 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+
+  // URL pública de la web app — usada para generar links del flow Discord
+  // /link. La web app debe levantar una página en {WEB_APP_URL}/link/<token>
+  // que pida confirmación y llame a POST /auth/link/confirm.
+  WEB_APP_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

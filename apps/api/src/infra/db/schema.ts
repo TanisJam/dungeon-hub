@@ -29,8 +29,37 @@ import { sql } from 'drizzle-orm';
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
   username: text('username').notNull().unique(),
+  // Discord identity — populated cuando el user vincula su cuenta via /link flow.
   discordId: text('discord_id').unique(),
+  discordUsername: text('discord_username'),
   role: text('role', { enum: ['player', 'gm', 'admin'] }).notNull().default('player'),
+  // Service flag — cuando true, este user puede actuar en nombre de otros via
+  // header X-Acting-As-Discord-Id. Reservado para el bot account.
+  canImpersonate: boolean('can_impersonate').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// discord_link_tokens — magic links de un solo uso para vincular Discord ↔ user.
+//
+// Flow: el bot llama POST /auth/link/request con el discord_id del usuario que
+// quiere vincularse → backend genera un token random, lo guarda acá, devuelve la
+// URL. El usuario abre la URL en la web (autenticado con Supabase), clickea
+// confirmar → backend valida el token, lo consume, setea users.discord_id.
+//
+// TTL corto (10 min). Una sola consumición permitida. El bot no puede usar el
+// token (no tiene la JWT del user real) — solo lo genera.
+// ---------------------------------------------------------------------------
+export const discordLinkTokens = pgTable('discord_link_tokens', {
+  token: text('token').primaryKey(),
+  discordId: text('discord_id').notNull(),
+  discordUsername: text('discord_username'),
+  requestedByUserId: uuid('requested_by_user_id')
+    .notNull()
+    .references(() => users.id),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  consumedByUserId: uuid('consumed_by_user_id').references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
