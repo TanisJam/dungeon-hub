@@ -117,6 +117,8 @@ UPDATE public.users SET can_impersonate = true WHERE username = 'dungeonhub-bot'
 |---------|-------------|
 | `/character list` | Lista tus characters en la campaña |
 | `/character show <name>` | Ficha completa (HP, AC, abilities, saves, skills, slots) |
+| `/character hp <name> <delta> [note]` | Aplicar daño (delta negativo) o curación (delta positivo). Temp HP absorbe daño primero. |
+| `/character rest <name> <type>` | Short o long rest. Short refresca recursos sin gastar hit dice; long restaura HP/slots/exhaustion. |
 
 ### West Marches (campaign-scoped)
 

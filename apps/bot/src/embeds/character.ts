@@ -55,6 +55,46 @@ export interface CharacterDetail extends CharacterRow {
   };
 }
 
+// --- Action response shapes (rest, hp delta) -------------------------------
+
+interface HpState {
+  current: number;
+  max: number;
+  temp: number;
+}
+
+export interface HpDeltaResponse {
+  character: { id: string; name: string; data: { hp?: HpState } };
+  hp: {
+    before: { current: number; temp: number };
+    after: HpState;
+    delta: number;
+    actualDamage: number;
+    actualHeal: number;
+    tempAbsorbed: number;
+  };
+}
+
+export interface ShortRestResponse {
+  character: { id: string; name: string };
+  shortRest: {
+    hpRecovered: number;
+    rollsUsed: Record<string, number[]>;
+    newHp: HpState;
+  };
+}
+
+export interface LongRestResponse {
+  character: { id: string; name: string };
+  longRest: {
+    hitDiceRecovered: number;
+    deathSavesReset: boolean;
+    exhaustionAfter: number;
+    newHp: HpState;
+    itemsRecharged: Array<{ instanceId: string; name?: string; before: number; after: number }>;
+  };
+}
+
 const STATUS_BADGE: Record<CharacterRow['status'], string> = {
   draft: '📝 draft',
   active: '🟢 active',
@@ -86,6 +126,102 @@ export function buildCharactersListEmbed(chars: CharacterRow[]): EmbedBuilder {
   embed.setDescription(lines.join('\n'));
   embed.setFooter({ text: `${chars.length} character(s)` });
   return embed;
+}
+
+function hpBar(hp: HpState, width = 12): string {
+  if (hp.max <= 0) return '';
+  const filled = Math.round((hp.current / hp.max) * width);
+  const empty = Math.max(0, width - filled);
+  return `\`[${'█'.repeat(filled)}${'░'.repeat(empty)}]\``;
+}
+
+export function buildHpDeltaEmbed(res: HpDeltaResponse, note: string | null): EmbedBuilder {
+  const { hp, character } = res;
+  const isHeal = hp.delta > 0;
+  const headerEmoji = isHeal ? '💚' : '🩸';
+  const action = isHeal ? `+${hp.actualHeal} HP curados` : `${hp.actualDamage} damage`;
+  const tempLine =
+    hp.tempAbsorbed > 0 ? `\n🛡 ${hp.tempAbsorbed} HP temp absorbieron parte del daño` : '';
+
+  // Color: rojo si quedó en 0, naranja si <25%, amarillo si <50%, verde si full.
+  const ratio = hp.after.max > 0 ? hp.after.current / hp.after.max : 0;
+  let color = 0x2ecc71;
+  if (ratio === 0) color = 0xc0392b;
+  else if (ratio < 0.25) color = 0xe67e22;
+  else if (ratio < 0.5) color = 0xf1c40f;
+
+  const downedLine = hp.after.current === 0 ? '\n⚠️ **El personaje cayó a 0 HP.**' : '';
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${headerEmoji} ${character.name}`)
+    .setDescription(
+      `**${action}**${tempLine}${downedLine}\n\n` +
+        `HP: **${hp.before.current}** → **${hp.after.current}** / ${hp.after.max}` +
+        (hp.after.temp > 0 ? ` (+${hp.after.temp} temp)` : '') +
+        `\n${hpBar(hp.after)}`,
+    )
+    .setColor(color);
+
+  if (note) embed.addFields({ name: 'Nota', value: note });
+  embed.setFooter({ text: `character ${shortId(character.id)}` });
+  return embed;
+}
+
+export function buildShortRestEmbed(res: ShortRestResponse): EmbedBuilder {
+  const { shortRest, character } = res;
+  const lines: string[] = [];
+  if (shortRest.hpRecovered > 0) {
+    lines.push(`💚 Recuperaste **${shortRest.hpRecovered}** HP gastando hit dice.`);
+  } else {
+    lines.push('☕ Short rest sin gastar hit dice — recursos por short rest refrescados.');
+  }
+  lines.push(`\nHP: **${shortRest.newHp.current}** / ${shortRest.newHp.max}\n${hpBar(shortRest.newHp)}`);
+
+  if (Object.keys(shortRest.rollsUsed).length > 0) {
+    const rollLines = Object.entries(shortRest.rollsUsed)
+      .map(([die, rolls]) => `${die}: ${rolls.join(', ')}`)
+      .join(' · ');
+    lines.push(`\nDados: ${rollLines}`);
+  }
+
+  return new EmbedBuilder()
+    .setTitle(`☕ Short rest — ${character.name}`)
+    .setDescription(lines.join('\n'))
+    .setColor(0xf39c12)
+    .setFooter({ text: `character ${shortId(character.id)}` });
+}
+
+export function buildLongRestEmbed(res: LongRestResponse): EmbedBuilder {
+  const { longRest, character } = res;
+  const lines: string[] = [
+    `🌙 HP full: **${longRest.newHp.current}** / ${longRest.newHp.max}`,
+    hpBar(longRest.newHp),
+    '',
+    `🎲 Hit dice recuperados: **${longRest.hitDiceRecovered}**`,
+    `✨ Spell slots: full · Pact slots: full`,
+  ];
+  if (longRest.exhaustionAfter > 0) {
+    lines.push(`😩 Exhaustion: nivel **${longRest.exhaustionAfter}** (bajaste 1)`);
+  } else {
+    lines.push('😌 Exhaustion: 0');
+  }
+  if (longRest.deathSavesReset) lines.push('💀 Death saves reseteados');
+  if (longRest.itemsRecharged.length > 0) {
+    const itemLines = longRest.itemsRecharged
+      .slice(0, 5)
+      .map((it) => `• ${it.name ?? it.instanceId.slice(0, 8)}: ${it.before} → ${it.after}`)
+      .join('\n');
+    lines.push(`\n🔋 Items recargados:\n${itemLines}`);
+    if (longRest.itemsRecharged.length > 5) {
+      lines.push(`_(+${longRest.itemsRecharged.length - 5} más)_`);
+    }
+  }
+
+  return new EmbedBuilder()
+    .setTitle(`🌙 Long rest — ${character.name}`)
+    .setDescription(lines.join('\n'))
+    .setColor(0x6c5ce7)
+    .setFooter({ text: `character ${shortId(character.id)}` });
 }
 
 export function buildCharacterSheetEmbed(
