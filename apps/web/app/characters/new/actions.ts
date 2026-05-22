@@ -36,5 +36,5 @@ export async function createCharacter(
     return { error: err instanceof Error ? err.message : 'Unknown error' };
   }
 
-  redirect(`/characters/${created.id}/build/stats`);
+  redirect(`/characters/${created.id}/wizard/stats`);
 }

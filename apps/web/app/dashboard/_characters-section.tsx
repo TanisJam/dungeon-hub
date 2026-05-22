@@ -47,7 +47,7 @@ export function CharactersSection({ characters }: { characters: CharacterRow[] }
 function CharacterCard({ character }: { character: CharacterRow }) {
   const statusClass = STATUS_STYLES[character.status] ?? STATUS_STYLES.retired;
   // Draft characters jump back into the wizard; later we'll route active chars to a sheet page.
-  const href = `/characters/${character.id}/build`;
+  const href = `/characters/${character.id}/wizard`;
   return (
     <li>
       <Link
