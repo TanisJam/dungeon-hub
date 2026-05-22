@@ -31,8 +31,8 @@ function getCharacterHref(character: CharacterRow): string {
   if (character.status === 'draft') {
     return `/characters/${character.id}/wizard`;
   }
-  // active, pending_approval, retired, dead → sheet (Phase D will add /characters/[id] page)
-  return `/characters/${character.id}/wizard`;
+  // active, pending_approval, retired, dead → sheet page
+  return `/characters/${character.id}`;
 }
 
 export function CharactersSection({ characters }: { characters: CharacterRow[] }) {
