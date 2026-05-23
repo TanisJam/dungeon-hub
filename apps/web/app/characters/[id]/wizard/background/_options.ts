@@ -1,6 +1,14 @@
 // Listas estándar de 5e para "any X" choices en backgrounds.
 // PHB-based — si Mauricio quiere agregar de Tasha's/MPMM, son menores.
-// TODO si esto crece, mover a packages/domain.
+
+// Tool pools — single source of truth lives in packages/domain.
+import {
+  ARTISANS_TOOLS,
+  GAMING_SETS,
+  MUSICAL_INSTRUMENTS,
+} from '@dungeon-hub/domain/character/tool';
+
+export { ARTISANS_TOOLS, GAMING_SETS, MUSICAL_INSTRUMENTS };
 
 export const STANDARD_LANGUAGES = [
   'common',
@@ -26,47 +34,7 @@ export const EXOTIC_LANGUAGES = [
 
 export const ANY_LANGUAGES = [...STANDARD_LANGUAGES, ...EXOTIC_LANGUAGES];
 
-export const GAMING_SETS = [
-  'dice-set',
-  'dragonchess-set',
-  'playing-card-set',
-  'three-dragon-ante-set',
-];
-
-export const ARTISANS_TOOLS = [
-  'alchemists-supplies',
-  'brewers-supplies',
-  'calligraphers-supplies',
-  'carpenters-tools',
-  'cartographers-tools',
-  'cobblers-tools',
-  'cooks-utensils',
-  'glassblowers-tools',
-  'jewelers-tools',
-  'leatherworkers-tools',
-  'masons-tools',
-  'painters-supplies',
-  'potters-tools',
-  'smiths-tools',
-  'tinkers-tools',
-  'weavers-tools',
-  'woodcarvers-tools',
-];
-
-export const MUSICAL_INSTRUMENTS = [
-  'bagpipes',
-  'drum',
-  'dulcimer',
-  'flute',
-  'horn',
-  'lute',
-  'lyre',
-  'pan-flute',
-  'shawm',
-  'viol',
-];
-
-export function poolFor(kind: string): string[] {
+export function poolFor(kind: string): readonly string[] {
   switch (kind) {
     case 'anyStandard': return STANDARD_LANGUAGES;
     case 'anyExotic': return EXOTIC_LANGUAGES;

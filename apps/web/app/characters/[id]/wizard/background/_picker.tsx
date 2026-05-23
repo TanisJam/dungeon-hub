@@ -139,6 +139,12 @@ export function BackgroundPicker({
       }
     }
 
+    if (parsed.toolChoose && (tools['choose']?.length ?? 0) !== parsed.toolChoose.count) {
+      const n = parsed.toolChoose.count;
+      setError(`Elegí ${n} herramienta${n > 1 ? 's' : ''}.`);
+      return;
+    }
+
     startTransition(async () => {
       const res = await saveBackground(
         characterId,
@@ -163,7 +169,7 @@ export function BackgroundPicker({
     const pills: ChoiceOption<string>['pills'] = [
       ...p.fixedSkills.map((s) => ({ tone: 'green' as const, label: titleCase(s) })),
       ...(p.skillChoose ? [{ tone: 'green' as const, label: `+${p.skillChoose.count} elección` }] : []),
-      ...(p.fixedTools.length > 0 || Object.keys(p.toolChooseCounts).length > 0
+      ...(p.fixedTools.length > 0 || Object.keys(p.toolChooseCounts).length > 0 || p.toolChoose !== null
         ? [{ tone: 'stone' as const, label: 'Herramientas' }]
         : []),
       ...(p.fixedLanguages.length > 0 || Object.keys(p.languageChooseCounts).length > 0
@@ -307,7 +313,7 @@ function BackgroundDetailInline({
       )}
 
       {/* Tools */}
-      {(parsed.fixedTools.length > 0 || Object.keys(parsed.toolChooseCounts).length > 0) && (
+      {(parsed.fixedTools.length > 0 || Object.keys(parsed.toolChooseCounts).length > 0 || parsed.toolChoose !== null) && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Herramientas</p>
           {parsed.fixedTools.length > 0 && (
@@ -331,6 +337,15 @@ function BackgroundDetailInline({
               />
             );
           })}
+          {parsed.toolChoose && (
+            <MultiSelectChoose
+              label={`Elegí ${parsed.toolChoose.count} herramienta${parsed.toolChoose.count > 1 ? 's' : ''}`}
+              pool={parsed.toolChoose.from}
+              selected={tools['choose'] ?? []}
+              count={parsed.toolChoose.count}
+              onChange={(vals) => setToolsForKind('choose', vals)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -346,7 +361,7 @@ function ChooseGroup({
   lockedSkills,
 }: {
   label: string;
-  pool: string[];
+  pool: readonly string[];
   selected: string[];
   count: number;
   onToggle: (v: string) => void;
@@ -399,7 +414,7 @@ function MultiSelectChoose({
   onChange,
 }: {
   label: string;
-  pool: string[];
+  pool: readonly string[];
   selected: string[];
   count: number;
   onChange: (vals: string[]) => void;
