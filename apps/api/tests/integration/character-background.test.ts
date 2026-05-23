@@ -413,7 +413,9 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
 
   it('happy path: 2 distinct valid skills → 200 with appliedBackground.skills', async () => {
     const app = await getTestApp();
-    // Custom Background (PHB p.126) also requires 2 language choices (anyStandard:2)
+    // Custom Background (PHB p.125-126) requires skills + mixed-pool + equipment + feature.
+    // languageChoices are no longer validated via languageProficiencies block (F-01 fix);
+    // mixed-pool block handles language/tool grants for Custom Background.
     const res = await app.inject({
       method: 'PUT',
       url: `/api/v1/characters/${characterId}/background`,
@@ -421,7 +423,12 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
       payload: {
         background: CUSTOM_BG,
         skillChoices: ['perception', 'stealth'],
-        languageChoices: ['draconic', 'elvish'],
+        languageChoices: [],
+        customization: {
+          mixedPool: { shape: 'lang2', langs: ['draconic', 'elvish'], tools: [] },
+          equipment: { kind: 'coin' },
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
       },
     });
 
@@ -486,8 +493,8 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
 
   it('rejects skill that overlaps class grant → 400 SKILL_DUPLICATE_WITH_CLASS', async () => {
     const app = await getTestApp();
-    // Wizard already granted 'arcana' and 'history'; trying to pick 'arcana' in BG
-    // Must also include languageChoices so validator passes and cross-step check fires
+    // Wizard already granted 'arcana' and 'history'; trying to pick 'arcana' in BG.
+    // Custom Background requires full customization — include it so the cross-step check fires.
     const res = await app.inject({
       method: 'PUT',
       url: `/api/v1/characters/${charWithClassId}/background`,
@@ -495,7 +502,12 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
       payload: {
         background: CUSTOM_BG,
         skillChoices: ['arcana', 'stealth'],
-        languageChoices: ['draconic', 'elvish'],
+        languageChoices: [],
+        customization: {
+          mixedPool: { shape: 'lang2', langs: ['draconic', 'elvish'], tools: [] },
+          equipment: { kind: 'coin' },
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
       },
     });
 
@@ -503,5 +515,341 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
     const body = res.json();
     expect(body.issues[0].code).toBe('SKILL_DUPLICATE_WITH_CLASS');
     expect(body.issues[0].skills).toContain('arcana');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C.1 — Custom Background customization (mixed-pool + equipment + feature)
+// PHB p.125–126: Custom Background lets player pick:
+//   - 1 of 3 mixed-pool shapes (lang2 | lang1tool1 | tool2)
+//   - equipment package from any background OR take coin instead
+//   - any feature from any standard background
+//
+// Integration test scenarios:
+//   Happy path: 3 mixed-pool shapes (lang2, lang1tool1, tool2) — 200 + customization persisted
+//   Error: BACKGROUND_MIXED_POOL_SHAPE_REQUIRED — no customization sent
+//   Error: BACKGROUND_MIXED_POOL_COUNT_MISMATCH — shape says 2 langs but user sends 1
+//   Error: BACKGROUND_EQUIPMENT_REQUIRED — no equipment choice
+//   Error: BACKGROUND_FEATURE_REQUIRED — no feature choice
+//   Regression: NON-Custom backgrounds still validate languageProficiencies normally
+//   Legacy round-trip: AppliedBackground without customization reads back normalized (no error)
+// ---------------------------------------------------------------------------
+
+// Minimal valid customization payloads per mixed-pool shape
+const BASE_SKILL_CHOICES = ['perception', 'stealth'];
+// lang2: 2 languages, 0 tools
+const CUSTOMIZATION_LANG2 = {
+  mixedPool: { shape: 'lang2', langs: ['draconic', 'elvish'], tools: [] },
+  equipment: { kind: 'coin' },
+  feature: { slug: 'acolyte-shelter-of-the-faithful' },
+};
+// lang1tool1: 1 language + 2 tools (anyTool:1 in 5etools is patched to 2 by patchAnyToolCount per F-06)
+const CUSTOMIZATION_LANG1TOOL1 = {
+  mixedPool: { shape: 'lang1tool1', langs: ['dwarvish'], tools: ['lute', 'drum'] },
+  equipment: { kind: 'coin' },
+  feature: { slug: 'acolyte-shelter-of-the-faithful' },
+};
+// tool2: 0 languages, 2 tools
+const CUSTOMIZATION_TOOL2 = {
+  mixedPool: { shape: 'tool2', langs: [], tools: ['lute', 'drum'] },
+  equipment: { kind: 'coin' },
+  feature: { slug: 'acolyte-shelter-of-the-faithful' },
+};
+
+describe('PUT /characters/:id/background — Custom Background customization', () => {
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Custom BG Customization Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Custom BG Customization Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  // ── Happy paths: all 3 mixed-pool shapes ──────────────────────────────────
+
+  it('shape lang2: 2 langs, 0 tools + coin equipment + feature → 200 + customization persisted', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: CUSTOMIZATION_LANG2,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const bg = res.json().data.background;
+    expect(bg.slug).toBe('custom-background');
+    expect(bg.skills).toContain('perception');
+    expect(bg.customization.mixedPool.shape).toBe('lang2');
+    expect(bg.customization.mixedPool.langs).toEqual(['draconic', 'elvish']);
+    expect(bg.customization.equipment.kind).toBe('coin');
+    expect(bg.customization.feature.slug).toBe('acolyte-shelter-of-the-faithful');
+  });
+
+  it('shape lang1tool1: 1 lang + 2 tools + coin equipment + feature → 200 + customization persisted', async () => {
+    const app = await getTestApp();
+    // Note: anyTool:1 in 5etools is patched to 2 by patchAnyToolCount (F-06 data fix).
+    // So lang1tool1 requires 1 lang + 2 tools.
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: CUSTOMIZATION_LANG1TOOL1,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const bg = res.json().data.background;
+    expect(bg.customization.mixedPool.shape).toBe('lang1tool1');
+    expect(bg.customization.mixedPool.langs).toEqual(['dwarvish']);
+    expect(bg.customization.mixedPool.tools).toEqual(['lute', 'drum']);
+  });
+
+  it('shape tool2: 0 langs + 2 tools + coin equipment + feature → 200 + customization persisted', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: CUSTOMIZATION_TOOL2,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const bg = res.json().data.background;
+    expect(bg.customization.mixedPool.shape).toBe('tool2');
+    expect(bg.customization.mixedPool.tools).toEqual(['lute', 'drum']);
+  });
+
+  // ── Error: missing customization entirely ─────────────────────────────────
+
+  it('no customization sent → 400 BACKGROUND_MIXED_POOL_SHAPE_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        // no customization
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_MIXED_POOL_SHAPE_REQUIRED')).toBe(true);
+  });
+
+  // ── Error: wrong lang count for chosen shape ──────────────────────────────
+
+  it('shape lang2 but sends 1 lang → 400 BACKGROUND_MIXED_POOL_COUNT_MISMATCH', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: { shape: 'lang2', langs: ['elvish'], tools: [] }, // only 1 lang, needs 2
+          equipment: { kind: 'coin' },
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string; axis?: string }>;
+    const mismatch = issues.find((i) => i.code === 'BACKGROUND_MIXED_POOL_COUNT_MISMATCH');
+    expect(mismatch).toBeDefined();
+    expect(mismatch?.axis).toBe('langs');
+  });
+
+  // ── Error: missing equipment ──────────────────────────────────────────────
+
+  it('no equipment in customization → 400 BACKGROUND_EQUIPMENT_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: CUSTOMIZATION_LANG2.mixedPool,
+          // no equipment
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_EQUIPMENT_REQUIRED')).toBe(true);
+  });
+
+  // ── Error: missing feature ────────────────────────────────────────────────
+
+  it('no feature in customization → 400 BACKGROUND_FEATURE_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: CUSTOMIZATION_LANG2.mixedPool,
+          equipment: { kind: 'coin' },
+          // no feature
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_FEATURE_REQUIRED')).toBe(true);
+  });
+
+  // ── Error: unknown equipment package background ───────────────────────────
+
+  it('package with unknown backgroundSlug → 400 BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: CUSTOMIZATION_LANG2.mixedPool,
+          equipment: { kind: 'package', backgroundSlug: 'nonexistent-bg', backgroundSource: 'PHB' },
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN')).toBe(true);
+  });
+
+  // ── Error: unknown feature slug ───────────────────────────────────────────
+
+  it('feature slug not in splitFeatureBlock → 400 BACKGROUND_FEATURE_UNKNOWN', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: CUSTOMIZATION_LANG2.mixedPool,
+          equipment: { kind: 'coin' },
+          feature: { slug: 'nonexistent-feature-that-does-not-exist' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_FEATURE_UNKNOWN')).toBe(true);
+  });
+
+  // ── Regression: non-Custom backgrounds still validate languageProficiencies ──
+
+  it('Sage without language choices still returns BACKGROUND_LANGUAGE_COUNT_MISMATCH (regression)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { background: { slug: 'sage', source: 'PHB' } },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_LANGUAGE_COUNT_MISMATCH')).toBe(true);
+  });
+
+  // ── Legacy round-trip: no customization field in DB → normalized cleanly ──
+
+  it('GET character after save returns normalizeAppliedBackground applied (legacy-safe round-trip)', async () => {
+    const app = await getTestApp();
+    // First, save with full customization to verify the route persists it
+    const putRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: CUSTOMIZATION_LANG2,
+      },
+    });
+    expect(putRes.statusCode).toBe(200);
+
+    // Then GET the character and verify customization round-trips
+    const getRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(getRes.statusCode).toBe(200);
+    const bg = getRes.json().data.background;
+    // normalizeAppliedBackground must preserve customization
+    expect(bg.customization).toBeDefined();
+    expect(bg.customization.mixedPool.shape).toBe('lang2');
   });
 });
