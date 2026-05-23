@@ -1,4 +1,6 @@
 import type { InlineToken } from './types';
+import { TAG_REGISTRY } from './tags/registry';
+import { UnknownTag } from './tags/unknown';
 
 /**
  * Tokenize a 5etools string into text and `{@tag args}` tokens.
@@ -44,17 +46,11 @@ export function takeFirstSegment(args: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Registry — phases B/C/D fill this with concrete handlers. The unknown-tag
-// fallback is the only entry shipped in Phase A.
+// Renderer — concrete handlers live in tags/registry.ts; phases B/C/D extend
+// that map. Unknown tags fall through to UnknownTag so prose stays readable.
 // ---------------------------------------------------------------------------
 
 export type TagHandler = (args: string) => React.ReactNode;
-
-export const TAG_REGISTRY: Record<string, TagHandler> = {};
-
-function UnknownTag({ args }: { args: string }) {
-  return <span>{takeDisplay(args)}</span>;
-}
 
 /**
  * Server component. Renders the token stream of a string via TAG_REGISTRY.
