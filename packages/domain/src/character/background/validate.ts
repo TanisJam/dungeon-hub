@@ -1,3 +1,4 @@
+import { ALL_SKILLS } from '../sheet/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
 import type {
   AppliedBackground,
@@ -24,6 +25,17 @@ function splitSkillBlock(block: BackgroundSkillBlock): {
     if (key === 'choose' && value && typeof value === 'object') {
       const c = value as { from: string[]; count?: number };
       choose = { from: c.from.map((s) => s.toLowerCase()), count: c.count ?? 1 };
+    } else if (key.startsWith('any') && typeof value === 'number') {
+      const fixedSet = new Set(fixed);
+      const pool = ALL_SKILLS.filter((s) => !fixedSet.has(s));
+      if (!choose) {
+        choose = { from: pool.slice(), count: value };
+      } else {
+        choose.count += value;
+        for (const s of pool) {
+          if (!choose.from.includes(s)) choose.from.push(s);
+        }
+      }
     } else if (value === true) {
       fixed.push(key.toLowerCase());
     }

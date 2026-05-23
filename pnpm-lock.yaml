@@ -85,6 +85,9 @@ importers:
       '@dungeon-hub/compendium-import':
         specifier: workspace:*
         version: link:../../packages/compendium-import
+      '@dungeon-hub/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@radix-ui/react-hover-card':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
