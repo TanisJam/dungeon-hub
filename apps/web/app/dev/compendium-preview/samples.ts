@@ -150,4 +150,102 @@ export const SAMPLES: Sample[] = [
       {} as Entry,
     ],
   },
+  {
+    label: 'statblock + refXxxFeature nodes',
+    entries: [
+      'Encounter: a {@creature goblin|MM} ambushes the party.',
+      { type: 'statblock', tag: 'creature', name: 'Goblin', source: 'MM' },
+      { type: 'refClassFeature', classFeature: 'Action Surge|Fighter|PHB|2' },
+      { type: 'refOptionalfeature', optionalfeature: 'Eldritch Spear|XGE' },
+      { type: 'refFeat', feat: 'Alert|PHB' },
+    ],
+  },
+  {
+    label: 'options + ingredient',
+    entries: [
+      {
+        type: 'options',
+        count: 2,
+        entries: ['Increase Str by 2', 'Increase Wis by 1 and Cha by 1', 'Gain proficiency in one skill'],
+      },
+      'Recipe ingredients:',
+      { type: 'ingredient', amount: 2, entry: 'lbs. of dragon scales' },
+      { type: 'ingredient', amount: 1, amountSecondary: 3, entry: 'pinches of pixie dust' },
+    ],
+  },
+  {
+    label: 'ability formula nodes',
+    entries: [
+      { type: 'abilityDc', name: 'Spell', attributes: ['int'] },
+      { type: 'abilityAttackMod', name: 'Spell attack', attributes: ['int'] },
+      { type: 'abilityGeneric', name: 'Wisdom-based caster', text: 'Use Wisdom for spell save DC and attack rolls.', attributes: ['wis'] },
+    ],
+  },
+  {
+    label: 'attack node + dice + bonus',
+    entries: [
+      {
+        type: 'attack',
+        attackEntries: ['{@atk mw} {@hit 5} to hit, reach 5 ft., one target.'],
+        hitEntries: ['{@damage 1d8 + 3} slashing damage.'],
+      },
+      { type: 'bonus', value: 4 },
+      ' to attack rolls. Speed: ',
+      { type: 'bonusSpeed', value: 10 },
+      '. Roll: ',
+      { type: 'dice', toRoll: [{ number: 2, faces: 6 }] },
+    ],
+  },
+  {
+    label: 'variant boxes',
+    entries: [
+      {
+        type: 'variant',
+        name: 'Optional Rule: Encumbrance',
+        entries: [
+          'When you carry more than 5 times your Strength score in pounds, your speed drops.',
+          {
+            type: 'variantSub',
+            name: 'Heavily Encumbered',
+            entries: ['Speed -20 ft.; disadvantage on Strength, Dexterity, Constitution checks.'],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'link node (external) + flowchart',
+    entries: [
+      { type: 'link', text: 'D&D Beyond', href: { type: 'external', url: 'https://dndbeyond.com' } },
+      'Encounter flow:',
+      {
+        type: 'flowchart',
+        blocks: ['Roll initiative.', 'Surprise check.', 'First round begins.'],
+      },
+    ],
+  },
+  {
+    label: 'spellcasting node',
+    entries: [
+      {
+        type: 'spellcasting',
+        name: 'Innate Spellcasting',
+        headerEntries: ['The dragon casts the following spells, requiring no material components.'],
+        will: ['detect magic', 'mage hand'],
+        daily: { '3': ['fireball', 'counterspell'] },
+        spells: {
+          '1': { slots: 4, spells: ['shield', 'mage armor'] },
+          '2': { slots: 3, spells: ['mirror image'] },
+        },
+      },
+    ],
+  },
+  {
+    label: 'hr separators',
+    entries: [
+      'First paragraph.',
+      { type: 'hr' },
+      'Second paragraph after the rule.',
+    ],
+  },
 ];
