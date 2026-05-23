@@ -26,13 +26,15 @@ export interface BackgroundLanguageBlock {
  * Shape de un toolProficiencies block:
  *   - `anyGamingSet: N`, `anyArtisansTool: N`, `anyMusicalInstrument: N`
  *   - keys específicos: `"thieves' tools": true`
+ *   - `choose: { from: string[], count?: number }` — 5etools choose-from-pool shape
  */
 export interface BackgroundToolBlock {
   anyGamingSet?: number;
   anyArtisansTool?: number;
   anyMusicalInstrument?: number;
   any?: number;
-  [toolName: string]: boolean | number | undefined;
+  choose?: { from: string[]; count?: number };
+  [toolName: string]: boolean | number | { from: string[]; count?: number } | undefined;
 }
 
 export interface BackgroundCompendiumData {
@@ -67,7 +69,8 @@ export type BackgroundValidationIssue =
       expectedCount: number;
       gotCount: number;
     }
-  | { code: 'BACKGROUND_TOOL_DUPLICATE'; tool: string };
+  | { code: 'BACKGROUND_TOOL_DUPLICATE'; tool: string }
+  | { code: 'BACKGROUND_TOOL_NOT_ALLOWED'; tool: string; allowed: string[] };
 
 export interface AppliedBackground {
   slug: string;

@@ -19,6 +19,7 @@
     "./character/spellcasting": "./src/character/spellcasting/index.ts",
     "./character/level-up": "./src/character/level-up/index.ts",
     "./character/class-features": "./src/character/class-features/index.ts",
+    "./character/tool": "./src/character/tool/index.ts",
     "./entities": "./src/entities/index.ts",
     "./constraints": "./src/constraints/index.ts",
     "./calculations": "./src/calculations/index.ts",

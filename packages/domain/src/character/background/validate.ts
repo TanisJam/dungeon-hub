@@ -1,5 +1,6 @@
 import { ALL_SKILLS } from '../sheet/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
+import { expandToolFrom } from '../tool/pools.js';
 import type {
   AppliedBackground,
   BackgroundCompendiumData,
@@ -60,22 +61,31 @@ function splitLanguageBlock(block: BackgroundLanguageBlock): {
   return { fixed, anyCount };
 }
 
-/** Separa un block de tools. Devuelve fijos + counts por "any-kind". */
+/** Separa un block de tools. Devuelve fijos + counts por "any-kind" + choose pool. */
 function splitToolBlock(block: BackgroundToolBlock): {
   fixed: string[];
   /** Mapa "anyGamingSet" → N, "anyArtisansTool" → N, etc. */
   anyCounts: Record<string, number>;
+  /** choose-from-pool block expandido, o null si no existe. */
+  choose: { from: string[]; count: number } | null;
 } {
   const fixed: string[] = [];
   const anyCounts: Record<string, number> = {};
+  let choose: { from: string[]; count: number } | null = null;
   for (const [key, value] of Object.entries(block)) {
-    if (key.startsWith('any') && typeof value === 'number') {
+    if (key === 'choose' && value && typeof value === 'object' && !Array.isArray(value)) {
+      const c = value as { from: string[]; count?: number };
+      choose = {
+        from: expandToolFrom(c.from).map((s) => s.toLowerCase()),
+        count: c.count ?? 1,
+      };
+    } else if (key.startsWith('any') && typeof value === 'number') {
       anyCounts[key] = (anyCounts[key] ?? 0) + value;
     } else if (value === true) {
       fixed.push(key.toLowerCase());
     }
   }
-  return { fixed, anyCounts };
+  return { fixed, anyCounts, choose };
 }
 
 interface ValidateBackgroundInput {
@@ -193,11 +203,18 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
   // ---- 4) Tools ---------------------------------------------------------
   const allToolsFixed: string[] = [];
   const expectedToolCountsByKind: Record<string, number> = {};
+  const allowedToolChoosePool = new Set<string>();
+  let totalToolChooseCount = 0;
+
   for (const block of backgroundData.toolProficiencies ?? []) {
-    const { fixed, anyCounts } = splitToolBlock(block);
+    const { fixed, anyCounts, choose } = splitToolBlock(block);
     allToolsFixed.push(...fixed);
     for (const [kind, n] of Object.entries(anyCounts)) {
       expectedToolCountsByKind[kind] = (expectedToolCountsByKind[kind] ?? 0) + n;
+    }
+    if (choose) {
+      totalToolChooseCount += choose.count;
+      choose.from.forEach((s) => allowedToolChoosePool.add(s));
     }
   }
 
@@ -212,6 +229,28 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
       });
     }
   }
+
+  if (totalToolChooseCount > 0) {
+    const choosePicks = (toolChoices['choose'] ?? []).map((t) => t.toLowerCase());
+    if (choosePicks.length !== totalToolChooseCount) {
+      issues.push({
+        code: 'BACKGROUND_TOOL_COUNT_MISMATCH',
+        kind: 'choose',
+        expectedCount: totalToolChooseCount,
+        gotCount: choosePicks.length,
+      });
+    }
+    for (const t of choosePicks) {
+      if (!allowedToolChoosePool.has(t)) {
+        issues.push({
+          code: 'BACKGROUND_TOOL_NOT_ALLOWED',
+          tool: t,
+          allowed: [...allowedToolChoosePool].sort(),
+        });
+      }
+    }
+  }
+
   const flatToolChoices = Object.values(toolChoices).flat().map((t) => t.toLowerCase());
   const seenTools = new Set<string>();
   for (const t of flatToolChoices) {
