@@ -1,5 +1,7 @@
 // Parser para el shape de backgrounds del compendium 5etools.
 
+import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
+
 export type SkillBlock = {
   choose?: { from: string[]; count?: number };
   [k: string]: boolean | { from: string[]; count?: number } | undefined;
@@ -62,6 +64,18 @@ export function parseBackground(data: BackgroundData): ParsedBackground {
         } else {
           out.skillChoose.count += c.count ?? 1;
           for (const s of c.from) {
+            if (!out.skillChoose.from.includes(s)) out.skillChoose.from.push(s);
+          }
+        }
+      } else if (typeof v === 'number' && k.startsWith('any')) {
+        // Numeric-any shape: {any:N} → synthesize skillChoose from ALL_SKILLS minus fixed
+        const fixedLower = new Set(out.fixedSkills);
+        const pool = ALL_SKILLS.filter((s) => !fixedLower.has(s));
+        if (!out.skillChoose) {
+          out.skillChoose = { from: [...pool], count: v };
+        } else {
+          out.skillChoose.count += v;
+          for (const s of pool) {
             if (!out.skillChoose.from.includes(s)) out.skillChoose.from.push(s);
           }
         }
