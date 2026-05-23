@@ -102,6 +102,253 @@ describe('PUT /characters/:id/background', () => {
 });
 
 // ---------------------------------------------------------------------------
+// C.1 — Tool choose-block: parameterized integration tests
+// 7 backgrounds that have toolProficiencies[*].choose (choose-from-pool).
+// Slugs verified via slugify(name) + data/5etools/data/backgrounds.json.
+//
+// Background      | slug                                  | src  | pool | count | needs lang?
+// Far Traveler    | far-traveler                          | SCAG | 14   | 1     | yes (anyStandard:1)
+// Inheritor       | inheritor                             | SCAG | 14   | 1     | yes
+// Knight of Order | knight-of-the-order                  | SCAG | 14   | 1     | yes
+// Urban BH        | urban-bounty-hunter                   | SCAG | 15   | 2     | no
+// Uthgardt        | uthgardt-tribe-member                 | SCAG | 27   | 1     | yes
+// Waterdhavian N. | waterdhavian-noble                    | SCAG | 14   | 1     | yes
+// VGM             | variant-guild-artisan-guild-merchant  | PHB  | 18   | 1     | no
+//
+// Pool slugs are expanded by expandToolFrom() in domain — e.g. "lute" ∈ MUSICAL_INSTRUMENTS.
+// "alchemists-supplies" is NOT in any pool that contains only musical+gaming (Far Traveler etc).
+// ---------------------------------------------------------------------------
+
+type BgFixture = {
+  name: string;
+  slug: string;
+  source: string;
+  /** Number of tool picks required */
+  count: number;
+  /** A valid pick that is in the expanded pool */
+  validPick: string;
+  /** A second valid pick (only needed when count=2) */
+  validPick2?: string;
+  /** A slug that is NOT in the expanded pool — used for BACKGROUND_TOOL_NOT_ALLOWED test */
+  invalidPick: string;
+  /** Optional language choices — required for backgrounds with anyStandard:1 */
+  languageChoices?: string[];
+  /**
+   * Optional skill choices — some backgrounds have a skill choose block too.
+   * Must be provided for: Inheritor (choose 1 of arcana/history/religion),
+   * Knight of the Order (choose 1 of arcana/history/nature/religion),
+   * Urban Bounty Hunter (choose 2 of deception/insight/persuasion/stealth).
+   */
+  skillChoices?: string[];
+};
+
+const TOOL_CHOOSE_BACKGROUNDS: BgFixture[] = [
+  // musical instrument (10) + gaming set (4) = 14; needs 1 language
+  {
+    name: 'Far Traveler',
+    slug: 'far-traveler',
+    source: 'SCAG',
+    count: 1,
+    validPick: 'lute',
+    invalidPick: 'alchemists-supplies',
+    languageChoices: ['draconic'],
+  },
+  // Inheritor: survival fixed + choose 1 of arcana/history/religion; also needs 1 language
+  {
+    name: 'Inheritor',
+    slug: 'inheritor',
+    source: 'SCAG',
+    count: 1,
+    validPick: 'drum',
+    invalidPick: 'alchemists-supplies',
+    languageChoices: ['elvish'],
+    skillChoices: ['arcana'], // choose 1 of arcana/history/religion
+  },
+  // Knight of the Order: persuasion fixed + choose 1 of arcana/history/nature/religion; needs 1 lang
+  {
+    name: 'Knight of the Order',
+    slug: 'knight-of-the-order',
+    source: 'SCAG',
+    count: 1,
+    validPick: 'flute',
+    invalidPick: 'alchemists-supplies',
+    languageChoices: ['dwarvish'],
+    skillChoices: ['history'], // choose 1 of arcana/history/nature/religion
+  },
+  // Urban Bounty Hunter: choose 2 of deception/insight/persuasion/stealth; count=2 tools; no lang
+  {
+    name: 'Urban Bounty Hunter',
+    slug: 'urban-bounty-hunter',
+    source: 'SCAG',
+    count: 2,
+    validPick: 'dice-set',
+    validPick2: 'lute',
+    invalidPick: 'alchemists-supplies',
+    languageChoices: undefined,
+    skillChoices: ['deception', 'stealth'], // choose 2 of deception/insight/persuasion/stealth
+  },
+  // musical instrument (10) + anyArtisansTool (17) = 27; needs 1 language
+  {
+    name: 'Uthgardt Tribe Member',
+    slug: 'uthgardt-tribe-member',
+    source: 'SCAG',
+    count: 1,
+    validPick: 'drum',
+    invalidPick: 'dice-set', // gaming set NOT in Uthgardt pool
+    languageChoices: ['goblin'],
+  },
+  // gaming set (4) + musical instrument (10) = 14; needs 1 language
+  {
+    name: 'Waterdhavian Noble',
+    slug: 'waterdhavian-noble',
+    source: 'SCAG',
+    count: 1,
+    validPick: 'viol',
+    invalidPick: 'alchemists-supplies',
+    languageChoices: ['halfling'],
+  },
+  // anyArtisansTool (17) + literal "navigator's tools" (1) = 18; no language
+  {
+    name: 'Variant Guild Artisan (Guild Merchant)',
+    slug: 'variant-guild-artisan-guild-merchant',
+    source: 'PHB',
+    count: 1,
+    validPick: 'alchemists-supplies',
+    invalidPick: 'lute', // musical instrument NOT in VGM pool
+    languageChoices: undefined,
+  },
+];
+
+describe('PUT /characters/:id/background — Tool choose-block (7 backgrounds)', () => {
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Tool Choose Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Tool Choose Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  for (const bg of TOOL_CHOOSE_BACKGROUNDS) {
+    const picks = bg.count === 2 ? [bg.validPick, bg.validPick2!] : [bg.validPick];
+
+    it(`[${bg.name}] happy path: ${bg.count} valid pick(s) → 200 with tools in appliedBackground`, async () => {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/background`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          background: { slug: bg.slug, source: bg.source },
+          toolChoices: { choose: picks },
+          ...(bg.languageChoices ? { languageChoices: bg.languageChoices } : {}),
+          ...(bg.skillChoices ? { skillChoices: bg.skillChoices } : {}),
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      const tools: string[] = body.data.background.tools ?? [];
+      for (const pick of picks) {
+        expect(tools).toContain(pick);
+      }
+    });
+
+    it(`[${bg.name}] empty picks → 400 BACKGROUND_TOOL_COUNT_MISMATCH`, async () => {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/background`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          background: { slug: bg.slug, source: bg.source },
+          toolChoices: { choose: [] },
+          // Include valid skill/language choices so those validators pass — tool error fires at step 4
+          ...(bg.languageChoices ? { languageChoices: bg.languageChoices } : {}),
+          ...(bg.skillChoices ? { skillChoices: bg.skillChoices } : {}),
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      const issues = res.json().issues as Array<{ code: string; kind?: string }>;
+      const toolIssue = issues.find((i) => i.code === 'BACKGROUND_TOOL_COUNT_MISMATCH');
+      expect(toolIssue).toBeDefined();
+      expect(toolIssue?.kind).toBe('choose');
+    });
+
+    it(`[${bg.name}] pick not in pool → 400 BACKGROUND_TOOL_NOT_ALLOWED`, async () => {
+      const app = await getTestApp();
+      // For count=2 backgrounds, send 2 picks (one valid, one invalid) to avoid count mismatch
+      const pickPayload =
+        bg.count === 2 ? [bg.validPick, bg.invalidPick] : [bg.invalidPick];
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/background`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          background: { slug: bg.slug, source: bg.source },
+          toolChoices: { choose: pickPayload },
+          ...(bg.languageChoices ? { languageChoices: bg.languageChoices } : {}),
+          ...(bg.skillChoices ? { skillChoices: bg.skillChoices } : {}),
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      const issues = res.json().issues as Array<{ code: string; tool?: string }>;
+      const notAllowedIssue = issues.find((i) => i.code === 'BACKGROUND_TOOL_NOT_ALLOWED');
+      expect(notAllowedIssue).toBeDefined();
+      expect(notAllowedIssue?.tool).toBe(bg.invalidPick);
+    });
+
+    it(`[${bg.name}] duplicate pick → 400 BACKGROUND_TOOL_DUPLICATE`, async () => {
+      const app = await getTestApp();
+      // Send the same valid pick twice — for count=1 bgs this triggers both COUNT_MISMATCH and
+      // DUPLICATE; for count=2 bgs it triggers only DUPLICATE. Both cases must have DUPLICATE issue.
+      const dupPayload = [bg.validPick, bg.validPick];
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/background`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          background: { slug: bg.slug, source: bg.source },
+          toolChoices: { choose: dupPayload },
+          ...(bg.languageChoices ? { languageChoices: bg.languageChoices } : {}),
+          ...(bg.skillChoices ? { skillChoices: bg.skillChoices } : {}),
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      const issues = res.json().issues as Array<{ code: string; tool?: string }>;
+      const dupIssue = issues.find((i) => i.code === 'BACKGROUND_TOOL_DUPLICATE');
+      expect(dupIssue).toBeDefined();
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // C.1 — Custom Background (any:2) integration tests
 // PHB p.126: skillProficiencies: [{ any: 2 }] — player picks 2 from ALL_SKILLS
 // ---------------------------------------------------------------------------
