@@ -244,6 +244,48 @@ describe('TermProvider — missing accessToken makes all refs inert', () => {
 });
 
 // ---------------------------------------------------------------------------
+// TERM-FETCH — unsupported-kind guard: resolver not called, no dialog
+// ---------------------------------------------------------------------------
+
+describe('TermProvider — unsupported kind is ignored (no fetch, no card)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('does NOT call resolver and does NOT open card for variantrule kind', async () => {
+    const mockResolver = vi.fn();
+
+    render(
+      <TermProvider
+        campaignId="campaign-1"
+        accessToken="tok"
+        apiBaseUrl="http://api.test"
+        mockMode={mockResolver}
+      >
+        <span data-compendium-ref="variantrule|something|PHB" data-testid="ref-span">
+          something
+        </span>
+      </TermProvider>,
+    );
+
+    fireEvent.pointerOver(screen.getByTestId('ref-span'));
+
+    await act(async () => {
+      vi.advanceTimersByTime(OPEN_DELAY + 10);
+      await Promise.resolve();
+    });
+
+    expect(mockResolver).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // B.1 — Escape key closes open card
 // ---------------------------------------------------------------------------
 

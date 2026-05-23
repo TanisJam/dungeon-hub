@@ -3,6 +3,7 @@
  *
  * B.3 — tabIndex on supported-kind spans, role=dialog on open card, Escape dismisses.
  * B.6 — No raw color utilities (bg-gray-, text-blue-, etc.) in HoverCard className output.
+ * TERM-A11Y — keyboard-open path: focusin on a tabIndex=0 span opens the HoverCard.
  */
 import React from 'react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -127,6 +128,62 @@ describe('TermProvider + Term — a11y: role=dialog and Escape dismiss', () => {
     // Dismiss
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TERM-A11Y — keyboard-open path: focusin opens HoverCard instantly (no delay)
+// ---------------------------------------------------------------------------
+
+describe('TermProvider — keyboard-open via focusin (tabIndex=0 span)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('opens HoverCard dialog immediately when a tabIndex=0 ref span receives focus', async () => {
+    const { TermProvider } = await import('../TermProvider');
+
+    const mockResolver = vi.fn().mockResolvedValue({
+      kind: 'ok',
+      entry: { name: 'Fireball', entries: ['Boom'], source: 'PHB' },
+    });
+
+    render(
+      <TermProvider
+        campaignId="c1"
+        accessToken="tok"
+        apiBaseUrl="http://api.test"
+        mockMode={mockResolver}
+      >
+        <span
+          data-compendium-ref="spell|fireball|PHB"
+          data-testid="ref"
+          tabIndex={0}
+        >
+          fireball
+        </span>
+      </TermProvider>,
+    );
+
+    // Fire focusin — this is what the browser emits when a child receives focus.
+    // fireEvent.focus dispatches "focus" but NOT "focusin" (which bubbles).
+    // Use fireEvent.focusIn so the delegated focusin listener on the container fires.
+    fireEvent.focusIn(screen.getByTestId('ref'));
+
+    // focusin handler is instant (no timer) — but the mock resolver is async.
+    // Flush the microtask queue so the resolved promise updates state.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('dialog')).not.toBeNull();
   });
 });
 
