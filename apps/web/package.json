@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@dungeon-hub/compendium-import": "workspace:*",
+    "@radix-ui/react-hover-card": "^1.1.15",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "next": "^15.5.18",
