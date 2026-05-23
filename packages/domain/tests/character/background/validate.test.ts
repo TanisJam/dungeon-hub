@@ -803,7 +803,7 @@ describe('splitFeatureBlock — slug derivation', () => {
 // ── A.14 TEST-RED: 6 new validation error codes ───────────────────────────────
 
 const CUSTOM_BG_FULL: BackgroundCompendiumData = {
-  slug: 'custom',
+  slug: 'custom-background',
   source: 'PHB',
   name: 'Custom Background',
   skillProficiencies: [{ any: 2 }],

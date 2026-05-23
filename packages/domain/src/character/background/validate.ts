@@ -400,29 +400,40 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
   }
 
   // ---- 3) Languages -----------------------------------------------------
+  // Skip the standard languageProficiencies validation for Custom Background when
+  // skillToolLanguageProficiencies is present (F-01: 5etools data bug where Custom BG
+  // incorrectly lists languageProficiencies=[{anyStandard:2}] — the mixed-pool block
+  // replaces the language grant per PHB p.125). The mixed-pool validation in step 5 handles this.
+  const skipLanguageValidation =
+    backgroundData.slug === 'custom-background' &&
+    (backgroundData.skillToolLanguageProficiencies?.length ?? 0) > 0;
+
   const allLanguagesFixed: string[] = [];
   let totalLangAnyCount = 0;
-  for (const block of backgroundData.languageProficiencies ?? []) {
-    const { fixed, anyCount } = splitLanguageBlock(block);
-    allLanguagesFixed.push(...fixed);
-    totalLangAnyCount += anyCount;
-  }
 
-  if (totalLangAnyCount > 0) {
-    if (languageChoices.length !== totalLangAnyCount) {
-      issues.push({
-        code: 'BACKGROUND_LANGUAGE_COUNT_MISMATCH',
-        expectedCount: totalLangAnyCount,
-        gotCount: languageChoices.length,
-      });
+  if (!skipLanguageValidation) {
+    for (const block of backgroundData.languageProficiencies ?? []) {
+      const { fixed, anyCount } = splitLanguageBlock(block);
+      allLanguagesFixed.push(...fixed);
+      totalLangAnyCount += anyCount;
     }
-    const seen = new Set<string>();
-    for (const lang of languageChoices) {
-      if (seen.has(lang) || allLanguagesFixed.includes(lang)) {
-        issues.push({ code: 'BACKGROUND_LANGUAGE_DUPLICATE', language: lang });
-        continue;
+
+    if (totalLangAnyCount > 0) {
+      if (languageChoices.length !== totalLangAnyCount) {
+        issues.push({
+          code: 'BACKGROUND_LANGUAGE_COUNT_MISMATCH',
+          expectedCount: totalLangAnyCount,
+          gotCount: languageChoices.length,
+        });
       }
-      seen.add(lang);
+      const seen = new Set<string>();
+      for (const lang of languageChoices) {
+        if (seen.has(lang) || allLanguagesFixed.includes(lang)) {
+          issues.push({ code: 'BACKGROUND_LANGUAGE_DUPLICATE', language: lang });
+          continue;
+        }
+        seen.add(lang);
+      }
     }
   }
 
@@ -490,7 +501,7 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
   // ---- 5) Custom Background customization ----------------------------------
   // Only runs when the background has skillToolLanguageProficiencies (real Custom Background)
   // OR when customization was explicitly provided by the caller.
-  const CUSTOM_BG_SLUG = 'custom';
+  const CUSTOM_BG_SLUG = 'custom-background';
   const hasCustomizationData =
     (backgroundData.skillToolLanguageProficiencies?.length ?? 0) > 0 ||
     input.customization !== undefined;
