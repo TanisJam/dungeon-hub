@@ -642,9 +642,9 @@ const ACOLYTE_BG: BackgroundCompendiumData = {
   skillProficiencies: [{ insight: true, religion: true }],
   languageProficiencies: [{ anyStandard: 2 }],
   toolProficiencies: null,
-  startingEquipment: {
-    _: ['a holy symbol', 'a prayer book', 'incense (5)', 'vestments', 'a set of common clothes', '15 gp'],
-  },
+  startingEquipment: [
+    { _: ['a holy symbol', 'a prayer book', 'incense (5)', 'vestments', 'a set of common clothes', '15 gp'] },
+  ],
 };
 
 const CRIMINAL_BG: BackgroundCompendiumData = {
@@ -654,9 +654,9 @@ const CRIMINAL_BG: BackgroundCompendiumData = {
   skillProficiencies: [{ deception: true, stealth: true }],
   languageProficiencies: null,
   toolProficiencies: [{ anyGamingSet: 1, "thieves' tools": true }],
-  startingEquipment: {
-    _: ['a crowbar', 'a set of dark common clothes including a hood', '15 gp'],
-  },
+  startingEquipment: [
+    { _: ['a crowbar', 'a set of dark common clothes including a hood', '15 gp'] },
+  ],
 };
 
 const BG_WITH_UPPERCASE_SLOT: BackgroundCompendiumData = {
@@ -666,11 +666,9 @@ const BG_WITH_UPPERCASE_SLOT: BackgroundCompendiumData = {
   skillProficiencies: [],
   languageProficiencies: null,
   toolProficiencies: null,
-  startingEquipment: {
-    _: ['always item'],
-    a: ['option a item'],
-    A: ['IGNORED uppercase slot item'],
-  },
+  startingEquipment: [
+    { _: ['always item'], a: ['option a item'], A: ['IGNORED uppercase slot item'] },
+  ],
 };
 
 describe('splitEquipmentBlock — package building', () => {

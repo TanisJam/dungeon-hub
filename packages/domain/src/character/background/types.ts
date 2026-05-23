@@ -115,7 +115,8 @@ export interface BackgroundCompendiumData {
   /** Custom Background only — 3-alternative shape picker (PHB p. 125). */
   skillToolLanguageProficiencies?: SkillToolLanguageProficienciesAlt[] | null;
   /** Raw starting equipment from 5etools (slot map). */
-  startingEquipment?: Record<string, unknown[]> | null;
+  /** 5etools shape: array of slot-keyed objects. Slots are merged at consumption time. */
+  startingEquipment?: Array<Record<string, unknown[]>> | null;
   /** Background entries (features, etc.) from 5etools. */
   entries?: unknown[] | null;
 }

@@ -176,32 +176,55 @@ export function splitMixedPoolBlock(
  * @param allBackgrounds - Full compendium list; packages are built from these.
  */
 export function splitEquipmentBlock(
-  _startingEquipment: Record<string, unknown[]> | null | undefined,
+  _startingEquipment: Array<Record<string, unknown[]>> | null | undefined,
   allBackgrounds: BackgroundCompendiumData[],
 ): { packages: BackgroundPackage[]; coinAllowed: true } {
   const packages: BackgroundPackage[] = [];
   const LOWERCASE_SLOT_KEYS = new Set<string>(['a', 'b', 'c', 'd']);
 
+  const renderItem = (item: unknown): string | null => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') {
+      const o = item as Record<string, unknown>;
+      if (typeof o.displayName === 'string') return o.displayName;
+      if (typeof o.item === 'string') return o.item;
+      if (typeof o.special === 'string') {
+        const qty = typeof o.quantity === 'number' ? ` (×${o.quantity})` : '';
+        return `${o.special}${qty}`;
+      }
+    }
+    return null;
+  };
+
   for (const bg of allBackgrounds) {
     const equip = bg.startingEquipment;
-    if (!equip) continue;
+    if (!Array.isArray(equip) || equip.length === 0) continue;
 
-    const alwaysGrantedRaw = equip['_'];
-    if (!Array.isArray(alwaysGrantedRaw) || alwaysGrantedRaw.length === 0) continue;
+    // 5etools shape: [{_: [...]}, {a: [...], b: [...]}]. Merge slot maps across objects.
+    const merged: Record<string, unknown[]> = {};
+    for (const slotObj of equip) {
+      if (!slotObj || typeof slotObj !== 'object') continue;
+      for (const [slot, items] of Object.entries(slotObj)) {
+        if (!Array.isArray(items)) continue;
+        (merged[slot] ??= []).push(...items);
+      }
+    }
 
-    // Filter to only string items (raw text entries)
-    const alwaysGranted: string[] = alwaysGrantedRaw.filter(
-      (item): item is string => typeof item === 'string',
-    );
+    const alwaysGrantedRaw = merged['_'] ?? [];
+    const alwaysGranted: string[] = alwaysGrantedRaw
+      .map(renderItem)
+      .filter((s): s is string => s !== null);
 
     const alternatives: Partial<Record<'a' | 'b' | 'c' | 'd', string[]>> = {};
-    for (const [slot, items] of Object.entries(equip)) {
-      if (slot === '_') continue;
-      if (!LOWERCASE_SLOT_KEYS.has(slot)) continue; // skip uppercase A/B
-      if (!Array.isArray(items)) continue;
-      const slotKey = slot as 'a' | 'b' | 'c' | 'd';
-      alternatives[slotKey] = items.filter((item): item is string => typeof item === 'string');
+    for (const slot of LOWERCASE_SLOT_KEYS) {
+      const items = merged[slot];
+      if (!items) continue;
+      alternatives[slot as 'a' | 'b' | 'c' | 'd'] = items
+        .map(renderItem)
+        .filter((s): s is string => s !== null);
     }
+
+    if (alwaysGranted.length === 0 && Object.keys(alternatives).length === 0) continue;
 
     packages.push({
       backgroundSlug: bg.slug,
