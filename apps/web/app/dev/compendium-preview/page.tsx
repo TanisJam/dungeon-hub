@@ -2,9 +2,7 @@ import { notFound } from 'next/navigation';
 import { CompendiumEntries } from '@/components/compendium';
 import { Card } from '@/components/ui';
 import { SAMPLES } from './samples';
-import { CompendiumEntriesWithTerms } from '@/components/compendium/term';
-import { createMockResolver } from '@/components/compendium/term';
-import { TERM_FIXTURES, TERM_DEMO_ENTRIES } from './term-fixtures';
+import { TermHoverDemo } from './TermHoverDemo';
 
 /**
  * Dev-only visual QA page for <CompendiumEntries>. Lists every supported node
@@ -49,12 +47,7 @@ export default function CompendiumPreviewPage() {
           Kinds demonstrated: spell, creature, condition, item, race, background.
         </p>
         <Card variant="surface" className="p-4">
-          <CompendiumEntriesWithTerms
-            entries={TERM_DEMO_ENTRIES}
-            campaignId="dev-preview"
-            accessToken="mock-token"
-            mockMode={createMockResolver(TERM_FIXTURES)}
-          />
+          <TermHoverDemo />
         </Card>
       </section>
     </main>

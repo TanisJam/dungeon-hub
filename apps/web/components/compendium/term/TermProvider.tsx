@@ -166,6 +166,23 @@ export function TermProvider({
     }
   }, []);
 
+  // Cancel any pending close — used when the pointer enters the card itself.
+  const cancelCloseTimer = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  // Start the close timer — used when the pointer leaves the card.
+  const startCloseTimer = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null;
+      setState(IDLE_STATE);
+    }, closeDelayMs);
+  }, [closeDelayMs]);
+
   // -------------------------------------------------------------------------
   // Event delegation handlers
   // -------------------------------------------------------------------------
@@ -202,6 +219,12 @@ export function TermProvider({
     (e: Event) => {
       if (!isActive) return;
 
+      // Touch: pointerleave fires after touchend (finger lifts). Ignoring it
+      // here lets the card stay open so the user can scroll/select inside.
+      // Touch dismissal is handled by the global pointerdown listener below.
+      const pe = e as PointerEvent;
+      if (pe.pointerType === 'touch') return;
+
       const target = e.target as Element;
       const refEl = target.closest('[data-compendium-ref]');
       if (!refEl) return;
@@ -221,6 +244,21 @@ export function TermProvider({
       }, closeDelayMs);
     },
     [isActive, clearTimers, closeDelayMs],
+  );
+
+  // Global tap/click-outside: closes when the user presses anywhere that is
+  // neither a ref span nor the card content. Essential for touch (where
+  // pointerleave is ignored above) and a nice mouse affordance too.
+  const handleGlobalPointerDown = useCallback(
+    (e: Event) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (target.closest('[data-compendium-ref]')) return;
+      if (target.closest('[data-term-card]')) return;
+      clearTimers();
+      setState(IDLE_STATE);
+    },
+    [clearTimers],
   );
 
   const handleFocusIn = useCallback(
@@ -285,6 +323,8 @@ export function TermProvider({
 
     // Escape is global (card may have focus outside the container)
     document.addEventListener('keydown', handleKeyDown);
+    // Tap/click outside dismisses (essential for touch dismissal)
+    document.addEventListener('pointerdown', handleGlobalPointerDown);
 
     return () => {
       container.removeEventListener('pointerover', handlePointerOver);
@@ -292,8 +332,9 @@ export function TermProvider({
       container.removeEventListener('focusin', handleFocusIn);
       container.removeEventListener('focusout', handleFocusOut);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handleGlobalPointerDown);
     };
-  }, [handlePointerOver, handlePointerOut, handleFocusIn, handleFocusOut, handleKeyDown]);
+  }, [handlePointerOver, handlePointerOut, handleFocusIn, handleFocusOut, handleKeyDown, handleGlobalPointerDown]);
 
   // Cleanup timers on unmount
   useEffect(() => () => { clearTimers(); }, [clearTimers]);
@@ -313,6 +354,8 @@ export function TermProvider({
           state={state.cardState}
           entry={state.entry}
           error={state.error}
+          onCardPointerEnter={cancelCloseTimer}
+          onCardPointerLeave={startCloseTimer}
         />
       )}
     </div>

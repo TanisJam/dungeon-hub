@@ -17,6 +17,10 @@ export interface TermProps {
   state: 'loading' | 'ok' | 'error';
   entry?: TermEntry;
   error?: string;
+  /** Called when the pointer enters the card content — provider cancels close timer */
+  onCardPointerEnter?: () => void;
+  /** Called when the pointer leaves the card content — provider starts close timer */
+  onCardPointerLeave?: () => void;
 }
 
 /**
@@ -31,7 +35,15 @@ export interface TermProps {
  * fixed-position overlay div that sits atop the anchor element. In jsdom
  * getBoundingClientRect returns zeros, so positioning is a browser-only concern.
  */
-export function Term({ open, anchorEl, state, entry, error }: TermProps) {
+export function Term({
+  open,
+  anchorEl,
+  state,
+  entry,
+  error,
+  onCardPointerEnter,
+  onCardPointerLeave,
+}: TermProps) {
   const triggerRef = useRef<HTMLAnchorElement>(null);
 
   // Sync trigger position to anchorEl in the browser (no-op in jsdom)
@@ -83,6 +95,17 @@ export function Term({ open, anchorEl, state, entry, error }: TermProps) {
           align="start"
           sideOffset={4}
           className="z-50"
+          data-term-card
+          onPointerEnter={(e) => {
+            // Touch: pointerleave fires immediately after touchend, which
+            // would close the card. Skip enter→start cycle on touch.
+            if (e.pointerType === 'touch') return;
+            onCardPointerEnter?.();
+          }}
+          onPointerLeave={(e) => {
+            if (e.pointerType === 'touch') return;
+            onCardPointerLeave?.();
+          }}
         >
           <TermCard state={state} entry={entry} error={error} />
           <HoverCard.Arrow className="fill-line" />
