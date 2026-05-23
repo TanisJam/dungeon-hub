@@ -1,5 +1,6 @@
 import type { TagHandler } from '../inline';
 import { slugify } from '../slugify';
+import { SUPPORTED_KINDS } from '../term/registry';
 
 /**
  * Build a handler for a "reference" inline tag — emits a styled span carrying
@@ -20,10 +21,16 @@ function refHandler(kind: string): TagHandler {
     const slug = slugify(rawSlug);
     const source = parts[1] && parts[1].length > 0 ? parts[1] : 'PHB';
     const display = parts[2] && parts[2].length > 0 ? parts[2] : rawSlug;
+    const isSupported = SUPPORTED_KINDS.has(kind);
     return (
       <span
         data-compendium-ref={`${kind}|${slug}|${source}`}
-        className="italic text-ink-soft cursor-help"
+        className={
+          isSupported
+            ? 'italic text-ink-soft underline decoration-dotted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            : 'italic text-ink-soft cursor-help'
+        }
+        tabIndex={isSupported ? 0 : undefined}
       >
         {display}
       </span>
