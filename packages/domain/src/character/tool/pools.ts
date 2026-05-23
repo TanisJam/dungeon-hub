@@ -45,6 +45,19 @@ export const MUSICAL_INSTRUMENTS: readonly string[] = [
 ];
 
 /**
+ * Full union of artisans + gaming + musical tool pools.
+ * Used by the `anyTool` key in Custom Background's
+ * `skillToolLanguageProficiencies` (PHB p. 125).
+ *
+ * Count: 17 artisans + 4 gaming + 10 musical = 31 items.
+ */
+export const ANY_TOOLS: readonly string[] = [
+  ...ARTISANS_TOOLS,
+  ...GAMING_SETS,
+  ...MUSICAL_INSTRUMENTS,
+];
+
+/**
  * Maps both camelCase (5etools block-key style) and spaced (5etools choose.from style)
  * category labels to their pool arrays.
  *
@@ -54,6 +67,8 @@ export const MUSICAL_INSTRUMENTS: readonly string[] = [
  *   - "gaming set" (spaced)
  *
  * camelCase variants for musical/gaming are included for symmetry and forward-compat.
+ *
+ * `anyTool` — Custom Background mixed-pool: resolves to artisans ∪ gaming ∪ musical.
  */
 export const TOOL_CATEGORY_MAP: Readonly<Record<string, readonly string[]>> = {
   anyArtisansTool: ARTISANS_TOOLS,
@@ -62,7 +77,24 @@ export const TOOL_CATEGORY_MAP: Readonly<Record<string, readonly string[]>> = {
   'musical instrument': MUSICAL_INSTRUMENTS,
   anyGamingSet: GAMING_SETS,
   'gaming set': GAMING_SETS,
+  anyTool: ANY_TOOLS,
 };
+
+/**
+ * Enforces the PHB rule for Custom Background: the third
+ * `skillToolLanguageProficiencies` alternative should grant 2 tool proficiencies,
+ * but 5etools encodes it as `{ anyTool: 1 }` — a known data bug.
+ *
+ * This function patches the count at read time and must be called whenever
+ * an `anyTool` value is extracted from that field. The compendium importer
+ * emits a WARNING log when it detects `anyTool: 1` so upstream fixes are visible.
+ *
+ * @param count - The raw count from the 5etools JSON
+ * @returns 2 if count is 1 (data-bug enforcement), otherwise the original count
+ */
+export function patchAnyToolCount(count: number): number {
+  return count === 1 ? 2 : count;
+}
 
 /**
  * Expands an array of tool `from` entries (as they appear in 5etools backgrounds.json)

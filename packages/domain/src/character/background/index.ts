@@ -1,2 +1,9 @@
 export * from './types.js';
-export { validateBackgroundSelection } from './validate.js';
+export * from './schemas.js';
+export { normalizeAppliedBackground } from './normalize.js';
+export {
+  validateBackgroundSelection,
+  splitMixedPoolBlock,
+  splitEquipmentBlock,
+  splitFeatureBlock,
+} from './validate.js';

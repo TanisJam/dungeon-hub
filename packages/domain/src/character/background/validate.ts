@@ -1,14 +1,20 @@
 import { ALL_SKILLS } from '../sheet/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
-import { expandToolFrom } from '../tool/pools.js';
+import { expandToolFrom, patchAnyToolCount } from '../tool/pools.js';
 import type {
   AppliedBackground,
   BackgroundCompendiumData,
   BackgroundLanguageBlock,
+  BackgroundPackage,
   BackgroundSkillBlock,
   BackgroundToolBlock,
   BackgroundValidationIssue,
   BackgroundValidationResult,
+  Customization,
+  FeatureOption,
+  MixedPoolShape,
+  MixedPoolShapeKey,
+  SkillToolLanguageProficienciesAlt,
 } from './types.js';
 
 function entityKey(slug: string, source: string): string {
@@ -88,6 +94,199 @@ function splitToolBlock(block: BackgroundToolBlock): {
   return { fixed, anyCounts, choose };
 }
 
+// ── Slug helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Converts a string to kebab-case (lowercase, spaces/punctuation → hyphens).
+ * Used for feature slug derivation:
+ *   kebab(bgName) + "-" + kebab(featureName.replace("Feature: ", ""))
+ */
+function toKebab(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // strip punctuation except spaces/hyphens
+    .replace(/[\s_]+/g, '-')       // spaces → hyphens
+    .replace(/-{2,}/g, '-')         // collapse multiple hyphens
+    .replace(/^-|-$/g, '');         // trim leading/trailing hyphens
+}
+
+// ── A.9: splitMixedPoolBlock ─────────────────────────────────────────────────
+
+/**
+ * Parses the `skillToolLanguageProficiencies` field from a Custom Background
+ * compendium entry and returns the three MixedPoolShape alternatives.
+ *
+ * Shape resolution rules (PHB p. 125):
+ *   - Entry with only `anyLanguage` key → `lang2`
+ *   - Entry with both `anyLanguage` and `anyTool` → `lang1tool1`
+ *   - Entry with only `anyTool` key → `tool2`
+ *
+ * `anyTool` counts are patched from 1 → 2 via `patchAnyToolCount` to fix
+ * the known 5etools data bug.
+ *
+ * Throws if an alternative contains an unrecognized key.
+ */
+export function splitMixedPoolBlock(
+  field: SkillToolLanguageProficienciesAlt[],
+): MixedPoolShape[] {
+  return field.map((alt) => {
+    const langCount = typeof alt['anyLanguage'] === 'number' ? alt['anyLanguage'] : 0;
+    const rawToolCount = typeof alt['anyTool'] === 'number' ? alt['anyTool'] : 0;
+    const toolCount = rawToolCount > 0 ? patchAnyToolCount(rawToolCount) : 0;
+
+    const knownKeys = new Set(['anyLanguage', 'anyTool']);
+    for (const key of Object.keys(alt)) {
+      if (!knownKeys.has(key)) {
+        throw new Error(
+          `splitMixedPoolBlock: unrecognized key "${key}" in skillToolLanguageProficiencies alternative`,
+        );
+      }
+    }
+
+    let shapeKey: MixedPoolShapeKey;
+    if (langCount > 0 && toolCount === 0) {
+      shapeKey = 'lang2';
+    } else if (langCount > 0 && toolCount > 0) {
+      shapeKey = 'lang1tool1';
+    } else if (langCount === 0 && toolCount > 0) {
+      shapeKey = 'tool2';
+    } else {
+      throw new Error(
+        `splitMixedPoolBlock: alternative with no recognized counts: ${JSON.stringify(alt)}`,
+      );
+    }
+
+    return { shapeKey, langCount, toolCount };
+  });
+}
+
+// ── A.11: splitEquipmentBlock ────────────────────────────────────────────────
+
+/**
+ * Builds the list of selectable equipment packages for the Custom Background
+ * equipment picker.
+ *
+ * Each background with a non-empty `_` slot in its `startingEquipment` becomes
+ * a selectable `BackgroundPackage`. Uppercase slot keys (`A`/`B`) are filtered
+ * out per spec (only lowercase `a`/`b`/`c`/`d` alternatives are in scope).
+ *
+ * `coinAllowed` is always `true` for Custom Background (PHB p. 125).
+ *
+ * @param _startingEquipment - The Custom Background's own startingEquipment (ignored — Custom BG has no own equipment).
+ * @param allBackgrounds - Full compendium list; packages are built from these.
+ */
+export function splitEquipmentBlock(
+  _startingEquipment: Record<string, unknown[]> | null | undefined,
+  allBackgrounds: BackgroundCompendiumData[],
+): { packages: BackgroundPackage[]; coinAllowed: true } {
+  const packages: BackgroundPackage[] = [];
+  const LOWERCASE_SLOT_KEYS = new Set<string>(['a', 'b', 'c', 'd']);
+
+  for (const bg of allBackgrounds) {
+    const equip = bg.startingEquipment;
+    if (!equip) continue;
+
+    const alwaysGrantedRaw = equip['_'];
+    if (!Array.isArray(alwaysGrantedRaw) || alwaysGrantedRaw.length === 0) continue;
+
+    // Filter to only string items (raw text entries)
+    const alwaysGranted: string[] = alwaysGrantedRaw.filter(
+      (item): item is string => typeof item === 'string',
+    );
+
+    const alternatives: Partial<Record<'a' | 'b' | 'c' | 'd', string[]>> = {};
+    for (const [slot, items] of Object.entries(equip)) {
+      if (slot === '_') continue;
+      if (!LOWERCASE_SLOT_KEYS.has(slot)) continue; // skip uppercase A/B
+      if (!Array.isArray(items)) continue;
+      const slotKey = slot as 'a' | 'b' | 'c' | 'd';
+      alternatives[slotKey] = items.filter((item): item is string => typeof item === 'string');
+    }
+
+    packages.push({
+      backgroundSlug: bg.slug,
+      backgroundSource: bg.source,
+      backgroundName: bg.name,
+      alwaysGranted,
+      alternatives,
+    });
+  }
+
+  return { packages, coinAllowed: true };
+}
+
+// ── A.13: splitFeatureBlock ───────────────────────────────────────────────────
+
+/**
+ * Scans all backgrounds for entries where data.isFeature === true and
+ * emits a FeatureOption[] for the Custom Background feature picker.
+ *
+ * Slug derivation rule (Mauricio's lock, #502):
+ *   kebab(backgroundName) + "-" + kebab(featureName.replace("Feature: ", ""))
+ *
+ * Example: background "Acolyte", feature "Feature: Shelter of the Faithful"
+ *   slug = "acolyte-shelter-of-the-faithful"
+ *
+ * Runtime uniqueness: if two features produce the same slug (from different
+ * backgrounds), throws BACKGROUND_FEATURE_SLUG_COLLISION. This is a
+ * developer-facing assertion, not a player-facing issue code.
+ */
+export function splitFeatureBlock(
+  allBackgrounds: BackgroundCompendiumData[],
+): { features: FeatureOption[] } {
+  const slugMap = new Map<string, FeatureOption>();
+
+  for (const bg of allBackgrounds) {
+    if (!Array.isArray(bg.entries)) continue;
+
+    for (const entry of bg.entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      const e = entry as Record<string, unknown>;
+      const data = e['data'] as Record<string, unknown> | undefined;
+      if (!data || data['isFeature'] !== true) continue;
+
+      const rawName = typeof e['name'] === 'string' ? e['name'] : '';
+      if (!rawName) continue;
+
+      const withoutPrefix = rawName.replace(/^Feature:\s*/i, '');
+      const slug = `${toKebab(bg.name)}-${toKebab(withoutPrefix)}`;
+
+      if (slugMap.has(slug)) {
+        const existing = slugMap.get(slug)!;
+        if (existing.sourceBackgroundSlug !== bg.slug) {
+          throw new Error(
+            `BACKGROUND_FEATURE_SLUG_COLLISION: slug "${slug}" is produced by both ` +
+              `"${existing.sourceBackgroundSlug}" and "${bg.slug}". ` +
+              `Add a source-suffix tie-breaker.`,
+          );
+        }
+      }
+
+      // Capture text from entries array
+      const entryEntries = e['entries'];
+      let text = '';
+      if (Array.isArray(entryEntries) && entryEntries.length > 0) {
+        const first = entryEntries[0];
+        text = typeof first === 'string' ? first : JSON.stringify(first);
+      }
+
+      const feature: FeatureOption = {
+        slug,
+        sourceBackgroundSlug: bg.slug,
+        sourceBackgroundSource: bg.source,
+        name: rawName,
+        text,
+      };
+
+      slugMap.set(slug, feature);
+    }
+  }
+
+  return { features: Array.from(slugMap.values()) };
+}
+
+// ── A.15: Validation branches for Custom Background ──────────────────────────
+
 interface ValidateBackgroundInput {
   backgroundData: BackgroundCompendiumData;
   rulesProfile: RulesProfile;
@@ -100,6 +299,10 @@ interface ValidateBackgroundInput {
   languageChoices?: string[];
   /** Tools elegidos. Mapa "anyGamingSet" → ["dice set"], "anyArtisansTool" → ["...tools"], etc. */
   toolChoices?: Record<string, string[]>;
+  /** Custom Background customization choices (mixedPool, equipment, feature). */
+  customization?: Customization;
+  /** Full background compendium list — required for Custom Background validation. */
+  allBackgrounds?: BackgroundCompendiumData[];
 }
 
 export function validateBackgroundSelection(input: ValidateBackgroundInput): BackgroundValidationResult {
@@ -261,6 +464,79 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
     seenTools.add(t);
   }
 
+  // ---- 5) Custom Background customization ----------------------------------
+  // Only runs when the background has skillToolLanguageProficiencies (real Custom Background)
+  // OR when customization was explicitly provided by the caller.
+  const CUSTOM_BG_SLUG = 'custom';
+  const hasCustomizationData =
+    (backgroundData.skillToolLanguageProficiencies?.length ?? 0) > 0 ||
+    input.customization !== undefined;
+  if (backgroundData.slug === CUSTOM_BG_SLUG && hasCustomizationData) {
+    const customization = input.customization;
+    const allBackgrounds = input.allBackgrounds ?? [];
+
+    // ---- 5a) Mixed Pool --------------------------------------------------
+    const mixedPoolShapes = backgroundData.skillToolLanguageProficiencies
+      ? splitMixedPoolBlock(backgroundData.skillToolLanguageProficiencies)
+      : [];
+
+    if (!customization?.mixedPool) {
+      issues.push({ code: 'BACKGROUND_MIXED_POOL_SHAPE_REQUIRED' });
+    } else {
+      const { shape, langs, tools } = customization.mixedPool;
+      const matchedShape = mixedPoolShapes.find((s) => s.shapeKey === shape);
+      if (!matchedShape) {
+        issues.push({ code: 'BACKGROUND_MIXED_POOL_SHAPE_REQUIRED' });
+      } else {
+        if (langs.length !== matchedShape.langCount) {
+          issues.push({
+            code: 'BACKGROUND_MIXED_POOL_COUNT_MISMATCH',
+            axis: 'langs',
+            expectedCount: matchedShape.langCount,
+            gotCount: langs.length,
+          });
+        }
+        if (tools.length !== matchedShape.toolCount) {
+          issues.push({
+            code: 'BACKGROUND_MIXED_POOL_COUNT_MISMATCH',
+            axis: 'tools',
+            expectedCount: matchedShape.toolCount,
+            gotCount: tools.length,
+          });
+        }
+      }
+    }
+
+    // ---- 5b) Equipment ---------------------------------------------------
+    if (!customization?.equipment) {
+      issues.push({ code: 'BACKGROUND_EQUIPMENT_REQUIRED' });
+    } else if (customization.equipment.kind === 'package') {
+      const { backgroundSlug, backgroundSource } = customization.equipment;
+      const exists = allBackgrounds.some(
+        (b) => b.slug === backgroundSlug && b.source === backgroundSource,
+      );
+      if (!exists) {
+        issues.push({
+          code: 'BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN',
+          backgroundSlug,
+          backgroundSource,
+        });
+      }
+    }
+    // kind === 'coin' → no further check needed
+
+    // ---- 5c) Feature -----------------------------------------------------
+    if (!customization?.feature) {
+      issues.push({ code: 'BACKGROUND_FEATURE_REQUIRED' });
+    } else {
+      const { features } = splitFeatureBlock(allBackgrounds);
+      const featureExists = features.some((f) => f.slug === customization.feature!.slug);
+      if (!featureExists) {
+        issues.push({ code: 'BACKGROUND_FEATURE_UNKNOWN', slug: customization.feature.slug });
+      }
+    }
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
   const applied: AppliedBackground = {
@@ -270,6 +546,10 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
     languages: [...allLanguagesFixed, ...languageChoices],
     tools: [...allToolsFixed, ...flatToolChoices],
   };
+
+  if (input.customization !== undefined) {
+    applied.customization = input.customization;
+  }
 
   return { ok: true, appliedBackground: applied };
 }

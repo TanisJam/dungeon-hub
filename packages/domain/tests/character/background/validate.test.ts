@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { validateBackgroundSelection } from '../../../src/character/background/validate.js';
+import {
+  validateBackgroundSelection,
+  splitMixedPoolBlock,
+  splitEquipmentBlock,
+  splitFeatureBlock,
+} from '../../../src/character/background/validate.js';
 import type { BackgroundCompendiumData } from '../../../src/character/background/types.js';
 import { DEFAULT_RULES_PROFILE } from '../../../src/rules-profile/default.js';
 import { ARTISANS_TOOLS, GAMING_SETS, MUSICAL_INSTRUMENTS } from '../../../src/character/tool/pools.js';
@@ -589,5 +594,340 @@ describe('validateBackgroundSelection — 7 enabled backgrounds integration (A.6
   it('Urban Bounty Hunter expanded pool has 15 slugs (4 gaming + 10 musical + 1 literal)', () => {
     const pool = [...GAMING_SETS, ...MUSICAL_INSTRUMENTS, "thieves' tools"];
     expect(pool).toHaveLength(15);
+  });
+});
+
+// ── A.8 TEST-RED: splitMixedPoolBlock ────────────────────────────────────────
+
+describe('splitMixedPoolBlock — three-alternative parse', () => {
+  const THREE_ALT_FIELD = [
+    { anyLanguage: 2 },
+    { anyLanguage: 1, anyTool: 1 }, // anyTool:1 gets patched to 2
+    { anyTool: 1 },                  // anyTool:1 gets patched to 2
+  ];
+
+  it('returns 3 MixedPoolShape items for 3-alternative field', () => {
+    const result = splitMixedPoolBlock(THREE_ALT_FIELD);
+    expect(result).toHaveLength(3);
+  });
+
+  it('first alternative → lang2 (langCount=2, toolCount=0)', () => {
+    const result = splitMixedPoolBlock(THREE_ALT_FIELD);
+    expect(result[0]).toMatchObject({ shapeKey: 'lang2', langCount: 2, toolCount: 0 });
+  });
+
+  it('second alternative → lang1tool1 (langCount=1, toolCount=2 after patch)', () => {
+    const result = splitMixedPoolBlock(THREE_ALT_FIELD);
+    expect(result[1]).toMatchObject({ shapeKey: 'lang1tool1', langCount: 1, toolCount: 2 });
+  });
+
+  it('third alternative → tool2 (langCount=0, toolCount=2 after patch)', () => {
+    const result = splitMixedPoolBlock(THREE_ALT_FIELD);
+    expect(result[2]).toMatchObject({ shapeKey: 'tool2', langCount: 0, toolCount: 2 });
+  });
+
+  it('unrecognized key throws', () => {
+    expect(() =>
+      splitMixedPoolBlock([{ unknownPoolKey: 3 }]),
+    ).toThrow();
+  });
+});
+
+// ── A.10 TEST-RED: splitEquipmentBlock ───────────────────────────────────────
+
+const ACOLYTE_BG: BackgroundCompendiumData = {
+  slug: 'acolyte',
+  source: 'PHB',
+  name: 'Acolyte',
+  skillProficiencies: [{ insight: true, religion: true }],
+  languageProficiencies: [{ anyStandard: 2 }],
+  toolProficiencies: null,
+  startingEquipment: {
+    _: ['a holy symbol', 'a prayer book', 'incense (5)', 'vestments', 'a set of common clothes', '15 gp'],
+  },
+};
+
+const CRIMINAL_BG: BackgroundCompendiumData = {
+  slug: 'criminal',
+  source: 'PHB',
+  name: 'Criminal',
+  skillProficiencies: [{ deception: true, stealth: true }],
+  languageProficiencies: null,
+  toolProficiencies: [{ anyGamingSet: 1, "thieves' tools": true }],
+  startingEquipment: {
+    _: ['a crowbar', 'a set of dark common clothes including a hood', '15 gp'],
+  },
+};
+
+const BG_WITH_UPPERCASE_SLOT: BackgroundCompendiumData = {
+  slug: 'test-bg',
+  source: 'PHB',
+  name: 'Test BG',
+  skillProficiencies: [],
+  languageProficiencies: null,
+  toolProficiencies: null,
+  startingEquipment: {
+    _: ['always item'],
+    a: ['option a item'],
+    A: ['IGNORED uppercase slot item'],
+  },
+};
+
+describe('splitEquipmentBlock — package building', () => {
+  it('builds packages from allBackgrounds with non-empty _ slot', () => {
+    const allBackgrounds = [ACOLYTE_BG, CRIMINAL_BG];
+    const result = splitEquipmentBlock(null, allBackgrounds);
+    expect(result.coinAllowed).toBe(true);
+    expect(result.packages).toHaveLength(2);
+    const acolytePackage = result.packages.find((p) => p.backgroundSlug === 'acolyte');
+    expect(acolytePackage).toBeDefined();
+    expect(acolytePackage!.alwaysGranted).toContain('a holy symbol');
+  });
+
+  it('coinAllowed is always true for Custom Background', () => {
+    const result = splitEquipmentBlock(null, [ACOLYTE_BG]);
+    expect(result.coinAllowed).toBe(true);
+  });
+
+  it('_ slot items come through as raw strings', () => {
+    const result = splitEquipmentBlock(null, [ACOLYTE_BG]);
+    const pkg = result.packages.find((p) => p.backgroundSlug === 'acolyte')!;
+    expect(typeof pkg.alwaysGranted[0]).toBe('string');
+    expect(pkg.alwaysGranted[0]).toBe('a holy symbol');
+  });
+
+  it('uppercase slot keys are ignored (A/B out of scope)', () => {
+    const result = splitEquipmentBlock(null, [BG_WITH_UPPERCASE_SLOT]);
+    const pkg = result.packages.find((p) => p.backgroundSlug === 'test-bg')!;
+    expect(pkg).toBeDefined();
+    expect(pkg.alternatives).not.toHaveProperty('A');
+    expect(pkg.alternatives).toHaveProperty('a');
+  });
+
+  it('lowercase alternative slots (a/b/c/d) are included', () => {
+    const result = splitEquipmentBlock(null, [BG_WITH_UPPERCASE_SLOT]);
+    const pkg = result.packages.find((p) => p.backgroundSlug === 'test-bg')!;
+    expect(pkg.alternatives['a']).toBeDefined();
+    expect(pkg.alternatives['a']).toContain('option a item');
+  });
+
+  it('backgrounds with no startingEquipment or empty _ slot are excluded', () => {
+    const noEquip: BackgroundCompendiumData = {
+      slug: 'no-equip',
+      source: 'PHB',
+      name: 'No Equip',
+      skillProficiencies: [],
+      languageProficiencies: null,
+      toolProficiencies: null,
+      startingEquipment: null,
+    };
+    const result = splitEquipmentBlock(null, [noEquip, ACOLYTE_BG]);
+    const pkg = result.packages.find((p) => p.backgroundSlug === 'no-equip');
+    expect(pkg).toBeUndefined();
+    expect(result.packages).toHaveLength(1);
+  });
+});
+
+// ── A.12 TEST-RED: splitFeatureBlock ─────────────────────────────────────────
+
+const ACOLYTE_WITH_FEATURE: BackgroundCompendiumData = {
+  slug: 'acolyte',
+  source: 'PHB',
+  name: 'Acolyte',
+  skillProficiencies: [{ insight: true, religion: true }],
+  languageProficiencies: [{ anyStandard: 2 }],
+  toolProficiencies: null,
+  entries: [
+    {
+      name: 'Feature: Shelter of the Faithful',
+      data: { isFeature: true },
+      entries: ['You receive shelter and healing at temples...'],
+    },
+    {
+      name: 'Suggested Characteristics',
+      data: { isFeature: false },
+      entries: [],
+    },
+  ],
+};
+
+const CRIMINAL_WITH_FEATURE: BackgroundCompendiumData = {
+  slug: 'criminal',
+  source: 'PHB',
+  name: 'Criminal',
+  skillProficiencies: [{ deception: true, stealth: true }],
+  languageProficiencies: null,
+  toolProficiencies: null,
+  entries: [
+    {
+      name: 'Feature: Criminal Contact',
+      data: { isFeature: true },
+      entries: ['You have a reliable and trustworthy contact...'],
+    },
+  ],
+};
+
+describe('splitFeatureBlock — slug derivation', () => {
+  it('derives slug for acolyte feature: acolyte-shelter-of-the-faithful', () => {
+    const result = splitFeatureBlock([ACOLYTE_WITH_FEATURE]);
+    const feature = result.features.find((f) => f.sourceBackgroundSlug === 'acolyte');
+    expect(feature).toBeDefined();
+    expect(feature!.slug).toBe('acolyte-shelter-of-the-faithful');
+  });
+
+  it('derives slug for criminal feature: criminal-criminal-contact', () => {
+    const result = splitFeatureBlock([CRIMINAL_WITH_FEATURE]);
+    const feature = result.features.find((f) => f.sourceBackgroundSlug === 'criminal');
+    expect(feature).toBeDefined();
+    expect(feature!.slug).toBe('criminal-criminal-contact');
+  });
+
+  it('only includes entries with data.isFeature === true', () => {
+    const result = splitFeatureBlock([ACOLYTE_WITH_FEATURE]);
+    // Suggested Characteristics should NOT be included
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0]!.slug).toBe('acolyte-shelter-of-the-faithful');
+  });
+
+  it('slug uniqueness — no collisions across multiple backgrounds', () => {
+    const result = splitFeatureBlock([ACOLYTE_WITH_FEATURE, CRIMINAL_WITH_FEATURE]);
+    const slugs = result.features.map((f) => f.slug);
+    const unique = new Set(slugs);
+    expect(unique.size).toBe(slugs.length);
+  });
+
+  it('feature text is captured', () => {
+    const result = splitFeatureBlock([ACOLYTE_WITH_FEATURE]);
+    expect(result.features[0]!.text).toBeTruthy();
+  });
+});
+
+// ── A.14 TEST-RED: 6 new validation error codes ───────────────────────────────
+
+const CUSTOM_BG_FULL: BackgroundCompendiumData = {
+  slug: 'custom',
+  source: 'PHB',
+  name: 'Custom Background',
+  skillProficiencies: [{ any: 2 }],
+  languageProficiencies: null,
+  toolProficiencies: null,
+  skillToolLanguageProficiencies: [
+    { anyLanguage: 2 },
+    { anyLanguage: 1, anyTool: 1 },
+    { anyTool: 1 },
+  ],
+  startingEquipment: null,
+  entries: [],
+};
+
+const ALL_BGS_FOR_VALIDATION = [ACOLYTE_BG, CRIMINAL_BG];
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_MIXED_POOL_SHAPE_REQUIRED', () => {
+  it('emits BACKGROUND_MIXED_POOL_SHAPE_REQUIRED when customization.mixedPool absent', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: ALL_BGS_FOR_VALIDATION,
+      customization: {},
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'BACKGROUND_MIXED_POOL_SHAPE_REQUIRED')).toBe(true);
+  });
+});
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_MIXED_POOL_COUNT_MISMATCH', () => {
+  it('emits BACKGROUND_MIXED_POOL_COUNT_MISMATCH when lang count wrong for lang1tool1', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: ALL_BGS_FOR_VALIDATION,
+      customization: {
+        mixedPool: { shape: 'lang1tool1', langs: ['elvish'], tools: [] }, // tools missing
+        equipment: { kind: 'coin' },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'BACKGROUND_MIXED_POOL_COUNT_MISMATCH')).toBe(true);
+  });
+});
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_EQUIPMENT_REQUIRED', () => {
+  it('emits BACKGROUND_EQUIPMENT_REQUIRED when customization.equipment absent', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: ALL_BGS_FOR_VALIDATION,
+      customization: {
+        mixedPool: { shape: 'lang2', langs: ['elvish', 'dwarvish'], tools: [] },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'BACKGROUND_EQUIPMENT_REQUIRED')).toBe(true);
+  });
+});
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN', () => {
+  it('emits BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN for unknown backgroundSlug in package', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: ALL_BGS_FOR_VALIDATION,
+      customization: {
+        mixedPool: { shape: 'lang2', langs: ['elvish', 'dwarvish'], tools: [] },
+        equipment: { kind: 'package', backgroundSlug: 'nonexistent', backgroundSource: 'PHB' },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(
+      res.issues.some((i) => i.code === 'BACKGROUND_EQUIPMENT_BACKGROUND_UNKNOWN'),
+    ).toBe(true);
+  });
+});
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_FEATURE_REQUIRED', () => {
+  it('emits BACKGROUND_FEATURE_REQUIRED when customization.feature absent', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: ALL_BGS_FOR_VALIDATION,
+      customization: {
+        mixedPool: { shape: 'lang2', langs: ['elvish', 'dwarvish'], tools: [] },
+        equipment: { kind: 'coin' },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'BACKGROUND_FEATURE_REQUIRED')).toBe(true);
+  });
+});
+
+describe('validateBackgroundSelection — Custom Background: BACKGROUND_FEATURE_UNKNOWN', () => {
+  it('emits BACKGROUND_FEATURE_UNKNOWN for unknown feature slug', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: [ACOLYTE_WITH_FEATURE, CRIMINAL_WITH_FEATURE],
+      customization: {
+        mixedPool: { shape: 'lang2', langs: ['elvish', 'dwarvish'], tools: [] },
+        equipment: { kind: 'coin' },
+        feature: { slug: 'nonexistent-feature-slug' },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'BACKGROUND_FEATURE_UNKNOWN')).toBe(true);
   });
 });

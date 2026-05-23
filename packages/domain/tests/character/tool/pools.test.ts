@@ -5,6 +5,7 @@ import {
   MUSICAL_INSTRUMENTS,
   TOOL_CATEGORY_MAP,
   expandToolFrom,
+  patchAnyToolCount,
 } from '../../../src/character/tool/pools.js';
 
 describe('Pool constants', () => {
@@ -132,5 +133,57 @@ describe('expandToolFrom', () => {
     const camel = expandToolFrom(['anyMusicalInstrument']);
     const spaced = expandToolFrom(['musical instrument']);
     expect(camel).toEqual(spaced);
+  });
+});
+
+// ── A.3 TEST-RED: anyTool pool + {anyTool:1} → 2 data-bug patch ─────────────
+
+describe('TOOL_CATEGORY_MAP — anyTool entry', () => {
+  it('anyTool maps to artisans ∪ gaming ∪ musical (31 items)', () => {
+    const pool = TOOL_CATEGORY_MAP['anyTool'];
+    expect(pool).toBeDefined();
+    expect(pool).toHaveLength(
+      ARTISANS_TOOLS.length + GAMING_SETS.length + MUSICAL_INSTRUMENTS.length,
+    );
+    // 17 artisans + 4 gaming + 10 musical = 31
+    expect(pool).toHaveLength(31);
+  });
+
+  it('anyTool pool contains all artisans tools', () => {
+    const pool = TOOL_CATEGORY_MAP['anyTool'];
+    expect(pool).toBeDefined();
+    for (const t of ARTISANS_TOOLS) {
+      expect(pool).toContain(t);
+    }
+  });
+
+  it('anyTool pool contains all gaming sets', () => {
+    const pool = TOOL_CATEGORY_MAP['anyTool'];
+    expect(pool).toBeDefined();
+    for (const t of GAMING_SETS) {
+      expect(pool).toContain(t);
+    }
+  });
+
+  it('anyTool pool contains all musical instruments', () => {
+    const pool = TOOL_CATEGORY_MAP['anyTool'];
+    expect(pool).toBeDefined();
+    for (const t of MUSICAL_INSTRUMENTS) {
+      expect(pool).toContain(t);
+    }
+  });
+});
+
+describe('patchAnyToolCount — {anyTool:1} data-bug enforcement', () => {
+  it('returns 2 when input count is 1 (data-bug patch)', () => {
+    expect(patchAnyToolCount(1)).toBe(2);
+  });
+
+  it('returns the count unchanged when it is already 2', () => {
+    expect(patchAnyToolCount(2)).toBe(2);
+  });
+
+  it('returns the count unchanged when it is 3 or more', () => {
+    expect(patchAnyToolCount(3)).toBe(3);
   });
 });
