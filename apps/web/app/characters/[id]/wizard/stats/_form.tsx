@@ -51,6 +51,24 @@ function d6(): number {
   return Math.floor(Math.random() * 6) + 1;
 }
 
+function hintForMethod(method: Method, tileScores: NullableScores, scores: Scores): string | null {
+  if (method === 'standard-array') {
+    const missing = Object.values(tileScores).filter((v) => v === null).length;
+    if (missing > 0) {
+      return `Asigná ${missing} valor${missing > 1 ? 'es' : ''} más del array estándar.`;
+    }
+    return 'Los valores no coinciden con el array estándar (15, 14, 13, 12, 10, 8).';
+  }
+  if (method === 'point-buy') {
+    const totalCost = ABILITIES.reduce((sum, a) => sum + (POINT_BUY_COST[scores[a.key]] ?? 0), 0);
+    if (totalCost > POINT_BUY_BUDGET) {
+      return `Te pasaste por ${totalCost - POINT_BUY_BUDGET} puntos (presupuesto: ${POINT_BUY_BUDGET}).`;
+    }
+    return null;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 
 export function StatsForm({
@@ -169,12 +187,11 @@ export function StatsForm({
         <RollEditor scores={scores} setScore={setScore} />
       )}
 
-      {error && <p className="text-sm text-warning-deep">{error}</p>}
-
       <WizardFooterNav
         onNext={handleSubmit}
         pending={pending}
         disabled={!canContinue}
+        error={error ?? (canContinue ? null : hintForMethod(method, tileScores, scores))}
       />
     </div>
   );

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Bricolage_Grotesque, Manrope } from 'next/font/google';
+import { Suspense } from 'react';
 import './globals.css';
 import { TweaksPanel } from '@/components/dev/tweaks-panel';
+import { NavProgress } from '@/components/layout/nav-progress';
 
 const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -27,6 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body
         className={`${bricolage.variable} ${manrope.variable} min-h-screen bg-paper text-ink font-sans antialiased`}
       >
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
         {children}
         {process.env.NODE_ENV !== 'production' && <TweaksPanel />}
       </body>

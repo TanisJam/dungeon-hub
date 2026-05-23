@@ -213,13 +213,12 @@ export function ClassPicker({
         />
       )}
 
-      {error && <p className="text-sm text-warning-deep">{error}</p>}
-
       <WizardFooterNav
         backHref={`/characters/${characterId}/wizard/race`}
         onNext={handleContinue}
         pending={pending}
         disabled={!selected}
+        error={error}
       />
     </div>
   );

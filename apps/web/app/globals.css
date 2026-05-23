@@ -138,6 +138,12 @@
   --color-warning-deep:  #8C2E2E;
 }
 
+/* Indeterminate loading bar used by WizardFooterNav while a server action runs. */
+@keyframes wizard-loading {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
 /* ── Base styles ── */
 html,
 body {

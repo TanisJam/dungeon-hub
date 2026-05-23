@@ -217,13 +217,12 @@ export function BackgroundPicker({
         />
       )}
 
-      {error && <p className="text-sm text-warning-deep">{error}</p>}
-
       <WizardFooterNav
         backHref={`/characters/${characterId}/wizard/class`}
         onNext={handleContinue}
         pending={pending}
         disabled={!selected}
+        error={error}
       />
     </div>
   );
