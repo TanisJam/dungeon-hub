@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import { CompendiumEntries } from '@/components/compendium';
 import { Card } from '@/components/ui';
 import { SAMPLES } from './samples';
+import { CompendiumEntriesWithTerms } from '@/components/compendium/term';
+import { createMockResolver } from '@/components/compendium/term';
+import { TERM_FIXTURES, TERM_DEMO_ENTRIES } from './term-fixtures';
 
 /**
  * Dev-only visual QA page for <CompendiumEntries>. Lists every supported node
@@ -32,6 +35,28 @@ export default function CompendiumPreviewPage() {
           </Card>
         </section>
       ))}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Term Hover Demo — MAURICIO: hover the underlined refs below to      */}
+      {/* visually verify hover cards open with mocked content.               */}
+      {/* Kinds covered: spell, condition, item, creature, race, background   */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="space-y-2">
+        <h2 className="font-display text-lg font-semibold text-ink">Term Hover Demo</h2>
+        <p className="text-sm text-ink-mute italic">
+          Hover (or tab-focus) the highlighted inline terms to see the mock HoverCard.
+          No real API credentials required — all responses come from static fixtures.
+          Kinds demonstrated: spell, creature, condition, item, race, background.
+        </p>
+        <Card variant="surface" className="p-4">
+          <CompendiumEntriesWithTerms
+            entries={TERM_DEMO_ENTRIES}
+            campaignId="dev-preview"
+            accessToken="mock-token"
+            mockMode={createMockResolver(TERM_FIXTURES)}
+          />
+        </Card>
+      </section>
     </main>
   );
 }
