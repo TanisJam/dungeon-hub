@@ -13,6 +13,9 @@ import {
   compendiumFeats,
   compendiumOptionalFeatures,
   compendiumMonsters,
+  compendiumConditions,
+  compendiumLanguages,
+  compendiumActions,
 } from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { profileFilterConditions } from '../../use-cases/compendium/profile-filter.js';
@@ -703,5 +706,189 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumOptionalFeatures).where(conds),
     ]);
     return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  // ---- CONDITIONS ----------------------------------------------------------
+  // Conditions + statuses (Blinded, Concentration, etc.). Reference data — NOT
+  // filtered by Rules Profile (same rationale as monsters: a PC who is blinded
+  // is blinded regardless of which sourcebooks the campaign uses). XPHB rows
+  // are excluded at import time.
+  const ConditionsQuery = PaginationQuery.extend({
+    kind: z.enum(['condition', 'status']).optional(),
+  });
+
+  app.get('/compendium/conditions', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q, kind } = ConditionsQuery.parse(request.query);
+
+    const where: SQL[] = [];
+    if (q) where.push(ilike(compendiumConditions.name, `%${q}%`));
+    if (kind) where.push(eq(compendiumConditions.kind, kind));
+    const conds = where.length > 0 ? and(...where) : undefined;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumConditions.id,
+          slug: compendiumConditions.slug,
+          source: compendiumConditions.source,
+          name: compendiumConditions.name,
+          kind: compendiumConditions.kind,
+        })
+        .from(compendiumConditions)
+        .where(conds)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumConditions.name, q)] : []),
+          sourcePriorityOrder(compendiumConditions.source),
+          compendiumConditions.name,
+        )
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumConditions).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/conditions/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumConditions)
+      .where(
+        and(
+          eq(compendiumConditions.slug, slug),
+          source ? eq(compendiumConditions.source, source) : undefined,
+        ),
+      )
+      .orderBy(sourcePriorityOrder(compendiumConditions.source))
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
+
+  // ---- LANGUAGES -----------------------------------------------------------
+  // Reference dictionary — not Rules-Profile filtered. 5etools `languages.json`
+  // covers PHB + many setting books; XPHB/XDMG/XMM/UA are excluded at import.
+  const LanguagesQuery = PaginationQuery.extend({
+    type: z.enum(['standard', 'exotic', 'secret']).optional(),
+  });
+
+  app.get('/compendium/languages', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q, type } = LanguagesQuery.parse(request.query);
+
+    const where: SQL[] = [];
+    if (q) where.push(ilike(compendiumLanguages.name, `%${q}%`));
+    if (type) where.push(eq(compendiumLanguages.type, type));
+    const conds = where.length > 0 ? and(...where) : undefined;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumLanguages.id,
+          slug: compendiumLanguages.slug,
+          source: compendiumLanguages.source,
+          name: compendiumLanguages.name,
+          type: compendiumLanguages.type,
+          script: compendiumLanguages.script,
+        })
+        .from(compendiumLanguages)
+        .where(conds)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumLanguages.name, q)] : []),
+          sourcePriorityOrder(compendiumLanguages.source),
+          compendiumLanguages.name,
+        )
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumLanguages).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/languages/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumLanguages)
+      .where(
+        and(
+          eq(compendiumLanguages.slug, slug),
+          source ? eq(compendiumLanguages.source, source) : undefined,
+        ),
+      )
+      .orderBy(sourcePriorityOrder(compendiumLanguages.source))
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
+
+  // ---- ACTIONS -------------------------------------------------------------
+  // Reference dictionary of core actions (Attack, Dash, Hide, Two-Weapon
+  // Fighting, etc.). Not Rules-Profile filtered. XPHB rows are excluded at
+  // import time; remaining sources are PHB / DMG / XGE.
+  app.get('/compendium/actions', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q } = PaginationQuery.parse(request.query);
+
+    const where: SQL[] = [];
+    if (q) where.push(ilike(compendiumActions.name, `%${q}%`));
+    const conds = where.length > 0 ? and(...where) : undefined;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumActions.id,
+          slug: compendiumActions.slug,
+          source: compendiumActions.source,
+          name: compendiumActions.name,
+        })
+        .from(compendiumActions)
+        .where(conds)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumActions.name, q)] : []),
+          sourcePriorityOrder(compendiumActions.source),
+          compendiumActions.name,
+        )
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumActions).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/actions/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumActions)
+      .where(
+        and(
+          eq(compendiumActions.slug, slug),
+          source ? eq(compendiumActions.source, source) : undefined,
+        ),
+      )
+      .orderBy(sourcePriorityOrder(compendiumActions.source))
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
   });
 };
