@@ -891,4 +891,75 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
     return rows[0];
   });
+
+  // ---- TOOLS ---------------------------------------------------------------
+  // Slice of /compendium/items where item type ∈ {T, AT, GS, INS}: tools,
+  // artisan tools, gaming sets, instruments. Same envelope shape as /items —
+  // uses Rules Profile filter (items kind) since tools are player-facing
+  // proficiency picks.
+  const TOOL_TYPE_FILTER = sql`${compendiumItems.type} IN ('T', 'AT', 'GS', 'INS')`;
+
+  app.get('/compendium/tools', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { limit, offset, q } = PaginationQuery.parse(request.query);
+
+    const filter = profileFilterConditions({
+      profile: campaign.rulesProfile,
+      kind: 'items',
+      slugCol: compendiumItems.slug,
+      sourceCol: compendiumItems.source,
+    });
+    if (!filter) return { data: [], total: 0, limit, offset };
+
+    const where: SQL[] = [filter, TOOL_TYPE_FILTER];
+    if (q) where.push(ilike(compendiumItems.name, `%${q}%`));
+    const conds = and(...where)!;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select({
+          id: compendiumItems.id,
+          slug: compendiumItems.slug,
+          source: compendiumItems.source,
+          name: compendiumItems.name,
+          type: compendiumItems.type,
+          weight: compendiumItems.weight,
+        })
+        .from(compendiumItems)
+        .where(conds)
+        .orderBy(
+          ...(q ? [nameStartsWithBoost(compendiumItems.name, q)] : []),
+          sourcePriorityOrder(compendiumItems.source),
+          compendiumItems.name,
+        )
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(compendiumItems).where(conds),
+    ]);
+    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+  });
+
+  app.get('/compendium/tools/:slug', { preHandler: app.authenticate }, async (request, reply) => {
+    const campaign = await resolveProfile(request, reply);
+    if (!campaign) return;
+    const { slug } = z.object({ slug: z.string() }).parse(request.params);
+    const source = z.object({ source: z.string().optional() }).parse(request.query).source;
+
+    const rows = await db
+      .select()
+      .from(compendiumItems)
+      .where(
+        and(
+          eq(compendiumItems.slug, slug),
+          TOOL_TYPE_FILTER,
+          source ? eq(compendiumItems.source, source) : undefined,
+        ),
+      )
+      .orderBy(sourcePriorityOrder(compendiumItems.source))
+      .limit(1);
+
+    if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
+    return rows[0];
+  });
 };
