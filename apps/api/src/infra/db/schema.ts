@@ -737,3 +737,54 @@ export const compendiumOptionalFeatures = pgTable(
     index('idx_optfeats_feature_type').using('gin', t.featureType),
   ],
 );
+
+export const compendiumConditions = pgTable(
+  'compendium_conditions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    /** 'condition' (Blinded, Charmed, …) | 'status' (Concentration, Surprised). */
+    kind: text('kind', { enum: ['condition', 'status'] }).notNull().default('condition'),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_conditions_slug_source').on(t.slug, t.source),
+    index('idx_conditions_kind').on(t.kind),
+  ],
+);
+
+export const compendiumLanguages = pgTable(
+  'compendium_languages',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    /** 'standard' | 'exotic' | 'secret' | null */
+    type: text('type'),
+    /** Script family: 'Common', 'Elvish', 'Draconic', 'Dwarvish', etc. Null for scriptless (Druidic, Thieves' Cant). */
+    script: text('script'),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [
+    uniqueIndex('uq_languages_slug_source').on(t.slug, t.source),
+    index('idx_languages_type').on(t.type),
+  ],
+);
+
+export const compendiumActions = pgTable(
+  'compendium_actions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    data: jsonb('data').notNull(),
+    reprintedAs: text('reprinted_as').array(),
+  },
+  (t) => [uniqueIndex('uq_actions_slug_source').on(t.slug, t.source)],
+);
