@@ -35,4 +35,15 @@ export const FORMATTING_TAGS: Record<string, TagHandler> = {
   sub: (args) => <sub>{takeDisplay(args)}</sub>,
   // `{@code mono}` — monospace inline
   code: (args) => <code className="font-mono text-sm bg-paper-soft px-1 rounded-sm">{takeFirstSegment(args)}</code>,
+  // `{@color text|hex}` — 5etools renders with arbitrary hex. We DON'T render the color
+  // (would violate the design-token strict rule); we just show the text.
+  color: (args) => {
+    const parts = args.split('|');
+    return <span>{parts[0] ?? ''}</span>;
+  },
+  // Comic-specific headings — render as h-tags in line with their level
+  comicH1: (args) => <span className="font-display text-ink text-lg font-bold">{takeDisplay(args)}</span>,
+  comicH2: (args) => <span className="font-display text-ink text-base font-bold">{takeDisplay(args)}</span>,
+  comicH3: (args) => <span className="font-display text-ink font-semibold">{takeDisplay(args)}</span>,
+  comicH4: (args) => <span className="font-display text-ink font-semibold">{takeDisplay(args)}</span>,
 };

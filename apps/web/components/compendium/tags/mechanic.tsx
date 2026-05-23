@@ -56,4 +56,12 @@ export const MECHANIC_TAGS: Record<string, TagHandler> = {
   actSave: (args) => <em className="font-semibold text-ink">{takeFirstSegment(args)} Save:</em>,
   actSaveFail: () => <em className="font-semibold text-ink">Failure:</em>,
   actSaveSuccess: () => <em className="font-semibold text-ink">Success:</em>,
+  actSaveSuccessOrFail: () => (
+    <em className="font-semibold text-ink">Success or Failure:</em>
+  ),
+  // Placeholder for "your spell attack modifier" (no value to substitute at render time;
+  // future SDD can interpolate caster context)
+  hitYourSpellAttack: () => badge('+spell attack mod'),
+  // `{@d20 +5}` already handled; `{@savingThrow Dex +5}` rare
+  savingThrow: (args) => badge(`${takeFirstSegment(args)} save`),
 };

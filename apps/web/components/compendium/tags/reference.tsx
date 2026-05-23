@@ -57,6 +57,12 @@ export const REFERENCE_TAGS: Record<string, TagHandler> = {
   recipe: refHandler('recipe'),
   deck: refHandler('deck'),
   card: refHandler('card'),
+  itemProperty: refHandler('itemProperty'),
+  itemMastery: refHandler('itemMastery'),
+  facility: refHandler('facility'),
+  disease: refHandler('disease'),
+  // `refClass` rare alias
+  refClass: refHandler('class'),
   // B.3 — extended reference tags
   table: refHandler('table'),
   variantrule: refHandler('variantrule'),

@@ -135,6 +135,18 @@ describe('unknown node + edge cases', () => {
   it('does not throw on null entry', () => {
     expect(() => render(<EntryNodeRenderer entry={null as never} />)).not.toThrow();
   });
+
+  it('handles bare object without `type` but with `name`', () => {
+    const { container } = render(<EntryNodeRenderer entry={{ name: 'Loose Name' } as never} />);
+    expect(container.querySelector('span')?.textContent).toBe('Loose Name');
+  });
+
+  it('handles nested arrays inside Entry[] (flattens transparently)', () => {
+    const { container } = render(
+      <EntryNodeRenderer entry={['Para A.', 'Para B.'] as never} />,
+    );
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
 });
 
 describe('CompendiumEntries top-level', () => {
