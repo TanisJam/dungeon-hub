@@ -19,6 +19,9 @@ import {
   compendiumFeats,
   compendiumMonsters,
   compendiumOptionalFeatures,
+  compendiumConditions,
+  compendiumLanguages,
+  compendiumActions,
 } from '../src/infra/db/schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +56,9 @@ async function main() {
   console.log(`   - feats:        ${fmt(result.feats.length)}`);
   console.log(`   - opt-features: ${fmt(result.optionalFeatures.length)}`);
   console.log(`   - monsters:     ${fmt(result.monsters.length)}`);
+  console.log(`   - conditions:   ${fmt(result.conditions.length)}`);
+  console.log(`   - languages:    ${fmt(result.languages.length)}`);
+  console.log(`   - actions:      ${fmt(result.actions.length)}`);
   if (result.warnings.length > 0) {
     console.log(`\n⚠️  ${result.warnings.length} warnings:`);
     for (const w of result.warnings.slice(0, 10)) console.log(`   - ${w}`);
@@ -266,6 +272,78 @@ async function main() {
             name: sqlExcluded('name'),
             featureType: sqlExcluded('feature_type'),
             prerequisites: sqlExcluded('prerequisites'),
+            data: sqlExcluded('data'),
+            reprintedAs: sqlExcluded('reprinted_as'),
+          },
+        });
+    }
+
+    if (result.conditions.length > 0) {
+      await tx
+        .insert(compendiumConditions)
+        .values(
+          result.conditions.map((c) => ({
+            slug: c.slug,
+            source: c.source,
+            name: c.name,
+            kind: c.kind,
+            data: c.data,
+            reprintedAs: c.reprintedAs ?? undefined,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [compendiumConditions.slug, compendiumConditions.source],
+          set: {
+            name: sqlExcluded('name'),
+            kind: sqlExcluded('kind'),
+            data: sqlExcluded('data'),
+            reprintedAs: sqlExcluded('reprinted_as'),
+          },
+        });
+    }
+
+    if (result.languages.length > 0) {
+      await tx
+        .insert(compendiumLanguages)
+        .values(
+          result.languages.map((l) => ({
+            slug: l.slug,
+            source: l.source,
+            name: l.name,
+            type: l.type,
+            script: l.script,
+            data: l.data,
+            reprintedAs: l.reprintedAs ?? undefined,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [compendiumLanguages.slug, compendiumLanguages.source],
+          set: {
+            name: sqlExcluded('name'),
+            type: sqlExcluded('type'),
+            script: sqlExcluded('script'),
+            data: sqlExcluded('data'),
+            reprintedAs: sqlExcluded('reprinted_as'),
+          },
+        });
+    }
+
+    if (result.actions.length > 0) {
+      await tx
+        .insert(compendiumActions)
+        .values(
+          result.actions.map((a) => ({
+            slug: a.slug,
+            source: a.source,
+            name: a.name,
+            data: a.data,
+            reprintedAs: a.reprintedAs ?? undefined,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [compendiumActions.slug, compendiumActions.source],
+          set: {
+            name: sqlExcluded('name'),
             data: sqlExcluded('data'),
             reprintedAs: sqlExcluded('reprinted_as'),
           },

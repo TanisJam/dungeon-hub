@@ -7,6 +7,9 @@ import { importItems } from './importers/items.js';
 import { importFeats } from './importers/feats.js';
 import { importOptionalFeatures } from './importers/optional-features.js';
 import { importMonsters } from './importers/monsters.js';
+import { importConditions } from './importers/conditions.js';
+import { importLanguages } from './importers/languages.js';
+import { importActions } from './importers/actions.js';
 import type { ImportResult } from './types.js';
 
 export * from './types.js';
@@ -45,17 +48,31 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
   assertDataDir(dataDir);
   const warnings: string[] = [];
 
-  const [races, classesResult, backgrounds, spells, items, feats, optionalFeatures, monsters] =
-    await Promise.all([
-      importRaces(dataDir, warnings),
-      importClassesAndSubclasses(dataDir, warnings),
-      importBackgrounds(dataDir),
-      importSpells(dataDir),
-      importItems(dataDir),
-      importFeats(dataDir),
-      importOptionalFeatures(dataDir),
-      importMonsters(dataDir, warnings),
-    ]);
+  const [
+    races,
+    classesResult,
+    backgrounds,
+    spells,
+    items,
+    feats,
+    optionalFeatures,
+    monsters,
+    conditions,
+    languages,
+    actions,
+  ] = await Promise.all([
+    importRaces(dataDir, warnings),
+    importClassesAndSubclasses(dataDir, warnings),
+    importBackgrounds(dataDir),
+    importSpells(dataDir),
+    importItems(dataDir),
+    importFeats(dataDir),
+    importOptionalFeatures(dataDir),
+    importMonsters(dataDir, warnings),
+    importConditions(dataDir),
+    importLanguages(dataDir),
+    importActions(dataDir),
+  ]);
 
   return {
     races: dedup(races, 'race', warnings),
@@ -67,6 +84,9 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
     feats: dedup(feats, 'feat', warnings),
     optionalFeatures: dedup(optionalFeatures, 'optional-feature', warnings),
     monsters: dedup(monsters, 'monster', warnings),
+    conditions: dedup(conditions, 'condition', warnings),
+    languages: dedup(languages, 'language', warnings),
+    actions: dedup(actions, 'action', warnings),
     warnings,
   };
 }

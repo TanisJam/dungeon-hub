@@ -171,6 +171,35 @@ export interface NormalizedOptionalFeature extends NormalizedRecord {
   prerequisites: unknown | null;
 }
 
+export interface FiveeToolsCondition extends FiveeToolsBase {
+  entries?: unknown[];
+  hasFluffImages?: boolean;
+}
+
+export interface FiveeToolsLanguage extends FiveeToolsBase {
+  type?: 'standard' | 'exotic' | 'secret';
+  script?: string;
+  typicalSpeakers?: unknown[];
+  entries?: unknown[];
+}
+
+export interface FiveeToolsAction extends FiveeToolsBase {
+  time?: unknown[];
+  entries?: unknown[];
+  seeAlsoAction?: string[];
+}
+
+export interface NormalizedCondition extends NormalizedRecord {
+  kind: 'condition' | 'status';
+}
+
+export interface NormalizedLanguage extends NormalizedRecord {
+  type: string | null;
+  script: string | null;
+}
+
+export type NormalizedAction = NormalizedRecord;
+
 export interface ImportResult {
   races: NormalizedRace[];
   classes: NormalizedRecord[];
@@ -181,5 +210,8 @@ export interface ImportResult {
   feats: NormalizedFeat[];
   optionalFeatures: NormalizedOptionalFeature[];
   monsters: NormalizedMonster[];
+  conditions: NormalizedCondition[];
+  languages: NormalizedLanguage[];
+  actions: NormalizedAction[];
   warnings: string[];
 }
