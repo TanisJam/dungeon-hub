@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { parseBackground, type BackgroundData } from './_parsers';
 import { poolFor } from './_options';
 import { BackgroundPicker, type BackgroundEntry } from './_picker';
+import type { BackgroundCompendiumData } from '@dungeon-hub/domain/character/background';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type BgRow = { id: string; slug: string; source: string; name: string };
@@ -37,8 +38,12 @@ const TOOL_KINDS = ['anyGamingSet', 'anyArtisansTool', 'anyMusicalInstrument', '
  * (que es fixed+chosen merged) y la background data del compendium (que indica
  * cuáles son fixed). Es la operación inversa del merge que hace la API.
  */
-function deriveChoices(applied: AppliedBackground, bgData: BackgroundData) {
-  const parsed = parseBackground(bgData);
+function deriveChoices(
+  applied: AppliedBackground,
+  bgData: BackgroundData,
+  allBackgrounds: BackgroundCompendiumData[],
+) {
+  const parsed = parseBackground({ ...bgData, slug: applied.slug }, allBackgrounds);
   const fixedSkills = new Set(parsed.fixedSkills.map((s) => s.toLowerCase()));
   const fixedLangs = new Set(parsed.fixedLanguages.map((s) => s.toLowerCase()));
   const fixedTools = new Set(parsed.fixedTools.map((s) => s.toLowerCase()));
@@ -92,6 +97,13 @@ export default async function BackgroundStepPage({ params }: Props) {
     data: d.data,
   }));
 
+  const allBackgrounds: BackgroundCompendiumData[] = detailed.map((d) => ({
+    slug: d.slug,
+    source: d.source,
+    name: d.name,
+    ...d.data,
+  }));
+
   // Si hay background guardado, derivamos los choices del compendium data del bg.
   let initialSelection = null;
   if (character.data?.background) {
@@ -100,7 +112,7 @@ export default async function BackgroundStepPage({ params }: Props) {
       (d) => d.slug === applied.slug && d.source === applied.source,
     );
     const choices = matching
-      ? deriveChoices(applied, matching.data)
+      ? deriveChoices(applied, matching.data, allBackgrounds)
       : { skillChoices: [], languageChoices: [], toolChoices: {} };
     initialSelection = {
       slug: applied.slug,
@@ -122,6 +134,7 @@ export default async function BackgroundStepPage({ params }: Props) {
         <BackgroundPicker
           characterId={id}
           entries={entries}
+          allBackgrounds={allBackgrounds}
           initialSelection={initialSelection}
           lockedSkills={(character.data?.classes?.[0]?.skillChoices ?? []).map((s) =>
             s.toLowerCase(),

@@ -5,7 +5,7 @@ import {
   GAMING_SETS,
   MUSICAL_INSTRUMENTS,
 } from '@dungeon-hub/domain/character/tool';
-import { parseBackground, type BackgroundData } from './_parsers';
+import { parseBackground, type BackgroundData, type BackgroundCompendiumData } from './_parsers';
 
 // ---------------------------------------------------------------------------
 // B.1 — Parser: numeric-any skill branch
@@ -237,5 +237,121 @@ describe('parseBackground — regression: boolean fixed-skill shape', () => {
     expect(result.fixedSkills).toContain('athletics');
     expect(result.fixedSkills).toContain('intimidation');
     expect(result.fixedSkills).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B.1 — Parser: Custom Background emits customization sub-object
+// ---------------------------------------------------------------------------
+
+const ACOLYTE_BG: BackgroundCompendiumData = {
+  slug: 'acolyte',
+  source: 'PHB',
+  name: 'Acolyte',
+  startingEquipment: [
+    { _: ['a holy symbol', '5 sticks of incense'] },
+  ],
+  entries: [
+    {
+      name: 'Feature: Shelter of the Faithful',
+      type: 'entries',
+      data: { isFeature: true },
+      entries: ['As an acolyte, you command the respect of those who share your faith.'],
+    },
+  ],
+};
+
+const SOLDIER_BG: BackgroundCompendiumData = {
+  slug: 'soldier',
+  source: 'PHB',
+  name: 'Soldier',
+  startingEquipment: [
+    {
+      _: ['an insignia of rank', 'a trophy taken from a fallen enemy'],
+      a: ['dice set'],
+      b: ['playing card set'],
+    },
+  ],
+  entries: [
+    {
+      name: 'Feature: Military Rank',
+      type: 'entries',
+      data: { isFeature: true },
+      entries: ['You have a military rank from your career as a soldier.'],
+    },
+  ],
+};
+
+const CUSTOM_BG_DATA: BackgroundData = {
+  name: 'Custom Background',
+  source: 'PHB',
+  slug: 'custom-background',
+  skillProficiencies: [{ any: 2 } as never],
+  skillToolLanguageProficiencies: [
+    { anyLanguage: 2 },
+    { anyLanguage: 1, anyTool: 1 },
+    { anyTool: 2 },
+  ],
+  startingEquipment: null,
+  entries: [],
+};
+
+describe('parseBackground — Custom Background emits customization', () => {
+  it('emits customization with mixedPool, equipment, feature when slug is custom-background', () => {
+    const allBackgrounds: BackgroundCompendiumData[] = [ACOLYTE_BG, SOLDIER_BG];
+    const result = parseBackground(CUSTOM_BG_DATA, allBackgrounds);
+
+    expect(result.customization).toBeDefined();
+    expect(result.customization!.mixedPool).toHaveLength(3);
+    expect(result.customization!.mixedPool[0].shapeKey).toBe('lang2');
+    expect(result.customization!.mixedPool[1].shapeKey).toBe('lang1tool1');
+    expect(result.customization!.mixedPool[2].shapeKey).toBe('tool2');
+  });
+
+  it('emits customization.equipment.packages from allBackgrounds _ slots', () => {
+    const allBackgrounds: BackgroundCompendiumData[] = [ACOLYTE_BG, SOLDIER_BG];
+    const result = parseBackground(CUSTOM_BG_DATA, allBackgrounds);
+
+    expect(result.customization!.equipment.coinAllowed).toBe(true);
+    expect(result.customization!.equipment.packages.length).toBeGreaterThanOrEqual(2);
+    const acolytePackage = result.customization!.equipment.packages.find(
+      (p) => p.backgroundSlug === 'acolyte',
+    );
+    expect(acolytePackage).toBeDefined();
+    expect(acolytePackage!.alwaysGranted).toContain('a holy symbol');
+  });
+
+  it('emits customization.feature.features with correct slugs', () => {
+    const allBackgrounds: BackgroundCompendiumData[] = [ACOLYTE_BG, SOLDIER_BG];
+    const result = parseBackground(CUSTOM_BG_DATA, allBackgrounds);
+
+    const features = result.customization!.feature.features;
+    expect(features.length).toBeGreaterThanOrEqual(2);
+    const acolyteFeature = features.find((f) => f.slug === 'acolyte-shelter-of-the-faithful');
+    expect(acolyteFeature).toBeDefined();
+    expect(acolyteFeature!.name).toBe('Feature: Shelter of the Faithful');
+  });
+});
+
+describe('parseBackground — non-custom background emits no customization', () => {
+  it('returns customization undefined for Acolyte slug', () => {
+    const acolyteData: BackgroundData = {
+      name: 'Acolyte',
+      source: 'PHB',
+      slug: 'acolyte',
+      skillProficiencies: [{ insight: true, religion: true } as never],
+    };
+    const result = parseBackground(acolyteData, [ACOLYTE_BG]);
+    expect(result.customization).toBeUndefined();
+  });
+
+  it('returns customization undefined when no slug provided', () => {
+    const data: BackgroundData = {
+      name: 'Acolyte',
+      source: 'PHB',
+      skillProficiencies: [{ insight: true, religion: true } as never],
+    };
+    const result = parseBackground(data);
+    expect(result.customization).toBeUndefined();
   });
 });

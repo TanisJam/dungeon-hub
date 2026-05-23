@@ -1,12 +1,11 @@
 /**
- * B.4 — Picker unit tests: MultiSelectChoose tool-choose block
+ * Picker unit tests: BackgroundPicker sub-components
  *
- * Tests that BackgroundDetailInline renders a MultiSelectChoose block
- * when parsed.toolChoose is non-null, and omits it when null.
- *
- * BackgroundDetailInline is a local component inside _picker.tsx.
- * We test it indirectly via a thin wrapper that mirrors its signature
- * using the same ParsedBackground type.
+ * Tests:
+ * - B.4: MultiSelectChoose tool-choose block (existing)
+ * - B.3: MixedPoolPicker (3 radio options, sub-pickers, 375px)
+ * - B.5: EquipmentPicker (coin toggle, package selection, a/b radio, _ slot items)
+ * - B.7: FeaturePicker (filter input narrows select, persist slug)
  */
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -14,6 +13,8 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 afterEach(cleanup);
 import type { ParsedBackground, BackgroundData } from './_parsers';
+import type { MixedPoolShape, BackgroundPackage, FeatureOption } from '@dungeon-hub/domain/character/background';
+import { MixedPoolPicker, EquipmentPicker, FeaturePicker } from './_picker';
 
 // ---------------------------------------------------------------------------
 // Thin inline wrapper that mirrors BackgroundDetailInline signature
@@ -171,5 +172,260 @@ describe('BackgroundPicker — toolChoose block absent when null (Acolyte)', () 
     expect(screen.queryByRole('button', { name: 'Lute' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Dice Set' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Alchemists Supplies' })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B.3 — MixedPoolPicker tests
+// ---------------------------------------------------------------------------
+
+const MIXED_POOL_SHAPES: MixedPoolShape[] = [
+  { shapeKey: 'lang2', langCount: 2, toolCount: 0 },
+  { shapeKey: 'lang1tool1', langCount: 1, toolCount: 1 },
+  { shapeKey: 'tool2', langCount: 0, toolCount: 2 },
+];
+
+describe('MixedPoolPicker — 3 radio options render', () => {
+  it('renders 3 radio inputs for lang2, lang1tool1, tool2', () => {
+    render(
+      <MixedPoolPicker
+        shapes={MIXED_POOL_SHAPES}
+        value={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const radios = screen.getAllByRole('radio');
+    expect(radios).toHaveLength(3);
+  });
+
+  it('shows labels for all three shapes', () => {
+    render(
+      <MixedPoolPicker
+        shapes={MIXED_POOL_SHAPES}
+        value={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+
+    // Labels should contain shape keys or descriptive text
+    expect(screen.getByText(/2 idiomas/i) ?? screen.getByLabelText(/lang2/i)).toBeTruthy();
+  });
+});
+
+describe('MixedPoolPicker — selecting lang1tool1 shows sub-pickers', () => {
+  it('renders language and tool MultiSelectChoose when lang1tool1 is selected', () => {
+    const shape = MIXED_POOL_SHAPES[1]; // lang1tool1
+    render(
+      <MixedPoolPicker
+        shapes={MIXED_POOL_SHAPES}
+        value={{ shape: 'lang1tool1', langs: [], tools: [] }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    // Should show at least one group of chip buttons for languages
+    // Language pool has 16 chips (8 standard + 8 exotic)
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBeGreaterThan(0);
+  });
+
+  it('calls onChange when a radio is clicked', () => {
+    const onChange = vi.fn();
+    render(
+      <MixedPoolPicker
+        shapes={MIXED_POOL_SHAPES}
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+
+    const radios = screen.getAllByRole('radio');
+    fireEvent.click(radios[0]); // click lang2
+    expect(onChange).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B.5 — EquipmentPicker tests
+// ---------------------------------------------------------------------------
+
+const SAMPLE_PACKAGES: BackgroundPackage[] = [
+  {
+    backgroundSlug: 'acolyte',
+    backgroundSource: 'PHB',
+    backgroundName: 'Acolyte',
+    alwaysGranted: ['a holy symbol', '5 sticks of incense'],
+    alternatives: {},
+  },
+  {
+    backgroundSlug: 'soldier',
+    backgroundSource: 'PHB',
+    backgroundName: 'Soldier',
+    alwaysGranted: ['an insignia of rank'],
+    alternatives: {
+      a: ['dice set'],
+      b: ['playing card set'],
+    },
+  },
+];
+
+describe('EquipmentPicker — coin toggle hides package dropdown', () => {
+  it('shows coin option and hides background select when coin is selected', () => {
+    render(
+      <EquipmentPicker
+        packages={SAMPLE_PACKAGES}
+        coinAllowed={true}
+        value={{ kind: 'coin' }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    // No background select should be visible when coin is chosen
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('calls onChange with { kind: coin } when coin radio is selected', () => {
+    const onChange = vi.fn();
+    render(
+      <EquipmentPicker
+        packages={SAMPLE_PACKAGES}
+        coinAllowed={true}
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+
+    // Find and click coin radio by value
+    const coinRadio = screen.getByDisplayValue('coin');
+    fireEvent.click(coinRadio);
+    expect(onChange).toHaveBeenCalledWith({ kind: 'coin' });
+  });
+});
+
+describe('EquipmentPicker — package selection shows _ slot items', () => {
+  it('renders _ slot items as li elements when acolyte package selected', () => {
+    render(
+      <EquipmentPicker
+        packages={SAMPLE_PACKAGES}
+        coinAllowed={true}
+        value={{ kind: 'package', backgroundSlug: 'acolyte', backgroundSource: 'PHB' }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('a holy symbol')).toBeTruthy();
+    expect(screen.getByText('5 sticks of incense')).toBeTruthy();
+  });
+
+  it('renders a/b radio group when soldier package selected (has alternatives)', () => {
+    render(
+      <EquipmentPicker
+        packages={SAMPLE_PACKAGES}
+        coinAllowed={true}
+        value={{ kind: 'package', backgroundSlug: 'soldier', backgroundSource: 'PHB' }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const radios = screen.getAllByRole('radio').filter(
+      (r) => r.getAttribute('name') === 'equipment-slot',
+    );
+    expect(radios.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B.7 — FeaturePicker tests
+// ---------------------------------------------------------------------------
+
+const SAMPLE_FEATURES: FeatureOption[] = [
+  {
+    slug: 'acolyte-shelter-of-the-faithful',
+    sourceBackgroundSlug: 'acolyte',
+    sourceBackgroundSource: 'PHB',
+    name: 'Feature: Shelter of the Faithful',
+    text: 'As an acolyte, you command the respect of those who share your faith.',
+  },
+  {
+    slug: 'soldier-military-rank',
+    sourceBackgroundSlug: 'soldier',
+    sourceBackgroundSource: 'PHB',
+    name: 'Feature: Military Rank',
+    text: 'You have a military rank from your career as a soldier.',
+  },
+  {
+    slug: 'criminal-criminal-contact',
+    sourceBackgroundSlug: 'criminal',
+    sourceBackgroundSource: 'PHB',
+    name: 'Feature: Criminal Contact',
+    text: 'You have a reliable contact who acts as a liaison.',
+  },
+];
+
+describe('FeaturePicker — filter input narrows options', () => {
+  it('renders a native select with all features initially', () => {
+    render(
+      <FeaturePicker
+        features={SAMPLE_FEATURES}
+        value={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const select = screen.getByRole('listbox') ?? screen.getByRole('combobox');
+    expect(select).toBeTruthy();
+    const options = screen.getAllByRole('option');
+    // All 3 features + placeholder
+    expect(options.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('filters options when user types in filter input', () => {
+    render(
+      <FeaturePicker
+        features={SAMPLE_FEATURES}
+        value={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const filterInput = screen.getByRole('searchbox');
+    fireEvent.change(filterInput, { target: { value: 'military' } });
+
+    // After filtering "military", only the Military Rank option should remain
+    const options = screen.getAllByRole('option').filter(
+      (o) => (o as HTMLOptionElement).value !== '',
+    );
+    expect(options).toHaveLength(1);
+    expect(options[0].textContent).toContain('Military');
+  });
+});
+
+describe('FeaturePicker — selection persists slug, shows preview', () => {
+  it('calls onChange with the feature slug when user selects an option', () => {
+    const onChange = vi.fn();
+    render(
+      <FeaturePicker
+        features={SAMPLE_FEATURES}
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+
+    const select = screen.getByRole('listbox') ?? screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'acolyte-shelter-of-the-faithful' } });
+    expect(onChange).toHaveBeenCalledWith({ slug: 'acolyte-shelter-of-the-faithful' });
+  });
+
+  it('renders feature text preview below select when value is set', () => {
+    render(
+      <FeaturePicker
+        features={SAMPLE_FEATURES}
+        value={{ slug: 'soldier-military-rank' }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/You have a military rank/i)).toBeTruthy();
   });
 });

@@ -39,6 +39,7 @@ export function poolFor(kind: string): readonly string[] {
     case 'anyStandard': return STANDARD_LANGUAGES;
     case 'anyExotic': return EXOTIC_LANGUAGES;
     case 'any': return ANY_LANGUAGES;
+    case 'anyLanguage': return ANY_LANGUAGES;
     case 'anyGamingSet': return GAMING_SETS;
     case 'anyArtisansTool': return ARTISANS_TOOLS;
     case 'anyMusicalInstrument': return MUSICAL_INSTRUMENTS;
