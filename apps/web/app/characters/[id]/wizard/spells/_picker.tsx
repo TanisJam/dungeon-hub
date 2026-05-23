@@ -271,11 +271,9 @@ export function SpellsPicker({
   function togglePrepared(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked — skip
+    // Invariant: prepared ⊆ known. Can't prepare a spell not in the spellbook.
+    if (checked && !knownKeys.has(key)) return;
     setPreparedKeys((prev) => toggleSet(prev, key, checked));
-    // Auto-link: checking Prepared → forces Known on
-    if (checked) {
-      setKnownKeys((prev) => toggleSet(prev, key, true));
-    }
     setError(null);
   }
 
@@ -510,8 +508,8 @@ export function SpellsPicker({
                     !knownChecked && freeKnownLimit > 0 && freeKnownCount >= freeKnownLimit;
                   const preparedAtCap =
                     !preparedChecked &&
-                    freePreparedLimit > 0 &&
-                    freePreparedCount >= freePreparedLimit;
+                    (!knownChecked ||
+                      (freePreparedLimit > 0 && freePreparedCount >= freePreparedLimit));
                   return (
                     <WizardSpellRow
                       key={key}
