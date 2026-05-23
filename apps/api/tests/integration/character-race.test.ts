@@ -46,6 +46,7 @@ describe('PUT /characters/:id/race', () => {
       payload: {
         race: { slug: 'elf', source: 'PHB' },
         subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
       },
     });
 
@@ -53,6 +54,7 @@ describe('PUT /characters/:id/race', () => {
     const c = res.json();
     expect(c.data.race).toEqual({ slug: 'elf', source: 'PHB' });
     expect(c.data.subrace).toEqual({ slug: 'elf--high', source: 'PHB' });
+    expect(c.data.raceLanguageChoices).toEqual(['dwarvish']);
     expect(c.data.asisApplied).toContainEqual({ ability: 'dex', bonus: 2, source: 'race' });
     expect(c.data.asisApplied).toContainEqual({ ability: 'int', bonus: 1, source: 'subrace' });
     expect(c.data.usedTashasCustomOrigin).toBe(false);
@@ -64,7 +66,10 @@ describe('PUT /characters/:id/race', () => {
       method: 'PUT',
       url: `/api/v1/characters/${characterId}/race`,
       headers: { authorization: `Bearer ${user.accessToken}` },
-      payload: { race: { slug: 'half-elf', source: 'PHB' } },
+      payload: {
+        race: { slug: 'half-elf', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+      },
     });
 
     expect(res.statusCode).toBe(400);
@@ -84,6 +89,7 @@ describe('PUT /characters/:id/race', () => {
           { ability: 'dex', bonus: 1, source: 'race' },
           { ability: 'con', bonus: 1, source: 'race' },
         ],
+        languageChoices: ['dwarvish'],
       },
     });
 
@@ -92,6 +98,7 @@ describe('PUT /characters/:id/race', () => {
     expect(c.data.race).toEqual({ slug: 'half-elf', source: 'PHB' });
     expect(c.data.asisApplied).toHaveLength(3);
     expect(c.data.asisApplied).toContainEqual({ ability: 'cha', bonus: 2, source: 'race' });
+    expect(c.data.raceLanguageChoices).toEqual(['dwarvish']);
   });
 
   it("requiere appliedAsis cuando Tasha's está ON, y los redistribuye", async () => {
@@ -131,7 +138,11 @@ describe('PUT /characters/:id/race', () => {
       method: 'PUT',
       url: `/api/v1/characters/${characterId}/race`,
       headers: { authorization: `Bearer ${user.accessToken}` },
-      payload: { race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--high', source: 'PHB' } },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+      },
     });
     expect(missing.statusCode).toBe(400);
     expect(missing.json().issues[0].code).toBe('ASI_REQUIRED');
@@ -148,6 +159,7 @@ describe('PUT /characters/:id/race', () => {
           { ability: 'str', bonus: 2, source: 'race' },
           { ability: 'cha', bonus: 1, source: 'subrace' },
         ],
+        languageChoices: ['dwarvish'],
       },
     });
     expect(ok.statusCode).toBe(200);

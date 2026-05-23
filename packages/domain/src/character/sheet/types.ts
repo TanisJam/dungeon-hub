@@ -58,6 +58,8 @@ export interface CharacterSnapshot {
   classFeatures?: Record<string, Record<string, Array<{ slug: string; source: string }>>>;
   /** Selección persistida de spells por clase. */
   spells?: Record<string, { cantrips: Array<{ slug: string; source: string }>; known: Array<{ slug: string; source: string }>; prepared: Array<{ slug: string; source: string }> }>;
+  /** Idiomas elegidos por el jugador para slots `any*` del linaje (raza + subrace). */
+  raceLanguageChoices?: string[];
 }
 
 /**

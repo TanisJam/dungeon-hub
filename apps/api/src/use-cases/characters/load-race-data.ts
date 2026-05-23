@@ -42,6 +42,8 @@ export async function loadRaceAndSubrace(input: {
         ability: (raceRow.data as { ability?: unknown }).ability as
           | RaceCompendiumData['ability']
           | undefined,
+        languageProficiencies: (raceRow.data as { languageProficiencies?: unknown })
+          .languageProficiencies as RaceCompendiumData['languageProficiencies'] | undefined,
       }
     : null;
 
@@ -68,6 +70,8 @@ export async function loadRaceAndSubrace(input: {
         ability: (subRow.data as { ability?: unknown }).ability as
           | SubraceCompendiumData['ability']
           | undefined,
+        languageProficiencies: (subRow.data as { languageProficiencies?: unknown })
+          .languageProficiencies as SubraceCompendiumData['languageProficiencies'] | undefined,
       };
     }
   }

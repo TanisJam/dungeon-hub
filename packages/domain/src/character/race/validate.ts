@@ -3,11 +3,31 @@ import type { RulesProfile } from '../../rules-profile/types.js';
 import type {
   AbilityBlock,
   AppliedAsi,
+  LanguageProficiencyBlock,
   RaceCompendiumData,
   RaceValidationIssue,
   RaceValidationResult,
   SubraceCompendiumData,
 } from './types.js';
+
+/** Suma fijos + cantidad total de slots `any*` para los language blocks dados. */
+function splitLanguageBlocks(blocks: LanguageProficiencyBlock[] | null | undefined): {
+  fixed: string[];
+  anyCount: number;
+} {
+  const fixed: string[] = [];
+  let anyCount = 0;
+  for (const block of blocks ?? []) {
+    for (const [key, value] of Object.entries(block)) {
+      if (key === 'anyStandard' || key === 'anyExotic' || key === 'any') {
+        if (typeof value === 'number') anyCount += value;
+      } else if (value === true) {
+        fixed.push(key.toLowerCase());
+      }
+    }
+  }
+  return { fixed, anyCount };
+}
 
 /**
  * Convención MPMM cuando la raza tiene `ability: null`:
@@ -86,6 +106,46 @@ interface ValidateRaceInput {
   subraceData?: SubraceCompendiumData | null;
   rulesProfile: RulesProfile;
   appliedAsis?: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>;
+  /** Idiomas elegidos por el jugador (para satisfacer slots `any*` de raza + subrace). */
+  languageChoices?: string[];
+}
+
+/**
+ * Valida los idiomas elegidos contra los slots `any*` combinados de race + subrace.
+ * Devuelve issues (vacío si OK) y la lista normalizada (lowercase) a persistir.
+ */
+function validateLanguageChoices(input: {
+  race: RaceCompendiumData;
+  subrace?: SubraceCompendiumData | null;
+  choices: string[];
+}): { issues: RaceValidationIssue[]; applied: string[] } {
+  const raceLangs = splitLanguageBlocks(input.race.languageProficiencies);
+  const subraceLangs = splitLanguageBlocks(input.subrace?.languageProficiencies);
+  const totalAnyCount = raceLangs.anyCount + subraceLangs.anyCount;
+  const fixedSet = new Set([...raceLangs.fixed, ...subraceLangs.fixed]);
+
+  const issues: RaceValidationIssue[] = [];
+  const normalized = input.choices.map((c) => c.toLowerCase());
+
+  if (normalized.length !== totalAnyCount) {
+    issues.push({
+      code: 'RACE_LANGUAGE_COUNT_MISMATCH',
+      expectedCount: totalAnyCount,
+      gotCount: normalized.length,
+    });
+    return { issues, applied: normalized };
+  }
+
+  const seen = new Set<string>();
+  for (const lang of normalized) {
+    if (seen.has(lang) || fixedSet.has(lang)) {
+      issues.push({ code: 'RACE_LANGUAGE_DUPLICATE', language: lang });
+      continue;
+    }
+    seen.add(lang);
+  }
+
+  return { issues, applied: normalized };
 }
 
 export function validateRaceSelection(input: ValidateRaceInput): RaceValidationResult {
@@ -127,6 +187,17 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
     }
   }
   if (issues.length > 0) return { ok: false, issues };
+
+  // ---- 1.5) Idiomas elegidos --------------------------------------------
+  const langResult = validateLanguageChoices({
+    race: raceData,
+    subrace: subraceData,
+    choices: input.languageChoices ?? [],
+  });
+  if (langResult.issues.length > 0) {
+    return { ok: false, issues: langResult.issues };
+  }
+  const appliedLanguageChoices = langResult.applied;
 
   // ---- 2) Procesar bloques race + subrace --------------------------------
   const raceBlocks = (raceData.ability ?? []).map(processAbilityBlock);
@@ -178,7 +249,12 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       const mismatch = compareAsiSets(input.appliedAsis, derived);
       if (mismatch) return { ok: false, issues: [mismatch] };
     }
-    return { ok: true, appliedAsis: derived, usedTashasCustomOrigin: false };
+    return {
+      ok: true,
+      appliedAsis: derived,
+      usedTashasCustomOrigin: false,
+      appliedLanguageChoices,
+    };
   }
 
   // Para todos los demás casos, exigimos appliedAsis.
@@ -230,6 +306,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
         source: a.source,
       })),
       usedTashasCustomOrigin: true,
+      appliedLanguageChoices,
     };
   }
 
@@ -255,6 +332,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
         source: a.source,
       })),
       usedTashasCustomOrigin: false,
+      appliedLanguageChoices,
     };
   }
 
@@ -429,6 +507,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       source: a.source,
     })),
     usedTashasCustomOrigin: false,
+    appliedLanguageChoices,
   };
 }
 

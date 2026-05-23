@@ -10,14 +10,23 @@ import {
   formatSpeed,
   extractTraits,
   parseAsis,
+  parseLanguageChoices,
   type AbilityKey,
   type AsiSlot,
   type RaceData,
 } from './_parsers';
 import { saveRace } from './actions';
+import { poolFor, titleCase } from '../background/_options';
 import { ChoiceList } from '@/components/wizard/choice-list';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
 import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
+
+const LANG_KIND_LABEL: Record<string, string> = {
+  anyStandard: 'idioma estándar',
+  anyExotic: 'idioma exótico',
+  any: 'idioma',
+};
+const LANG_CHOOSE_KEYS = ['anyStandard', 'anyExotic', 'any'] as const;
 
 export type RaceEntry = {
   slug: string;
@@ -55,11 +64,13 @@ export function RacePicker({
   entries,
   initialSelection,
   initialChosenAsis = {},
+  initialLanguageChoices = [],
 }: {
   characterId: string;
   entries: RaceEntry[];
   initialSelection: Selection | null;
   initialChosenAsis?: Record<string, AbilityKey[]>;
+  initialLanguageChoices?: string[];
 }) {
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
@@ -69,6 +80,7 @@ export function RacePicker({
       : `${initialSelection.raceSlug}|${initialSelection.raceSource}`;
   });
   const [chosenAsis, setChosenAsis] = useState<Record<string, AbilityKey[]>>(initialChosenAsis);
+  const [chosenLangs, setChosenLangs] = useState<string[]>(initialLanguageChoices);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -151,8 +163,36 @@ export function RacePicker({
       seen.add(a.ability);
     }
 
+    // Idiomas: cantidad esperada = suma de slots any* de race + subrace.
+    const langInfo = parseLanguageChoices({
+      race: selected.isSubrace && parent ? parent.data : selected.data,
+      subrace: selected.isSubrace ? selected.data : null,
+    });
+    if (chosenLangs.length !== langInfo.totalChooseCount) {
+      setError(
+        `Elegí ${langInfo.totalChooseCount} idioma${langInfo.totalChooseCount === 1 ? '' : 's'}.`,
+      );
+      return;
+    }
+    const langSeen = new Set<string>();
+    const fixedSet = new Set(langInfo.fixed);
+    for (const lang of chosenLangs) {
+      const norm = lang.toLowerCase();
+      if (fixedSet.has(norm) || langSeen.has(norm)) {
+        setError(`No podés repetir idiomas. "${titleCase(lang)}" aparece dos veces o ya está otorgado.`);
+        return;
+      }
+      langSeen.add(norm);
+    }
+
     startTransition(async () => {
-      const res = await saveRace(characterId, racePart, subracePart, appliedAsis);
+      const res = await saveRace(
+        characterId,
+        racePart,
+        subracePart,
+        appliedAsis,
+        chosenLangs,
+      );
       if (res.error) setError(res.error);
     });
   }
@@ -183,6 +223,8 @@ export function RacePicker({
       ? entries.find((p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace) ?? null
       : null;
 
+    const isThisSelected = key === selectedKey;
+
     return {
       key,
       title: displayName(e, entries),
@@ -195,6 +237,11 @@ export function RacePicker({
           chosenAsis={chosenAsis}
           setChosenAsis={(next) => {
             setChosenAsis(next);
+            setError(null);
+          }}
+          chosenLangs={isThisSelected ? chosenLangs : []}
+          setChosenLangs={(next) => {
+            setChosenLangs(next);
             setError(null);
           }}
         />
@@ -222,20 +269,22 @@ export function RacePicker({
           options={options}
           selectedKey={selectedKey}
           onSelect={(key) => {
-            if (key !== selectedKey) setChosenAsis({});
+            if (key !== selectedKey) {
+              setChosenAsis({});
+              setChosenLangs([]);
+            }
             setSelectedKey(key);
             setError(null);
           }}
         />
       )}
 
-      {error && <p className="text-sm text-warning-deep">{error}</p>}
-
       <WizardFooterNav
         backHref={`/characters/${characterId}/wizard/stats`}
         onNext={handleContinue}
         pending={pending}
         disabled={!selected}
+        error={error}
       />
     </div>
   );
@@ -250,11 +299,15 @@ function RaceDetailPanel({
   parent,
   chosenAsis,
   setChosenAsis,
+  chosenLangs,
+  setChosenLangs,
 }: {
   entry: RaceEntry;
   parent: RaceEntry | null;
   chosenAsis: Record<string, AbilityKey[]>;
   setChosenAsis: (next: Record<string, AbilityKey[]>) => void;
+  chosenLangs: string[];
+  setChosenLangs: (next: string[]) => void;
 }) {
   const traits = useMemo(() => {
     const own = extractTraits(entry.data.entries);
@@ -262,9 +315,19 @@ function RaceDetailPanel({
     return [...extractTraits(parent.data.entries), ...own];
   }, [entry, parent]);
 
-  const langs = formatLanguages(entry.data.languageProficiencies);
+  const langInfo = useMemo(
+    () =>
+      parseLanguageChoices({
+        race: entry.isSubrace && parent ? parent.data : entry.data,
+        subrace: entry.isSubrace ? entry.data : null,
+      }),
+    [entry, parent],
+  );
   const size = formatSize(entry.data.size);
   const speed = formatSpeed(entry.data.speed);
+
+  const fixedLangs = langInfo.fixed;
+  const hasLangChoices = langInfo.totalChooseCount > 0;
 
   return (
     <div className="space-y-3">
@@ -279,10 +342,23 @@ function RaceDetailPanel({
         setChosen={setChosenAsis}
       />
 
-      {langs && (
+      {(fixedLangs.length > 0 || hasLangChoices) && (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Idiomas</p>
-          <p className="mt-1 text-xs text-ink">{langs}</p>
+          {fixedLangs.length > 0 && (
+            <p className="mt-1 text-xs">
+              <span className="text-ink-mute">Otorgados:</span>{' '}
+              <span className="text-ink">{fixedLangs.map(titleCase).join(', ')}</span>
+            </p>
+          )}
+          {hasLangChoices && (
+            <LanguageChoosers
+              chooseCounts={langInfo.chooseCounts}
+              fixedLangs={fixedLangs}
+              chosen={chosenLangs}
+              setChosen={setChosenLangs}
+            />
+          )}
         </div>
       )}
 
@@ -440,6 +516,96 @@ function AsiChooser({
               ].join(' ')}
             >
               {a.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Language pickers (one block per kind: anyStandard / anyExotic / any)
+// ---------------------------------------------------------------------------
+
+function LanguageChoosers({
+  chooseCounts,
+  fixedLangs,
+  chosen,
+  setChosen,
+}: {
+  chooseCounts: Record<string, number>;
+  fixedLangs: string[];
+  chosen: string[];
+  setChosen: (next: string[]) => void;
+}) {
+  const fixedSet = new Set(fixedLangs);
+  return (
+    <div className="mt-2 space-y-2">
+      {LANG_CHOOSE_KEYS.map((kind) => {
+        const count = chooseCounts[kind];
+        if (!count) return null;
+        const pool = poolFor(kind).filter((p) => !fixedSet.has(p));
+        const selectedInPool = chosen.filter((c) => pool.includes(c));
+        const setSelectedInPool = (vals: string[]) => {
+          const others = chosen.filter((c) => !pool.includes(c));
+          setChosen([...others, ...vals]);
+        };
+        return (
+          <LangMultiSelect
+            key={kind}
+            label={`Elegí ${count} ${LANG_KIND_LABEL[kind]}${count > 1 ? 's' : ''}`}
+            pool={pool}
+            selected={selectedInPool}
+            count={count}
+            onChange={setSelectedInPool}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function LangMultiSelect({
+  label,
+  pool,
+  selected,
+  count,
+  onChange,
+}: {
+  label: string;
+  pool: string[];
+  selected: string[];
+  count: number;
+  onChange: (vals: string[]) => void;
+}) {
+  function toggle(v: string) {
+    const has = selected.includes(v);
+    if (has) onChange(selected.filter((x) => x !== v));
+    else if (selected.length >= count) return;
+    else onChange([...selected, v]);
+  }
+  return (
+    <div className="rounded-md border border-accent-soft bg-paper p-2.5">
+      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {pool.map((v) => {
+          const isOn = selected.includes(v);
+          const disabled = !isOn && selected.length >= count;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => toggle(v)}
+              disabled={disabled}
+              className={[
+                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                isOn
+                  ? 'bg-accent-soft text-accent-deep ring-accent'
+                  : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
+              ].join(' ')}
+            >
+              {titleCase(v)}
             </button>
           );
         })}

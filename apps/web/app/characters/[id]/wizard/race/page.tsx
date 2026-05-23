@@ -24,6 +24,7 @@ type Character = {
     race?: { slug: string; source: string };
     subrace?: { slug: string; source: string } | null;
     asisApplied?: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>;
+    raceLanguageChoices?: string[];
   } | null;
 };
 
@@ -144,7 +145,7 @@ export default async function RaceStepPage({ params }: Props) {
       <NumberedSectionHead
         num="02"
         title="Linaje"
-        meta="Paso 2 de 5"
+        meta="Paso 2 de 6"
         description="Elegí el linaje de tu personaje. Las subrazas y razas padre aparecen juntas."
       />
 
@@ -154,6 +155,7 @@ export default async function RaceStepPage({ params }: Props) {
           entries={entries}
           initialSelection={initialSelection}
           initialChosenAsis={initialChosenAsis}
+          initialLanguageChoices={character.data?.raceLanguageChoices ?? []}
         />
       </div>
     </section>

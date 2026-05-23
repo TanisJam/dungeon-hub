@@ -23,10 +23,23 @@ export interface AbilityBlock {
   };
 }
 
+/**
+ * Bloque del campo `languageProficiencies` de 5etools.
+ *   - keys con valor `true` → idiomas fijos (ej: `{ elvish: true }`)
+ *   - keys `anyStandard | anyExotic | any` con número → N idiomas a elegir
+ */
+export interface LanguageProficiencyBlock {
+  anyStandard?: number;
+  anyExotic?: number;
+  any?: number;
+  [language: string]: boolean | number | undefined;
+}
+
 export interface RaceCompendiumData {
   slug: string;
   source: string;
   ability?: AbilityBlock[] | null;
+  languageProficiencies?: LanguageProficiencyBlock[] | null;
 }
 
 export interface SubraceCompendiumData {
@@ -36,6 +49,7 @@ export interface SubraceCompendiumData {
   parentSlug: string;
   parentSource: string;
   ability?: AbilityBlock[] | null;
+  languageProficiencies?: LanguageProficiencyBlock[] | null;
 }
 
 export interface AppliedAsi {
@@ -104,8 +118,24 @@ export type RaceValidationIssue =
       code: 'RACE_ASI_OVERLAP_WITH_FIXED';
       where: 'race' | 'subrace';
       ability: AbilityKey;
+    }
+  | {
+      /** Cantidad incorrecta de idiomas elegidos (raza + subrace combinados). */
+      code: 'RACE_LANGUAGE_COUNT_MISMATCH';
+      expectedCount: number;
+      gotCount: number;
+    }
+  | {
+      /** Idioma elegido aparece dos veces (o ya estaba fijo en la raza). */
+      code: 'RACE_LANGUAGE_DUPLICATE';
+      language: string;
     };
 
 export type RaceValidationResult =
-  | { ok: true; appliedAsis: AppliedAsi[]; usedTashasCustomOrigin: boolean }
+  | {
+      ok: true;
+      appliedAsis: AppliedAsi[];
+      usedTashasCustomOrigin: boolean;
+      appliedLanguageChoices: string[];
+    }
   | { ok: false; issues: RaceValidationIssue[] };

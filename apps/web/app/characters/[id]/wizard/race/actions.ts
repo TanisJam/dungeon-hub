@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { formatValidationIssues } from '@/lib/issue-messages';
 
 export type RaceState = { error: string | null };
 
@@ -17,6 +18,7 @@ export async function saveRace(
   race: { slug: string; source: string },
   subrace: { slug: string; source: string } | null,
   appliedAsis: AsiPayload[],
+  languageChoices: string[] = [],
 ): Promise<RaceState> {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -25,19 +27,16 @@ export async function saveRace(
   try {
     await api.put(
       `/characters/${characterId}/race`,
-      { race, subrace, appliedAsis },
+      { race, subrace, appliedAsis, languageChoices },
       session.access_token,
     );
   } catch (err) {
     if (err instanceof ApiError) {
       const body = err.body as
-        | { message?: string; error?: string; issues?: Array<{ code: string; note?: string }> }
+        | { message?: string; error?: string; issues?: Array<{ code: string; note?: string } & Record<string, unknown>> }
         | null;
       if (body?.issues?.length) {
-        const detail = body.issues
-          .map((i) => (i.note ? `${i.code}: ${i.note}` : i.code))
-          .join(' · ');
-        return { error: `Validation failed: ${detail}` };
+        return { error: formatValidationIssues(body.issues) };
       }
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }

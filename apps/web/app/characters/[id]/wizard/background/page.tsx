@@ -114,7 +114,7 @@ export default async function BackgroundStepPage({ params }: Props) {
       <NumberedSectionHead
         num="04"
         title="Trasfondo"
-        meta="Paso 4 de 5"
+        meta="Paso 4 de 6"
         description="Elegí el trasfondo de tu personaje."
       />
 

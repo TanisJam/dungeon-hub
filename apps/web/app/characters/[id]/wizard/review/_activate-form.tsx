@@ -48,14 +48,13 @@ export function ActivateForm({
         </p>
       )}
 
-      {state.error && <p className="text-sm text-warning-deep">{state.error}</p>}
-
       <WizardFooterNav
-        backHref={`/characters/${characterId}/wizard/background`}
+        backHref={`/characters/${characterId}/wizard/spells`}
         nextLabel="Publicar"
         nextIcon="check"
         onNext={() => formRef.current?.requestSubmit()}
         pending={pending}
+        error={state.error}
       />
     </form>
   );

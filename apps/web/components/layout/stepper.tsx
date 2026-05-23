@@ -9,6 +9,7 @@ const STEPS = [
   { segment: 'race',       label: 'Linaje' },
   { segment: 'class',      label: 'Clase' },
   { segment: 'background', label: 'Trasfondo' },
+  { segment: 'spells',     label: 'Hechizos' },
   { segment: 'review',     label: 'Revisión' },
 ] as const;
 

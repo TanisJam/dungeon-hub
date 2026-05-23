@@ -20,7 +20,9 @@ import {
 import {
   SPELLCASTING_ABILITY,
   validateClassSpells,
+  computeSpellLimits,
   type AppliedClassSpells,
+  type SpellLimitsView,
 } from '@dungeon-hub/domain/character/spellcasting';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
 import {
@@ -37,7 +39,7 @@ import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { characters } from '../../infra/db/schema.js';
+import { characters, compendiumSpells } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
   assertCampaignMembership,
@@ -296,6 +298,8 @@ const SetRaceBody = z.object({
       }),
     )
     .optional(),
+  /** Idiomas elegidos para llenar slots `any*` de la raza + subrace. */
+  languageChoices: z.array(z.string().min(1)).optional(),
 });
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
@@ -424,6 +428,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         spells: data.spells as never,
         exhaustion: data.exhaustion as never,
         classFeatures: data.classFeatures as never,
+        raceLanguageChoices: data.raceLanguageChoices as never,
       },
       raceData,
       itemWeights,
@@ -630,6 +635,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       subraceData: subrace,
       rulesProfile: campaign.rulesProfile,
       appliedAsis: body.appliedAsis,
+      languageChoices: body.languageChoices,
     });
 
     if (!result.ok) {
@@ -646,6 +652,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           subrace: body.subrace ?? null,
           asisApplied: result.appliedAsis,
           usedTashasCustomOrigin: result.usedTashasCustomOrigin,
+          raceLanguageChoices: result.appliedLanguageChoices,
         },
         updatedAt: new Date(),
       })
@@ -1454,6 +1461,120 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       spell: body.spell,
     });
   });
+
+  // ---- GET /characters/:id/classes/:classSlug/spells/options --------------
+  // Devuelve los límites de selección de spells + lista disponible + subclase grants
+  // para una clase aplicada al personaje. Usado por el paso de hechizos del wizard.
+  //
+  // Response shape:
+  //   { limits: SpellLimitsView, availableSpells: SpellRow[], subclassGrantedSlugs: string[] }
+  //
+  // Para clases no-caster (ability === null), short-circuit: retorna todo en cero/vacío.
+  app.get(
+    '/characters/:id/classes/:classSlug/spells/options',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede acceder' });
+      }
+
+      const campaign = await loadCampaign(character.campaignId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const appliedClass = classes.find((c) => c.slug === classSlug);
+      if (!appliedClass) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+
+      // Determinar la spellcasting ability de la clase.
+      const ability = SPELLCASTING_ABILITY[appliedClass.slug] ?? null;
+
+      // Short-circuit para clases no-caster: devolver todo en cero/vacío.
+      if (!ability) {
+        const emptyLimits: SpellLimitsView = {
+          cantripsKnown: 0,
+          spellsKnown: 0,
+          spellsPrepared: null,
+          maxSpellLevel: 0,
+          ability: null,
+        };
+        return reply.code(200).send({
+          limits: emptyLimits,
+          availableSpells: [],
+          subclassGrantedSlugs: [],
+        });
+      }
+
+      // Calcular abilityMod del personaje (misma lógica que PUT .../spells).
+      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+        str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+      };
+      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+      );
+      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+      const abilityMod = abilityModifier(effective[ability]);
+
+      const limits = computeSpellLimits(appliedClass, abilityMod);
+
+      // Cargar el universo de spells con subclase (para detectar grants) y sin subclase.
+      const subclassSlug = appliedClass.subclass?.slug;
+      const withSubclass = await loadClassSpells({
+        classSlug,
+        ...(subclassSlug ? { subclassSlug } : {}),
+        rulesProfile: campaign.rulesProfile,
+      });
+      const withoutSubclass = subclassSlug
+        ? await loadClassSpells({ classSlug, rulesProfile: campaign.rulesProfile })
+        : withSubclass;
+
+      // Detectar los slugs otorgados por la subclase (presentes en withSubclass pero no en withoutSubclass).
+      const baseSet = new Set(withoutSubclass.map((s) => `${s.slug}|${s.source}`));
+      const subclassGrantedSlugs = withSubclass
+        .filter((s) => !baseSet.has(`${s.slug}|${s.source}`))
+        .map((s) => s.slug);
+
+      // Hidratar la lista con name + school via una query a compendiumSpells.
+      const slugs = withSubclass.map((s) => s.slug);
+      type SpellRow = { slug: string; source: string; name: string; level: number; school: string };
+      let availableSpells: SpellRow[] = [];
+      if (slugs.length > 0) {
+        const rows = await db
+          .select({
+            slug: compendiumSpells.slug,
+            source: compendiumSpells.source,
+            name: compendiumSpells.name,
+            level: compendiumSpells.level,
+            school: compendiumSpells.school,
+          })
+          .from(compendiumSpells)
+          .where(inArray(compendiumSpells.slug, slugs));
+
+        // Filtrar los spells según el maxSpellLevel y solo incluir los que están en withSubclass.
+        const withSubclassKeys = new Set(withSubclass.map((s) => `${s.slug}|${s.source}`));
+        availableSpells = rows.filter(
+          (r) =>
+            withSubclassKeys.has(`${r.slug}|${r.source}`) &&
+            r.level <= limits.maxSpellLevel,
+        );
+      }
+
+      return reply.code(200).send({ limits, availableSpells, subclassGrantedSlugs });
+    },
+  );
 
   // ---- PUT /characters/:id/classes/:classSlug/spells ----------------------
   // Setea la selección de spells (cantrips + known + prepared) para UNA clase.

@@ -77,7 +77,7 @@ export default async function ClassStepPage({ params }: Props) {
       <NumberedSectionHead
         num="03"
         title="Clase"
-        meta="Paso 3 de 5"
+        meta="Paso 3 de 6"
         description="Elegí tu clase. Empieza en nivel 1; multiclase y subida de nivel vienen después."
       />
 

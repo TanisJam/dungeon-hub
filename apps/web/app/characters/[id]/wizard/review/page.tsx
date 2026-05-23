@@ -21,6 +21,29 @@ type AppliedClass = {
   skillChoices: string[];
 };
 
+type SpellRef = { slug: string; source: string };
+
+type CharacterSpells = {
+  cantrips: SpellRef[];
+  known: SpellRef[];
+  prepared: SpellRef[];
+};
+
+type SpellLimitsView = {
+  cantripsKnown: number;
+  spellsKnown: number | null;
+  spellsPrepared: number | null;
+  maxSpellLevel: number;
+  wizardSpellbookSize?: number;
+  ability: 'int' | 'wis' | 'cha' | null;
+};
+
+type SpellOptionsResponse = {
+  limits: SpellLimitsView;
+  availableSpells: unknown[];
+  subclassGrantedSlugs: string[];
+};
+
 type Character = {
   id: string;
   name: string;
@@ -40,6 +63,7 @@ type Character = {
       languages?: string[];
       tools?: string[];
     };
+    spells?: Record<string, CharacterSpells>;
   } | null;
 };
 
@@ -65,6 +89,22 @@ export default async function ReviewStepPage({ params }: Props) {
 
   const character = await api.get<Character>(`/characters/${id}`, session.access_token);
   const d = character.data ?? {};
+
+  // ── Spell options for completeness check (Option 1: API-based, no hardcoded allowlist) ──
+  const primaryClassForSpells = d.classes?.[0] ?? null;
+  let spellLimits: SpellLimitsView | null = null;
+  if (primaryClassForSpells) {
+    try {
+      const spellOptions = await api.get<SpellOptionsResponse>(
+        `/characters/${id}/classes/${primaryClassForSpells.slug}/spells/options`,
+        session.access_token,
+      );
+      spellLimits = spellOptions.limits;
+    } catch (_err) {
+      // On API failure (404, 500, network, etc.) → pessimistic: spellLimits stays null
+      // → computeSpellsComplete() returns false (incomplete)
+    }
+  }
 
   const baseStats = d.baseStats;
   const finalStats = baseStats ? { ...baseStats } : null;
@@ -92,11 +132,39 @@ export default async function ReviewStepPage({ params }: Props) {
 
   const primaryClass = d.classes?.[0] ?? null;
 
+  // Spells completeness via API limits (Option 1 — no hardcoded class allowlist)
+  // If limits are all-zero → non-caster → complete automatically
+  // If limits have non-zero values → need picks → check character.data.spells
+  // If spellLimits is null (API failure) → pessimistic: incomplete
+  function computeSpellsComplete(): boolean {
+    if (!primaryClassForSpells) return true; // no class → not relevant
+    if (!spellLimits) return false; // API failed → pessimistic
+    const allZero =
+      spellLimits.cantripsKnown === 0 &&
+      (spellLimits.spellsKnown === null || spellLimits.spellsKnown === 0) &&
+      (spellLimits.spellsPrepared === null || spellLimits.spellsPrepared === 0) &&
+      spellLimits.maxSpellLevel === 0;
+    if (allZero) return true; // non-caster → no picks needed
+    const saved = d.spells?.[primaryClassForSpells.slug];
+    if (!saved) return false;
+    const hasCantrips = spellLimits.cantripsKnown > 0 ? saved.cantrips.length > 0 : true;
+    const hasKnown =
+      spellLimits.spellsKnown !== null && spellLimits.spellsKnown > 0
+        ? saved.known.length > 0
+        : true;
+    const hasPrepared =
+      spellLimits.spellsPrepared !== null && spellLimits.spellsPrepared > 0
+        ? saved.prepared.length > 0
+        : true;
+    return hasCantrips && hasKnown && hasPrepared;
+  }
+
   const completeness = {
     stats: !!d.baseStats,
     race: !!d.race,
     class: !!primaryClass,
     background: !!d.background,
+    spells: computeSpellsComplete(),
   };
   const allComplete = Object.values(completeness).every(Boolean);
   const missingSteps = (Object.keys(completeness) as Array<keyof typeof completeness>).filter(
@@ -156,9 +224,9 @@ export default async function ReviewStepPage({ params }: Props) {
   return (
     <section>
       <NumberedSectionHead
-        num="05"
+        num="06"
         title="Revisión"
-        meta="Paso 5 de 5"
+        meta="Paso 6 de 6"
         description="Revisá tu personaje antes de enviarlo al DM."
       />
 
@@ -251,6 +319,35 @@ export default async function ReviewStepPage({ params }: Props) {
             editHref={`/characters/${id}/wizard/background`}
           />
         )}
+
+        {/* Hechizos */}
+        {primaryClassForSpells && (() => {
+          const saved = d.spells?.[primaryClassForSpells.slug];
+          const allZero = spellLimits
+            ? spellLimits.cantripsKnown === 0 &&
+              (spellLimits.spellsKnown === null || spellLimits.spellsKnown === 0) &&
+              (spellLimits.spellsPrepared === null || spellLimits.spellsPrepared === 0) &&
+              spellLimits.maxSpellLevel === 0
+            : false;
+          const spellTitle = allZero
+            ? 'Sin hechizos (clase no arcana)'
+            : saved
+              ? [
+                  saved.cantrips.length > 0 ? `${saved.cantrips.length} cantrip${saved.cantrips.length !== 1 ? 's' : ''}` : null,
+                  saved.known.length > 0 ? `${saved.known.length} conocido${saved.known.length !== 1 ? 's' : ''}` : null,
+                  saved.prepared.length > 0 ? `${saved.prepared.length} preparado${saved.prepared.length !== 1 ? 's' : ''}` : null,
+                ].filter(Boolean).join(' · ') || 'Sin hechizos guardados'
+              : 'Sin hechizos guardados';
+          return (
+            <NumberedReviewCard
+              num="05"
+              title="Hechizos"
+              subtitle={spellTitle}
+              pills={[]}
+              editHref={`/characters/${id}/wizard/spells`}
+            />
+          );
+        })()}
 
         {/* Character name input */}
         <CharacterNameInput characterId={character.id} initialName={character.name} />

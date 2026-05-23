@@ -137,6 +137,44 @@ export function formatLanguages(langs: RaceData['languageProficiencies']): strin
   return out.length > 0 ? out.join(', ') : null;
 }
 
+/**
+ * Parsea los bloques `languageProficiencies` y devuelve fijos + counts por kind
+ * (anyStandard / anyExotic / any) — análogo al parser de background, pero
+ * combina race + subrace.
+ */
+export function parseLanguageChoices(input: {
+  race: RaceData;
+  subrace?: RaceData | null;
+}): {
+  fixed: string[];
+  chooseCounts: Record<string, number>;
+  totalChooseCount: number;
+} {
+  const fixed: string[] = [];
+  const chooseCounts: Record<string, number> = {};
+
+  const consume = (blocks: RaceData['languageProficiencies']) => {
+    if (!blocks) return;
+    for (const block of blocks) {
+      for (const [k, v] of Object.entries(block)) {
+        if (k === 'anyStandard' || k === 'anyExotic' || k === 'any') {
+          if (typeof v === 'number') {
+            chooseCounts[k] = (chooseCounts[k] ?? 0) + v;
+          }
+        } else if (v === true) {
+          fixed.push(k.toLowerCase());
+        }
+      }
+    }
+  };
+
+  consume(input.race.languageProficiencies);
+  consume(input.subrace?.languageProficiencies ?? null);
+
+  const totalChooseCount = Object.values(chooseCounts).reduce((s, n) => s + n, 0);
+  return { fixed, chooseCounts, totalChooseCount };
+}
+
 export type Trait = { name: string; text: string };
 
 const NAMED_BLOCK_TYPES = new Set(['entries', 'inset', 'section']);

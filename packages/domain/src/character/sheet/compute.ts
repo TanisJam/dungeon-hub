@@ -324,6 +324,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   for (const x of character.background?.tools ?? []) tools.add(normalizeProf(x));
   for (const x of character.background?.languages ?? []) languages.add(normalizeProf(x));
   if (raceData) for (const x of extractRaceLanguages(raceData)) languages.add(normalizeProf(x));
+  for (const x of character.raceLanguageChoices ?? []) languages.add(normalizeProf(x));
 
   // ---- Speed + size desde race ------------------------------------------
   const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };

@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 // End-to-end del character builder wizard.
-// Cubre: create draft → atributos → linaje → clase → trasfondo → revisión → activar.
+// Cubre: create draft → atributos → linaje → clase → trasfondo → hechizos (no-picks) → revisión → activar.
 //
 // Combinación elegida para evitar overlap entre class skills y background skills
 // (validación cross-step):
-//   - Fighter PHB: pick acrobatics + survival
+//   - Fighter PHB: pick acrobatics + survival (non-caster → no-picks panel en step de hechizos)
 //   - Soldier PHB: skills fijas athletics + intimidation (no chocan)
 //   - Soldier tools: pick 1 gaming set (dice-set)
 
 test.describe('character builder wizard', () => {
-  test('create, fill 5 steps, activate', async ({ page }) => {
+  test('create, fill 6 steps (non-caster), activate', async ({ page }) => {
     const charName = `E2E Char ${Date.now()}`;
 
     await test.step('navigate to new character form', async () => {
@@ -87,19 +87,33 @@ test.describe('character builder wizard', () => {
       // Tool choice: anyGamingSet → pick "Dice Set"
       await page.getByRole('button', { name: 'Dice Set', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+    });
+
+    await test.step('hechizos: Fighter es non-caster → panel "no picks needed" → siguiente', async () => {
+      // Fighter is a non-caster: the spells step renders NoPicksPanel instead of the picker.
+      await expect(page.locator('text=Tu clase no utiliza hechizos.').first()).toBeVisible({
+        timeout: 5_000,
+      });
+      // No checkbox / spell list should be rendered on this panel
+      await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
+      // Click the Siguiente button in the NoPicksPanel footer
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
     });
 
-    await test.step('revisión: verificar contenido + publicar', async () => {
-      // El review (post-E.6) tiene: NumberedSectionHead "05 Revisión",
-      // ReviewBanner con character name, AbilityScoreGrid, y 3 NumberedReviewCards
-      // con los slugs (human/fighter/soldier — pre E.5 ES translations).
+    await test.step('revisión: verificar contenido (incluye card Hechizos) + publicar', async () => {
+      // El review (post-E.6) tiene: NumberedSectionHead "06 Revisión",
+      // ReviewBanner con character name, AbilityScoreGrid, y 4 NumberedReviewCards
+      // incluyendo la nueva card "05 Hechizos" (non-caster → sin hechizos guardados).
       await expect(page.locator('text=Revisión').first()).toBeVisible();
       await expect(page.locator('text=Atributos').first()).toBeVisible();
       await expect(page.getByText(charName, { exact: false }).first()).toBeVisible();
       await expect(page.locator('text=human').first()).toBeVisible();
       await expect(page.locator('text=fighter').first()).toBeVisible();
       await expect(page.locator('text=soldier').first()).toBeVisible();
+      // Spells review card (num "05") must be visible for Fighter (non-caster)
+      await expect(page.locator('text=Hechizos').first()).toBeVisible();
 
       // Publish
       await page.getByRole('button', { name: /^publicar/i }).click();

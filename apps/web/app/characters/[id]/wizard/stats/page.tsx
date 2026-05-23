@@ -42,7 +42,7 @@ export default async function StatsStepPage({ params }: Props) {
       <NumberedSectionHead
         num="01"
         title="Atributos"
-        meta="Paso 1 de 5"
+        meta="Paso 1 de 6"
         description="Asigná los seis atributos. Podés usar puntos, el arreglo estándar, o tirar 4d6 quitando el menor."
       />
 

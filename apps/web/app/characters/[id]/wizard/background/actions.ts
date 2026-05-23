@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { formatValidationIssues } from '@/lib/issue-messages';
 
 export type BackgroundState = { error: string | null };
 
@@ -26,15 +27,15 @@ export async function saveBackground(
   } catch (err) {
     if (err instanceof ApiError) {
       const body = err.body as
-        | { message?: string; error?: string; issues?: Array<{ code: string }> }
+        | { message?: string; error?: string; issues?: Array<{ code: string } & Record<string, unknown>> }
         | null;
       if (body?.issues?.length) {
-        return { error: `Validation failed: ${body.issues.map((i) => i.code).join(', ')}` };
+        return { error: formatValidationIssues(body.issues) };
       }
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
     return { error: err instanceof Error ? err.message : 'Unknown error' };
   }
 
-  redirect(`/characters/${characterId}/wizard/review`);
+  redirect(`/characters/${characterId}/wizard/spells`);
 }

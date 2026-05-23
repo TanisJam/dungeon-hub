@@ -65,6 +65,7 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
         payload: {
           race: { slug: 'elf', source: 'PHB' },
           subrace: { slug: 'elf--high', source: 'PHB' },
+          languageChoices: ['dwarvish'],
         },
       }),
     );
