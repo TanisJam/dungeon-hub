@@ -7,6 +7,8 @@ import { Stepper } from '@/components/layout/stepper';
 import { Pill } from '@/components/ui';
 import { Card } from '@/components/ui';
 import { StepSubtitle } from './_step-subtitle';
+import { TermProvider } from '@/components/compendium/term';
+import { env } from '@/lib/env';
 
 type Character = { id: string; name: string; status: string; campaignId: string };
 
@@ -77,7 +79,15 @@ export default async function BuildLayout({ children, params }: Props) {
 
       <Stepper characterId={id} />
 
-      <div className="mt-8">{children}</div>
+      <div className="mt-8">
+        <TermProvider
+          accessToken={session?.access_token}
+          campaignId={character.campaignId}
+          apiBaseUrl={env.API_URL}
+        >
+          {children}
+        </TermProvider>
+      </div>
     </AppShell>
   );
 }
