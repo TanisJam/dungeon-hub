@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { formatValidationIssues } from '@/lib/issue-messages';
+import type { Customization } from '@dungeon-hub/domain/character/background';
 
 export type BackgroundState = { error: string | null };
 
@@ -13,6 +14,7 @@ export async function saveBackground(
   skillChoices: string[],
   languageChoices: string[],
   toolChoices: Record<string, string[]>,
+  customization?: Customization,
 ): Promise<BackgroundState> {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -21,7 +23,7 @@ export async function saveBackground(
   try {
     await api.put(
       `/characters/${characterId}/background`,
-      { background: bg, skillChoices, languageChoices, toolChoices },
+      { background: bg, skillChoices, languageChoices, toolChoices, ...(customization !== undefined ? { customization } : {}) },
       session.access_token,
     );
   } catch (err) {

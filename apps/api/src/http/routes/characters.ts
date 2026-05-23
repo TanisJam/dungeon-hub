@@ -4,7 +4,11 @@ import { and, eq } from 'drizzle-orm';
 import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
-import { validateBackgroundSelection } from '@dungeon-hub/domain/character/background';
+import {
+  validateBackgroundSelection,
+  SetBackgroundBodyCustomizationSchema,
+  normalizeAppliedBackground,
+} from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel } from '@dungeon-hub/domain/character/class';
@@ -49,7 +53,10 @@ import {
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
-import { loadBackgroundData } from '../../use-cases/characters/load-background-data.js';
+import {
+  loadBackgroundData,
+  loadAllBackgrounds,
+} from '../../use-cases/characters/load-background-data.js';
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import { recordSessionEventForCharacter } from '../../use-cases/sessions/events.js';
@@ -154,6 +161,7 @@ const SetBackgroundBody = z.object({
   skillChoices: z.array(z.string().min(1)).optional(),
   languageChoices: z.array(z.string().min(1)).optional(),
   toolChoices: z.record(z.string(), z.array(z.string().min(1))).optional(),
+  customization: SetBackgroundBodyCustomizationSchema.optional(),
 });
 
 const SetClassBody = z.object({
@@ -373,7 +381,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const access = await getCharacterAccess(character, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    return character;
+    // Normalize background on read: ensures legacy saves (pre-customization) round-trip cleanly.
+    const data = (character.data as Record<string, unknown> | null) ?? {};
+    const rawBg = data['background'];
+    if (rawBg != null) {
+      try {
+        data['background'] = normalizeAppliedBackground(rawBg);
+      } catch {
+        // If normalization throws (missing slug/source — unrecoverable corruption),
+        // leave the raw data in place so the response still returns rather than 500.
+      }
+    }
+
+    return { ...character, data };
   });
 
   // ---- GET /characters/:id/sheet ------------------------------------------
@@ -782,12 +802,20 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // For Custom Background: load all backgrounds to validate feature slugs + equipment packages.
+    // (~57 rows, one-shot read, acceptable cost per PUT.)
+    const allBackgrounds = body.background.slug === 'custom-background'
+      ? await loadAllBackgrounds()
+      : [];
+
     const result = validateBackgroundSelection({
       backgroundData,
       rulesProfile: campaign.rulesProfile,
       skillChoices: body.skillChoices,
       languageChoices: body.languageChoices,
       toolChoices: body.toolChoices,
+      customization: body.customization,
+      allBackgrounds,
     });
 
     if (!result.ok) {

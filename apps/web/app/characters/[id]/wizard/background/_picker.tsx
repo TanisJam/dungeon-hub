@@ -197,6 +197,7 @@ export function BackgroundPicker({
         skills,
         langs,
         tools,
+        parsed.customization ? (customization ?? undefined) : undefined,
       );
       if (res.error) setError(res.error);
     });
