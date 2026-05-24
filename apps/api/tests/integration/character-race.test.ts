@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { db } from '../../src/infra/db/client.js';
-import { characters } from '../../src/infra/db/schema.js';
+import { characters, compendiumRaces } from '../../src/infra/db/schema.js';
 
 describe('PUT /characters/:id/race', () => {
   let user: TestUser;
@@ -670,5 +670,244 @@ describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => 
     const issue = body.issues.find((i: { code: string }) => i.code === 'FEAT_NOT_FOUND');
     expect(issue).toBeDefined();
     expect(issue.feat).toEqual({ slug: 'nonexistent-made-up-feat', source: 'PHB' });
+  });
+});
+
+// ============================================================
+// Phase D — Dragonborn ancestry (race-dragonborn-ancestry Batch 3)
+// ============================================================
+
+/**
+ * Seeds the 10 PHB Dragonborn ancestry rows into the test DB.
+ * Uses upsert on (slug, source) unique index — idempotent.
+ * This mirrors what `pnpm import:compendium` does after deploy.
+ */
+async function seedDragonbornAncestries(): Promise<void> {
+  const ancestries = [
+    { color: 'Black',  slug: 'dragonborn--black',  damageType: 'acid',      shape: 'line', size: '5 ft × 30 ft', savingThrow: 'dex' },
+    { color: 'Blue',   slug: 'dragonborn--blue',   damageType: 'lightning', shape: 'line', size: '5 ft × 30 ft', savingThrow: 'dex' },
+    { color: 'Brass',  slug: 'dragonborn--brass',  damageType: 'fire',      shape: 'line', size: '5 ft × 30 ft', savingThrow: 'dex' },
+    { color: 'Bronze', slug: 'dragonborn--bronze', damageType: 'lightning', shape: 'line', size: '5 ft × 30 ft', savingThrow: 'dex' },
+    { color: 'Copper', slug: 'dragonborn--copper', damageType: 'acid',      shape: 'line', size: '5 ft × 30 ft', savingThrow: 'dex' },
+    { color: 'Gold',   slug: 'dragonborn--gold',   damageType: 'fire',      shape: 'cone', size: '15 ft',        savingThrow: 'dex' },
+    { color: 'Green',  slug: 'dragonborn--green',  damageType: 'poison',    shape: 'cone', size: '15 ft',        savingThrow: 'con' },
+    { color: 'Red',    slug: 'dragonborn--red',    damageType: 'fire',      shape: 'cone', size: '15 ft',        savingThrow: 'dex' },
+    { color: 'Silver', slug: 'dragonborn--silver', damageType: 'cold',      shape: 'cone', size: '15 ft',        savingThrow: 'con' },
+    { color: 'White',  slug: 'dragonborn--white',  damageType: 'cold',      shape: 'cone', size: '15 ft',        savingThrow: 'con' },
+  ] as const;
+
+  for (const a of ancestries) {
+    await db
+      .insert(compendiumRaces)
+      .values({
+        slug: a.slug,
+        source: 'PHB',
+        name: a.color,
+        data: {
+          breathWeapon: { damageType: a.damageType, shape: a.shape, size: a.size, savingThrow: a.savingThrow },
+          resist: [a.damageType],
+        },
+        reprintedAs: null,
+        isSubrace: true,
+        parentSlug: 'dragonborn',
+        parentSource: 'PHB',
+      })
+      .onConflictDoUpdate({
+        target: [compendiumRaces.slug, compendiumRaces.source],
+        set: {
+          name: sql`excluded.name`,
+          data: sql`excluded.data`,
+          isSubrace: sql`excluded.is_subrace`,
+          parentSlug: sql`excluded.parent_slug`,
+          parentSource: sql`excluded.parent_source`,
+        },
+      });
+  }
+}
+
+describe('Dragonborn ancestry — PHB Batch 3 (race-dragonborn-ancestry)', () => {
+  let user: TestUser;
+  let characterId: string;
+  let campaignId: string;
+
+  beforeAll(async () => {
+    // Seed ancestry rows (idempotent upsert — safe to run alongside import)
+    await seedDragonbornAncestries();
+
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Dragonborn Ancestry Test Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId, name: 'Qyara Virixis' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+
+    // Set base stats: CON 14 (+2 mod) — needed for saveDC calculation on sheet.
+    // Point-buy cost: 15(9)+10(2)+14(7)+10(2)+10(2)+13(5) = 27 pts exactly.
+    const statsRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/stats`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        method: 'point-buy',
+        scores: { str: 15, dex: 10, con: 14, int: 10, wis: 10, cha: 13 },
+      },
+    });
+    if (statsRes.statusCode !== 200) throw new Error(`stats setup: ${statsRes.body}`);
+
+    // Set class for sheet computation
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/class`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  // A-1: GET /compendium/races returns 10 dragonborn ancestry subraces
+  it('A-1 (S-22): GET /compendium/races includes 10 dragonborn--<color> subraces', async () => {
+    const app = await getTestApp();
+    // Use limit=200 to get all races, filter client-side for dragonborn subraces
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/races?campaign=${campaignId}&limit=200`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    // Filter to only the 10 synthetic PHB ancestry rows (dragonborn--<color> pattern).
+    // Other existing subraces (EGW Draconblood/Ravenite, anonymous PHB variant) are excluded.
+    const expectedColors = ['black', 'blue', 'brass', 'bronze', 'copper', 'gold', 'green', 'red', 'silver', 'white'];
+    const dragonbornAncestries = (data as Array<{ slug: string; isSubrace: boolean; parentSlug: string | null }>)
+      .filter((r) => r.parentSlug === 'dragonborn' && r.isSubrace
+        && expectedColors.some((c) => r.slug === `dragonborn--${c}`));
+
+    expect(dragonbornAncestries).toHaveLength(10);
+    const slugs = dragonbornAncestries.map((r) => r.slug).sort();
+    expect(slugs).toContain('dragonborn--black');
+    expect(slugs).toContain('dragonborn--green');
+    expect(slugs).toContain('dragonborn--gold');
+    expect(slugs).toContain('dragonborn--silver');
+  });
+
+  // A-2: PUT without subrace → 400 RACE_SUBRACE_REQUIRED
+  it('A-2 (S-23): PUT Dragonborn without ancestry → 400 RACE_SUBRACE_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'dragonborn', source: 'PHB' },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    const issue = body.issues.find((i: { code: string }) => i.code === 'RACE_SUBRACE_REQUIRED');
+    expect(issue).toBeDefined();
+    expect(issue.race).toEqual({ slug: 'dragonborn', source: 'PHB' });
+  });
+
+  // A-3: PUT Dragonborn + gold ancestry → 200, persisted
+  it('A-3 (S-24): PUT Dragonborn + dragonborn--gold → 200, subrace persisted', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'dragonborn', source: 'PHB' },
+        subrace: { slug: 'dragonborn--gold', source: 'PHB' },
+        // Dragonborn: STR+2, CHA+1 (PHB p.32)
+        appliedAsis: [
+          { ability: 'str', bonus: 2, source: 'race' },
+          { ability: 'cha', bonus: 1, source: 'race' },
+        ],
+      },
+    });
+
+    if (res.statusCode !== 200) console.log('A-3 body:', res.body);
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'dragonborn', source: 'PHB' });
+    expect(c.data.subrace).toEqual({ slug: 'dragonborn--gold', source: 'PHB' });
+  });
+
+  // A-4: GET /sheet returns breathWeapon populated for gold ancestry
+  it('A-4 (S-15): GET /sheet after A-3 → breathWeapon fire/cone populated', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    if (res.statusCode !== 200) console.log('A-4 body:', res.body);
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+
+    expect(sheet.breathWeapon).not.toBeNull();
+    expect(sheet.breathWeapon.damageType).toBe('fire');
+    expect(sheet.breathWeapon.shape).toBe('cone');
+    expect(sheet.breathWeapon.area).toBe('15 ft');
+    expect(sheet.breathWeapon.savingThrow).toBe('dex');
+    // saveDC = 8 + CON mod (+2 for CON 14) + PB (+2 for level 1)
+    expect(sheet.breathWeapon.saveDC).toBe(12);
+    expect(sheet.breathWeapon.damageDice).toBe('2d6');
+  });
+
+  // A-5: Legacy Dragonborn (no ancestry) → 200, breathWeapon null
+  it('A-5 (S-25): GET legacy Dragonborn (no ancestry subrace) → 200, breathWeapon null', async () => {
+    const app = await getTestApp();
+
+    // Write legacy character directly (no subrace)
+    await db
+      .update(characters)
+      .set({
+        data: {
+          race: { slug: 'dragonborn', source: 'PHB' },
+          subrace: null,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'dragonborn', source: 'PHB' });
+    expect(c.data.subrace).toBeNull();
   });
 });

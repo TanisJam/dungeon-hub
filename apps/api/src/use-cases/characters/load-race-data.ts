@@ -3,7 +3,7 @@ import type {
   RaceCompendiumData,
   SubraceCompendiumData,
 } from '@dungeon-hub/domain/character/race';
-import type { RaceSheetData } from '@dungeon-hub/domain/character/sheet';
+import type { RaceSheetData, BreathWeaponData } from '@dungeon-hub/domain/character/sheet';
 import { db } from '../../infra/db/client.js';
 import { compendiumRaces } from '../../infra/db/schema.js';
 
@@ -36,7 +36,7 @@ export async function loadRaceAndSubrace(input: {
   const raceRow = raceRows[0];
 
   const race: RaceCompendiumData | null = raceRow
-    ? {
+    ? ({
         slug: raceRow.slug,
         source: raceRow.source,
         ability: (raceRow.data as { ability?: unknown }).ability as
@@ -49,7 +49,10 @@ export async function loadRaceAndSubrace(input: {
           | undefined,
         skillProficiencies: (raceRow.data as { skillProficiencies?: unknown })
           .skillProficiencies as RaceCompendiumData['skillProficiencies'] | undefined,
-      }
+        breathWeapon: (raceRow.data as { breathWeapon?: unknown }).breathWeapon as
+          | RaceCompendiumData['breathWeapon']
+          | undefined,
+      } as RaceCompendiumData)
     : null;
 
   let subrace: SubraceCompendiumData | null = null;
@@ -82,7 +85,10 @@ export async function loadRaceAndSubrace(input: {
           | undefined,
         skillProficiencies: (subRow.data as { skillProficiencies?: unknown })
           .skillProficiencies as SubraceCompendiumData['skillProficiencies'] | undefined,
-      };
+        breathWeapon: (subRow.data as { breathWeapon?: unknown }).breathWeapon as
+          | SubraceCompendiumData['breathWeapon']
+          | undefined,
+      } as SubraceCompendiumData;
     }
   }
 
@@ -116,12 +122,15 @@ export async function loadRaceSheetData(input: {
   const raceData = raceRow.data as Record<string, unknown>;
 
   let result: RaceSheetData = {
-    speed: raceData.speed as RaceSheetData['speed'],
-    size: raceData.size as RaceSheetData['size'],
-    languageProficiencies: raceData.languageProficiencies as RaceSheetData['languageProficiencies'],
-  };
+    speed: raceData['speed'] as RaceSheetData['speed'],
+    size: raceData['size'] as RaceSheetData['size'],
+    languageProficiencies: raceData['languageProficiencies'] as RaceSheetData['languageProficiencies'],
+    // Race-level breathWeapon for symmetry (null in 100% of PHB cases today).
+    breathWeapon: (raceData['breathWeapon'] as BreathWeaponData | null | undefined) ?? null,
+  } as RaceSheetData;
 
-  // Mergeamos languageProficiencies de la subrace si existe
+  // Merge languageProficiencies and breathWeapon from subrace if it exists.
+  // Subrace breathWeapon OVERRIDES race-level (per design D-5: only subraces carry it).
   if (input.subraceSlug && input.subraceSource) {
     const subRows = await db
       .select()
@@ -137,7 +146,7 @@ export async function loadRaceSheetData(input: {
     const subRow = subRows[0];
     if (subRow) {
       const subData = subRow.data as Record<string, unknown>;
-      const subLangs = subData.languageProficiencies as
+      const subLangs = subData['languageProficiencies'] as
         | RaceSheetData['languageProficiencies']
         | undefined;
       if (subLangs && subLangs.length > 0) {
@@ -145,6 +154,11 @@ export async function loadRaceSheetData(input: {
           ...result,
           languageProficiencies: [...(result.languageProficiencies ?? []), ...subLangs],
         };
+      }
+      // Project breathWeapon from subrace JSONB (PHB Dragonborn ancestries).
+      const subBreath = subData['breathWeapon'] as BreathWeaponData | null | undefined;
+      if (subBreath) {
+        result = { ...result, breathWeapon: subBreath };
       }
     }
   }
