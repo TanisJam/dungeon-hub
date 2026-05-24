@@ -10,9 +10,10 @@ type Props = {
   variant: 'non-caster' | 'too-early';
   className: string;
   level: number;
+  hasRaceCantrip?: boolean;
 };
 
-export function NoPicksPanel({ characterId, variant, className, level }: Props) {
+export function NoPicksPanel({ characterId, variant, className, level, hasRaceCantrip }: Props) {
   const [pending, startTransition] = useTransition();
 
   function handleSkip() {
@@ -33,6 +34,11 @@ export function NoPicksPanel({ characterId, variant, className, level }: Props) 
           {className} · Nivel {level}
         </p>
         <p className="mt-2 text-sm text-ink-mute">{body}</p>
+        {hasRaceCantrip && (
+          <p className="mt-2 text-sm text-ink-mute">
+            Tu cantrip racial está configurado en el paso de raza.
+          </p>
+        )}
       </Card>
 
       <WizardFooterNav

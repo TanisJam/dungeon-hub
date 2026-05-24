@@ -105,6 +105,7 @@ export default async function SpellsStepPage({ params }: Props) {
             variant={nonCaster ? 'non-caster' : 'too-early'}
             className={primaryClass.slug}
             level={primaryClass.level}
+            hasRaceCantrip={!!character.data?.raceCantrip}
           />
         ) : (
           <SpellsPicker
