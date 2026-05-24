@@ -705,7 +705,7 @@ function finishWithSkillsAndFeats(
             slug: input.featChoice.featData.slug,
             source: input.featChoice.featData.source,
           },
-          nested: featResult.issues,
+          wrapped: featResult.issues,
         }],
       };
     }

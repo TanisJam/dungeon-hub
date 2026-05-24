@@ -164,7 +164,7 @@ export type RaceValidationIssue =
       /** El featChoice falló las validaciones del feat domain. Issues bubbled. */
       code: 'RACE_FEAT_INVALID';
       feat: { slug: string; source: string };
-      nested: FeatValidationIssue[];
+      wrapped: FeatValidationIssue[];
     }
   | {
       /** La raza requiere N skills pero el user proveyó otro número. */

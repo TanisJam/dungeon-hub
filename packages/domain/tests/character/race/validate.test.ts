@@ -944,7 +944,7 @@ describe('validateRaceSelection — race feat grant (Variant Human)', () => {
     const issue = res.issues[0]!;
     expect(issue.code).toBe('RACE_FEAT_INVALID');
     if (issue.code !== 'RACE_FEAT_INVALID') return;
-    expect(issue.nested[0]!.code).toBe('FEAT_ASI_REQUIRED');
+    expect(issue.wrapped[0]!.code).toBe('FEAT_ASI_REQUIRED');
   });
 
   it('D-13: Variant Human + Heavy Armor Master (prereq unmet) → RACE_FEAT_INVALID wrapping PREREQ_PROFICIENCY_NOT_MET', () => {
@@ -969,7 +969,7 @@ describe('validateRaceSelection — race feat grant (Variant Human)', () => {
     const issue = res.issues[0]!;
     expect(issue.code).toBe('RACE_FEAT_INVALID');
     if (issue.code !== 'RACE_FEAT_INVALID') return;
-    expect(issue.nested[0]!.code).toBe('PREREQ_PROFICIENCY_NOT_MET');
+    expect(issue.wrapped[0]!.code).toBe('PREREQ_PROFICIENCY_NOT_MET');
   });
 
   it('D-14: Variant Human + Resilient feat with valid asiChoice → ok:true', () => {
