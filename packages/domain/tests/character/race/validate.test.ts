@@ -747,6 +747,31 @@ describe('validateRaceSelection — race skill choices (Variant Human / Half-Elf
     expect(res.issues[0]!.code).toBe('RACE_FEAT_REQUIRED');
   });
 
+  it('D-2b (S-03): Custom Lineage (TCE), no featChoice → RACE_FEAT_REQUIRED', () => {
+    // Custom Lineage per TCE shares the same `feats: [{any:1}]` shape as Variant
+    // Human but is a distinct base race (slug 'custom-lineage', source 'TCE') —
+    // NOT a subrace. Spec #545 S-03 + SUG-2 of verify #553. The `_versions`
+    // darkvision/extra-skill toggle of Custom Lineage is OUT of scope (Batch 3).
+    const CUSTOM_LINEAGE_WITH_GRANTS: RaceCompendiumData = {
+      slug: 'custom-lineage',
+      source: 'TCE',
+      ability: [{ str: 2, dex: 1 }],
+      feats: [{ any: 1 }],
+      skillProficiencies: [{ any: 1 }],
+    };
+    const res = validateRaceSelection({
+      raceData: CUSTOM_LINEAGE_WITH_GRANTS,
+      subraceData: null,
+      rulesProfile: PROFILE_FEATS_ON,
+      skillChoices: ['perception'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_FEAT_REQUIRED');
+    if (res.issues[0]!.code !== 'RACE_FEAT_REQUIRED') return;
+    expect(res.issues[0]!.race).toEqual({ slug: 'custom-lineage', source: 'TCE' });
+  });
+
   it('D-3: Variant Human, no skillChoices, featChoice valid → RACE_SKILL_COUNT_MISMATCH (skill runs first)', () => {
     const res = validateRaceSelection({
       raceData: PHB_HUMAN_BASE,
