@@ -8,10 +8,9 @@
  * - B.7: FeaturePicker (filter input narrows select, persist slug)
  */
 import React from 'react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 
-afterEach(cleanup);
 import type { ParsedBackground, BackgroundData } from './_parsers';
 import type { MixedPoolShape, BackgroundPackage, FeatureOption, BackgroundCompendiumData } from '@dungeon-hub/domain/character/background';
 import { MixedPoolPicker, EquipmentPicker, FeaturePicker } from './_picker';
