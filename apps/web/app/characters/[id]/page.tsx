@@ -14,6 +14,7 @@ import { HabilidadesTab } from './_tabs/habilidades';
 import { HechizosTab } from './_tabs/hechizos';
 import { InventarioTab } from './_tabs/inventario';
 import { NotasTab } from './_tabs/notas';
+import { DeleteCharacterButton } from './_delete-button';
 
 const VALID_TABS = ['resumen', 'habilidades', 'hechizos', 'inventario', 'notas'] as const;
 
@@ -146,6 +147,16 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           <span aria-hidden>✎</span>
           Editar personaje en el constructor
         </Link>
+
+        <section
+          aria-label="Zona de peligro"
+          className="mt-6 rounded-2xl border border-red-200 p-4"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-400 mb-3">
+            Zona de peligro
+          </p>
+          <DeleteCharacterButton characterId={id} characterName={identity.name} />
+        </section>
       </div>
     </AppShell>
   );
