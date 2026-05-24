@@ -15,7 +15,9 @@ import {
   type BreathWeaponView,
   type BreathWeaponData,
   type DarkvisionView,
+  type RacialSpellView,
 } from './types.js';
+import type { RaceInnateSpell } from '../race/types.js';
 import {
   buildWeightLookup,
   carryingCapacity,
@@ -220,6 +222,55 @@ function computeDarkvision(feet: number | null | undefined): DarkvisionView | nu
   return { feet, isSuperior: feet >= 120 };
 }
 
+/**
+ * Builds RacialSpellView[] from race+subrace merged additionalSpellsNormalized + raceCantrip.
+ * Decisions: #602 (sentinel), #603 (level field), #605 (flag-based), #606 (picker in race step).
+ * Read-path tolerance per CLAUDE.md §11: returns [] when raceData absent.
+ * High Elf isPlayerChoice entries are SKIPPED when raceCantrip is null/absent (legacy rows
+ * predating Batch 6 still load cleanly). REQ-D-COMPUTE-01, REQ-D-COMPUTE-02.
+ *
+ * Level-gating policy: ALL entries are returned regardless of character total level.
+ * The renderer is responsible for showing/dimming entries whose characterLevelAvailable
+ * exceeds the character's totalLevel — letting the sheet preview future-unlock entries.
+ * Spec S-5 / design #608 §5 rationale.
+ *
+ * De-dup policy (spec S-10): compute helper does NOT merge racialSpells into spellsByClass.
+ * The two surfaces are intentionally separate (REQ-D-COMPUTE-03).
+ */
+function computeRacialSpells(
+  raceData: RaceSheetData | null,
+  raceCantrip: { slug: string; source: string } | null | undefined,
+): RacialSpellView[] {
+  const entries: RaceInnateSpell[] = (raceData as RaceSheetData & { additionalSpellsNormalized?: RaceInnateSpell[] | null } | null)?.additionalSpellsNormalized ?? [];
+  const out: RacialSpellView[] = [];
+  for (const e of entries) {
+    if (e.isPlayerChoice) {
+      // Resolve from character.raceCantrip — skip silently when not yet chosen (legacy tolerance).
+      if (!raceCantrip) continue;
+      out.push({
+        slug: raceCantrip.slug,
+        source: raceCantrip.source,
+        characterLevelAvailable: e.characterLevelAvailable,
+        frequency: e.frequency,
+        ability: e.ability,
+        castLevel: e.castLevel ?? null,
+        isPlayerChoice: true,
+      });
+    } else {
+      out.push({
+        slug: e.slug,
+        source: e.source,
+        characterLevelAvailable: e.characterLevelAvailable,
+        frequency: e.frequency,
+        ability: e.ability,
+        castLevel: e.castLevel ?? null,
+        isPlayerChoice: false,
+      });
+    }
+  }
+  return out;
+}
+
 interface ComputeInput {
   character: CharacterSnapshot;
   raceData?: RaceSheetData | null;
@@ -405,6 +456,11 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   // ---- Darkvision (race + subrace already merged in loadRaceSheetData — PHB p.17, 24) ---
   const darkvision = computeDarkvision(raceData?.darkvision);
 
+  // ---- Racial innate/known spells (Batch 6 — race-additional-spells) --------
+  // PHB p.23 (High Elf), p.24 (Drow), p.37 (Forest Gnome), p.42-43 (Tiefling).
+  // ALL entries returned; renderer dims by characterLevelAvailable (design #608 §5).
+  const racialSpells = computeRacialSpells(raceData, character.raceCantrip ?? null);
+
   // ---- Encumbrance (con o sin variant) ----------------------------------
   const totalCarryWeight = totalWeight(
     character.inventory ?? [],
@@ -469,6 +525,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     feats: (character.feats ?? []).map((f) => ({ slug: f.slug, source: f.source })),
     breathWeapon,
     darkvision,
+    racialSpells,
     spellcasting,
     currency: character.currency ?? { ...EMPTY_CURRENCY },
     encumbrance: encumbranceView,

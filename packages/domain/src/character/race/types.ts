@@ -94,6 +94,40 @@ export type WeaponProficiencyBlock = Record<string, boolean | { choose: unknown 
  */
 export type ArmorProficiencyBlock = Record<string, boolean>;
 
+/** Frequency bucket for racial innate spells. PHB 2014 races use only 'at-will' or 'daily-1'. */
+export type RaceInnateSpellFrequency = 'at-will' | 'daily-1';
+
+/**
+ * Normalized racial innate/known spell entry. Stored under `data.additionalSpellsNormalized`
+ * in the race/subrace JSONB (computed at import time by `normalize-additional-spells.ts`).
+ *
+ * Decision #605: single flat interface with `isPlayerChoice` flag (NOT a discriminated union).
+ * When `isPlayerChoice: true`, `slug` is the sentinel placeholder `'__choose__'` and
+ * `source` is `''`; the resolved cantrip lives on `CharacterSnapshot.raceCantrip`.
+ *
+ * Decision #603: `characterLevelAvailable` is a literal union — forces explicit widening
+ * if a future race uses other levels. The `3` key in 5etools `innate["3"]` means
+ * character level 3 ("When you reach 3rd level..."), NOT spell slot level.
+ */
+export interface RaceInnateSpell {
+  /** Spell slug (e.g. 'hellish-rebuke'). Sentinel '__choose__' when isPlayerChoice. */
+  slug: string;
+  /** Spell source ('phb'). Empty string when isPlayerChoice. */
+  source: string;
+  /** Character level at which this spell becomes available. PHB 2014: 1, 3, or 5 only. */
+  characterLevelAvailable: 1 | 3 | 5;
+  /** 'at-will' (cantrip) or 'daily-1' (1 use per long rest). PHB 2014 frequencies only. */
+  frequency: RaceInnateSpellFrequency;
+  /** Spellcasting ability for this entry. PHB: 'cha' (Tiefling/Drow) or 'int' (HighElf/ForestGnome). */
+  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  /** Cast level override for `#N` suffix (e.g. `hellish rebuke#2` → 2). PHB Tiefling only. */
+  castLevel?: number | null;
+  /** True ONLY for the High Elf wizard-cantrip sentinel (Decision #602). */
+  isPlayerChoice?: boolean;
+  /** Class filter when isPlayerChoice. PHB: 'wizard'. Decision #605 + #602. */
+  fromClass?: string;
+}
+
 export interface RaceCompendiumData {
   slug: string;
   source: string;
@@ -124,6 +158,13 @@ export interface RaceCompendiumData {
    * Absent when race grants no armor proficiencies.
    */
   armorProficiencies?: ArmorProficiencyBlock[] | null;
+  /**
+   * Normalized racial innate/known spells. Populated by the importer from the raw
+   * `additionalSpells` JSONB block. PHB 2014: Tiefling (3 entries), High Elf (1 sentinel),
+   * Forest Gnome (1 entry); Drow lives on the SUBRACE — see SubraceCompendiumData.
+   * Absent when race grants none. Decisions #602, #603, #604, #605.
+   */
+  additionalSpellsNormalized?: RaceInnateSpell[] | null;
 }
 
 export interface SubraceCompendiumData {
@@ -161,6 +202,13 @@ export interface SubraceCompendiumData {
    * - undefined (field absent): no override — race-level armorProficiencies used (or none).
    */
   armorProficiencies?: ArmorProficiencyBlock[] | null;
+  /**
+   * Normalized racial innate/known spells from the subrace. When PRESENT (incl. null),
+   * OVERRIDES the parent race's additionalSpellsNormalized per Decision #589 family
+   * (same merge pattern as darkvision/weaponProficiencies). PHB: Drow (3 entries),
+   * High Elf (1 sentinel), Forest Gnome (1 entry).
+   */
+  additionalSpellsNormalized?: RaceInnateSpell[] | null;
 }
 
 export interface AppliedAsi {
@@ -268,6 +316,19 @@ export type RaceValidationIssue =
       /** El user picó una skill que no existe en ALL_SKILLS. */
       code: 'RACE_SKILL_UNKNOWN';
       skill: string;
+    }
+  | {
+      /** Subrace requires a wizard cantrip pick (High Elf) and `raceCantrip` is null on WRITE. */
+      code: 'RACE_CANTRIP_REQUIRED';
+      race: { slug: string; source: string };
+      subrace: { slug: string; source: string };
+      expectedFilter: { class: string; spellLevel: number };
+    }
+  | {
+      /** Chosen cantrip slug is not in the wizard cantrip pool (cross-checked via use-case). */
+      code: 'RACE_CANTRIP_INVALID';
+      cantrip: { slug: string; source: string };
+      fromClass: string;
     };
 
 export type RaceValidationResult =

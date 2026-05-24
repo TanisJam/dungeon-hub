@@ -1132,3 +1132,199 @@ describe('computeCharacterSheet — race weapon/armor proficiencies (Batch 5)', 
     }).not.toThrow();
   });
 });
+
+// ── Batch 6: computeRacialSpells (race-additional-spells) ────────────────────
+// PHB citations per CLAUDE.md §5 strict TDD requirement.
+// REQ-D-COMPUTE-01, REQ-D-COMPUTE-02, REQ-D-COMPUTE-03 from spec #607.
+// Design: engram #608 §5.
+// NOTE: computeRacialSpells returns ALL entries regardless of character level —
+// the renderer is responsible for dimming entries where characterLevelAvailable > totalLevel.
+// This design decision is in spec S-5 / design #608 §5 rationale.
+
+import type { RaceInnateSpell } from '../../../src/character/race/types.js';
+
+function tieflingRaceData(): RaceSheetData & { additionalSpellsNormalized: RaceInnateSpell[] } {
+  return {
+    speed: 30,
+    size: ['M'],
+    // PHB p.42-43 Infernal Legacy trait
+    additionalSpellsNormalized: [
+      { slug: 'thaumaturgy', source: 'phb', characterLevelAvailable: 1, frequency: 'at-will', ability: 'cha' },
+      { slug: 'hellish-rebuke', source: 'phb', characterLevelAvailable: 3, frequency: 'daily-1', ability: 'cha', castLevel: 2 },
+      { slug: 'darkness', source: 'phb', characterLevelAvailable: 5, frequency: 'daily-1', ability: 'cha' },
+    ],
+  };
+}
+
+function drowRaceData(): RaceSheetData & { additionalSpellsNormalized: RaceInnateSpell[] } {
+  return {
+    speed: 30,
+    size: ['M'],
+    darkvision: 120,
+    // PHB p.24 Drow Magic trait
+    additionalSpellsNormalized: [
+      { slug: 'dancing-lights', source: 'phb', characterLevelAvailable: 1, frequency: 'at-will', ability: 'cha' },
+      { slug: 'faerie-fire', source: 'phb', characterLevelAvailable: 3, frequency: 'daily-1', ability: 'cha' },
+      { slug: 'darkness', source: 'phb', characterLevelAvailable: 5, frequency: 'daily-1', ability: 'cha' },
+    ],
+  };
+}
+
+function forestGnomeRaceData(): RaceSheetData & { additionalSpellsNormalized: RaceInnateSpell[] } {
+  return {
+    speed: 25,
+    size: ['S'],
+    // PHB p.37 Natural Illusionist trait
+    additionalSpellsNormalized: [
+      { slug: 'minor-illusion', source: 'phb', characterLevelAvailable: 1, frequency: 'at-will', ability: 'int' },
+    ],
+  };
+}
+
+function highElfRaceData(): RaceSheetData & { additionalSpellsNormalized: RaceInnateSpell[] } {
+  return {
+    speed: 30,
+    size: ['M'],
+    // PHB p.23 Cantrip trait — sentinel entry
+    additionalSpellsNormalized: [
+      { slug: '__choose__', source: '', characterLevelAvailable: 1, frequency: 'at-will', ability: 'int', isPlayerChoice: true, fromClass: 'wizard' },
+    ],
+  };
+}
+
+function makeChar(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
+  return {
+    name: 'Test Character',
+    ...overrides,
+  };
+}
+
+describe('computeRacialSpells — Batch 6 (race-additional-spells)', () => {
+  // C-1: Tiefling → racialSpells has ALL 3 entries (renderer dims by characterLevelAvailable)
+  // PHB p.42-43: "When you reach 3rd level... When you reach 5th level..."
+  // NOTE: compute returns ALL entries; no level-gating here (design #608 §5 rationale)
+  it('C-1: Tiefling → racialSpells has all 3 entries (renderer dims future-unlock)', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({ race: { slug: 'tiefling', source: 'PHB' } }),
+      raceData: tieflingRaceData(),
+    });
+    expect(sheet.racialSpells).toHaveLength(3);
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'thaumaturgy', frequency: 'at-will', ability: 'cha' }),
+    );
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'hellish-rebuke', frequency: 'daily-1', ability: 'cha' }),
+    );
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'darkness', frequency: 'daily-1', ability: 'cha' }),
+    );
+  });
+
+  // C-2: Drow → racialSpells has 3 entries with correct frequencies and abilities
+  // PHB p.24: "You know the dancing lights cantrip..."
+  it('C-2: Drow → racialSpells has 3 entries with correct frequencies and abilities', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({ race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--drow', source: 'PHB' } }),
+      raceData: drowRaceData(),
+    });
+    expect(sheet.racialSpells).toHaveLength(3);
+    expect(sheet.racialSpells.every((s) => s.ability === 'cha')).toBe(true);
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'dancing-lights', frequency: 'at-will', ability: 'cha' }),
+    );
+    // castLevel should be null (Drow spells have no upcast modifier)
+    const faerieFire = sheet.racialSpells.find((s) => s.slug === 'faerie-fire');
+    expect(faerieFire?.castLevel).toBeNull();
+  });
+
+  // C-3: Forest Gnome → racialSpells has 1 entry with ability='int'
+  // PHB p.37: "You know the minor illusion cantrip. Intelligence is your spellcasting ability for it."
+  it('C-3: Forest Gnome → racialSpells has 1 entry, ability=int', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({ race: { slug: 'gnome', source: 'PHB' }, subrace: { slug: 'gnome--forest', source: 'PHB' } }),
+      raceData: forestGnomeRaceData(),
+    });
+    expect(sheet.racialSpells).toHaveLength(1);
+    expect(sheet.racialSpells[0]).toMatchObject({
+      slug: 'minor-illusion',
+      source: 'phb',
+      frequency: 'at-will',
+      ability: 'int',
+      characterLevelAvailable: 1,
+      isPlayerChoice: false,
+    });
+  });
+
+  // C-4: High Elf + raceCantrip → 1 entry resolved with correct slug
+  // PHB p.23: "You know one cantrip of your choice from the wizard spell list."
+  it('C-4: High Elf + raceCantrip={slug:fire-bolt} → 1 resolved entry with isPlayerChoice=true', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
+      }),
+      raceData: highElfRaceData(),
+    });
+    expect(sheet.racialSpells).toHaveLength(1);
+    expect(sheet.racialSpells[0]).toMatchObject({
+      slug: 'fire-bolt',
+      source: 'phb',
+      frequency: 'at-will',
+      ability: 'int',
+      characterLevelAvailable: 1,
+      isPlayerChoice: true,
+    });
+  });
+
+  // C-5: High Elf + raceCantrip=null (legacy/unfinished) → racialSpells=[] (read-path tolerance)
+  // CLAUDE.md §11: read-path must be tolerant — no exception on null raceCantrip
+  it('C-5: High Elf + raceCantrip=null (legacy) → racialSpells=[] no throw', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        raceCantrip: null,
+      }),
+      raceData: highElfRaceData(),
+    });
+    expect(sheet.racialSpells).toHaveLength(0);
+  });
+
+  // C-6: Human (no additionalSpellsNormalized) → racialSpells=[]
+  // PHB p.17: Humans grant no innate spells
+  it('C-6: Human (no additionalSpellsNormalized on raceData) → racialSpells=[]', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({ race: { slug: 'human', source: 'PHB' } }),
+      raceData: { speed: 30, size: ['M'] }, // no additionalSpellsNormalized
+    });
+    expect(sheet.racialSpells).toHaveLength(0);
+    expect(sheet.racialSpells).toEqual([]);
+  });
+
+  // C-7: raceData=null → racialSpells=[]
+  // CLAUDE.md §11: read-path must not throw when race data is absent
+  it('C-7: raceData=null → racialSpells=[] no throw', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar(),
+      raceData: null,
+    });
+    expect(sheet.racialSpells).toHaveLength(0);
+    expect(sheet.racialSpells).toEqual([]);
+  });
+
+  // C-8: Tiefling hellish-rebuke entry → castLevel:2 propagates to RacialSpellView
+  // PHB p.42: "you can cast the hellish rebuke spell as a 2nd-level spell"
+  it('C-8: Tiefling hellish-rebuke → castLevel:2 propagates to RacialSpellView', () => {
+    const sheet = computeCharacterSheet({
+      character: makeChar({ race: { slug: 'tiefling', source: 'PHB' } }),
+      raceData: tieflingRaceData(),
+    });
+    const hellishRebuke = sheet.racialSpells.find((s) => s.slug === 'hellish-rebuke');
+    expect(hellishRebuke).toBeDefined();
+    expect(hellishRebuke?.castLevel).toBe(2);
+    // Only hellish-rebuke should have castLevel set; thaumaturgy and darkness should not
+    const thaumaturgy = sheet.racialSpells.find((s) => s.slug === 'thaumaturgy');
+    expect(thaumaturgy?.castLevel ?? null).toBeNull();
+  });
+});

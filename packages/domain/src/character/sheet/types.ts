@@ -2,7 +2,7 @@ import type { AbilityKey, AbilityScores } from '../stats/types.js';
 import type { AppliedClass } from '../class/types.js';
 import type { AppliedFeat } from '../feat/types.js';
 import type { AppliedBackground } from '../background/types.js';
-import type { AppliedAsi, BreathWeaponData, BreathWeaponShape, BreathWeaponSavingThrow } from '../race/types.js';
+import type { AppliedAsi, BreathWeaponData, BreathWeaponShape, BreathWeaponSavingThrow, RaceInnateSpell, RaceInnateSpellFrequency } from '../race/types.js';
 import type { InventoryItem } from '../inventory/types.js';
 import type { EncumbranceView } from '../inventory/encumbrance.js';
 
@@ -37,6 +37,28 @@ export const SKILL_TO_ABILITY: Readonly<Record<string, AbilityKey>> = Object.fre
 export const ALL_SKILLS = Object.keys(SKILL_TO_ABILITY).sort();
 
 /**
+ * Computed racial innate/known spell entry for the character sheet.
+ * Derived from `RaceSheetData.additionalSpellsNormalized` + `CharacterSnapshot.raceCantrip`.
+ * Decisions #602, #603, #605, #606. PHB p.17, 23, 24, 37, 42-43.
+ */
+export interface RacialSpellView {
+  /** Resolved spell slug — never '__choose__'. For player-choice entries, set from raceCantrip. */
+  slug: string;
+  source: string;
+  /** Character level at which it becomes available — gating not applied here (renderer decides). */
+  characterLevelAvailable: 1 | 3 | 5;
+  frequency: RaceInnateSpellFrequency;
+  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  /** Spell upcast forced level (Tiefling `hellish rebuke#2`). */
+  castLevel?: number | null;
+  /** True when this entry originated from a player choice (High Elf). UI marks it as such. */
+  isPlayerChoice: boolean;
+}
+
+// Re-export for convenience (consumed by compute.ts and by API/web layers)
+export type { RaceInnateSpell, RaceInnateSpellFrequency };
+
+/**
  * Estado del personaje que necesita el sheet calculator. Es el shape
  * persistido en `characters.data` (parcial) más data del compendio para race.
  */
@@ -65,6 +87,8 @@ export interface CharacterSnapshot {
   raceSkillChoices?: string[];
   /** Slug of the feat granted by the race (Variant Human / Custom Lineage). Marker for wizard re-edit. */
   raceFeatSlug?: string | null;
+  /** Wizard cantrip chosen for High Elf race step. Decision #606. Null when not yet chosen. */
+  raceCantrip?: { slug: string; source: string } | null;
 }
 
 /**
@@ -136,10 +160,17 @@ export interface RaceSheetData {
    * null/undefined when no armor proficiencies.
    */
   armorProficiencies?: Array<Record<string, boolean | unknown>> | null;
+  /**
+   * Effective normalized racial spells after race+subrace merge (subrace OVERRIDES race
+   * per the in-operator pattern, mirrors Decision #577/#589). Populated by
+   * loadRaceSheetData. Consumed by computeCharacterSheet to derive RacialSpellView[].
+   * null/undefined when race+subrace grant no innate spells. PHB p.17/23/24/37/42-43.
+   */
+  additionalSpellsNormalized?: RaceInnateSpell[] | null;
 }
 
 // Re-export for convenience (BreathWeaponData is consumed by compute.ts)
-export type { BreathWeaponData };
+export type { BreathWeaponData, BreathWeaponShape, BreathWeaponSavingThrow };
 
 export interface AbilityScoreView {
   score: number;
@@ -246,6 +277,12 @@ export interface CharacterSheet {
   breathWeapon: BreathWeaponView | null;
   /** Null when the character has no darkvision (PHB Human, Halfling, Dragonborn). PHB p.17. */
   darkvision: DarkvisionView | null;
+  /**
+   * Racial innate/known spells. Empty array when race grants none OR when High Elf
+   * raceCantrip is not yet chosen (read-path tolerance per CLAUDE.md §11).
+   * REQ-D-COMPUTE-01, REQ-D-COMPUTE-02. Batch 6.
+   */
+  racialSpells: RacialSpellView[];
   spellcasting: SpellcastingView[];
   currency: Currency;
   encumbrance: EncumbranceView;

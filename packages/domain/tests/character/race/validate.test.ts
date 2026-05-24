@@ -1112,3 +1112,126 @@ describe('validateRaceSelection — race feat grant (Variant Human)', () => {
     expect(res.appliedSkillChoices).toEqual(['arcana']);
   });
 });
+
+// ── Batch 6: RACE_CANTRIP_REQUIRED + RACE_CANTRIP_INVALID gates ──────────────
+// Spec: engram #607 REQ-D-GATE-01, REQ-D-GATE-02.
+// PHB p.23 — High Elf "Cantrip" trait: player-chosen wizard cantrip.
+// Decision #605: isPlayerChoice flag in additionalSpellsNormalized triggers this gate.
+// Decision #602: gate fires when ANY entry has isPlayerChoice:true AND raceCantrip is absent.
+
+const PHB_ELF_BASE: RaceCompendiumData = {
+  slug: 'elf',
+  source: 'PHB',
+  ability: [{ dex: 2 }],
+};
+
+const PHB_HIGH_ELF_SUBRACE_WITH_CANTRIP: SubraceCompendiumData = {
+  slug: 'elf--high',
+  source: 'PHB',
+  parentSlug: 'elf',
+  parentSource: 'PHB',
+  ability: [{ int: 1 }],
+  additionalSpellsNormalized: [
+    {
+      slug: '__choose__',
+      source: '',
+      characterLevelAvailable: 1,
+      frequency: 'at-will',
+      ability: 'int',
+      isPlayerChoice: true,
+      fromClass: 'wizard',
+    },
+  ],
+};
+
+const PHB_TIEFLING_NO_PLAYER_CHOICE: RaceCompendiumData = {
+  slug: 'tiefling',
+  source: 'PHB',
+  ability: [{ int: 1, cha: 2 }],
+  additionalSpellsNormalized: [
+    // Fixed spells — isPlayerChoice is NOT set
+    { slug: 'thaumaturgy', source: 'phb', characterLevelAvailable: 1, frequency: 'at-will', ability: 'cha' },
+    { slug: 'hellish-rebuke', source: 'phb', characterLevelAvailable: 3, frequency: 'daily-1', ability: 'cha', castLevel: 2 },
+    { slug: 'darkness', source: 'phb', characterLevelAvailable: 5, frequency: 'daily-1', ability: 'cha' },
+  ],
+};
+
+/** Pool of valid wizard cantrips for testing (subset of PHB). */
+const WIZARD_CANTRIP_POOL: Array<{ slug: string; source: string }> = [
+  { slug: 'fire-bolt', source: 'phb' },
+  { slug: 'chill-touch', source: 'phb' },
+  { slug: 'minor-illusion', source: 'phb' },
+  { slug: 'prestidigitation', source: 'phb' },
+];
+
+describe('validateRaceSelection — Batch 6 RACE_CANTRIP_REQUIRED / RACE_CANTRIP_INVALID gates', () => {
+  // V-1: High Elf write + raceCantrip=null → emits RACE_CANTRIP_REQUIRED
+  // REQ-D-GATE-01: write-time gate fires when isPlayerChoice:true entry exists and raceCantrip absent
+  it('V-1: High Elf write + raceCantrip=null → RACE_CANTRIP_REQUIRED issue', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_ELF_BASE,
+      subraceData: PHB_HIGH_ELF_SUBRACE_WITH_CANTRIP,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      raceCantrip: null,
+      wizardCantripPool: WIZARD_CANTRIP_POOL,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues.find((i) => i.code === 'RACE_CANTRIP_REQUIRED');
+    expect(issue).toBeDefined();
+    expect(issue).toMatchObject({
+      code: 'RACE_CANTRIP_REQUIRED',
+      race: { slug: 'elf', source: 'PHB' },
+      subrace: { slug: 'elf--high', source: 'PHB' },
+      expectedFilter: { class: 'wizard', spellLevel: 0 },
+    });
+  });
+
+  // V-2: High Elf write + valid raceCantrip slug in wizardCantripPool → ok:true
+  // REQ-D-GATE-01: gate does NOT fire when a valid slug is provided
+  it('V-2: High Elf write + valid raceCantrip in pool → ok:true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_ELF_BASE,
+      subraceData: PHB_HIGH_ELF_SUBRACE_WITH_CANTRIP,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      raceCantrip: { slug: 'fire-bolt', source: 'phb' },
+      wizardCantripPool: WIZARD_CANTRIP_POOL,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  // V-3: High Elf write + raceCantrip NOT in wizardCantripPool → RACE_CANTRIP_INVALID
+  // REQ-D-GATE-02: fireball is a 3rd-level spell, not a wizard cantrip
+  it('V-3: High Elf write + raceCantrip slug not in pool (fireball) → RACE_CANTRIP_INVALID', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_ELF_BASE,
+      subraceData: PHB_HIGH_ELF_SUBRACE_WITH_CANTRIP,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      raceCantrip: { slug: 'fireball', source: 'phb' },
+      wizardCantripPool: WIZARD_CANTRIP_POOL,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues.find((i) => i.code === 'RACE_CANTRIP_INVALID');
+    expect(issue).toBeDefined();
+    expect(issue).toMatchObject({
+      code: 'RACE_CANTRIP_INVALID',
+      cantrip: { slug: 'fireball', source: 'phb' },
+    });
+  });
+
+  // V-4: Tiefling write (fixed spells, no isPlayerChoice) + raceCantrip=null → ok:true
+  // REQ-D-GATE-01: gate does NOT fire for races without isPlayerChoice entries
+  it('V-4: Tiefling write (fixed spells, no isPlayerChoice) + raceCantrip=null → ok:true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_TIEFLING_NO_PLAYER_CHOICE,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      raceCantrip: null,
+      wizardCantripPool: WIZARD_CANTRIP_POOL,
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const hasCantrip = res.issues?.some?.((i: { code: string }) => i.code === 'RACE_CANTRIP_REQUIRED');
+    expect(hasCantrip).toBeFalsy();
+  });
+});

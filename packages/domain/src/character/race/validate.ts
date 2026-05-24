@@ -7,6 +7,7 @@ import type {
   LanguageProficiencyBlock,
   RaceCompendiumData,
   RaceFeatBlock,
+  RaceInnateSpell,
   RaceSkillProficiencyBlock,
   RaceValidationIssue,
   RaceValidationResult,
@@ -209,6 +210,19 @@ interface ValidateRaceInput {
    * Construido por la API con baseStats + ASIs raciales (misma call).
    */
   featContext?: CharacterFeatContext;
+  /**
+   * Wizard cantrip chosen at the race step. Required when the merged
+   * additionalSpellsNormalized contains an isPlayerChoice:true entry (High Elf).
+   * Null = not yet chosen (write gate RACE_CANTRIP_REQUIRED fires).
+   * Write-only — NOT used in GET/sheet-compute paths. Decision #606. REQ-D-GATE-01.
+   */
+  raceCantrip?: { slug: string; source: string } | null;
+  /**
+   * Pool of valid wizard cantrips for RACE_CANTRIP_INVALID validation.
+   * Injected from the use-case (not hardcoded — CLAUDE.md §1.2 runtime DI).
+   * Only needed when raceCantrip is non-null. REQ-D-GATE-02. Decision #605.
+   */
+  wizardCantripPool?: Array<{ slug: string; source: string }>;
 }
 
 /**
@@ -710,6 +724,45 @@ function finishWithSkillsAndFeats(
       };
     }
     appliedFeat = featResult.appliedFeat;
+  }
+
+  // ---- 8) Racial cantrip gate (Batch 6 — REQ-D-GATE-01 + REQ-D-GATE-02) ----
+  // WRITE-ONLY: only runs from the save-race path; GET/sheet-compute never calls validateRaceSelection.
+  // Checks the merged additionalSpellsNormalized for isPlayerChoice entries.
+  // The merged array comes from the subraceData (when present) or raceData (when no subrace).
+  const mergedSpells: RaceInnateSpell[] = (subraceData?.additionalSpellsNormalized ?? raceData.additionalSpellsNormalized) ?? [];
+  const hasPlayerChoice = mergedSpells.some((e) => e.isPlayerChoice === true);
+
+  if (hasPlayerChoice) {
+    if (!input.raceCantrip) {
+      // Gate REQ-D-GATE-01: isPlayerChoice entry exists but raceCantrip is absent
+      return {
+        ok: false,
+        issues: [{
+          code: 'RACE_CANTRIP_REQUIRED',
+          race: { slug: raceData.slug, source: raceData.source },
+          subrace: subraceData
+            ? { slug: subraceData.slug, source: subraceData.source }
+            : { slug: '', source: '' },
+          expectedFilter: { class: 'wizard', spellLevel: 0 },
+        }],
+      };
+    }
+
+    // Gate REQ-D-GATE-02: raceCantrip provided but slug not in wizardCantripPool
+    if (input.wizardCantripPool && input.wizardCantripPool.length > 0) {
+      const inPool = input.wizardCantripPool.some((c) => c.slug === input.raceCantrip!.slug);
+      if (!inPool) {
+        return {
+          ok: false,
+          issues: [{
+            code: 'RACE_CANTRIP_INVALID',
+            cantrip: input.raceCantrip,
+            fromClass: 'wizard',
+          }],
+        };
+      }
+    }
   }
 
   return {
