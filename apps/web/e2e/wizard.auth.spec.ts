@@ -59,6 +59,9 @@ test.describe('character builder wizard', () => {
       //   - CON del segundo bloque (+1)
       await page.getByRole('button', { name: 'STR', exact: true }).first().click();
       await page.getByRole('button', { name: 'CON', exact: true }).last().click();
+      // Race language picker (added in 1d3e594): Human PHB grants Common fixed
+      // + 1 standard language of choice. Pick Dwarvish (no overlap with anything).
+      await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
