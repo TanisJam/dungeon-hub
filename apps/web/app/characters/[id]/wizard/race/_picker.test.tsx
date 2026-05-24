@@ -977,3 +977,120 @@ describe('W-D2: handleContinue passes raceCantrip to saveRace; preflight blocks 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// W-E1: Subraces are rendered immediately after their parent race in the list
+// W-E2: Grouping works even after a search query filters the list
+// ---------------------------------------------------------------------------
+
+const DRAGONBORN_BLACK = makeRaceEntry({
+  slug: 'dragonborn--black',
+  source: 'PHB',
+  name: 'Black',
+  isSubrace: true,
+  parentSlug: 'dragonborn',
+  parentSource: 'PHB',
+  data: { name: 'Black', source: 'PHB', ability: [{ str: 2, cha: 1 }], size: ['M'], speed: 30 },
+});
+
+const DRAGONBORN_RED = makeRaceEntry({
+  slug: 'dragonborn--red',
+  source: 'PHB',
+  name: 'Red',
+  isSubrace: true,
+  parentSlug: 'dragonborn',
+  parentSource: 'PHB',
+  data: { name: 'Red', source: 'PHB', ability: [{ str: 2, cha: 1 }], size: ['M'], speed: 30 },
+});
+
+const HIGH_ELF = makeRaceEntry({
+  slug: 'elf--high',
+  source: 'PHB',
+  name: 'High',
+  isSubrace: true,
+  parentSlug: 'elf',
+  parentSource: 'PHB',
+  data: { name: 'High', source: 'PHB', ability: [{ dex: 2, int: 1 }], size: ['M'], speed: 30 },
+});
+
+/**
+ * Helper: returns the rendered order of race title <p> elements by their text content.
+ * ChoiceCard renders each card's title in a <p> inside the button. We collect
+ * all such elements and map their position in the DOM — later elements have higher index.
+ */
+function getTitleOrder(titles: string[]): number[] {
+  // getAllByText returns elements in DOM order
+  const all: string[] = [];
+  const container = document.body;
+  const paragraphs = container.querySelectorAll('p');
+  paragraphs.forEach((p) => {
+    const text = p.textContent?.trim() ?? '';
+    if (titles.includes(text)) all.push(text);
+  });
+  return titles.map((t) => all.indexOf(t));
+}
+
+describe('W-E1: subraces are rendered immediately after their parent in the list', () => {
+  it('Dragonborn parent appears before its subraces (Black Dragonborn, Red Dragonborn)', () => {
+    // Entries intentionally out of natural order to test the sort
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DRAGONBORN_BLACK, DRAGONBORN_RED, DRAGONBORN_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    const order = getTitleOrder(['Dragonborn', 'Black Dragonborn', 'Red Dragonborn', 'Human']);
+    const [dragonbornIdx, blackIdx, redIdx, humanIdx] = order;
+
+    // Parent must appear in DOM (index >= 0)
+    expect(dragonbornIdx).toBeGreaterThanOrEqual(0);
+    // Parent must come before both subraces
+    expect(dragonbornIdx).toBeLessThan(blackIdx);
+    expect(dragonbornIdx).toBeLessThan(redIdx);
+    // Human must NOT appear between Dragonborn and its subraces
+    const lastSubraceIdx = Math.max(blackIdx, redIdx);
+    const humanInBetween = humanIdx > dragonbornIdx && humanIdx < lastSubraceIdx;
+    expect(humanInBetween).toBe(false);
+  });
+
+  it('Elf parent appears before High Elf subrace', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    const order = getTitleOrder(['Elf', 'High Elf', 'Human']);
+    const [elfIdx, highElfIdx] = order;
+
+    expect(elfIdx).toBeGreaterThanOrEqual(0);
+    expect(highElfIdx).toBeGreaterThanOrEqual(0);
+    expect(elfIdx).toBeLessThan(highElfIdx);
+  });
+});
+
+describe('W-E2: grouping is preserved after a search filter', () => {
+  it('searching "elf" shows Elf parent before High Elf subrace', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, DRAGONBORN_BASE, DRAGONBORN_BLACK, ELF_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/buscar linaje/i);
+    fireEvent.change(searchInput, { target: { value: 'elf' } });
+
+    const order = getTitleOrder(['Elf', 'High Elf']);
+    const [elfIdx, highElfIdx] = order;
+
+    expect(elfIdx).toBeGreaterThanOrEqual(0);
+    expect(highElfIdx).toBeGreaterThanOrEqual(0);
+    expect(elfIdx).toBeLessThan(highElfIdx);
+  });
+});

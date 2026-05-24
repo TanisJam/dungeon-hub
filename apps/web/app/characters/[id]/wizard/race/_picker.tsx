@@ -121,11 +121,64 @@ export function RacePicker({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter((e) => {
-      const display = displayName(e, entries).toLowerCase();
-      return display.includes(q) || e.source.toLowerCase().includes(q);
-    });
+    const raw = !q
+      ? entries
+      : entries.filter((e) => {
+          const display = displayName(e, entries).toLowerCase();
+          return display.includes(q) || e.source.toLowerCase().includes(q);
+        });
+
+    // Group subraces under their parent: each parent is followed immediately by its subraces.
+    // Parents and standalone races are interleaved alphabetically by display name.
+    // Algorithm:
+    //   1. Collect subraces in the filtered set (keyed by parentSlug|parentSource).
+    //   2. Walk the non-subrace entries sorted by name. For each parent, append it
+    //      then its matching subraces (sorted by name). Standalone races are emitted as-is.
+    const subracesByParent = new Map<string, RaceEntry[]>();
+    for (const e of raw) {
+      if (e.isSubrace && e.parentSlug) {
+        const key = `${e.parentSlug}|${e.parentSource}`;
+        if (!subracesByParent.has(key)) subracesByParent.set(key, []);
+        subracesByParent.get(key)!.push(e);
+      }
+    }
+
+    // Sort each subrace group by display name
+    for (const group of subracesByParent.values()) {
+      group.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
+    }
+
+    const parents = raw
+      .filter((e) => !e.isSubrace)
+      .sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
+
+    const ordered: RaceEntry[] = [];
+    for (const p of parents) {
+      ordered.push(p);
+      const key = `${p.slug}|${p.source}`;
+      const children = subracesByParent.get(key);
+      if (children) ordered.push(...children);
+    }
+
+    // Orphan subraces: their parent is not in the filtered set (e.g. search matched
+    // the subrace name but not the parent). Append them at the end, grouped by parent key.
+    const emittedParentKeys = new Set(parents.map((p) => `${p.slug}|${p.source}`));
+    const orphanGroups = new Map<string, RaceEntry[]>();
+    for (const e of raw) {
+      if (e.isSubrace && e.parentSlug) {
+        const key = `${e.parentSlug}|${e.parentSource}`;
+        if (!emittedParentKeys.has(key)) {
+          if (!orphanGroups.has(key)) orphanGroups.set(key, []);
+          orphanGroups.get(key)!.push(e);
+        }
+      }
+    }
+    for (const group of orphanGroups.values()) {
+      group.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
+      ordered.push(...group);
+    }
+
+    return ordered;
   }, [entries, query]);
 
   const selected = useMemo(
