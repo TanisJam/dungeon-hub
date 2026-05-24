@@ -1,5 +1,6 @@
 import { ABILITY_KEYS, type AbilityKey } from '../stats/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
+import { RACES_REQUIRING_SUBRACE } from './subrace-required.js';
 import type {
   AbilityBlock,
   AppliedAsi,
@@ -186,6 +187,18 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       });
     }
   }
+
+  // ---- 1.2) Subrace required gate (PHB 2014) --------------------------------
+  // Some races (Dwarf/Elf/Gnome/Halfling per PHB) cannot be selected without
+  // a subrace — the subrace carries half the mechanical identity (ASI,
+  // proficiencies, traits). Hard block; see decision #528.
+  if (!subraceData && RACES_REQUIRING_SUBRACE.has(entityKey(raceData.slug, raceData.source))) {
+    issues.push({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: raceData.slug, source: raceData.source },
+    });
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
   // ---- 1.5) Idiomas elegidos --------------------------------------------

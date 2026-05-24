@@ -60,18 +60,23 @@ describe('validateRaceSelection — fixed ASIs (Tasha\'s OFF)', () => {
     expect(res.usedTashasCustomOrigin).toBe(false);
   });
 
-  it('acepta appliedAsis explícitos si coinciden con los fijos', () => {
+  it('acepta appliedAsis explícitos si coinciden con los fijos (Elf + High Elf subrace)', () => {
     const res = validateRaceSelection({
       raceData: PHB_ELF,
+      subraceData: PHB_HIGH_ELF,
       rulesProfile: PROFILE_TASHAS_OFF,
-      appliedAsis: [{ ability: 'dex', bonus: 2, source: 'race' }],
+      appliedAsis: [
+        { ability: 'dex', bonus: 2, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'subrace' },
+      ],
     });
     expect(res.ok).toBe(true);
   });
 
-  it('rechaza appliedAsis que no coinciden con los fijos', () => {
+  it('rechaza appliedAsis que no coinciden con los fijos (Elf + High Elf subrace)', () => {
     const res = validateRaceSelection({
       raceData: PHB_ELF,
+      subraceData: PHB_HIGH_ELF,
       rulesProfile: PROFILE_TASHAS_OFF,
       appliedAsis: [{ ability: 'str', bonus: 2, source: 'race' }],
     });
@@ -381,5 +386,204 @@ describe('validateRaceSelection — source + entity gating', () => {
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.issues[0]?.code).toBe('SUBRACE_DOES_NOT_BELONG_TO_RACE');
+  });
+});
+
+// ---- Fixtures for subrace-required tests ----------------------------------
+const PHB_DWARF: RaceCompendiumData = {
+  slug: 'dwarf',
+  source: 'PHB',
+  ability: [{ con: 2 }],
+};
+const PHB_HILL_DWARF: SubraceCompendiumData = {
+  slug: 'dwarf--hill',
+  source: 'PHB',
+  parentSlug: 'dwarf',
+  parentSource: 'PHB',
+  ability: [{ wis: 1 }],
+};
+const PHB_GNOME: RaceCompendiumData = {
+  slug: 'gnome',
+  source: 'PHB',
+  ability: [{ int: 2 }],
+};
+const PHB_HALFLING: RaceCompendiumData = {
+  slug: 'halfling',
+  source: 'PHB',
+  ability: [{ dex: 2 }],
+};
+const PHB_HUMAN: RaceCompendiumData = {
+  slug: 'human',
+  source: 'PHB',
+  ability: [{ str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }],
+};
+const PHB_HALF_ORC: RaceCompendiumData = {
+  slug: 'half-orc',
+  source: 'PHB',
+  ability: [{ str: 2, con: 1 }],
+};
+const PHB_DRAGONBORN: RaceCompendiumData = {
+  slug: 'dragonborn',
+  source: 'PHB',
+  ability: [{ str: 2, cha: 1 }],
+};
+const TCE_CUSTOM_LINEAGE: RaceCompendiumData = {
+  slug: 'custom-lineage',
+  source: 'TCE',
+  ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 2 } }],
+};
+
+describe('validateRaceSelection — subrace required (PHB gate)', () => {
+  it('V-1: Dwarf without subrace → RACE_SUBRACE_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_DWARF,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toHaveLength(1);
+    expect(res.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'dwarf', source: 'PHB' },
+    });
+  });
+
+  it('V-2: Elf without subrace → RACE_SUBRACE_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_ELF,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'elf', source: 'PHB' },
+    });
+  });
+
+  it('V-3: Gnome without subrace → RACE_SUBRACE_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_GNOME,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'gnome', source: 'PHB' },
+    });
+  });
+
+  it('V-4: Halfling without subrace → RACE_SUBRACE_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALFLING,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'halfling', source: 'PHB' },
+    });
+  });
+
+  it('V-5: Dwarf + Hill Dwarf subrace → gate does NOT fire, ok: true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_DWARF,
+      subraceData: PHB_HILL_DWARF,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('V-6: Human without subrace → not in required set, ok: true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('V-7: Half-Elf without subrace → not in required set, ok: true (choose race)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+      ],
+      // No languageChoices: PHB_HALF_ELF mock has no languageProficiencies defined
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('V-8: Dragonborn without subrace → not in required set, ok: true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_DRAGONBORN,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('V-9: Custom Lineage (TCE) without subrace → NOT in required set (regression guard)', () => {
+    const res = validateRaceSelection({
+      raceData: TCE_CUSTOM_LINEAGE,
+      subraceData: null,
+      rulesProfile: {
+        ...PROFILE_TASHAS_OFF,
+        sources: { ...DEFAULT_RULES_PROFILE.sources, TCE: true },
+      },
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('V-10: Dwarf no subrace AND wrong language count → only RACE_SUBRACE_REQUIRED (short-circuit)', () => {
+    const dwarfWithLang: RaceCompendiumData = {
+      slug: 'dwarf',
+      source: 'PHB',
+      ability: [{ con: 2 }],
+      languageProficiencies: [{ anyStandard: 1 }],
+    };
+    const res = validateRaceSelection({
+      raceData: dwarfWithLang,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      languageChoices: [], // wrong count but should not reach language check
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    // Only RACE_SUBRACE_REQUIRED, no RACE_LANGUAGE_COUNT_MISMATCH
+    expect(res.issues).toHaveLength(1);
+    expect(res.issues[0]!.code).toBe('RACE_SUBRACE_REQUIRED');
+  });
+
+  it('V-11: Dwarf disabled in rulesProfile AND no subrace → only RACE_DISABLED (disabled check runs first)', () => {
+    const profileWithDisabledDwarf: RulesProfile = {
+      ...PROFILE_TASHAS_OFF,
+      disabledEntities: {
+        ...PROFILE_TASHAS_OFF.disabledEntities,
+        races: ['dwarf|PHB'],
+      },
+    };
+    const res = validateRaceSelection({
+      raceData: PHB_DWARF,
+      subraceData: null,
+      rulesProfile: profileWithDisabledDwarf,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_DISABLED');
   });
 });

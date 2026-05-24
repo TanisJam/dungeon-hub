@@ -61,6 +61,7 @@ export interface AppliedAsi {
 export type RaceValidationIssue =
   | { code: 'RACE_NOT_FOUND'; race: { slug: string; source: string } }
   | { code: 'RACE_DISABLED'; race: { slug: string; source: string } }
+  | { code: 'RACE_SUBRACE_REQUIRED'; race: { slug: string; source: string } }
   | { code: 'SUBRACE_NOT_FOUND'; subrace: { slug: string; source: string } }
   | { code: 'SUBRACE_DISABLED'; subrace: { slug: string; source: string } }
   | {
