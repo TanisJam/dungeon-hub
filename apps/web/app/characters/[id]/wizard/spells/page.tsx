@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 import { NoPicksPanel } from './_no-picks-panel';
 import { SpellsPicker } from './_picker';
+import { RaceCantripCard } from './_race-cantrip-card';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,13 @@ type SpellOptionsResponse = {
   subclassGrantedSlugs: string[];
 };
 
+type WizardCantrip = {
+  slug: string;
+  source: string;
+  name: string;
+  level: number;
+};
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 type Props = { params: Promise<{ id: string }> };
@@ -68,10 +76,29 @@ export default async function SpellsStepPage({ params }: Props) {
   const primaryClass = character.data?.classes?.[0];
   if (!primaryClass) redirect(`/characters/${id}/wizard/class`);
 
-  const options = await api.get<SpellOptionsResponse>(
-    `/characters/${id}/classes/${primaryClass.slug}/spells/options`,
-    token,
-  );
+  const raceCantripRef = character.data?.raceCantrip ?? null;
+
+  const [options, wizardCantripsResp] = await Promise.all([
+    api.get<SpellOptionsResponse>(
+      `/characters/${id}/classes/${primaryClass.slug}/spells/options`,
+      token,
+    ),
+    raceCantripRef
+      ? api.get<{ data: WizardCantrip[] }>(
+          `/compendium/spells?campaign=${character.campaignId}&class=wizard&level=0&limit=200`,
+          token,
+        )
+      : Promise.resolve(null),
+  ]);
+
+  // Resolve cantrip name from the fetched list; fall back to slug if not found.
+  let raceCantripName: string | null = null;
+  if (raceCantripRef) {
+    const match = wizardCantripsResp?.data?.find(
+      (s) => s.slug === raceCantripRef.slug && s.source === raceCantripRef.source,
+    );
+    raceCantripName = match?.name ?? raceCantripRef.slug;
+  }
 
   const { limits } = options;
 
@@ -98,14 +125,15 @@ export default async function SpellsStepPage({ params }: Props) {
         description="Elegí los hechizos de tu clase."
       />
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-4">
+        {raceCantripName && <RaceCantripCard cantripName={raceCantripName} />}
+
         {!needsPicks ? (
           <NoPicksPanel
             characterId={id}
             variant={nonCaster ? 'non-caster' : 'too-early'}
             className={primaryClass.slug}
             level={primaryClass.level}
-            hasRaceCantrip={!!character.data?.raceCantrip}
           />
         ) : (
           <SpellsPicker
@@ -116,7 +144,6 @@ export default async function SpellsStepPage({ params }: Props) {
             availableSpells={options.availableSpells}
             subclassGrantedSlugs={options.subclassGrantedSlugs}
             initialSpells={initialSpells}
-            highElfWizardNotice={!!character.data?.raceCantrip}
           />
         )}
       </div>

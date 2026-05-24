@@ -41,7 +41,6 @@ export type SpellsPickerProps = {
   availableSpells: AvailableSpell[];
   subclassGrantedSlugs: string[];
   initialSpells: InitialSpells;
-  highElfWizardNotice?: boolean;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -117,7 +116,6 @@ export function SpellsPicker({
   availableSpells,
   subclassGrantedSlugs,
   initialSpells,
-  highElfWizardNotice,
 }: SpellsPickerProps) {
   const casterMode = useMemo(() => deriveCasterMode(limits), [limits]);
 
@@ -367,13 +365,6 @@ export function SpellsPicker({
 
   return (
     <div className="space-y-4">
-      {/* High Elf notice */}
-      {highElfWizardNotice && (
-        <p className="text-sm text-ink-mute">
-          Tu cantrip de Alto Elfo se gestiona en el paso de raza.
-        </p>
-      )}
-
       {/* Header summary */}
       <p className="text-sm font-medium text-ink">{headerSummary}</p>
 
