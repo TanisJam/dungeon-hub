@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
-import { parseBackground, type BackgroundData } from './_parsers';
-import { poolFor } from './_options';
+import { deriveChoices, type BackgroundData } from './_parsers';
 import { BackgroundPicker, type BackgroundEntry } from './_picker';
 import type {
   BackgroundCompendiumData,
@@ -35,41 +34,6 @@ type Character = {
 
 type Props = { params: Promise<{ id: string }> };
 
-const TOOL_KINDS = ['anyGamingSet', 'anyArtisansTool', 'anyMusicalInstrument', 'any'] as const;
-
-/**
- * Reconstruye los CHOICES del usuario a partir del appliedBackground guardado
- * (que es fixed+chosen merged) y la background data del compendium (que indica
- * cuáles son fixed). Es la operación inversa del merge que hace la API.
- */
-function deriveChoices(
-  applied: AppliedBackground,
-  bgData: BackgroundData,
-  allBackgrounds: BackgroundCompendiumData[],
-) {
-  const parsed = parseBackground({ ...bgData, slug: applied.slug }, allBackgrounds);
-  const fixedSkills = new Set(parsed.fixedSkills.map((s) => s.toLowerCase()));
-  const fixedLangs = new Set(parsed.fixedLanguages.map((s) => s.toLowerCase()));
-  const fixedTools = new Set(parsed.fixedTools.map((s) => s.toLowerCase()));
-
-  const skillChoices = (applied.skills ?? []).filter((s) => !fixedSkills.has(s.toLowerCase()));
-  const languageChoices = (applied.languages ?? []).filter((l) => !fixedLangs.has(l.toLowerCase()));
-
-  // Tools: para cada tool elegido, encontrar a qué "kind" pertenece (basado en pool).
-  const toolChoices: Record<string, string[]> = {};
-  for (const tool of applied.tools ?? []) {
-    const lower = tool.toLowerCase();
-    if (fixedTools.has(lower)) continue;
-    for (const kind of TOOL_KINDS) {
-      if (poolFor(kind).includes(lower)) {
-        (toolChoices[kind] ??= []).push(lower);
-        break;
-      }
-    }
-  }
-
-  return { skillChoices, languageChoices, toolChoices };
-}
 
 export default async function BackgroundStepPage({ params }: Props) {
   const { id } = await params;

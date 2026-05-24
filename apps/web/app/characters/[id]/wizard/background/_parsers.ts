@@ -1,7 +1,7 @@
 // Parser para el shape de backgrounds del compendium 5etools.
 
 import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
-import { expandToolFrom } from '@dungeon-hub/domain/character/tool';
+import { expandToolFrom, GAMING_SETS, MUSICAL_INSTRUMENTS, ARTISANS_TOOLS } from '@dungeon-hub/domain/character/tool';
 import {
   splitMixedPoolBlock,
   splitEquipmentBlock,
@@ -168,4 +168,79 @@ export function parseBackground(
   }
 
   return out;
+}
+
+// ── any* pool lookup for deriveChoices ───────────────────────────────────────
+
+const ANY_KIND_POOLS: Record<string, readonly string[]> = {
+  anyGamingSet: GAMING_SETS,
+  anyArtisansTool: ARTISANS_TOOLS,
+  anyMusicalInstrument: MUSICAL_INSTRUMENTS,
+};
+
+// ── deriveChoices ─────────────────────────────────────────────────────────────
+
+type AppliedBackgroundLike = {
+  slug: string;
+  source?: string;
+  skills?: string[];
+  languages?: string[];
+  tools?: string[];
+};
+
+/**
+ * Reconstructs the user's original choices from the saved `appliedBackground`
+ * (which stores fixed + chosen merged flat) and the background's compendium data
+ * (which describes the shape). This is the inverse of the merge that validateBackgroundSelection
+ * performs before persisting.
+ *
+ * Tool assignment rule (critical for Bug 2c correctness):
+ *  1. Check parsed.toolChoose.from first. If the tool appears there → key 'choose'.
+ *  2. Only if not in the choose pool, check any* pools → key 'anyGamingSet' / 'anyArtisansTool' /
+ *     'anyMusicalInstrument' / 'any'.
+ *
+ * This ordering is required because tools like 'bagpipes' (musical instrument) appear in both
+ * the expanded choose:{from:["musical instrument","gaming set"]} pool AND the anyMusicalInstrument
+ * pool. Without the choose-first check, bagpipes would land in 'anyMusicalInstrument', but the
+ * picker reads 'choose' → field appears empty, re-pick fires BACKGROUND_TOOL_DUPLICATE.
+ */
+export function deriveChoices(
+  applied: AppliedBackgroundLike,
+  bgData: BackgroundData,
+  allBackgrounds: BackgroundCompendiumData[],
+): { skillChoices: string[]; languageChoices: string[]; toolChoices: Record<string, string[]> } {
+  const parsed = parseBackground({ ...bgData, slug: applied.slug }, allBackgrounds);
+  const fixedSkills = new Set(parsed.fixedSkills.map((s) => s.toLowerCase()));
+  const fixedLangs = new Set(parsed.fixedLanguages.map((s) => s.toLowerCase()));
+  const fixedTools = new Set(parsed.fixedTools.map((s) => s.toLowerCase()));
+
+  const skillChoices = (applied.skills ?? []).filter((s) => !fixedSkills.has(s.toLowerCase()));
+  const languageChoices = (applied.languages ?? []).filter((l) => !fixedLangs.has(l.toLowerCase()));
+
+  // Tools: reconstruct the toolChoices map that the picker expects.
+  // The picker uses key 'choose' for toolChoose blocks and 'any*' for anyKind blocks.
+  // We MUST check the choose pool first: a tool like 'bagpipes' appears in both the expanded
+  // choose pool (musical instrument ∪ gaming set) and the anyMusicalInstrument pool. Checking
+  // choose first guarantees the correct key is used (Bug 2c fix).
+  const choosePool = new Set(parsed.toolChoose?.from.map((t) => t.toLowerCase()) ?? []);
+  const toolChoices: Record<string, string[]> = {};
+
+  for (const tool of applied.tools ?? []) {
+    const lower = tool.toLowerCase();
+    if (fixedTools.has(lower)) continue;
+
+    if (choosePool.has(lower)) {
+      (toolChoices['choose'] ??= []).push(lower);
+      continue;
+    }
+
+    for (const [kind, pool] of Object.entries(ANY_KIND_POOLS)) {
+      if ((pool as readonly string[]).includes(lower)) {
+        (toolChoices[kind] ??= []).push(lower);
+        break;
+      }
+    }
+  }
+
+  return { skillChoices, languageChoices, toolChoices };
 }

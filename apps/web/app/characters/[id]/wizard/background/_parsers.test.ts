@@ -5,7 +5,7 @@ import {
   GAMING_SETS,
   MUSICAL_INSTRUMENTS,
 } from '@dungeon-hub/domain/character/tool';
-import { parseBackground, type BackgroundData, type BackgroundCompendiumData } from './_parsers';
+import { parseBackground, deriveChoices, type BackgroundData, type BackgroundCompendiumData } from './_parsers';
 
 // ---------------------------------------------------------------------------
 // B.1 — Parser: numeric-any skill branch
@@ -353,5 +353,83 @@ describe('parseBackground — non-custom background emits no customization', () 
     };
     const result = parseBackground(data);
     expect(result.customization).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug 2c RED — deriveChoices: choose-block tools must map to key 'choose', not 'anyMusicalInstrument'
+//
+// Knight of the Order has toolProficiencies: [{choose:{from:["musical instrument","gaming set"]}}].
+// The picker stores the user's pick under key 'choose' in the tools state map.
+// After save, the DB stores only the flattened `tools: ['bagpipes']` array.
+// On reload, deriveChoices() must invert the merge correctly:
+//   - tools that belong to parsed.toolChoose.from → key 'choose'
+//   - tools that belong to anyGamingSet/anyArtisansTool/anyMusicalInstrument/any → respective key
+//
+// Before the fix, deriveChoices() checks anyMusicalInstrument pool first, finds bagpipes there,
+// and maps it to toolChoices['anyMusicalInstrument'] — the WRONG key.
+// The picker renders the choose-block looking at tools['choose'] ?? [] → empty.
+// The user re-picks bagpipes → both 'anyMusicalInstrument' and 'choose' contain it → DUPLICATE fires.
+// ---------------------------------------------------------------------------
+
+describe('deriveChoices — Bug 2c: choose-block tool maps to key "choose" not anyMusicalInstrument', () => {
+  // Knight of the Order: choose 1 from (musical instrument ∪ gaming set)
+  const knightBgData: BackgroundData = {
+    name: 'Knight of the Order',
+    source: 'SCAG',
+    slug: 'knight-of-the-order',
+    skillProficiencies: [{ persuasion: true, choose: { from: ['arcana', 'history', 'nature', 'religion'] } } as never],
+    languageProficiencies: [{ anyStandard: 1 }],
+    toolProficiencies: [{ choose: { from: ['musical instrument', 'gaming set'], count: 1 } } as never],
+  };
+
+  it('maps bagpipes (from choose-block) to toolChoices["choose"], NOT "anyMusicalInstrument"', () => {
+    // PHB SCAG p.151: Knight of the Order gets choice of gaming set OR musical instrument.
+    // The picker stores it under key "choose". deriveChoices must reproduce that key.
+    const applied = {
+      slug: 'knight-of-the-order',
+      source: 'SCAG',
+      skills: ['persuasion', 'history'],
+      languages: ['dwarvish'],
+      tools: ['bagpipes'],
+    };
+
+    const result = deriveChoices(applied, knightBgData, []);
+
+    // bagpipes must land in 'choose', not in 'anyMusicalInstrument'
+    expect(result.toolChoices['choose']).toEqual(['bagpipes']);
+    expect(result.toolChoices['anyMusicalInstrument']).toBeUndefined();
+  });
+
+  it('maps dice-set (from choose-block gaming set pool) to toolChoices["choose"], NOT "anyGamingSet"', () => {
+    const applied = {
+      slug: 'knight-of-the-order',
+      source: 'SCAG',
+      skills: ['persuasion', 'arcana'],
+      languages: ['elvish'],
+      tools: ['dice-set'],
+    };
+
+    const result = deriveChoices(applied, knightBgData, []);
+
+    expect(result.toolChoices['choose']).toEqual(['dice-set']);
+    expect(result.toolChoices['anyGamingSet']).toBeUndefined();
+  });
+
+  it('correctly derives skill and language choices alongside tool choices', () => {
+    const applied = {
+      slug: 'knight-of-the-order',
+      source: 'SCAG',
+      skills: ['persuasion', 'history'],
+      languages: ['dwarvish'],
+      tools: ['flute'],
+    };
+
+    const result = deriveChoices(applied, knightBgData, []);
+
+    // persuasion is fixed → NOT in skillChoices
+    expect(result.skillChoices).toEqual(['history']);
+    expect(result.languageChoices).toEqual(['dwarvish']);
+    expect(result.toolChoices['choose']).toEqual(['flute']);
   });
 });
