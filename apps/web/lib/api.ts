@@ -13,7 +13,8 @@ type Init = {
 };
 
 async function request<T>(path: string, init: Init = {}): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {};
+  if (init.body) headers['Content-Type'] = 'application/json';
   if (init.accessToken) headers.Authorization = `Bearer ${init.accessToken}`;
 
   const res = await fetch(`${env.API_URL}/api/v1${path}`, {
