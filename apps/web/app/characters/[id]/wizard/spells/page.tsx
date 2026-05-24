@@ -17,6 +17,13 @@ type AppliedClass = {
   subclass?: { slug: string; source: string } | null;
 };
 
+type RaceRow = {
+  slug: string;
+  source: string;
+  name: string;
+  isSubrace: boolean;
+};
+
 type Character = {
   id: string;
   campaignId: string;
@@ -24,6 +31,8 @@ type Character = {
     classes?: AppliedClass[];
     spells?: Record<string, { cantrips: SpellRef[]; known: SpellRef[]; prepared: SpellRef[] }>;
     raceCantrip?: { slug: string; source: string } | null;
+    race?: { slug: string; source: string };
+    subrace?: { slug: string; source: string } | null;
   } | null;
 };
 
@@ -78,7 +87,7 @@ export default async function SpellsStepPage({ params }: Props) {
 
   const raceCantripRef = character.data?.raceCantrip ?? null;
 
-  const [options, wizardCantripsResp] = await Promise.all([
+  const [options, wizardCantripsResp, raceListResp] = await Promise.all([
     api.get<SpellOptionsResponse>(
       `/characters/${id}/classes/${primaryClass.slug}/spells/options`,
       token,
@@ -89,15 +98,44 @@ export default async function SpellsStepPage({ params }: Props) {
           token,
         )
       : Promise.resolve(null),
+    raceCantripRef
+      ? api.get<{ data: RaceRow[] }>(
+          `/compendium/races?campaign=${character.campaignId}&limit=200`,
+          token,
+        )
+      : Promise.resolve(null),
   ]);
 
   // Resolve cantrip name from the fetched list; fall back to slug if not found.
   let raceCantripName: string | null = null;
+  // Resolve race name: prefer subrace name, fall back to race name, then slug.
+  let raceName: string | null = null;
   if (raceCantripRef) {
     const match = wizardCantripsResp?.data?.find(
       (s) => s.slug === raceCantripRef.slug && s.source === raceCantripRef.source,
     );
     raceCantripName = match?.name ?? raceCantripRef.slug;
+
+    const raceList = raceListResp?.data ?? [];
+    const subraceRef = character.data?.subrace ?? null;
+    const raceRef = character.data?.race ?? null;
+
+    if (subraceRef) {
+      const subraceRow = raceList.find(
+        (r) => r.slug === subraceRef.slug && r.source === subraceRef.source,
+      );
+      raceName = subraceRow?.name ?? null;
+    }
+    if (!raceName && raceRef) {
+      const raceRow = raceList.find(
+        (r) => r.slug === raceRef.slug && r.source === raceRef.source,
+      );
+      raceName = raceRow?.name ?? null;
+    }
+    // Final fallback: use slug as display
+    if (!raceName) {
+      raceName = subraceRef?.slug ?? raceRef?.slug ?? null;
+    }
   }
 
   const { limits } = options;
@@ -126,7 +164,9 @@ export default async function SpellsStepPage({ params }: Props) {
       />
 
       <div className="mt-6 space-y-4">
-        {raceCantripName && <RaceCantripCard cantripName={raceCantripName} />}
+        {raceCantripName && raceName && (
+          <RaceCantripCard cantripName={raceCantripName} raceName={raceName} />
+        )}
 
         {!needsPicks ? (
           <NoPicksPanel
