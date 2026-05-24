@@ -3,7 +3,8 @@
  *
  * Tests:
  * W-1: Base race entries that require subrace show amber pill 'requiere sublinaje'
- * W-2: Non-required base race entries (Human, Half-Elf, Dragonborn) do NOT show the pill
+ * W-2: Non-required base race entries (Human, Half-Elf) do NOT show the pill
+ *      Note: Dragonborn DOES require subrace (ancestry, PHB p.32–34 RAW) — it IS in W-1
  * W-3: Subrace entries (Hill Dwarf, Mountain Dwarf) do NOT show the pill
  * W-4: Clicking Siguiente with a required-subrace base race selected → inline error
  * W-5: Clicking Siguiente with Hill Dwarf subrace selected + fixed ASIs → saveRace IS called
@@ -184,10 +185,24 @@ describe('W-1: required-subrace base races show amber pill "requiere sublinaje"'
     );
     expect(screen.getByText('requiere sublinaje')).toBeTruthy();
   });
+
+  it('Dragonborn base entry shows amber pill (ancestry required, PHB p.32–34)', () => {
+    // PHB p.32–34: Dragonborn must choose a draconic ancestry — added to RACES_REQUIRING_SUBRACE
+    // in Batch 3 (race-dragonborn-ancestry). Pill is correct behavior.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DRAGONBORN_BASE]}
+        initialSelection={null}
+      />,
+    );
+    expect(screen.getByText('requiere sublinaje')).toBeTruthy();
+  });
 });
 
 // ---------------------------------------------------------------------------
 // W-2: Non-required base races do NOT show the pill
+// Note: Dragonborn DOES require subrace (PHB p.32–34) — covered in W-1 above
 // ---------------------------------------------------------------------------
 
 describe('W-2: non-required base races do NOT show "requiere sublinaje" pill', () => {
@@ -207,17 +222,6 @@ describe('W-2: non-required base races do NOT show "requiere sublinaje" pill', (
       <RacePicker
         characterId="char-1"
         entries={[HALF_ELF_BASE]}
-        initialSelection={null}
-      />,
-    );
-    expect(screen.queryByText('requiere sublinaje')).toBeNull();
-  });
-
-  it('Dragonborn base entry has no pill', () => {
-    render(
-      <RacePicker
-        characterId="char-1"
-        entries={[DRAGONBORN_BASE]}
         initialSelection={null}
       />,
     );
@@ -793,5 +797,183 @@ describe('W-C8: handleContinue preflight blocks when skill count is wrong (Half-
     // This test simply verifies no skill error appears without a selection
     // (no skill picker should be present for Dwarf).
     expect(screen.queryByText(/habilidades de linaje/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-D1: HighElfCantripPicker renders in RaceDetailPanel when isPlayerChoice entry present
+// W-D2: handleContinue passes raceCantrip to saveRace; preflight blocks when missing
+//
+// PHB p.23: "You know one cantrip of your choice from the wizard spell list."
+// Decisions #605 (isPlayerChoice flag), #606 (picker in race wizard step).
+// ---------------------------------------------------------------------------
+
+import type { RaceInnateSpell } from '@dungeon-hub/domain/character/race';
+
+// High Elf subrace with an isPlayerChoice wizard cantrip entry
+const HIGH_ELF_SUBRACE = makeRaceEntry({
+  slug: 'elf--high',
+  source: 'PHB',
+  name: 'High',
+  isSubrace: true,
+  parentSlug: 'elf',
+  parentSource: 'PHB',
+  data: {
+    name: 'High',
+    source: 'PHB',
+    ability: [{ int: 1 }],
+    size: ['M'],
+    speed: 30,
+    additionalSpellsNormalized: [
+      {
+        slug: '__choose__',
+        source: '',
+        characterLevelAvailable: 1,
+        frequency: 'at-will' as const,
+        ability: 'int' as const,
+        isPlayerChoice: true,
+        fromClass: 'wizard',
+      } as RaceInnateSpell,
+    ],
+  } as RaceEntry['data'] & { additionalSpellsNormalized: RaceInnateSpell[] },
+});
+
+// Wizard cantrips pool for the picker
+type CantripEntry = { slug: string; source: string; name: string };
+const WIZARD_CANTRIPS: CantripEntry[] = [
+  { slug: 'fire-bolt', source: 'PHB', name: 'Fire Bolt' },
+  { slug: 'mage-hand', source: 'PHB', name: 'Mage Hand' },
+  { slug: 'prestidigitation', source: 'PHB', name: 'Prestidigitation' },
+];
+
+describe('W-D1: HighElfCantripPicker renders when isPlayerChoice entry present', () => {
+  it('shows "Cantrip de linaje" label when High Elf is selected', () => {
+    // REQ-D-COMPUTE-01, Decision #606. PHB p.23.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[ELF_BASE, HIGH_ELF_SUBRACE]}
+        allFeats={[]}
+        allWizardCantrips={WIZARD_CANTRIPS}
+        initialSelection={{
+          raceSlug: 'elf',
+          raceSource: 'PHB',
+          subraceSlug: 'elf--high',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/cantrip de linaje/i)).toBeTruthy();
+  });
+
+  it('renders wizard cantrip names as selectable buttons', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[ELF_BASE, HIGH_ELF_SUBRACE]}
+        allFeats={[]}
+        allWizardCantrips={WIZARD_CANTRIPS}
+        initialSelection={{
+          raceSlug: 'elf',
+          raceSource: 'PHB',
+          subraceSlug: 'elf--high',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /fire bolt/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /mage hand/i })).toBeTruthy();
+  });
+
+  it('does NOT show cantrip picker for non-High-Elf races (Hill Dwarf)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DWARF_BASE, HILL_DWARF_SUBRACE]}
+        allFeats={[]}
+        allWizardCantrips={WIZARD_CANTRIPS}
+        initialSelection={{
+          raceSlug: 'dwarf',
+          raceSource: 'PHB',
+          subraceSlug: 'dwarf--hill',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/cantrip de linaje/i)).toBeNull();
+  });
+});
+
+describe('W-D2: handleContinue passes raceCantrip to saveRace; preflight blocks when missing', () => {
+  it('shows inline error when High Elf is selected but no cantrip is picked', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[ELF_BASE, HIGH_ELF_SUBRACE]}
+        allFeats={[]}
+        allWizardCantrips={WIZARD_CANTRIPS}
+        initialSelection={{
+          raceSlug: 'elf',
+          raceSource: 'PHB',
+          subraceSlug: 'elf--high',
+          subraceSource: 'PHB',
+        }}
+        // ASIs: Elf dex:2 (race, fixed) + High Elf int:1 (subrace, fixed) — no choose needed
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toMatch(/elegí un cantrip/i);
+    expect(saveRace).not.toHaveBeenCalled();
+  });
+
+  it('calls saveRace with raceCantrip when a cantrip is picked', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+    vi.mocked(saveRace).mockResolvedValue({ error: null });
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[ELF_BASE, HIGH_ELF_SUBRACE]}
+        allFeats={[]}
+        allWizardCantrips={WIZARD_CANTRIPS}
+        initialSelection={{
+          raceSlug: 'elf',
+          raceSource: 'PHB',
+          subraceSlug: 'elf--high',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    // Pick "Fire Bolt"
+    fireEvent.click(screen.getByRole('button', { name: /fire bolt/i }));
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    // saveRace must be called with raceCantrip: { slug: 'fire-bolt', source: 'PHB' }
+    await vi.waitFor(() => {
+      expect(saveRace).toHaveBeenCalledWith(
+        'char-1',
+        { slug: 'elf', source: 'PHB' },
+        { slug: 'elf--high', source: 'PHB' },
+        expect.any(Array),
+        expect.any(Array),
+        expect.any(Array),
+        null, // featChoice
+        { slug: 'fire-bolt', source: 'PHB' }, // raceCantrip
+      );
+    });
   });
 });

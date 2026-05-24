@@ -16,6 +16,7 @@ import {
   type AbilityKey,
   type AsiSlot,
   type RaceData,
+  type RaceInnateSpellLite,
 } from './_parsers';
 import { saveRace } from './actions';
 import { requiresSubrace } from '@dungeon-hub/domain/character/race';
@@ -47,6 +48,12 @@ export type FeatEntry = {
   name: string;
 };
 
+export type CantripEntry = {
+  slug: string;
+  source: string;
+  name: string;
+};
+
 type Selection = {
   raceSlug: string;
   raceSource: string;
@@ -72,20 +79,26 @@ export function RacePicker({
   characterId,
   entries,
   allFeats = [],
+  allWizardCantrips = [],
   initialSelection,
   initialChosenAsis = {},
   initialLanguageChoices = [],
   initialSkillChoices = [],
   initialFeatSlug = null,
+  initialRaceCantrip = null,
 }: {
   characterId: string;
   entries: RaceEntry[];
   allFeats?: FeatEntry[];
+  /** Pool of wizard cantrips for the HighElfCantripPicker. PHB p.23. Decision #606. */
+  allWizardCantrips?: CantripEntry[];
   initialSelection: Selection | null;
   initialChosenAsis?: Record<string, AbilityKey[]>;
   initialLanguageChoices?: string[];
   initialSkillChoices?: string[];
   initialFeatSlug?: string | null;
+  /** Pre-selected wizard cantrip for High Elf re-edit flow. Decision #606. */
+  initialRaceCantrip?: { slug: string; source: string } | null;
 }) {
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
@@ -99,6 +112,9 @@ export function RacePicker({
   const [chosenSkills, setChosenSkills] = useState<string[]>(initialSkillChoices);
   const [chosenFeatSlug, setChosenFeatSlug] = useState<string | null>(
     initialFeatSlug ?? null,
+  );
+  const [chosenCantrip, setChosenCantrip] = useState<{ slug: string; source: string } | null>(
+    initialRaceCantrip ?? null,
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -238,6 +254,16 @@ export function RacePicker({
       return;
     }
 
+    // Cantrip: validate when selected subrace has an isPlayerChoice spell entry (High Elf).
+    // PHB p.23: "You know one cantrip of your choice from the wizard spell list."
+    // Decision #606: player-choice cantrip picker lives in the race wizard step.
+    const subraceSpells = (selected.data as RaceData & { additionalSpellsNormalized?: RaceInnateSpellLite[] }).additionalSpellsNormalized;
+    const hasPlayerChoiceCantrip = subraceSpells?.some((s) => s.isPlayerChoice) ?? false;
+    if (hasPlayerChoiceCantrip && !chosenCantrip) {
+      setError('Elegí un cantrip de mago para tu linaje.');
+      return;
+    }
+
     // Build featChoice payload
     const featEntry = chosenFeatSlug
       ? allFeats.find((f) => f.slug === chosenFeatSlug) ?? null
@@ -246,6 +272,9 @@ export function RacePicker({
       featEntry && expectedFeatCount > 0
         ? { slug: featEntry.slug, source: featEntry.source }
         : null;
+
+    // Build raceCantrip payload (null for non-High-Elf races).
+    const raceCantripPayload = hasPlayerChoiceCantrip ? (chosenCantrip ?? null) : null;
 
     startTransition(async () => {
       const res = await saveRace(
@@ -256,6 +285,7 @@ export function RacePicker({
         chosenLangs,
         expectedSkillCount > 0 ? chosenSkills : [],
         featChoicePayload,
+        raceCantripPayload,
       );
       if (res.error) setError(res.error);
     });
@@ -302,6 +332,7 @@ export function RacePicker({
           entry={e}
           parent={parentEntry}
           allFeats={allFeats}
+          allWizardCantrips={allWizardCantrips}
           chosenAsis={chosenAsis}
           setChosenAsis={(next) => {
             setChosenAsis(next);
@@ -320,6 +351,11 @@ export function RacePicker({
           chosenFeatSlug={isThisSelected ? chosenFeatSlug : null}
           setChosenFeatSlug={(next) => {
             setChosenFeatSlug(next);
+            setError(null);
+          }}
+          chosenCantrip={isThisSelected ? chosenCantrip : null}
+          setChosenCantrip={(next) => {
+            setChosenCantrip(next);
             setError(null);
           }}
         />
@@ -352,6 +388,7 @@ export function RacePicker({
               setChosenLangs([]);
               setChosenSkills([]);
               setChosenFeatSlug(null);
+              setChosenCantrip(null);
             }
             setSelectedKey(key);
             setError(null);
@@ -378,6 +415,7 @@ function RaceDetailPanel({
   entry,
   parent,
   allFeats,
+  allWizardCantrips,
   chosenAsis,
   setChosenAsis,
   chosenLangs,
@@ -386,10 +424,13 @@ function RaceDetailPanel({
   setChosenSkills,
   chosenFeatSlug,
   setChosenFeatSlug,
+  chosenCantrip,
+  setChosenCantrip,
 }: {
   entry: RaceEntry;
   parent: RaceEntry | null;
   allFeats: FeatEntry[];
+  allWizardCantrips: CantripEntry[];
   chosenAsis: Record<string, AbilityKey[]>;
   setChosenAsis: (next: Record<string, AbilityKey[]>) => void;
   chosenLangs: string[];
@@ -398,6 +439,8 @@ function RaceDetailPanel({
   setChosenSkills: (next: string[]) => void;
   chosenFeatSlug: string | null;
   setChosenFeatSlug: (next: string | null) => void;
+  chosenCantrip: { slug: string; source: string } | null;
+  setChosenCantrip: (next: { slug: string; source: string } | null) => void;
 }) {
   const traits = useMemo(() => {
     const own = extractTraits(entry.data.entries);
@@ -429,6 +472,15 @@ function RaceDetailPanel({
     race: raceDataForExtras,
     subrace: subraceDataForExtras,
   });
+
+  // Detect player-choice cantrip slot (High Elf, PHB p.23).
+  // Reads from the subrace's additionalSpellsNormalized — if any entry has isPlayerChoice:true,
+  // the HighElfCantripPicker is shown. Decision #606.
+  const subraceSpells = (entry.isSubrace ? entry.data : null) as
+    | (RaceData & { additionalSpellsNormalized?: RaceInnateSpellLite[] })
+    | null;
+  const hasPlayerChoiceCantrip =
+    subraceSpells?.additionalSpellsNormalized?.some((s) => s.isPlayerChoice) ?? false;
 
   return (
     <div className="space-y-3">
@@ -482,6 +534,14 @@ function RaceDetailPanel({
           allFeats={allFeats}
           chosenSlug={chosenFeatSlug}
           setChosenSlug={setChosenFeatSlug}
+        />
+      )}
+
+      {hasPlayerChoiceCantrip && allWizardCantrips.length > 0 && (
+        <HighElfCantripPicker
+          cantrips={allWizardCantrips}
+          chosen={chosenCantrip}
+          setChosen={setChosenCantrip}
         />
       )}
 
@@ -853,6 +913,71 @@ function RaceFeatPicker({
               >
                 {feat.name}
                 <span className="ml-1 text-ink-mute">· {feat.source}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// High Elf Cantrip Picker — for High Elf isPlayerChoice wizard cantrip slot
+// PHB p.23: "You know one cantrip of your choice from the wizard spell list."
+// Decision #606. Batch 6 (race-additional-spells).
+// ---------------------------------------------------------------------------
+
+function HighElfCantripPicker({
+  cantrips,
+  chosen,
+  setChosen,
+}: {
+  cantrips: CantripEntry[];
+  chosen: { slug: string; source: string } | null;
+  setChosen: (next: { slug: string; source: string } | null) => void;
+}) {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return cantrips;
+    return cantrips.filter((c) => c.name.toLowerCase().includes(q));
+  }, [cantrips, query]);
+
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        Cantrip de linaje
+      </p>
+      <p className="mt-0.5 text-[10px] text-ink-mute">
+        Elegí 1 cantrip de mago (PHB p.23):
+      </p>
+      <input
+        type="search"
+        placeholder="Buscar cantrip…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="mt-1.5 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+      />
+      <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-line bg-paper">
+        {filtered.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-ink-mute">Sin resultados.</p>
+        ) : (
+          filtered.map((c) => {
+            const isOn = chosen?.slug === c.slug;
+            return (
+              <button
+                key={`${c.slug}|${c.source}`}
+                type="button"
+                onClick={() => setChosen(isOn ? null : { slug: c.slug, source: c.source })}
+                className={[
+                  'w-full px-3 py-1.5 text-left text-xs transition hover:bg-accent-soft/40',
+                  isOn ? 'bg-accent-soft text-accent-deep font-semibold' : 'text-ink',
+                ].join(' ')}
+              >
+                {c.name}
+                <span className="ml-1 text-ink-mute">· {c.source}</span>
               </button>
             );
           })

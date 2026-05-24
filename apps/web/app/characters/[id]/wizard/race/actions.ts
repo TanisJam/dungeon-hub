@@ -19,6 +19,8 @@ type FeatChoicePayload = {
   asiChoice?: Array<{ ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'; bonus: number }>;
 } | null;
 
+type RaceCantripPayload = { slug: string; source: string } | null;
+
 export async function saveRace(
   characterId: string,
   race: { slug: string; source: string },
@@ -27,6 +29,7 @@ export async function saveRace(
   languageChoices: string[] = [],
   skillChoices: string[] = [],
   featChoice: FeatChoicePayload = null,
+  raceCantrip: RaceCantripPayload = null,
 ): Promise<RaceState> {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -42,6 +45,9 @@ export async function saveRace(
         languageChoices,
         ...(skillChoices.length > 0 ? { skillChoices } : {}),
         ...(featChoice ? { featChoice } : {}),
+        // Always send raceCantrip (null when not applicable or not yet chosen).
+        // API upsert semantics: null = clear, undefined = absent (keep existing).
+        raceCantrip,
       },
       session.access_token,
     );

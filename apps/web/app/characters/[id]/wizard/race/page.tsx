@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { effectiveAsiSlots, type AbilityKey, type RaceData } from './_parsers';
-import { RacePicker, type RaceEntry, type FeatEntry } from './_picker';
+import { RacePicker, type RaceEntry, type FeatEntry, type CantripEntry } from './_picker';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type RaceRow = {
@@ -34,7 +34,16 @@ type Character = {
     raceLanguageChoices?: string[];
     raceSkillChoices?: string[];
     raceFeatSlug?: string | null;
+    raceCantrip?: { slug: string; source: string } | null;
   } | null;
+};
+
+type SpellRow = {
+  id: string;
+  slug: string;
+  source: string;
+  name: string;
+  level: number;
 };
 
 type Props = { params: Promise<{ id: string }> };
@@ -98,13 +107,18 @@ export default async function RaceStepPage({ params }: Props) {
 
   const character = await api.get<Character>(`/characters/${id}`, token);
 
-  const [{ data: list }, { data: featList }] = await Promise.all([
+  const [{ data: list }, { data: featList }, { data: spellList }] = await Promise.all([
     api.get<{ data: RaceRow[] }>(
       `/compendium/races?campaign=${character.campaignId}&limit=200`,
       token,
     ),
     api.get<{ data: FeatRow[] }>(
       `/compendium/feats?campaign=${character.campaignId}&limit=200`,
+      token,
+    ),
+    // Batch 6: fetch wizard cantrips for High Elf picker. PHB p.23. Decision #606.
+    api.get<{ data: SpellRow[] }>(
+      `/compendium/spells?campaign=${character.campaignId}&class=wizard&level=0&limit=200`,
       token,
     ),
   ]);
@@ -133,6 +147,12 @@ export default async function RaceStepPage({ params }: Props) {
     source: f.source,
     name: f.name,
   }));
+
+  // Wizard cantrips for High Elf HighElfCantripPicker. Batch 6. PHB p.23.
+  const allWizardCantrips: CantripEntry[] = spellList
+    .filter((s) => s.level === 0)
+    .map((s) => ({ slug: s.slug, source: s.source, name: s.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   let initialSelection = null;
   let initialChosenAsis: Record<string, AbilityKey[]> = {};
@@ -175,11 +195,13 @@ export default async function RaceStepPage({ params }: Props) {
           characterId={id}
           entries={entries}
           allFeats={allFeats}
+          allWizardCantrips={allWizardCantrips}
           initialSelection={initialSelection}
           initialChosenAsis={initialChosenAsis}
           initialLanguageChoices={character.data?.raceLanguageChoices ?? []}
           initialSkillChoices={character.data?.raceSkillChoices ?? []}
           initialFeatSlug={character.data?.raceFeatSlug ?? null}
+          initialRaceCantrip={character.data?.raceCantrip ?? null}
         />
       </div>
     </section>

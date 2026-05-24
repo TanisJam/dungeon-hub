@@ -9,6 +9,17 @@ export type AsiSlot =
   | { kind: 'fixed'; ability: AbilityKey; bonus: number }
   | { kind: 'choose'; from: AbilityKey[]; amount: number; count: number };
 
+/** Minimal shape of a normalized racial spell entry. Only the fields needed by the web picker. */
+export type RaceInnateSpellLite = {
+  slug: string;
+  source: string;
+  characterLevelAvailable: 1 | 3 | 5;
+  frequency: 'at-will' | 'daily-1';
+  ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  isPlayerChoice?: boolean;
+  fromClass?: string;
+};
+
 export type RaceData = {
   name: string;
   source: string;
@@ -21,6 +32,11 @@ export type RaceData = {
   feats?: Array<Record<string, number>>;
   entries?: unknown[];
   raceName?: string;
+  /**
+   * Normalized racial spells projected from the compendium DB (Batch 6).
+   * Used by RaceDetailPanel to detect isPlayerChoice slots (High Elf cantrip).
+   */
+  additionalSpellsNormalized?: RaceInnateSpellLite[];
 };
 
 /**
