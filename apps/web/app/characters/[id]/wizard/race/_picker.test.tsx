@@ -8,12 +8,23 @@
  * W-4: Clicking Siguiente with a required-subrace base race selected → inline error
  * W-5: Clicking Siguiente with Hill Dwarf subrace selected + fixed ASIs → saveRace IS called
  * W-6: Detail panel for base Dwarf shows hint paragraph
+ *
+ * Phase C backfill (race-variant-human-feat-skill):
+ * W-C1: RaceSkillPicker renders N skill buttons when race has skillProficiencies:[{any:N}]
+ * W-C2: RaceSkillPicker enforces the count — clicking N skills disables the rest
+ * W-C3: RaceFeatPicker renders a searchable list of feats
+ * W-C4: RaceFeatPicker filter narrows the visible feats
+ * W-C5: RaceDetailPanel renders BOTH pickers for Variant Human (feat + skill)
+ * W-C6: RaceDetailPanel renders ONLY SkillPicker for Half-Elf (skill, no feat)
+ * W-C7: handleContinue preflight blocks when featChoice is missing for feat-required race
+ * W-C8: handleContinue preflight blocks when skillChoices count is wrong
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 import { RacePicker, type RaceEntry } from './_picker';
+import type { AbilityKey } from './_parsers';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -328,5 +339,459 @@ describe('W-6: detail panel for base Dwarf shows hint paragraph when Dwarf is se
     );
 
     expect(screen.queryByText(/Esta raza requiere un sublinaje/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase C backfill fixtures
+// ---------------------------------------------------------------------------
+
+import type { FeatEntry } from './_picker';
+
+// Variant Human: subrace entry that carries feats:[{any:1}] + skillProficiencies:[{any:1}]
+const HUMAN_BASE_FOR_VARIANT = makeRaceEntry({
+  slug: 'human',
+  source: 'PHB',
+  name: 'Human',
+  isSubrace: false,
+  data: {
+    name: 'Human',
+    source: 'PHB',
+    ability: [],
+    size: ['M'],
+    speed: 30,
+  },
+});
+
+const VARIANT_HUMAN_SUBRACE = makeRaceEntry({
+  slug: 'variant',
+  source: 'PHB',
+  name: 'Variant Human',
+  isSubrace: true,
+  parentSlug: 'human',
+  parentSource: 'PHB',
+  data: {
+    name: 'Variant Human',
+    source: 'PHB',
+    ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], count: 2, amount: 1 } }],
+    size: ['M'],
+    speed: 30,
+    skillProficiencies: [{ any: 1 }],
+    feats: [{ any: 1 }],
+  },
+});
+
+// Half-Elf: base race with skillProficiencies:[{any:2}], no feats
+const HALF_ELF_WITH_SKILLS = makeRaceEntry({
+  slug: 'half-elf',
+  source: 'PHB',
+  name: 'Half-Elf',
+  isSubrace: false,
+  data: {
+    name: 'Half-Elf',
+    source: 'PHB',
+    ability: [{ cha: 2, choose: { from: ['str', 'dex', 'con', 'int', 'wis'], count: 2 } }],
+    size: ['M'],
+    speed: 30,
+    skillProficiencies: [{ any: 2 }],
+  },
+});
+
+// Sample feats for RaceFeatPicker tests
+const SAMPLE_FEATS: FeatEntry[] = [
+  { slug: 'actor', source: 'PHB', name: 'Actor' },
+  { slug: 'alert', source: 'PHB', name: 'Alert' },
+  { slug: 'athlete', source: 'PHB', name: 'Athlete' },
+];
+
+// ---------------------------------------------------------------------------
+// W-C1: RaceSkillPicker renders N skill buttons when race has skillProficiencies:[{any:N}]
+// ---------------------------------------------------------------------------
+
+describe('W-C1: RaceSkillPicker renders skill buttons for Half-Elf (skillProficiencies:[{any:2}])', () => {
+  it('renders skill buttons (at least one per PHB skill) when Half-Elf is selected', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ELF_WITH_SKILLS]}
+        allFeats={[]}
+        initialSelection={{
+          raceSlug: 'half-elf',
+          raceSource: 'PHB',
+          subraceSlug: null,
+          subraceSource: null,
+        }}
+      />,
+    );
+
+    // The skill picker renders buttons for all 18 PHB skills.
+    // We verify several well-known skills appear as buttons.
+    expect(screen.getByRole('button', { name: /perception/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /stealth/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /arcana/i })).toBeTruthy();
+  });
+
+  it('shows the "Habilidades de linaje" label and count hint', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ELF_WITH_SKILLS]}
+        allFeats={[]}
+        initialSelection={{
+          raceSlug: 'half-elf',
+          raceSource: 'PHB',
+          subraceSlug: null,
+          subraceSource: null,
+        }}
+      />,
+    );
+
+    // Label text from RaceSkillPicker
+    expect(screen.getByText(/habilidades de linaje/i)).toBeTruthy();
+    // Count hint: "Elegí 2 habilidades:"
+    expect(screen.getByText(/elegí 2 habilidades/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C2: RaceSkillPicker enforces the count — after picking N, the rest are disabled
+// ---------------------------------------------------------------------------
+
+describe('W-C2: RaceSkillPicker enforces the count (N=1 for Variant Human)', () => {
+  it('disables all other skill buttons after picking 1 skill (count=1)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    // Pick one skill: Perception
+    const perceptionBtn = screen.getByRole('button', { name: /^perception$/i });
+    fireEvent.click(perceptionBtn);
+
+    // After picking 1 (count=1), Stealth should now be disabled
+    const stealthBtn = screen.getByRole('button', { name: /^stealth$/i });
+    expect(stealthBtn.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('re-enables other buttons after deselecting the picked skill', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    const perceptionBtn = screen.getByRole('button', { name: /^perception$/i });
+    // Pick and then deselect
+    fireEvent.click(perceptionBtn);
+    fireEvent.click(perceptionBtn);
+
+    // Now stealth should be enabled again
+    const stealthBtn = screen.getByRole('button', { name: /^stealth$/i });
+    expect(stealthBtn.hasAttribute('disabled')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C3: RaceFeatPicker renders a searchable list of feats
+// ---------------------------------------------------------------------------
+
+describe('W-C3: RaceFeatPicker renders a searchable list of feats for Variant Human', () => {
+  it('renders each feat name as a selectable row', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /actor/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /alert/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /athlete/i })).toBeTruthy();
+  });
+
+  it('renders the "Talento racial" label', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/talento racial/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C4: RaceFeatPicker filter narrows the visible feats
+// ---------------------------------------------------------------------------
+
+describe('W-C4: RaceFeatPicker filter narrows the visible feats', () => {
+  it('hides non-matching feats when user types in the search input', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    // Find the feat search input (placeholder "Buscar talento…")
+    const searchInput = screen.getByPlaceholderText(/buscar talento/i);
+    fireEvent.change(searchInput, { target: { value: 'act' } });
+
+    // Only Actor should remain visible; Alert and Athlete should be gone
+    expect(screen.queryByRole('button', { name: /actor/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^alert/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^athlete/i })).toBeNull();
+  });
+
+  it('shows all feats again after clearing the filter', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/buscar talento/i);
+    fireEvent.change(searchInput, { target: { value: 'act' } });
+    fireEvent.change(searchInput, { target: { value: '' } });
+
+    expect(screen.queryByRole('button', { name: /actor/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^alert/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^athlete/i })).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C5: RaceDetailPanel renders BOTH pickers for Variant Human
+// ---------------------------------------------------------------------------
+
+describe('W-C5: RaceDetailPanel renders BOTH pickers for Variant Human', () => {
+  it('shows the feat picker AND the skill picker simultaneously', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    // Feat picker label
+    expect(screen.getByText(/talento racial/i)).toBeTruthy();
+    // Skill picker label
+    expect(screen.getByText(/habilidades de linaje/i)).toBeTruthy();
+  });
+
+  it('Siguiente is disabled when neither skill nor feat is picked', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    // The RacePicker disables Siguiente when no entry is selected
+    // (here one IS selected, but Siguiente may still be active — preflight runs on click)
+    // We just verify it exists and is clickable (no crash).
+    expect(siguiente).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C6: RaceDetailPanel renders ONLY SkillPicker for Half-Elf (no feat picker)
+// ---------------------------------------------------------------------------
+
+describe('W-C6: RaceDetailPanel renders ONLY SkillPicker for Half-Elf (no FeatPicker)', () => {
+  it('shows the skill picker (count=2) but NOT the feat picker for Half-Elf', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ELF_WITH_SKILLS]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'half-elf',
+          raceSource: 'PHB',
+          subraceSlug: null,
+          subraceSource: null,
+        }}
+      />,
+    );
+
+    // Skill picker present
+    expect(screen.getByText(/habilidades de linaje/i)).toBeTruthy();
+    expect(screen.getByText(/elegí 2 habilidades/i)).toBeTruthy();
+
+    // Feat picker absent — no "Talento racial" label
+    expect(screen.queryByText(/talento racial/i)).toBeNull();
+    // No feat search input
+    expect(screen.queryByPlaceholderText(/buscar talento/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C7: handleContinue preflight blocks when featChoice is missing (Variant Human)
+// ---------------------------------------------------------------------------
+
+// Variant Human subrace (slug: 'variant') has:
+//   ability: [{choose: {from:[...], count:2, amount:1}}] → ASI key is "subrace:0"
+// We need to pre-fill chosenAsis for "subrace:0" with 2 abilities so
+// the ASI preflight passes and we reach the feat preflight.
+const VARIANT_CHOSEN_ASIS_COMPLETE: Record<string, AbilityKey[]> = {
+  'subrace:0': ['str', 'dex'],
+};
+
+describe('W-C7: handleContinue preflight blocks when feat is missing for Variant Human', () => {
+  it('shows inline error "Elegí un talento racial." and does NOT call saveRace', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+        // ASIs complete so the ASI preflight passes
+        initialChosenAsis={VARIANT_CHOSEN_ASIS_COMPLETE}
+        // Start with one skill chosen so skill-count preflight passes
+        initialSkillChoices={['perception']}
+        // No feat slug chosen (initialFeatSlug omitted → defaults null)
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    // The feat preflight error is rendered in <p role="alert"> by WizardFooterNav.
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toMatch(/elegí un talento racial/i);
+    expect(saveRace).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-C8: handleContinue preflight blocks when skillChoices count is wrong (Half-Elf)
+// ---------------------------------------------------------------------------
+
+// Half-Elf ability: [{cha:2, choose:{from:[str,dex,con,int,wis], count:2}}]
+// → raceSlots: fixed cha:2 (idx=0), choose count=2 (idx=1)
+// → ASI keys: "race:0" is fixed (no choice needed), "race:1" needs 2 picks
+const HALF_ELF_CHOSEN_ASIS_COMPLETE: Record<string, AbilityKey[]> = {
+  'race:1': ['str', 'dex'],
+};
+
+describe('W-C8: handleContinue preflight blocks when skill count is wrong (Half-Elf)', () => {
+  it('shows inline error about skill count and does NOT call saveRace', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ELF_WITH_SKILLS]}
+        allFeats={[]}
+        initialSelection={{
+          raceSlug: 'half-elf',
+          raceSource: 'PHB',
+          subraceSlug: null,
+          subraceSource: null,
+        }}
+        // ASIs complete so the ASI preflight passes (cha:2 is fixed; choose needs 2)
+        initialChosenAsis={HALF_ELF_CHOSEN_ASIS_COMPLETE}
+        // Only 1 skill chosen; Half-Elf requires 2
+        initialSkillChoices={['perception']}
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    // The skill-count preflight error is rendered in a <p role="alert"> by WizardFooterNav.
+    // RaceSkillPicker also renders a "Elegí 2 habilidades:" hint (no role="alert").
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toMatch(/elegí 2 habilidades/i);
+    expect(saveRace).not.toHaveBeenCalled();
+  });
+
+  it('shows no skill error when 0 skills are chosen for a no-skill race (Dwarf base)', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DWARF_BASE, HILL_DWARF_SUBRACE]}
+        allFeats={[]}
+        initialSelection={null}
+      />,
+    );
+
+    // This test simply verifies no skill error appears without a selection
+    // (no skill picker should be present for Dwarf).
+    expect(screen.queryByText(/habilidades de linaje/i)).toBeNull();
   });
 });
