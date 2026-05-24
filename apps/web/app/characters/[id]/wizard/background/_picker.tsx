@@ -31,6 +31,7 @@ type Initial = {
   skillChoices: string[];
   languageChoices: string[];
   toolChoices: Record<string, string[]>;
+  customization?: Customization;
 };
 
 function entryKey(e: { slug: string; source: string }): string {
@@ -77,7 +78,9 @@ export function BackgroundPicker({
   const [tools, setTools] = useState<Record<string, string[]>>(
     initialSelection?.toolChoices ?? {},
   );
-  const [customization, setCustomization] = useState<Customization | undefined>(undefined);
+  const [customization, setCustomization] = useState<Customization | undefined>(
+    initialSelection?.customization,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 

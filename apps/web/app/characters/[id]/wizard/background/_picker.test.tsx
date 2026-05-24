@@ -13,7 +13,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 
 afterEach(cleanup);
 import type { ParsedBackground, BackgroundData } from './_parsers';
-import type { MixedPoolShape, BackgroundPackage, FeatureOption } from '@dungeon-hub/domain/character/background';
+import type { MixedPoolShape, BackgroundPackage, FeatureOption, BackgroundCompendiumData } from '@dungeon-hub/domain/character/background';
 import { MixedPoolPicker, EquipmentPicker, FeaturePicker } from './_picker';
 
 // ---------------------------------------------------------------------------
@@ -398,6 +398,144 @@ describe('FeaturePicker — filter input narrows options', () => {
     );
     expect(options).toHaveLength(1);
     expect(options[0].textContent).toContain('Military');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug 1 RED — BackgroundPicker round-trip: initialSelection.customization
+// must pre-populate the 3 customization sub-pickers (mixedPool/equipment/feature).
+// ---------------------------------------------------------------------------
+
+function makeCustomBgEntry(): BackgroundEntry {
+  return {
+    slug: 'custom-background',
+    source: 'PHB',
+    name: 'Custom Background',
+    data: {
+      name: 'Custom Background',
+      source: 'PHB',
+      skillProficiencies: [{ choose: { from: ['perception', 'arcana'], count: 2 } }],
+      skillToolLanguageProficiencies: [
+        { anyLanguage: 2 },
+        { anyLanguage: 1, anyTool: 1 },
+        { anyTool: 1 },
+      ],
+      startingEquipment: [],
+      toolProficiencies: [],
+    } as unknown as BackgroundData,
+  };
+}
+
+function makeAcolyteForAllBackgrounds(): BackgroundCompendiumData {
+  return {
+    slug: 'acolyte',
+    source: 'PHB',
+    name: 'Acolyte',
+    skillProficiencies: [{ insight: true, religion: true }],
+    languageProficiencies: [{ anyStandard: 2 }],
+    toolProficiencies: null,
+    startingEquipment: [
+      { _: ['a holy symbol', 'a prayer book', '15 gp'] },
+    ],
+    entries: [
+      {
+        type: 'entries',
+        name: 'Feature: Shelter of the Faithful',
+        data: { isFeature: true },
+        entries: ['You command the respect of those who share your faith.'],
+      },
+    ],
+  } as unknown as BackgroundCompendiumData;
+}
+
+describe('BackgroundPicker — customization round-trip (Bug 1)', () => {
+  it('pre-selects the mixedPool shape radio when initialSelection.customization is provided', () => {
+    const customBg = makeCustomBgEntry();
+    const allBackgrounds = [makeAcolyteForAllBackgrounds()];
+
+    const initialSelection = {
+      slug: customBg.slug,
+      source: customBg.source,
+      skillChoices: ['perception', 'arcana'],
+      languageChoices: [],
+      toolChoices: {},
+      customization: {
+        mixedPool: { shape: 'lang2' as const, langs: ['draconic', 'elvish'], tools: [] },
+        equipment: { kind: 'coin' as const },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    };
+
+    render(
+      <BackgroundPicker
+        characterId="char-1"
+        entries={[customBg]}
+        allBackgrounds={allBackgrounds}
+        initialSelection={initialSelection}
+      />,
+    );
+
+    const lang2Radio = screen.getByDisplayValue('lang2') as HTMLInputElement;
+    expect(lang2Radio.checked).toBe(true);
+  });
+
+  it('pre-selects the coin equipment mode when initialSelection.customization.equipment.kind=coin', () => {
+    const customBg = makeCustomBgEntry();
+    const allBackgrounds = [makeAcolyteForAllBackgrounds()];
+
+    const initialSelection = {
+      slug: customBg.slug,
+      source: customBg.source,
+      skillChoices: ['perception', 'arcana'],
+      languageChoices: [],
+      toolChoices: {},
+      customization: {
+        mixedPool: { shape: 'lang2' as const, langs: ['draconic', 'elvish'], tools: [] },
+        equipment: { kind: 'coin' as const },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    };
+
+    render(
+      <BackgroundPicker
+        characterId="char-1"
+        entries={[customBg]}
+        allBackgrounds={allBackgrounds}
+        initialSelection={initialSelection}
+      />,
+    );
+
+    const coinRadio = screen.getByDisplayValue('coin') as HTMLInputElement;
+    expect(coinRadio.checked).toBe(true);
+  });
+
+  it('pre-renders the feature preview when initialSelection.customization.feature.slug is set', () => {
+    const customBg = makeCustomBgEntry();
+    const allBackgrounds = [makeAcolyteForAllBackgrounds()];
+
+    const initialSelection = {
+      slug: customBg.slug,
+      source: customBg.source,
+      skillChoices: ['perception', 'arcana'],
+      languageChoices: [],
+      toolChoices: {},
+      customization: {
+        mixedPool: { shape: 'lang2' as const, langs: ['draconic', 'elvish'], tools: [] },
+        equipment: { kind: 'coin' as const },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    };
+
+    render(
+      <BackgroundPicker
+        characterId="char-1"
+        entries={[customBg]}
+        allBackgrounds={allBackgrounds}
+        initialSelection={initialSelection}
+      />,
+    );
+
+    expect(screen.getByText(/command the respect of those who share your faith/i)).toBeTruthy();
   });
 });
 

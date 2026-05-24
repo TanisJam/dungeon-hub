@@ -4,7 +4,10 @@ import { api } from '@/lib/api';
 import { parseBackground, type BackgroundData } from './_parsers';
 import { poolFor } from './_options';
 import { BackgroundPicker, type BackgroundEntry } from './_picker';
-import type { BackgroundCompendiumData } from '@dungeon-hub/domain/character/background';
+import type {
+  BackgroundCompendiumData,
+  Customization,
+} from '@dungeon-hub/domain/character/background';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type BgRow = { id: string; slug: string; source: string; name: string };
@@ -16,6 +19,7 @@ type AppliedBackground = {
   skills?: string[];
   languages?: string[];
   tools?: string[];
+  customization?: Customization;
 };
 
 type AppliedClass = { skillChoices?: string[] };
@@ -118,6 +122,7 @@ export default async function BackgroundStepPage({ params }: Props) {
       slug: applied.slug,
       source: applied.source,
       ...choices,
+      ...(applied.customization ? { customization: applied.customization } : {}),
     };
   }
 
