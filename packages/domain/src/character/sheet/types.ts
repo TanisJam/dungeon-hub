@@ -122,6 +122,20 @@ export interface RaceSheetData {
    * Consumed by computeCharacterSheet to derive DarkvisionView. PHB p.17.
    */
   darkvision?: number | null;
+  /**
+   * Effective weapon proficiencies after race+subrace merge (Decision #589).
+   * loadRaceSheetData applies: subrace OVERRIDES race when 'weaponProficiencies' in subData.
+   * 5etools shape: [{"battleaxe|phb": true}] — source suffix stripped in compute by normalizeProf.
+   * null/undefined when no weapon proficiencies (Human, Halfling, Dragonborn, etc.).
+   */
+  weaponProficiencies?: Array<Record<string, boolean | unknown>> | null;
+  /**
+   * Effective armor proficiencies after race+subrace merge (Decision #589).
+   * loadRaceSheetData applies: subrace OVERRIDES race when 'armorProficiencies' in subData.
+   * PHB Mountain Dwarf: light + medium. Dwarf race has none at race level.
+   * null/undefined when no armor proficiencies.
+   */
+  armorProficiencies?: Array<Record<string, boolean | unknown>> | null;
 }
 
 // Re-export for convenience (BreathWeaponData is consumed by compute.ts)

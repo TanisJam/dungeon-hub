@@ -80,6 +80,20 @@ export interface RaceFeatBlock {
  */
 export type RaceSkillProficiencyBlock = Record<string, boolean | number>;
 
+/**
+ * Bloque del campo `weaponProficiencies` en 5etools races shape.
+ * Keys son slugs con sufijo de source (ej: `"battleaxe|phb"`) con valor `true`.
+ * El helper `normalizeProf` de compute.ts ya stripea el sufijo `|phb`.
+ * El key `choose` con `fromFilter` se ignora silenciosamente (Decision #590).
+ */
+export type WeaponProficiencyBlock = Record<string, boolean | { choose: unknown }>;
+
+/**
+ * Bloque del campo `armorProficiencies` en 5etools races shape.
+ * Keys son strings de armor type (ej: `"light"`, `"medium"`) con valor `true`.
+ */
+export type ArmorProficiencyBlock = Record<string, boolean>;
+
 export interface RaceCompendiumData {
   slug: string;
   source: string;
@@ -98,6 +112,18 @@ export interface RaceCompendiumData {
    * - undefined (field absent): race does not grant darkvision (PHB: Human, Halfling, Dragonborn).
    */
   darkvision?: number | null;
+  /**
+   * Weapon proficiencies granted by this race. PHB p.20 (Dwarf), p.23 (Elf).
+   * 5etools shape: `[{ "battleaxe|phb": true }]` — source suffix stripped by normalizeProf.
+   * Absent when race grants no weapon proficiencies (Human, Halfling, Dragonborn, etc.).
+   */
+  weaponProficiencies?: WeaponProficiencyBlock[] | null;
+  /**
+   * Armor proficiencies granted by this race (at race level).
+   * PHB p.20 Mountain Dwarf: light + medium armor (stored on subrace in 5etools).
+   * Absent when race grants no armor proficiencies.
+   */
+  armorProficiencies?: ArmorProficiencyBlock[] | null;
 }
 
 export interface SubraceCompendiumData {
@@ -122,6 +148,19 @@ export interface SubraceCompendiumData {
    * - undefined (field absent): inherit parent race's darkvision.
    */
   darkvision?: number | null;
+  /**
+   * Weapon proficiencies on the subrace. When PRESENT, OVERRIDES race-level per Decision #589.
+   * - PHB Drow: rapier, shortsword, hand crossbow (REPLACES Elf Weapon Training).
+   * - PHB High/Wood/Eladrin: longsword, shortsword, shortbow, longbow (RESTATES Elf training).
+   * - undefined (field absent): no override — race-level weaponProficiencies used.
+   */
+  weaponProficiencies?: WeaponProficiencyBlock[] | null;
+  /**
+   * Armor proficiencies on the subrace. When PRESENT, OVERRIDES race-level per Decision #589.
+   * - PHB Mountain Dwarf: light + medium armor (Dwarf race has none, so override yields addition).
+   * - undefined (field absent): no override — race-level armorProficiencies used (or none).
+   */
+  armorProficiencies?: ArmorProficiencyBlock[] | null;
 }
 
 export interface AppliedAsi {

@@ -914,3 +914,221 @@ describe('computeCharacterSheet — BreathWeaponView (PHB p.34)', () => {
     }).not.toThrow();
   });
 });
+
+// ── Batch 5: weapon + armor proficiency merge from race + subrace ─────────────
+// Spec REQ-1..REQ-5, Design C-1..C-10.
+// Key decision #589: subrace OVERRIDES race per category (not union).
+// Drow REPLACES Elf weapons — strict negative assertion (S-08) catches union bug.
+// 5etools shape: [{"battleaxe|phb": true}] — normalizeProf strips "|phb" suffix.
+
+describe('computeCharacterSheet — race weapon/armor proficiencies (Batch 5)', () => {
+  // C-1: Hill Dwarf → inherits Dwarf race weapons (no subrace override).
+  // PHB p.20 — Dwarf Weapon Training: battleaxe, handaxe, light hammer, warhammer.
+  // Hill Dwarf subrace has NO weaponProficiencies field → race block wins.
+  it('C-1: Hill Dwarf → 4 axes+hammers from race (PHB p.20)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Thorin', race: { slug: 'dwarf', source: 'PHB' }, subrace: { slug: 'dwarf--hill', source: 'PHB' } },
+      raceData: {
+        speed: 25,
+        size: ['M'],
+        weaponProficiencies: [{ 'battleaxe|phb': true, 'handaxe|phb': true, 'light hammer|phb': true, 'warhammer|phb': true }],
+        // no armorProficiencies — Dwarf race has none at race level (Mountain Dwarf subrace adds them)
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('battleaxe');
+    expect(sheet.proficiencies.weapons).toContain('handaxe');
+    expect(sheet.proficiencies.weapons).toContain('light hammer');
+    expect(sheet.proficiencies.weapons).toContain('warhammer');
+    expect(sheet.proficiencies.armor).toHaveLength(0);
+  });
+
+  // C-2: Mountain Dwarf → race weapons + subrace adds light + medium armor.
+  // PHB p.20 — Mountain Dwarf: proficient with light and medium armor.
+  // raceData has BOTH weaponProficiencies (race-level) + armorProficiencies (subrace override present).
+  it('C-2: Mountain Dwarf → race weapons + light + medium armor (PHB p.20)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Bruenor', race: { slug: 'dwarf', source: 'PHB' }, subrace: { slug: 'dwarf--mountain', source: 'PHB' } },
+      raceData: {
+        speed: 25,
+        size: ['M'],
+        weaponProficiencies: [{ 'battleaxe|phb': true, 'handaxe|phb': true, 'light hammer|phb': true, 'warhammer|phb': true }],
+        armorProficiencies: [{ light: true, medium: true }],
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('battleaxe');
+    expect(sheet.proficiencies.weapons).toContain('warhammer');
+    expect(sheet.proficiencies.armor).toContain('light');
+    expect(sheet.proficiencies.armor).toContain('medium');
+  });
+
+  // C-3: High Elf — subrace RESTATES Elf Weapon Training (same 4 weapons as race).
+  // PHB p.23 — Elf Weapon Training (all PHB elf subraces restate it in 5etools).
+  // raceData.weaponProficiencies comes from subrace override (High Elf restates).
+  it('C-3: High Elf → 4 elf weapons in proficiencies.weapons (PHB p.23)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Legolas', race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--high', source: 'PHB' } },
+      raceData: {
+        speed: 30,
+        size: ['M'],
+        weaponProficiencies: [{ 'longsword|phb': true, 'shortsword|phb': true, 'shortbow|phb': true, 'longbow|phb': true }],
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('longsword');
+    expect(sheet.proficiencies.weapons).toContain('shortsword');
+    expect(sheet.proficiencies.weapons).toContain('shortbow');
+    expect(sheet.proficiencies.weapons).toContain('longbow');
+  });
+
+  // C-4: Wood Elf — same 4 elf weapons as High Elf (PHB p.24 Wood Elf Training).
+  it('C-4: Wood Elf → 4 elf weapons (PHB p.24)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Haldir', race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--wood', source: 'PHB' } },
+      raceData: {
+        speed: 35,
+        size: ['M'],
+        weaponProficiencies: [{ 'longsword|phb': true, 'shortsword|phb': true, 'shortbow|phb': true, 'longbow|phb': true }],
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('longsword');
+    expect(sheet.proficiencies.weapons).toContain('shortsword');
+    expect(sheet.proficiencies.weapons).toContain('shortbow');
+    expect(sheet.proficiencies.weapons).toContain('longbow');
+  });
+
+  // C-5: Drow REPLACES Elf weapons — strict negative assertion.
+  // PHB p.24 — Drow Weapon Training: rapier, shortsword, hand crossbow ONLY.
+  // Decision #589: subrace override means longsword/shortbow/longbow MUST NOT appear.
+  it('C-5 (S-08 CRITICAL): Drow → rapier+shortsword+hand crossbow; longsword NOT present (PHB p.24)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Drizzt', race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--drow', source: 'PHB' } },
+      raceData: {
+        speed: 30,
+        size: ['M'],
+        // API already applied Decision #589 override: Drow replaces Elf weapons entirely
+        weaponProficiencies: [{ 'rapier|phb': true, 'shortsword|phb': true, 'hand crossbow|phb': true }],
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('rapier');
+    expect(sheet.proficiencies.weapons).toContain('shortsword');
+    expect(sheet.proficiencies.weapons).toContain('hand crossbow');
+    // STRICT NEGATIVE — union bug would leave these in
+    expect(sheet.proficiencies.weapons).not.toContain('longsword');
+    expect(sheet.proficiencies.weapons).not.toContain('shortbow');
+    expect(sheet.proficiencies.weapons).not.toContain('longbow');
+  });
+
+  // C-6: Fighter (longsword via class) + High Elf (longsword via race) → dedup: appears once.
+  // Spec REQ-3: Set-based merge deduplicates across sources.
+  it('C-6: Fighter+HighElf dedup — longsword from class+race appears once (REQ-3)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Elven Knight',
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        classes: [{
+          slug: 'fighter', source: 'PHB', level: 1,
+          subclass: null, hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: ['light', 'medium', 'heavy', 'shields'],
+          weaponProficiencies: ['longsword', 'simple', 'martial'],
+          toolProficiencies: [], skillChoices: [],
+        }],
+      },
+      raceData: {
+        speed: 30,
+        size: ['M'],
+        weaponProficiencies: [{ 'longsword|phb': true, 'shortsword|phb': true, 'shortbow|phb': true, 'longbow|phb': true }],
+      },
+    });
+    const longswords = sheet.proficiencies.weapons.filter((w) => w === 'longsword');
+    expect(longswords).toHaveLength(1);
+    expect(sheet.proficiencies.weapons).toContain('shortsword');
+  });
+
+  // C-7: Human — no race weapon/armor profs. Only class profs present.
+  // PHB p.31 — Human: no weapon/armor training from race.
+  it('C-7: Human Wizard → no race weapon contrib (only class profs) (PHB p.31)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Sigurd',
+        race: { slug: 'human', source: 'PHB' },
+        classes: [{
+          slug: 'wizard', source: 'PHB', level: 1,
+          subclass: null, hitDie: 'd6',
+          savingThrows: ['int', 'wis'],
+          armorProficiencies: [],
+          weaponProficiencies: ['dagger', 'dart', 'quarterstaff'],
+          toolProficiencies: [], skillChoices: [],
+        }],
+      },
+      raceData: {
+        speed: 30,
+        size: ['M'],
+        // Human has no weaponProficiencies or armorProficiencies
+      },
+    });
+    expect(sheet.proficiencies.weapons).toContain('dagger');
+    expect(sheet.proficiencies.weapons).not.toContain('longsword');
+    expect(sheet.proficiencies.armor).toHaveLength(0);
+  });
+
+  // C-8: Halfling — no race weapon/armor profs. Zero race contribution.
+  // PHB p.28 — Halfling: no weapon training.
+  it('C-8: Halfling Rogue → no race weapon contrib (PHB p.28)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Bilbo',
+        race: { slug: 'halfling', source: 'PHB' },
+        classes: [{
+          slug: 'rogue', source: 'PHB', level: 1,
+          subclass: null, hitDie: 'd8',
+          savingThrows: ['dex', 'int'],
+          armorProficiencies: ['light'],
+          weaponProficiencies: ['simple', 'hand crossbow', 'longsword', 'rapier', 'shortsword'],
+          toolProficiencies: ["thieves' tools"], skillChoices: [],
+        }],
+      },
+      raceData: {
+        speed: 25,
+        size: ['S'],
+        // Halfling has no weaponProficiencies in 5etools
+      },
+    });
+    // Race contributes nothing; class profs still present
+    expect(sheet.proficiencies.armor).toContain('light');
+    expect(sheet.proficiencies.weapons).toContain('simple');
+    // No extra race-only weapons (battleaxe is a Dwarf weapon, Halfling has none)
+    expect(sheet.proficiencies.weapons).not.toContain('battleaxe');
+    // longsword came from class — still present, and only once
+    expect(sheet.proficiencies.weapons).toContain('longsword');
+  });
+
+  // C-9: Race with missing weaponProficiencies field → empty Set contribution, no throw.
+  // Spec REQ-5: absent field → treat as empty (don't crash on undefined).
+  it('C-9: missing weaponProficiencies on raceData → no crash, no extra weapons', () => {
+    expect(() => {
+      const sheet = computeCharacterSheet({
+        character: { name: 'Mystery', race: { slug: 'human', source: 'PHB' } },
+        raceData: { speed: 30, size: ['M'] }, // no weaponProficiencies
+      });
+      expect(sheet.proficiencies.weapons).toHaveLength(0);
+      expect(sheet.proficiencies.armor).toHaveLength(0);
+    }).not.toThrow();
+  });
+
+  // C-10: Subrace with explicit null/undefined weaponProficiencies → empty contribution, no throw.
+  // Decision #589: null field = drop/empty, not inherit from race. No crash.
+  it('C-10: subrace null weaponProficiencies in raceData → no crash, empty contribution', () => {
+    expect(() => {
+      const sheet = computeCharacterSheet({
+        character: { name: 'Test', race: { slug: 'elf', source: 'PHB' }, subrace: { slug: 'elf--eladrin', source: 'MTF' } },
+        raceData: {
+          speed: 30,
+          size: ['M'],
+          weaponProficiencies: null, // API resolved to null for this subrace
+        },
+      });
+      expect(sheet.proficiencies.weapons).toHaveLength(0);
+    }).not.toThrow();
+  });
+});

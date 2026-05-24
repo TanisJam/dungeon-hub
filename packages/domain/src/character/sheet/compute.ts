@@ -164,6 +164,19 @@ function stripInlineTag(s: string): string {
 }
 
 /**
+ * Strips the 5etools source suffix from a weapon/armor proficiency KEY.
+ * 5etools weapon proficiency blocks use the key as the slug+source:
+ *   "battleaxe|phb" → "battleaxe"
+ *   "hand crossbow|phb" → "hand crossbow"
+ *   "light" → "light"  (armor keys have no suffix)
+ * This is NOT the same as stripInlineTag (which handles {@tag ...} values).
+ */
+function stripSourceSuffix(key: string): string {
+  const pipeIdx = key.indexOf('|');
+  return pipeIdx === -1 ? key : key.slice(0, pipeIdx);
+}
+
+/**
  * Computes BreathWeaponView from subrace breathWeapon data + character stats.
  * PHB p.34 formulas:
  *   - saveDC = 8 + CON modifier + proficiency bonus
@@ -361,6 +374,26 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   for (const x of character.background?.languages ?? []) languages.add(normalizeProf(x));
   if (raceData) for (const x of extractRaceLanguages(raceData)) languages.add(normalizeProf(x));
   for (const x of character.raceLanguageChoices ?? []) languages.add(normalizeProf(x));
+  // Race + subrace weapon/armor proficiencies (Batch 5 — race-weapon-armor-profs).
+  // Decision #589: merge already applied by loadRaceSheetData (subrace overrides race per category).
+  // 5etools weapon proficiency KEYS carry the source suffix: "battleaxe|phb" → strip to "battleaxe".
+  // This is different from inline-tag values ({@item ...}) handled by normalizeProf/stripInlineTag.
+  // choose/fromFilter entries have val !== true — skip silently (Decision #590, VGM Hobgoblin only).
+  if (raceData?.weaponProficiencies) {
+    for (const block of raceData.weaponProficiencies) {
+      for (const [key, val] of Object.entries(block)) {
+        if (val === true) weapons.add(stripSourceSuffix(key));
+        // val is object (choose/fromFilter) — skip silently per Decision #590
+      }
+    }
+  }
+  if (raceData?.armorProficiencies) {
+    for (const block of raceData.armorProficiencies) {
+      for (const [key, val] of Object.entries(block)) {
+        if (val === true) armor.add(stripSourceSuffix(key));
+      }
+    }
+  }
 
   // ---- Speed + size desde race ------------------------------------------
   const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };
