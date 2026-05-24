@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readJson } from '../reader.js';
 import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
 import type { FiveeToolsRace, FiveeToolsSubrace, NormalizedRace } from '../types.js';
+import { expandDragonbornAncestries } from './phb-dragonborn-ancestries.js';
 
 interface RacesFile {
   race?: FiveeToolsRace[];
@@ -17,7 +18,7 @@ export async function importRaces(
 
   for (const r of file.race ?? []) {
     if (isExcludedSource(r.source)) continue;
-    out.push({
+    const baseRow: NormalizedRace = {
       slug: slugify(r.name),
       source: r.source,
       name: r.name,
@@ -26,7 +27,13 @@ export async function importRaces(
       isSubrace: false,
       parentSlug: null,
       parentSource: null,
-    });
+    };
+    out.push(baseRow);
+
+    // PHB Dragonborn: emit 10 synthetic ancestry subrace rows (PHB p.34).
+    // No-op for every other race. After deploy, run `pnpm import:compendium`
+    // to materialize the 10 rows in the DB.
+    out.push(...expandDragonbornAncestries(baseRow));
   }
 
   for (const s of file.subrace ?? []) {
