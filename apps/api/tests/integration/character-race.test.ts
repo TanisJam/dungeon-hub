@@ -644,4 +644,31 @@ describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => 
     const luckyPresent = feats.some((f) => f.slug === 'lucky');
     expect(luckyPresent).toBe(true);
   });
+
+  it('A-11 (S-07): PUT Variant Human with featChoice slug that does not exist → 400 FEAT_NOT_FOUND', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'human', source: 'PHB' },
+        subrace: { slug: 'human--variant', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'str', bonus: 1, source: 'subrace' },
+          { ability: 'dex', bonus: 1, source: 'subrace' },
+        ],
+        languageChoices: ['elvish'],
+        skillChoices: ['perception'],
+        featChoice: { slug: 'nonexistent-made-up-feat', source: 'PHB' },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    const issue = body.issues.find((i: { code: string }) => i.code === 'FEAT_NOT_FOUND');
+    expect(issue).toBeDefined();
+    expect(issue.feat).toEqual({ slug: 'nonexistent-made-up-feat', source: 'PHB' });
+  });
 });
