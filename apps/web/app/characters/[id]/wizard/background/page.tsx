@@ -102,10 +102,10 @@ export default async function BackgroundStepPage({ params }: Props) {
   }));
 
   const allBackgrounds: BackgroundCompendiumData[] = detailed.map((d) => ({
+    ...d.data,
     slug: d.slug,
     source: d.source,
     name: d.name,
-    ...d.data,
   }));
 
   // Si hay background guardado, derivamos los choices del compendium data del bg.

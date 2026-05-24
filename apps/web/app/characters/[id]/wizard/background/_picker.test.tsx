@@ -99,6 +99,7 @@ describe('BackgroundPicker — toolChoose block renders when non-null', () => {
       <BackgroundPicker
         characterId="char-1"
         entries={[entry]}
+        allBackgrounds={[]}
         initialSelection={initialSelection}
       />,
     );
@@ -123,6 +124,7 @@ describe('BackgroundPicker — toolChoose block renders when non-null', () => {
       <BackgroundPicker
         characterId="char-1"
         entries={[entry]}
+        allBackgrounds={[]}
         initialSelection={initialSelection}
       />,
     );
@@ -161,6 +163,7 @@ describe('BackgroundPicker — toolChoose block absent when null (Acolyte)', () 
       <BackgroundPicker
         characterId="char-1"
         entries={[entry]}
+        allBackgrounds={[]}
         initialSelection={initialSelection}
       />,
     );

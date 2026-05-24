@@ -102,19 +102,6 @@ const HIT_DIE_AVG: Record<string, number> = {
   d12: 7,
 };
 
-/** Spellcasting ability por clase (PHB). */
-const SPELLCASTING_ABILITY: Record<string, AbilityKey> = {
-  bard: 'cha',
-  cleric: 'wis',
-  druid: 'wis',
-  sorcerer: 'cha',
-  warlock: 'cha',
-  wizard: 'int',
-  paladin: 'cha',
-  ranger: 'wis',
-  artificer: 'int',
-};
-
 /** Tamaño default si no podemos resolverlo desde race data. */
 const DEFAULT_SIZE = 'M';
 
@@ -123,10 +110,10 @@ function normalizeSpeed(s: RaceSheetData['speed']): CharacterSheet['speed'] {
   if (typeof s === 'number') return { walk: s };
   if (s && typeof s === 'object') {
     return {
-      walk: typeof s.walk === 'number' ? s.walk : 30,
-      ...(typeof s.fly === 'number' ? { fly: s.fly } : {}),
-      ...(typeof s.swim === 'number' ? { swim: s.swim } : {}),
-      ...(typeof s.climb === 'number' ? { climb: s.climb } : {}),
+      walk: typeof s['walk'] === 'number' ? s['walk'] : 30,
+      ...(typeof s['fly'] === 'number' ? { fly: s['fly'] } : {}),
+      ...(typeof s['swim'] === 'number' ? { swim: s['swim'] } : {}),
+      ...(typeof s['climb'] === 'number' ? { climb: s['climb'] } : {}),
     };
   }
   return { walk: 30 };

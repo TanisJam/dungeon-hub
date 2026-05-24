@@ -19,7 +19,7 @@ interface BackgroundsFile {
  * surfaces the upstream issue so fixes can be tracked.
  */
 function warnIfAnyToolCountBug(b: FiveeToolsBackground): void {
-  const field = (b as Record<string, unknown>)['skillToolLanguageProficiencies'];
+  const field = (b as unknown as Record<string, unknown>)['skillToolLanguageProficiencies'];
   if (!Array.isArray(field)) return;
   for (const alt of field) {
     if (!alt || typeof alt !== 'object') continue;

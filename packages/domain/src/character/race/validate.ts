@@ -191,7 +191,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   // ---- 1.5) Idiomas elegidos --------------------------------------------
   const langResult = validateLanguageChoices({
     race: raceData,
-    subrace: subraceData,
+    subrace: subraceData ?? null,
     choices: input.languageChoices ?? [],
   });
   if (langResult.issues.length > 0) {

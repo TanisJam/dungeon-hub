@@ -189,11 +189,11 @@ export function splitEquipmentBlock(
     if (typeof item === 'string') return item;
     if (item && typeof item === 'object') {
       const o = item as Record<string, unknown>;
-      if (typeof o.displayName === 'string') return o.displayName;
-      if (typeof o.item === 'string') return o.item;
-      if (typeof o.special === 'string') {
-        const qty = typeof o.quantity === 'number' ? ` (×${o.quantity})` : '';
-        return `${o.special}${qty}`;
+      if (typeof o['displayName'] === 'string') return o['displayName'];
+      if (typeof o['item'] === 'string') return o['item'];
+      if (typeof o['special'] === 'string') {
+        const qty = typeof o['quantity'] === 'number' ? ` (×${o['quantity']})` : '';
+        return `${o['special']}${qty}`;
       }
     }
     return null;

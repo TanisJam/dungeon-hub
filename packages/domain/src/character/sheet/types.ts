@@ -4,6 +4,7 @@ import type { AppliedFeat } from '../feat/types.js';
 import type { AppliedBackground } from '../background/types.js';
 import type { AppliedAsi } from '../race/types.js';
 import type { InventoryItem } from '../inventory/types.js';
+import type { EncumbranceView } from '../inventory/encumbrance.js';
 
 export const CURRENCY_KEYS = ['cp', 'sp', 'ep', 'gp', 'pp'] as const;
 export type CurrencyKey = (typeof CURRENCY_KEYS)[number];
@@ -177,7 +178,7 @@ export interface CharacterSheet {
   feats: Array<{ slug: string; source: string }>;
   spellcasting: SpellcastingView[];
   currency: Currency;
-  encumbrance: { weight: number; max: number; status: 'ok' | 'over' };
+  encumbrance: EncumbranceView;
   attunement: { used: number; max: number };
   spellSlots: SpellSlotsView;
   spellsByClass: ClassSpellSummary[];

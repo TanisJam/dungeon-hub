@@ -169,7 +169,7 @@ export function parseLanguageChoices(input: {
   };
 
   consume(input.race.languageProficiencies);
-  consume(input.subrace?.languageProficiencies ?? null);
+  consume(input.subrace?.languageProficiencies ?? undefined);
 
   const totalChooseCount = Object.values(chooseCounts).reduce((s, n) => s + n, 0);
   return { fixed, chooseCounts, totalChooseCount };

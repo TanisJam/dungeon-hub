@@ -6,7 +6,7 @@
 //
 // GATING: solo responde si NODE_ENV !== 'production'. En prod devuelve 404.
 import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
         cookiesToSet.forEach(({ name, value, options }) =>
           cookieStore.set(name, value, options),
         );

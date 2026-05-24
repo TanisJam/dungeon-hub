@@ -21,9 +21,17 @@ export interface SupabaseJwtPayload {
   user_metadata?: Record<string, unknown>;
 }
 
+// @fastify/jwt does its own module augmentation of FastifyRequest.user
+// (defaults to string | object | Buffer). Extending FastifyJWT.user is the
+// canonical way to give every `request.user` access the correct payload type.
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    user: SupabaseJwtPayload;
+  }
+}
+
 declare module 'fastify' {
   interface FastifyRequest {
-    user?: SupabaseJwtPayload;
     /**
      * Set cuando el request entró con header X-Acting-As-Discord-Id y la
      * impersonation fue autorizada. Contiene el user_id del bot/servicio que
