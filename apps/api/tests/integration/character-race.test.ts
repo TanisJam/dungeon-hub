@@ -11,6 +11,12 @@ describe('PUT /characters/:id/race', () => {
   let campaignId: string;
 
   beforeAll(async () => {
+    // Guard against stale additionalSpellsNormalized from a prior Batch 6 run.
+    await db
+      .update(compendiumRaces)
+      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
+      .where(eq(compendiumRaces.slug, 'elf--high'));
+
     const app = await getTestApp();
     user = await createTestUser();
 
@@ -921,6 +927,13 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
   let characterId: string;
 
   beforeAll(async () => {
+    // Guard against stale additionalSpellsNormalized in elf--high from a prior Batch 6 run.
+    // Without this, the RACE_CANTRIP_REQUIRED gate fires on High Elf PUT tests in this suite.
+    await db
+      .update(compendiumRaces)
+      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
+      .where(eq(compendiumRaces.slug, 'elf--high'));
+
     const app = await getTestApp();
     user = await createTestUser();
 
@@ -1089,5 +1102,274 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
     expect(res.statusCode).toBe(200);
     const { sheet } = res.json();
     expect(sheet.darkvision).toBeNull();
+  });
+});
+
+// ── Batch 6: race-additional-spells — API integration tests ──────────────────
+// Spec: engram #607 REQ-A-PROJECT-01, REQ-A-SAVE-RACE-01, REQ-A-VALIDATION-01.
+// Tests A-1 through A-5 per tasks #609 Phase C.
+//
+// PREREQUISITE: The compendium DB must have elf--high and tiefling rows with
+// additionalSpellsNormalized seeded. This is done via seedRacialSpells() below
+// (idempotent upsert), mirroring the Dragonborn ancestry seed pattern.
+// In production, this data comes from `pnpm import:5etools` after Phase A deploy.
+
+/**
+ * Seeds test compendium rows for races with additionalSpells (Batch 6).
+ * Uses upsert on (slug, source) — idempotent. PHB citations inline.
+ */
+async function seedRacialSpells(): Promise<void> {
+  // Update elf--high subrace to include additionalSpellsNormalized
+  // PHB p.23: High Elf Cantrip trait — player chooses 1 wizard cantrip
+  await db
+    .update(compendiumRaces)
+    .set({
+      data: sql`data || '{"additionalSpellsNormalized": [{"slug": "__choose__", "source": "", "characterLevelAvailable": 1, "frequency": "at-will", "ability": "int", "isPlayerChoice": true, "fromClass": "wizard"}]}'::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(eq(compendiumRaces.slug, 'elf--high'));
+
+  // Update tiefling base race to include additionalSpellsNormalized
+  // PHB p.42-43: Infernal Legacy trait — 3 fixed spells
+  await db
+    .update(compendiumRaces)
+    .set({
+      data: sql`data || '{"additionalSpellsNormalized": [{"slug": "thaumaturgy", "source": "phb", "characterLevelAvailable": 1, "frequency": "at-will", "ability": "cha"}, {"slug": "hellish-rebuke", "source": "phb", "characterLevelAvailable": 3, "frequency": "daily-1", "ability": "cha", "castLevel": 2}, {"slug": "darkness", "source": "phb", "characterLevelAvailable": 5, "frequency": "daily-1", "ability": "cha"}]}'::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(eq(compendiumRaces.slug, 'tiefling'));
+}
+
+describe('Racial additional spells — Batch 6 (race-additional-spells)', () => {
+  let user: TestUser;
+  let characterId: string;
+  let campaignId: string;
+
+  beforeAll(async () => {
+    // Ensure compendium rows start clean (removes any stale additionalSpellsNormalized from
+    // prior test runs that may not have completed cleanup). Then seed fresh.
+    await db
+      .update(compendiumRaces)
+      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
+      .where(eq(compendiumRaces.slug, 'elf--high'));
+    await db
+      .update(compendiumRaces)
+      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
+      .where(eq(compendiumRaces.slug, 'tiefling'));
+
+    // Seed additionalSpellsNormalized into test compendium rows (idempotent)
+    await seedRacialSpells();
+
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Racial Spells Test Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId, name: 'Racial Spells Test Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+  });
+
+  afterAll(async () => {
+    // Clean up additionalSpellsNormalized from compendium rows to avoid cross-test contamination.
+    // Without this, subsequent test runs would find the seeded data and break pre-Batch-6 tests.
+    await db
+      .update(compendiumRaces)
+      .set({
+        data: sql`data - 'additionalSpellsNormalized'`,
+        updatedAt: new Date(),
+      })
+      .where(eq(compendiumRaces.slug, 'elf--high'));
+    await db
+      .update(compendiumRaces)
+      .set({
+        data: sql`data - 'additionalSpellsNormalized'`,
+        updatedAt: new Date(),
+      })
+      .where(eq(compendiumRaces.slug, 'tiefling'));
+
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  // A-1: PUT High Elf without raceCantrip → 400 RACE_CANTRIP_REQUIRED
+  // REQ-A-VALIDATION-01, REQ-D-GATE-01. PHB p.23.
+  it('A-1: PUT race High Elf without raceCantrip → 400 RACE_CANTRIP_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+        // NO raceCantrip field
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    const issue = body.issues.find((i: { code: string }) => i.code === 'RACE_CANTRIP_REQUIRED');
+    expect(issue).toBeDefined();
+    expect(issue.expectedFilter).toEqual({ class: 'wizard', spellLevel: 0 });
+  });
+
+  // A-2: PUT High Elf with valid raceCantrip → 200 + GET sheet shows racialSpells with fire-bolt
+  // REQ-A-SAVE-RACE-01, REQ-A-SAVE-RACE-02. PHB p.23.
+  it('A-2: PUT High Elf with valid raceCantrip → 200 + sheet.racialSpells has fire-bolt', async () => {
+    const app = await getTestApp();
+
+    const putRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
+      },
+    });
+    expect(putRes.statusCode).toBe(200);
+
+    // Verify raceCantrip was persisted
+    const charData = putRes.json().data;
+    expect(charData.raceCantrip).toEqual({ slug: 'fire-bolt', source: 'phb' });
+
+    // GET sheet and check racialSpells
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const { sheet } = sheetRes.json();
+    expect(sheet.racialSpells).toBeDefined();
+    expect(sheet.racialSpells).toHaveLength(1);
+    expect(sheet.racialSpells[0]).toMatchObject({
+      slug: 'fire-bolt',
+      source: 'phb',
+      frequency: 'at-will',
+      ability: 'int',
+      characterLevelAvailable: 1,
+      isPlayerChoice: true,
+    });
+  });
+
+  // A-3: PUT High Elf with raceCantrip not in wizard cantrip pool → 400 RACE_CANTRIP_INVALID
+  // REQ-A-SAVE-RACE-01. PHB p.23: only wizard cantrips are valid.
+  it('A-3: PUT High Elf with non-wizard cantrip (fireball) → 400 RACE_CANTRIP_INVALID', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+        raceCantrip: { slug: 'fireball', source: 'phb' }, // fireball is 3rd-level, not a cantrip
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    const issue = body.issues.find((i: { code: string }) => i.code === 'RACE_CANTRIP_INVALID');
+    expect(issue).toBeDefined();
+    expect(issue.cantrip.slug).toBe('fireball');
+  });
+
+  // A-4: GET /sheet Tiefling level 1 → body.racialSpells has all 3 entries
+  // REQ-A-PROJECT-01. PHB p.42-43: Infernal Legacy gives all 3 spells (rendered dims by level).
+  it('A-4: GET /sheet Tiefling → racialSpells has all 3 entries with correct frequencies', async () => {
+    const app = await getTestApp();
+
+    // Seed tiefling character directly
+    await db
+      .update(characters)
+      .set({
+        data: {
+          race: { slug: 'tiefling', source: 'PHB' },
+          subrace: null,
+          asisApplied: [
+            { ability: 'int', bonus: 1, source: 'race' },
+            { ability: 'cha', bonus: 2, source: 'race' },
+          ],
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.racialSpells).toBeDefined();
+    expect(sheet.racialSpells).toHaveLength(3);
+    expect(sheet.racialSpells.every((s: { ability: string }) => s.ability === 'cha')).toBe(true);
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'thaumaturgy', frequency: 'at-will' }),
+    );
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'hellish-rebuke', frequency: 'daily-1', castLevel: 2 }),
+    );
+    expect(sheet.racialSpells).toContainEqual(
+      expect.objectContaining({ slug: 'darkness', frequency: 'daily-1' }),
+    );
+  });
+
+  // A-5: GET /sheet legacy High Elf (no raceCantrip in data) → 200, racialSpells=[]
+  // REQ-A-PROJECT-01, CLAUDE.md §11 read-path tolerance.
+  it('A-5: GET /sheet legacy High Elf (no raceCantrip) → 200, racialSpells=[]', async () => {
+    const app = await getTestApp();
+
+    // Seed a High Elf character WITHOUT raceCantrip — simulates pre-Batch 6 row
+    await db
+      .update(characters)
+      .set({
+        data: {
+          race: { slug: 'elf', source: 'PHB' },
+          subrace: { slug: 'elf--high', source: 'PHB' },
+          asisApplied: [
+            { ability: 'dex', bonus: 2, source: 'race' },
+            { ability: 'int', bonus: 1, source: 'subrace' },
+          ],
+          // deliberately NO raceCantrip field
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.racialSpells).toBeDefined();
+    expect(sheet.racialSpells).toHaveLength(0);
   });
 });

@@ -326,6 +326,15 @@ const SetRaceBody = z.object({
     })
     .nullable()
     .optional(),
+  /**
+   * Cantrip elegido por el jugador para razas que tienen un `isPlayerChoice` slot
+   * en additionalSpellsNormalized (e.g. High Elf). Null = cantrip no elegido todavía.
+   * Decision #606. PHB p.23.
+   */
+  raceCantrip: z
+    .object({ slug: z.string().min(1), source: z.string().min(1) })
+    .nullable()
+    .optional(),
 });
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
@@ -468,6 +477,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         classFeatures: data.classFeatures as never,
         raceLanguageChoices: data.raceLanguageChoices as never,
         raceSkillChoices: data.raceSkillChoices as never,
+        // Batch 6: racial cantrip pick (High Elf). Read-path tolerance — may be absent.
+        raceCantrip: data.raceCantrip as never,
       },
       raceData,
       itemWeights,
@@ -713,6 +724,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // Load wizard cantrip pool for RACE_CANTRIP_REQUIRED / RACE_CANTRIP_INVALID gates (High Elf).
+    // PHB p.23: High Elf can learn one cantrip from the Wizard spell list.
+    const wizardCantrips = await loadClassSpells({ classSlug: 'wizard', rulesProfile: campaign.rulesProfile });
+    const wizardCantripPool = wizardCantrips
+      .filter((s) => s.level === 0)
+      .map((s) => ({ slug: s.slug, source: s.source }));
+
     const result = validateRaceSelection({
       raceData: race,
       ...(subrace !== null ? { subraceData: subrace } : {}),
@@ -731,6 +749,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
             featContext,
           }
         : {}),
+      raceCantrip: body.raceCantrip ?? null,
+      wizardCantripPool,
     });
 
     if (!result.ok) {
@@ -768,6 +788,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           raceSkillChoices: result.appliedSkillChoices,
           raceFeatSlug: newRaceFeatSlug,
           feats: newFeats,
+          // Persist raceCantrip: explicit send (even null) replaces; absent field leaves existing value.
+          ...(body.raceCantrip !== undefined ? { raceCantrip: body.raceCantrip } : {}),
         },
         updatedAt: new Date(),
       })

@@ -3,7 +3,7 @@ import type {
   RaceCompendiumData,
   SubraceCompendiumData,
 } from '@dungeon-hub/domain/character/race';
-import type { RaceSheetData, BreathWeaponData } from '@dungeon-hub/domain/character/sheet';
+import type { RaceSheetData, BreathWeaponData, RaceInnateSpell } from '@dungeon-hub/domain/character/sheet';
 import { db } from '../../infra/db/client.js';
 import { compendiumRaces } from '../../infra/db/schema.js';
 
@@ -55,6 +55,9 @@ export async function loadRaceAndSubrace(input: {
         darkvision: (raceRow.data as { darkvision?: unknown }).darkvision as
           | RaceCompendiumData['darkvision']
           | undefined,
+        additionalSpellsNormalized: (raceRow.data as { additionalSpellsNormalized?: unknown }).additionalSpellsNormalized as
+          | RaceCompendiumData['additionalSpellsNormalized']
+          | undefined,
       } as RaceCompendiumData)
     : null;
 
@@ -93,6 +96,9 @@ export async function loadRaceAndSubrace(input: {
           | undefined,
         darkvision: (subRow.data as { darkvision?: unknown }).darkvision as
           | SubraceCompendiumData['darkvision']
+          | undefined,
+        additionalSpellsNormalized: (subRow.data as { additionalSpellsNormalized?: unknown }).additionalSpellsNormalized as
+          | SubraceCompendiumData['additionalSpellsNormalized']
           | undefined,
       } as SubraceCompendiumData;
     }
@@ -138,6 +144,8 @@ export async function loadRaceSheetData(input: {
     // Batch 5: project race-level weapon/armor profs. Subrace may override below (Decision #589).
     weaponProficiencies: (raceData['weaponProficiencies'] as RaceSheetData['weaponProficiencies']) ?? null,
     armorProficiencies: (raceData['armorProficiencies'] as RaceSheetData['armorProficiencies']) ?? null,
+    // Batch 6: project race-level additionalSpellsNormalized. Subrace may override below (Decision #605 family).
+    additionalSpellsNormalized: (raceData['additionalSpellsNormalized'] as RaceInnateSpell[] | null | undefined) ?? null,
   } as RaceSheetData;
 
   // Merge languageProficiencies and breathWeapon from subrace if it exists.
@@ -197,6 +205,15 @@ export async function loadRaceSheetData(input: {
         result = {
           ...result,
           armorProficiencies: (subData['armorProficiencies'] as RaceSheetData['armorProficiencies']) ?? null,
+        };
+      }
+      // Batch 6 + Decision #605 family: subrace additionalSpellsNormalized OVERRIDES race
+      // when field PRESENT (Drow REPLACES Elf's empty default; High Elf REPLACES Elf's empty).
+      // `in` operator distinguishes "no field" (inherit) from "field present" (override, even null).
+      if ('additionalSpellsNormalized' in subData) {
+        result = {
+          ...result,
+          additionalSpellsNormalized: (subData['additionalSpellsNormalized'] as RaceInnateSpell[] | null | undefined) ?? null,
         };
       }
     }
