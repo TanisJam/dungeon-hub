@@ -22,6 +22,8 @@ type RaceRow = {
   source: string;
   name: string;
   isSubrace: boolean;
+  parentSlug: string | null;
+  parentSource: string | null;
 };
 
 type Character = {
@@ -124,7 +126,12 @@ export default async function SpellsStepPage({ params }: Props) {
       const subraceRow = raceList.find(
         (r) => r.slug === subraceRef.slug && r.source === subraceRef.source,
       );
-      raceName = subraceRow?.name ?? null;
+      if (subraceRow) {
+        const parentRow = raceList.find(
+          (r) => r.slug === subraceRow.parentSlug && r.source === subraceRow.parentSource,
+        );
+        raceName = parentRow ? `${subraceRow.name} ${parentRow.name}` : subraceRow.name;
+      }
     }
     if (!raceName && raceRef) {
       const raceRow = raceList.find(
