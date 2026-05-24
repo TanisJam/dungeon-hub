@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { effectiveAsiSlots, type AbilityKey, type RaceData } from './_parsers';
-import { RacePicker, type RaceEntry } from './_picker';
+import { RacePicker, type RaceEntry, type FeatEntry } from './_picker';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 type RaceRow = {
@@ -17,6 +17,13 @@ type RaceRow = {
 
 type RaceDetail = RaceRow & { data: RaceData };
 
+type FeatRow = {
+  id: string;
+  slug: string;
+  source: string;
+  name: string;
+};
+
 type Character = {
   id: string;
   campaignId: string;
@@ -25,6 +32,8 @@ type Character = {
     subrace?: { slug: string; source: string } | null;
     asisApplied?: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>;
     raceLanguageChoices?: string[];
+    raceSkillChoices?: string[];
+    raceFeatSlug?: string | null;
   } | null;
 };
 
@@ -89,10 +98,16 @@ export default async function RaceStepPage({ params }: Props) {
 
   const character = await api.get<Character>(`/characters/${id}`, token);
 
-  const { data: list } = await api.get<{ data: RaceRow[] }>(
-    `/compendium/races?campaign=${character.campaignId}&limit=200`,
-    token,
-  );
+  const [{ data: list }, { data: featList }] = await Promise.all([
+    api.get<{ data: RaceRow[] }>(
+      `/compendium/races?campaign=${character.campaignId}&limit=200`,
+      token,
+    ),
+    api.get<{ data: FeatRow[] }>(
+      `/compendium/feats?campaign=${character.campaignId}&limit=200`,
+      token,
+    ),
+  ]);
 
   const detailed: RaceDetail[] = await Promise.all(
     list.map((row) =>
@@ -111,6 +126,12 @@ export default async function RaceStepPage({ params }: Props) {
     parentSlug: d.parentSlug,
     parentSource: d.parentSource,
     data: d.data,
+  }));
+
+  const allFeats: FeatEntry[] = featList.map((f) => ({
+    slug: f.slug,
+    source: f.source,
+    name: f.name,
   }));
 
   let initialSelection = null;
@@ -153,9 +174,12 @@ export default async function RaceStepPage({ params }: Props) {
         <RacePicker
           characterId={id}
           entries={entries}
+          allFeats={allFeats}
           initialSelection={initialSelection}
           initialChosenAsis={initialChosenAsis}
           initialLanguageChoices={character.data?.raceLanguageChoices ?? []}
+          initialSkillChoices={character.data?.raceSkillChoices ?? []}
+          initialFeatSlug={character.data?.raceFeatSlug ?? null}
         />
       </div>
     </section>

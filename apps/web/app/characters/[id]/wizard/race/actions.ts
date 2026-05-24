@@ -13,12 +13,20 @@ type AsiPayload = {
   source: 'race' | 'subrace';
 };
 
+type FeatChoicePayload = {
+  slug: string;
+  source: string;
+  asiChoice?: Array<{ ability: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'; bonus: number }>;
+} | null;
+
 export async function saveRace(
   characterId: string,
   race: { slug: string; source: string },
   subrace: { slug: string; source: string } | null,
   appliedAsis: AsiPayload[],
   languageChoices: string[] = [],
+  skillChoices: string[] = [],
+  featChoice: FeatChoicePayload = null,
 ): Promise<RaceState> {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -27,7 +35,14 @@ export async function saveRace(
   try {
     await api.put(
       `/characters/${characterId}/race`,
-      { race, subrace, appliedAsis, languageChoices },
+      {
+        race,
+        subrace,
+        appliedAsis,
+        languageChoices,
+        ...(skillChoices.length > 0 ? { skillChoices } : {}),
+        ...(featChoice ? { featChoice } : {}),
+      },
       session.access_token,
     );
   } catch (err) {

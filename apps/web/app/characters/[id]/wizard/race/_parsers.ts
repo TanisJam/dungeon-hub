@@ -17,9 +17,63 @@ export type RaceData = {
   speed?: number | Record<string, number | boolean>;
   ability?: Array<Record<string, number | { from?: string[]; amount?: number; count?: number }>>;
   languageProficiencies?: Array<Record<string, boolean | number>>;
+  skillProficiencies?: Array<Record<string, boolean | number | { from?: string[]; count?: number }>>;
+  feats?: Array<Record<string, number>>;
   entries?: unknown[];
   raceName?: string;
 };
+
+/**
+ * Counts the number of free ("any: N") skill picks a race/subrace grants.
+ * Returns 0 for races with no skill grants.
+ */
+export function countRaceSkillGrants(input: {
+  race: RaceData;
+  subrace?: RaceData | null;
+}): number {
+  let count = 0;
+  const consume = (blocks: RaceData['skillProficiencies']) => {
+    if (!blocks) return;
+    for (const block of blocks) {
+      for (const [k, v] of Object.entries(block)) {
+        if (k === 'any' && typeof v === 'number') {
+          count += v;
+        } else if (
+          k === 'choose' &&
+          typeof v === 'object' &&
+          v !== null &&
+          typeof (v as { count?: number }).count === 'number'
+        ) {
+          count += (v as { count: number }).count;
+        }
+      }
+    }
+  };
+  consume(input.race.skillProficiencies);
+  consume(input.subrace?.skillProficiencies);
+  return count;
+}
+
+/**
+ * Counts the number of free ("any: N") feat grants a race/subrace provides.
+ * Returns 0 for races without feat grants.
+ */
+export function countRaceFeatGrants(input: {
+  race: RaceData;
+  subrace?: RaceData | null;
+}): number {
+  let count = 0;
+  const consume = (blocks: RaceData['feats']) => {
+    if (!blocks) return;
+    for (const block of blocks) {
+      const v = block['any'];
+      if (typeof v === 'number') count += v;
+    }
+  };
+  consume(input.race.feats);
+  consume(input.subrace?.feats);
+  return count;
+}
 
 const SIZE_NAMES: Record<string, string> = {
   T: 'Tiny',

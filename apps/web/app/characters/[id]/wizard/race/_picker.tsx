@@ -11,6 +11,8 @@ import {
   extractTraits,
   parseAsis,
   parseLanguageChoices,
+  countRaceSkillGrants,
+  countRaceFeatGrants,
   type AbilityKey,
   type AsiSlot,
   type RaceData,
@@ -39,6 +41,12 @@ export type RaceEntry = {
   data: RaceData;
 };
 
+export type FeatEntry = {
+  slug: string;
+  source: string;
+  name: string;
+};
+
 type Selection = {
   raceSlug: string;
   raceSource: string;
@@ -63,15 +71,21 @@ function displayName(e: RaceEntry, all: RaceEntry[]): string {
 export function RacePicker({
   characterId,
   entries,
+  allFeats = [],
   initialSelection,
   initialChosenAsis = {},
   initialLanguageChoices = [],
+  initialSkillChoices = [],
+  initialFeatSlug = null,
 }: {
   characterId: string;
   entries: RaceEntry[];
+  allFeats?: FeatEntry[];
   initialSelection: Selection | null;
   initialChosenAsis?: Record<string, AbilityKey[]>;
   initialLanguageChoices?: string[];
+  initialSkillChoices?: string[];
+  initialFeatSlug?: string | null;
 }) {
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
@@ -82,6 +96,10 @@ export function RacePicker({
   });
   const [chosenAsis, setChosenAsis] = useState<Record<string, AbilityKey[]>>(initialChosenAsis);
   const [chosenLangs, setChosenLangs] = useState<string[]>(initialLanguageChoices);
+  const [chosenSkills, setChosenSkills] = useState<string[]>(initialSkillChoices);
+  const [chosenFeatSlug, setChosenFeatSlug] = useState<string | null>(
+    initialFeatSlug ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -194,6 +212,41 @@ export function RacePicker({
       langSeen.add(norm);
     }
 
+    // Skills: validate count against race + subrace skillProficiencies grants.
+    const raceDataForExtras = selected.isSubrace && parent ? parent.data : selected.data;
+    const subraceDataForExtras = selected.isSubrace ? selected.data : null;
+    const expectedSkillCount = countRaceSkillGrants({
+      race: raceDataForExtras,
+      subrace: subraceDataForExtras,
+    });
+    if (chosenSkills.length !== expectedSkillCount) {
+      setError(
+        expectedSkillCount > 0
+          ? `Elegí ${expectedSkillCount} habilidad${expectedSkillCount === 1 ? '' : 'es'}.`
+          : null,
+      );
+      if (expectedSkillCount > 0) return;
+    }
+
+    // Feat: validate required for races with feats:[{any:1}]
+    const expectedFeatCount = countRaceFeatGrants({
+      race: raceDataForExtras,
+      subrace: subraceDataForExtras,
+    });
+    if (expectedFeatCount > 0 && !chosenFeatSlug) {
+      setError('Elegí un talento racial.');
+      return;
+    }
+
+    // Build featChoice payload
+    const featEntry = chosenFeatSlug
+      ? allFeats.find((f) => f.slug === chosenFeatSlug) ?? null
+      : null;
+    const featChoicePayload =
+      featEntry && expectedFeatCount > 0
+        ? { slug: featEntry.slug, source: featEntry.source }
+        : null;
+
     startTransition(async () => {
       const res = await saveRace(
         characterId,
@@ -201,6 +254,8 @@ export function RacePicker({
         subracePart,
         appliedAsis,
         chosenLangs,
+        expectedSkillCount > 0 ? chosenSkills : [],
+        featChoicePayload,
       );
       if (res.error) setError(res.error);
     });
@@ -246,6 +301,7 @@ export function RacePicker({
         <RaceDetailPanel
           entry={e}
           parent={parentEntry}
+          allFeats={allFeats}
           chosenAsis={chosenAsis}
           setChosenAsis={(next) => {
             setChosenAsis(next);
@@ -254,6 +310,16 @@ export function RacePicker({
           chosenLangs={isThisSelected ? chosenLangs : []}
           setChosenLangs={(next) => {
             setChosenLangs(next);
+            setError(null);
+          }}
+          chosenSkills={isThisSelected ? chosenSkills : []}
+          setChosenSkills={(next) => {
+            setChosenSkills(next);
+            setError(null);
+          }}
+          chosenFeatSlug={isThisSelected ? chosenFeatSlug : null}
+          setChosenFeatSlug={(next) => {
+            setChosenFeatSlug(next);
             setError(null);
           }}
         />
@@ -284,6 +350,8 @@ export function RacePicker({
             if (key !== selectedKey) {
               setChosenAsis({});
               setChosenLangs([]);
+              setChosenSkills([]);
+              setChosenFeatSlug(null);
             }
             setSelectedKey(key);
             setError(null);
@@ -309,17 +377,27 @@ export function RacePicker({
 function RaceDetailPanel({
   entry,
   parent,
+  allFeats,
   chosenAsis,
   setChosenAsis,
   chosenLangs,
   setChosenLangs,
+  chosenSkills,
+  setChosenSkills,
+  chosenFeatSlug,
+  setChosenFeatSlug,
 }: {
   entry: RaceEntry;
   parent: RaceEntry | null;
+  allFeats: FeatEntry[];
   chosenAsis: Record<string, AbilityKey[]>;
   setChosenAsis: (next: Record<string, AbilityKey[]>) => void;
   chosenLangs: string[];
   setChosenLangs: (next: string[]) => void;
+  chosenSkills: string[];
+  setChosenSkills: (next: string[]) => void;
+  chosenFeatSlug: string | null;
+  setChosenFeatSlug: (next: string | null) => void;
 }) {
   const traits = useMemo(() => {
     const own = extractTraits(entry.data.entries);
@@ -340,6 +418,17 @@ function RaceDetailPanel({
 
   const fixedLangs = langInfo.fixed;
   const hasLangChoices = langInfo.totalChooseCount > 0;
+
+  const raceDataForExtras = entry.isSubrace && parent ? parent.data : entry.data;
+  const subraceDataForExtras = entry.isSubrace ? entry.data : null;
+  const expectedSkillCount = countRaceSkillGrants({
+    race: raceDataForExtras,
+    subrace: subraceDataForExtras,
+  });
+  const expectedFeatCount = countRaceFeatGrants({
+    race: raceDataForExtras,
+    subrace: subraceDataForExtras,
+  });
 
   return (
     <div className="space-y-3">
@@ -378,6 +467,22 @@ function RaceDetailPanel({
             />
           )}
         </div>
+      )}
+
+      {expectedSkillCount > 0 && (
+        <RaceSkillPicker
+          count={expectedSkillCount}
+          chosen={chosenSkills}
+          setChosen={setChosenSkills}
+        />
+      )}
+
+      {expectedFeatCount > 0 && (
+        <RaceFeatPicker
+          allFeats={allFeats}
+          chosenSlug={chosenFeatSlug}
+          setChosenSlug={setChosenFeatSlug}
+        />
       )}
 
       {traits.length > 0 && (
@@ -627,6 +732,131 @@ function LangMultiSelect({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Race Skill Picker — for races with skillProficiencies:[{any:N}]
+// (Variant Human ×1, Half-Elf ×2, etc.)
+// ---------------------------------------------------------------------------
+
+const ALL_SKILL_KEYS = [
+  'acrobatics', 'animal handling', 'arcana', 'athletics', 'deception',
+  'history', 'insight', 'intimidation', 'investigation', 'medicine',
+  'nature', 'perception', 'performance', 'persuasion', 'religion',
+  'sleight of hand', 'stealth', 'survival',
+] as const;
+
+function RaceSkillPicker({
+  count,
+  chosen,
+  setChosen,
+}: {
+  count: number;
+  chosen: string[];
+  setChosen: (next: string[]) => void;
+}) {
+  function toggle(skill: string) {
+    const has = chosen.includes(skill);
+    if (has) setChosen(chosen.filter((s) => s !== skill));
+    else if (chosen.length >= count) return;
+    else setChosen([...chosen, skill]);
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        Habilidades de linaje
+      </p>
+      <p className="mt-0.5 text-[10px] text-ink-mute">
+        Elegí {count} habilidad{count === 1 ? '' : 'es'}:
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {ALL_SKILL_KEYS.map((skill) => {
+          const isOn = chosen.includes(skill);
+          const disabled = !isOn && chosen.length >= count;
+          return (
+            <button
+              key={skill}
+              type="button"
+              onClick={() => toggle(skill)}
+              disabled={disabled}
+              className={[
+                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                isOn
+                  ? 'bg-accent-soft text-accent-deep ring-accent'
+                  : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
+              ].join(' ')}
+            >
+              {titleCase(skill)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Race Feat Picker — for races with feats:[{any:1}] (Variant Human)
+// ---------------------------------------------------------------------------
+
+function RaceFeatPicker({
+  allFeats,
+  chosenSlug,
+  setChosenSlug,
+}: {
+  allFeats: FeatEntry[];
+  chosenSlug: string | null;
+  setChosenSlug: (next: string | null) => void;
+}) {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allFeats;
+    return allFeats.filter((f) => f.name.toLowerCase().includes(q));
+  }, [allFeats, query]);
+
+  return (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        Talento racial
+      </p>
+      <p className="mt-0.5 text-[10px] text-ink-mute">
+        Elegí 1 talento:
+      </p>
+      <input
+        type="search"
+        placeholder="Buscar talento…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="mt-1.5 w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+      />
+      <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-line bg-paper">
+        {filtered.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-ink-mute">Sin resultados.</p>
+        ) : (
+          filtered.map((feat) => {
+            const isOn = chosenSlug === feat.slug;
+            return (
+              <button
+                key={`${feat.slug}|${feat.source}`}
+                type="button"
+                onClick={() => setChosenSlug(isOn ? null : feat.slug)}
+                className={[
+                  'w-full px-3 py-1.5 text-left text-xs transition hover:bg-accent-soft/40',
+                  isOn ? 'bg-accent-soft text-accent-deep font-semibold' : 'text-ink',
+                ].join(' ')}
+              >
+                {feat.name}
+                <span className="ml-1 text-ink-mute">· {feat.source}</span>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
