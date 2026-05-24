@@ -82,6 +82,56 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
+
+    await test.step('complete wizard (class → background → review → publish)', async () => {
+      // Class: Wizard
+      await page
+        .locator('[class*="rounded-md border"]')
+        .filter({ hasText: 'Wizard' })
+        .filter({ hasText: 'PHB' })
+        .first()
+        .click();
+      await page.getByRole('button', { name: 'Arcana', exact: true }).first().click();
+      await page.getByRole('button', { name: 'History', exact: true }).first().click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
+
+      // Background: Sage PHB
+      await page
+        .locator('[class*="rounded-md border"]')
+        .filter({ hasText: 'Sage' })
+        .filter({ hasText: 'PHB' })
+        .first()
+        .click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+
+      // Spells step → review
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
+
+      // Publish
+      await page.getByRole('button', { name: /^publicar/i }).click();
+      const profileLink = page.getByRole('link', { name: /ir al perfil/i });
+      await expect(profileLink).toBeVisible({ timeout: 10_000 });
+      await profileLink.click();
+      await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
+    });
+
+    await test.step('sheet: chosen cantrip (fire-bolt) visible in Hechizos raciales section (PHB p.23)', async () => {
+      // Navigate to hechizos tab
+      const hechizosTab = page.getByRole('tab', { name: /hechizos/i });
+      if (await hechizosTab.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await hechizosTab.click();
+      } else {
+        await page.goto(page.url() + '?tab=hechizos');
+      }
+
+      // PHB p.23: "You know one cantrip of your choice from the wizard spell list."
+      // We picked Fire Bolt — it must appear in the Hechizos raciales section.
+      await expect(page.getByRole('heading', { name: /hechizos raciales/i }).first()).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText(/fire bolt/i).first()).toBeVisible({ timeout: 5_000 });
+    });
   });
 
   // E2E-RS-2: Tiefling character sheet shows Infernal Legacy racial spells
@@ -163,17 +213,24 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
-    await test.step('sheet: Infernal Legacy racial spells visible (PHB p.42-43)', async () => {
-      // Navigate to sheet tab if needed (sheet page may have tabs)
-      const sheetTab = page.getByRole('tab', { name: /hoja/i });
-      if (await sheetTab.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        await sheetTab.click();
+    await test.step('sheet: Infernal Legacy racial spells visible in Hechizos raciales section (PHB p.42-43)', async () => {
+      // Navigate to hechizos tab (the tab where racial spells are rendered)
+      const hechizosTab = page.getByRole('tab', { name: /hechizos/i });
+      if (await hechizosTab.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await hechizosTab.click();
+      } else {
+        await page.goto(page.url() + '?tab=hechizos');
       }
 
-      // At minimum, thaumaturgy should appear (level 1 at-will, PHB p.42-43).
-      // The sheet renders racialSpells[] in a section (exact label TBD by UI).
-      // We assert the spell name appears somewhere on the page.
+      // PHB p.42-43: Tiefling at level 1 has thaumaturgy (at-will, CHA).
+      // The sheet must render a "Hechizos raciales" section heading.
+      await expect(page.getByRole('heading', { name: /hechizos raciales/i }).first()).toBeVisible({ timeout: 5_000 });
+
+      // Thaumaturgy must appear in the section (it's available at level 1 — PHB p.42-43).
       await expect(page.getByText(/thaumaturgy/i).first()).toBeVisible({ timeout: 5_000 });
+
+      // The frequency label for at-will spells must be visible
+      await expect(page.getByText(/a voluntad/i).first()).toBeVisible({ timeout: 5_000 });
     });
   });
 });

@@ -6,6 +6,27 @@
 
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
+export type RaceInnateSpellFrequency = 'at-will' | 'daily-1';
+
+/**
+ * Computed racial innate/known spell entry for the character sheet.
+ * Mirrors domain RacialSpellView. Populated by GET /characters/:id/sheet.
+ * PHB p.17, 23, 24, 37, 42-43.
+ */
+export interface RacialSpellView {
+  /** Resolved spell slug — never '__choose__'. */
+  slug: string;
+  source: string;
+  /** Character level at which it becomes available. */
+  characterLevelAvailable: 1 | 3 | 5;
+  frequency: RaceInnateSpellFrequency;
+  ability: AbilityKey;
+  /** Spell upcast forced level (Tiefling hellish rebuke#2 → 2). */
+  castLevel?: number | null;
+  /** True when this originated from a player choice (High Elf). */
+  isPlayerChoice: boolean;
+}
+
 export interface AbilityScoreView {
   score: number;
   modifier: number;
@@ -72,6 +93,11 @@ export interface CharacterSheet {
     languages: string[];
   };
   feats: Array<{ slug: string; source: string }>;
+  /**
+   * Racial innate/known spells. Empty array when race grants none or High Elf
+   * has not yet chosen a cantrip (read-path tolerance). Batch 6 REQ-W-RENDER-01.
+   */
+  racialSpells: RacialSpellView[];
   spellcasting: SpellcastingView[];
   spellSlots: SpellSlotsView;
 }
