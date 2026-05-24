@@ -309,6 +309,23 @@ const SetRaceBody = z.object({
     .optional(),
   /** Idiomas elegidos para llenar slots `any*` de la raza + subrace. */
   languageChoices: z.array(z.string().min(1)).optional(),
+  /** Skills elegidas para razas con `skillProficiencies:[{any:N}]` (ej. Variant Human, Half-Elf). */
+  skillChoices: z.array(z.string().min(1)).optional(),
+  /**
+   * Feat elegido para razas con `feats:[{any:1}]` (ej. Variant Human).
+   * La API carga el FeatCompendiumData desde el compendio; el domain validator es puro.
+   */
+  featChoice: z
+    .object({
+      slug: z.string().min(1),
+      source: z.string().min(1),
+      /** ASI elegida para feats que dan un +1 libre (ej. Actor, Athlete). */
+      asiChoice: z
+        .array(z.object({ ability: AbilityKeyEnum, bonus: z.number().int() }))
+        .optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
@@ -450,6 +467,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         exhaustion: data.exhaustion as never,
         classFeatures: data.classFeatures as never,
         raceLanguageChoices: data.raceLanguageChoices as never,
+        raceSkillChoices: data.raceSkillChoices as never,
       },
       raceData,
       itemWeights,
@@ -651,29 +669,105 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // Load feat data if a featChoice was provided.
+    let featData = null;
+    if (body.featChoice) {
+      featData = await loadFeatData({ slug: body.featChoice.slug, source: body.featChoice.source });
+      if (!featData) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'FEAT_NOT_FOUND', feat: body.featChoice }],
+        });
+      }
+    }
+
+    // Build featContext from current character state (base stats + existing race ASIs).
+    // We pass the NEW race ASIs after validation succeeds below, but the context for prereq
+    // evaluation uses CURRENT baseStats (already set) and the ASIs from this PUT call
+    // (which the validator computes and returns). We build a preliminary context using
+    // the appliedAsis from the body — the validator will derive or verify them.
+    // Per decision #547: bypass is handled inside validateRaceSelection / finishWithSkillsAndFeats.
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const baseStats = charData.baseStats as AbilityScores | undefined;
+
+    let featContext = undefined;
+    if (body.featChoice && featData) {
+      if (!baseStats) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'NO_BASE_STATS', hint: 'Setea baseStats antes de elegir un feat racial.' }],
+        });
+      }
+      // Use the ASIs from the request body as the racial ASIs for context building.
+      // For purelyFixed races, the validator will derive the same ASIs from raceData.
+      // For choose/Tasha races, body.appliedAsis is what the user submitted.
+      const racialAsis: AppliedAsi[] = (body.appliedAsis ?? []) as AppliedAsi[];
+      const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
+      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      featContext = buildFeatContext({
+        baseStats,
+        racialAsis,
+        existingFeats,
+        classes,
+        race: body.race,
+      });
+    }
+
     const result = validateRaceSelection({
       raceData: race,
-      subraceData: subrace,
+      ...(subrace !== null ? { subraceData: subrace } : {}),
       rulesProfile: campaign.rulesProfile,
-      appliedAsis: body.appliedAsis,
-      languageChoices: body.languageChoices,
+      ...(body.appliedAsis !== undefined ? { appliedAsis: body.appliedAsis } : {}),
+      ...(body.languageChoices !== undefined ? { languageChoices: body.languageChoices } : {}),
+      ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
+      ...(featData !== null && featContext !== undefined
+        ? {
+            featChoice: {
+              featData,
+              ...(body.featChoice?.asiChoice !== undefined
+                ? { asiChoice: body.featChoice.asiChoice }
+                : {}),
+            },
+            featContext,
+          }
+        : {}),
     });
 
     if (!result.ok) {
       return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
     }
 
-    const data = (character.data as Record<string, unknown> | null) ?? {};
+    // Persist: re-edit replaces previous race-granted feat (if any) then appends the new one.
+    const prevData = (character.data as Record<string, unknown> | null) ?? {};
+    const prevFeats = (prevData.feats as AppliedFeat[] | undefined) ?? [];
+    const prevRaceFeatSlug = (prevData as { raceFeatSlug?: string | null }).raceFeatSlug ?? null;
+
+    // Remove the previous race-granted feat entry (re-edit path).
+    // Match on slug only — raceFeatSlug is the pointer; source is the compendium source (e.g. 'PHB').
+    const featsWithoutRaceFeat = prevRaceFeatSlug
+      ? prevFeats.filter((f) => f.slug !== prevRaceFeatSlug)
+      : prevFeats;
+
+    // Append the new race-granted feat (if the result includes one).
+    const newFeats: AppliedFeat[] = result.appliedFeat
+      ? [...featsWithoutRaceFeat, result.appliedFeat]
+      : featsWithoutRaceFeat;
+
+    const newRaceFeatSlug = result.appliedFeat?.slug ?? null;
+
     const [updated] = await db
       .update(characters)
       .set({
         data: {
-          ...data,
+          ...prevData,
           race: body.race,
           subrace: body.subrace ?? null,
           asisApplied: result.appliedAsis,
           usedTashasCustomOrigin: result.usedTashasCustomOrigin,
           raceLanguageChoices: result.appliedLanguageChoices,
+          raceSkillChoices: result.appliedSkillChoices,
+          raceFeatSlug: newRaceFeatSlug,
+          feats: newFeats,
         },
         updatedAt: new Date(),
       })

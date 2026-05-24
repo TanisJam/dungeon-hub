@@ -79,8 +79,9 @@ describe('PUT /characters/:id/race', () => {
     expect(res.json().issues[0].code).toBe('ASI_REQUIRED');
   });
 
-  it('Half-Elf: acepta +2 CHA + 2 picks de +1 a stats no-CHA', async () => {
+  it('Half-Elf: acepta +2 CHA + 2 picks de +1 a stats no-CHA + 2 skill picks', async () => {
     const app = await getTestApp();
+    // Half-Elf has skillProficiencies:[{any:2}] — requires 2 skillChoices.
     const res = await app.inject({
       method: 'PUT',
       url: `/api/v1/characters/${characterId}/race`,
@@ -93,6 +94,7 @@ describe('PUT /characters/:id/race', () => {
           { ability: 'con', bonus: 1, source: 'race' },
         ],
         languageChoices: ['dwarvish'],
+        skillChoices: ['insight', 'perception'],
       },
     });
 
@@ -102,6 +104,7 @@ describe('PUT /characters/:id/race', () => {
     expect(c.data.asisApplied).toHaveLength(3);
     expect(c.data.asisApplied).toContainEqual({ ability: 'cha', bonus: 2, source: 'race' });
     expect(c.data.raceLanguageChoices).toEqual(['dwarvish']);
+    expect(c.data.raceSkillChoices).toEqual(['insight', 'perception']);
   });
 
   it("requiere appliedAsis cuando Tasha's está ON, y los redistribuye", async () => {
@@ -357,5 +360,288 @@ describe('RACE_SUBRACE_REQUIRED — gate + read-path tolerance', () => {
     const c = res.json();
     expect(c.data.race).toEqual({ slug: 'dwarf', source: 'PHB' });
     expect(c.data.subrace).toBeNull();
+  });
+});
+
+// ============================================================
+// Phase B — Variant Human feat + skill (race-variant-human-feat-skill)
+// ============================================================
+
+describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => {
+  let user: TestUser;
+  let characterId: string;
+  let campaignId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'VH Feat Test Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId, name: 'Variant Human Test Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+
+    // Set base stats (required for feat validation context)
+    const sRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/stats`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        method: 'point-buy',
+        scores: { str: 8, dex: 10, con: 12, int: 15, wis: 14, cha: 13 },
+      },
+    });
+    if (sRes.statusCode !== 200) throw new Error(`stats setup: ${sRes.body}`);
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+  });
+
+  // Variant Human DB shape:
+  //   race: human (PHB) — no ability field, languageProficiencies:[{common:true,anyStandard:1}]
+  //   subrace: human--variant (PHB) — ability:[{choose:{from:all,count:2,amount:1}}],
+  //            skillProficiencies:[{any:1}], feats:[{any:1}]
+
+  it('A-1: Variant Human — full happy path (feat=Alert, skill=insight) → 200', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'human', source: 'PHB' },
+        subrace: { slug: 'human--variant', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'int', bonus: 1, source: 'subrace' },
+          { ability: 'wis', bonus: 1, source: 'subrace' },
+        ],
+        languageChoices: ['dwarvish'],
+        skillChoices: ['insight'],
+        featChoice: { slug: 'alert', source: 'PHB' },
+      },
+    });
+
+    if (res.statusCode !== 200) console.log('A-1 body:', res.body);
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'human', source: 'PHB' });
+    expect(c.data.subrace).toEqual({ slug: 'human--variant', source: 'PHB' });
+    expect(c.data.raceSkillChoices).toEqual(['insight']);
+    expect(c.data.raceFeatSlug).toBe('alert');
+    // Alert is in the feats array (source is the compendium source 'PHB', not 'race')
+    const alertFeat = (c.data.feats as Array<{slug: string; source: string}>)
+      .find((f) => f.slug === 'alert');
+    expect(alertFeat).toBeDefined();
+  });
+
+  it('A-2: Variant Human — missing featChoice → 400 RACE_FEAT_REQUIRED', async () => {
+    const app = await getTestApp();
+    // Variant Human: human (anyStandard:1 lang) + human--variant subrace (choose 2 ASIs,
+    // skillProficiencies:[{any:1}], feats:[{any:1}]).
+    // Sending correct ASIs + lang + skillChoices but NO featChoice.
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'human', source: 'PHB' },
+        subrace: { slug: 'human--variant', source: 'PHB' },
+        // Variant Human subrace ability:[{choose:{from:all,count:2,amount:1}}]
+        appliedAsis: [
+          { ability: 'str', bonus: 1, source: 'subrace' },
+          { ability: 'dex', bonus: 1, source: 'subrace' },
+        ],
+        // Human base has languageProficiencies:[{common:true, anyStandard:1}]
+        languageChoices: ['dwarvish'],
+        // Variant Human subrace has skillProficiencies:[{any:1}]
+        skillChoices: ['insight'],
+        // NO featChoice → should get RACE_FEAT_REQUIRED
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const issues = res.json().issues as Array<{ code: string }>;
+    const codes = issues.map((i) => i.code);
+    expect(codes).toContain('RACE_FEAT_REQUIRED');
+  });
+
+  it('A-7: Race without skill grants (Half-Orc) — stray skillChoices ignored → 200, raceSkillChoices=[]', async () => {
+    const app = await getTestApp();
+    // Half-Orc: STR+2 CON+1, no language any-slot, no skill grants in DB.
+    // Stray skillChoices must be silently ignored (validateRaceSkillChoices returns [] when
+    // expectedAnyCount === 0). This proves the no-op path.
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'half-orc', source: 'PHB' },
+        // stray skillChoices should be IGNORED for races without skillProficiencies
+        skillChoices: ['perception'],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'half-orc', source: 'PHB' });
+    // raceSkillChoices should be empty (stray picks ignored)
+    expect(c.data.raceSkillChoices ?? []).toEqual([]);
+    // raceFeatSlug should not be set
+    expect(c.data.raceFeatSlug ?? null).toBeNull();
+  });
+
+  it('A-8: GET legacy Variant Human row (no feat/skill in data) → 200, no crash', async () => {
+    // Directly write a legacy character row without raceFeatSlug / raceSkillChoices.
+    // Keep baseStats so subsequent tests (A-9, A-10) that need feat validation still work.
+    const app = await getTestApp();
+    const [current] = await db.select().from(characters).where(eq(characters.id, characterId)).limit(1);
+    const existingData = (current?.data as Record<string, unknown> | null) ?? {};
+    await db
+      .update(characters)
+      .set({
+        data: {
+          ...existingData,
+          race: { slug: 'human', source: 'PHB' },
+          subrace: { slug: 'human--variant', source: 'PHB' },
+          asisApplied: [
+            { ability: 'str', bonus: 1, source: 'subrace' },
+            { ability: 'dex', bonus: 1, source: 'subrace' },
+          ],
+          // Intentionally omit raceFeatSlug / raceSkillChoices — simulates legacy shape
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'human', source: 'PHB' });
+    // Should not crash even without feat/skill fields
+  });
+
+  it('A-9: GET /sheet for legacy Variant Human → 200, skills include only class skills (no crash)', async () => {
+    const app = await getTestApp();
+    // Set class so the sheet computes
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/class`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        class: { slug: 'wizard', source: 'PHB' },
+        level: 1,
+        skillChoices: ['arcana', 'history'],
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const arcana = body.sheet.skills.find((s: { name: string }) => s.name === 'arcana');
+    expect(arcana?.proficient).toBe(true);
+  });
+
+  it('A-4: Half-Elf — 2 skill choices → 200 + raceSkillChoices persisted', async () => {
+    const app = await getTestApp();
+    // Half-Elf: CHA+2 + 2 choose picks + 1 anyStandard lang + 2 skill picks
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'half-elf', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'cha', bonus: 2, source: 'race' },
+          { ability: 'str', bonus: 1, source: 'race' },
+          { ability: 'con', bonus: 1, source: 'race' },
+        ],
+        languageChoices: ['dwarvish'],
+        skillChoices: ['athletics', 'stealth'],
+      },
+    });
+
+    if (res.statusCode !== 200) console.log('A-4 body:', res.body);
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.raceSkillChoices).toEqual(['athletics', 'stealth']);
+    expect(c.data.raceFeatSlug ?? null).toBeNull();
+  });
+
+  it('A-10: Re-edit Variant Human — second PUT replaces previous race feat', async () => {
+    const app = await getTestApp();
+    // First PUT: pick Alert
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'human', source: 'PHB' },
+        subrace: { slug: 'human--variant', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'str', bonus: 1, source: 'subrace' },
+          { ability: 'dex', bonus: 1, source: 'subrace' },
+        ],
+        languageChoices: ['elvish'],
+        skillChoices: ['perception'],
+        featChoice: { slug: 'alert', source: 'PHB' },
+      },
+    });
+
+    // Second PUT: re-pick with Lucky feat
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'human', source: 'PHB' },
+        subrace: { slug: 'human--variant', source: 'PHB' },
+        appliedAsis: [
+          { ability: 'int', bonus: 1, source: 'subrace' },
+          { ability: 'cha', bonus: 1, source: 'subrace' },
+        ],
+        languageChoices: ['dwarvish'],
+        skillChoices: ['history'],
+        featChoice: { slug: 'lucky', source: 'PHB' },
+      },
+    });
+
+    if (res.statusCode !== 200) console.log('A-10 body:', res.body);
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.raceFeatSlug).toBe('lucky');
+    expect(c.data.raceSkillChoices).toEqual(['history']);
+    // Alert must NOT be in feats anymore
+    const feats = (c.data.feats as Array<{slug: string}>) ?? [];
+    const alertPresent = feats.some((f) => f.slug === 'alert');
+    expect(alertPresent).toBe(false);
+    // Lucky IS in feats
+    const luckyPresent = feats.some((f) => f.slug === 'lucky');
+    expect(luckyPresent).toBe(true);
   });
 });
