@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { db } from '../../src/infra/db/client.js';
+import { characters } from '../../src/infra/db/schema.js';
 
 describe('PUT /characters/:id/race', () => {
   let user: TestUser;
@@ -252,5 +255,107 @@ describe('PUT /characters/:id/race', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().issues[0].code).toBe('RACE_NOT_FOUND');
+  });
+});
+
+describe('RACE_SUBRACE_REQUIRED — gate + read-path tolerance', () => {
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Subrace Required Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Subrace Required Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('A-1: PUT /race con Dwarf sin subrace → 400 VALIDATION_FAILED + RACE_SUBRACE_REQUIRED', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'dwarf', source: 'PHB' },
+        languageChoices: [],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    expect(body.issues).toHaveLength(1);
+    expect(body.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'dwarf', source: 'PHB' },
+    });
+  });
+
+  it('A-2: PUT /race con Dwarf + Hill Dwarf subrace → 200 (regression)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'dwarf', source: 'PHB' },
+        subrace: { slug: 'dwarf--hill', source: 'PHB' },
+        languageChoices: [],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'dwarf', source: 'PHB' });
+    expect(c.data.subrace).toEqual({ slug: 'dwarf--hill', source: 'PHB' });
+  });
+
+  it('A-3: GET /characters/:id con legado Dwarf + null subrace → 200 (read-path tolerance)', async () => {
+    const app = await getTestApp();
+
+    // Seed legacy state directly: character with dwarf race and null subrace (pre-gate data)
+    await db
+      .update(characters)
+      .set({
+        data: {
+          race: { slug: 'dwarf', source: 'PHB' },
+          subrace: null,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const c = res.json();
+    expect(c.data.race).toEqual({ slug: 'dwarf', source: 'PHB' });
+    expect(c.data.subrace).toBeNull();
   });
 });
