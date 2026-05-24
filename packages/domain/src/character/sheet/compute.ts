@@ -14,6 +14,7 @@ import {
   type SkillView,
   type BreathWeaponView,
   type BreathWeaponData,
+  type DarkvisionView,
 } from './types.js';
 import {
   buildWeightLookup,
@@ -193,6 +194,19 @@ function computeBreathWeapon(
   };
 }
 
+/**
+ * Computes DarkvisionView from the effective darkvision feet value.
+ * The race+subrace merge has already been applied at the projection layer
+ * (loadRaceSheetData) per decision #577. PHB p.17, 24.
+ *
+ * Returns null when feet is null, undefined, or <= 0 (defensive against zero-as-falsey).
+ * isSuperior = feet >= 120 per spec REQ-7 (>= accommodates homebrew above 120).
+ */
+function computeDarkvision(feet: number | null | undefined): DarkvisionView | null {
+  if (feet === null || feet === undefined || feet <= 0) return null;
+  return { feet, isSuperior: feet >= 120 };
+}
+
 interface ComputeInput {
   character: CharacterSnapshot;
   raceData?: RaceSheetData | null;
@@ -355,6 +369,9 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   // ---- Breath weapon (Dragonborn ancestries — PHB p.34) -----------------
   const breathWeapon = computeBreathWeapon(raceData?.breathWeapon, conMod, pb, totalLevel);
 
+  // ---- Darkvision (race + subrace already merged in loadRaceSheetData — PHB p.17, 24) ---
+  const darkvision = computeDarkvision(raceData?.darkvision);
+
   // ---- Encumbrance (con o sin variant) ----------------------------------
   const totalCarryWeight = totalWeight(
     character.inventory ?? [],
@@ -418,6 +435,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     },
     feats: (character.feats ?? []).map((f) => ({ slug: f.slug, source: f.source })),
     breathWeapon,
+    darkvision,
     spellcasting,
     currency: character.currency ?? { ...EMPTY_CURRENCY },
     encumbrance: encumbranceView,

@@ -91,6 +91,13 @@ export interface RaceCompendiumData {
   skillProficiencies?: RaceSkillProficiencyBlock[] | null;
   /** Set by importer for PHB Dragonborn synthetic subraces. Race-level for symmetry. */
   breathWeapon?: BreathWeaponData | null;
+  /**
+   * Darkvision radius in feet. PHB p.17.
+   * - number: race grants darkvision at this radius (PHB: 60 for Dwarf/Elf/Gnome/Half-Elf/Half-Orc/Tiefling).
+   * - null: explicit opt-out (rare; reserved for hypothetical subrace overrides that REMOVE darkvision).
+   * - undefined (field absent): race does not grant darkvision (PHB: Human, Halfling, Dragonborn).
+   */
+  darkvision?: number | null;
 }
 
 export interface SubraceCompendiumData {
@@ -107,6 +114,14 @@ export interface SubraceCompendiumData {
   skillProficiencies?: RaceSkillProficiencyBlock[] | null;
   /** Set by importer for PHB Dragonborn ancestry rows. PHB p.34. */
   breathWeapon?: BreathWeaponData | null;
+  /**
+   * Darkvision radius in feet. PHB p.17, 24.
+   * When PRESENT (number or null), OVERRIDES the parent race's darkvision per decision #577.
+   * - PHB Drow: 120 (Superior Darkvision — replaces base Elf 60).
+   * - MPMM Duergar / Deep Gnome: 120 (Superior — replaces base Dwarf/Gnome 60).
+   * - undefined (field absent): inherit parent race's darkvision.
+   */
+  darkvision?: number | null;
 }
 
 export interface AppliedAsi {

@@ -627,6 +627,93 @@ describe('computeCharacterSheet — raceSkillChoices merged into proficientSkill
   });
 });
 
+// ── Batch 4: DarkvisionView computation (race-darkvision-grant) ───────────────
+// PHB p.17 — Darkvision definition. PHB p.24 — Superior Darkvision (Drow 120 ft).
+// Design: API does the merge; compute receives the EFFECTIVE darkvision via raceData.darkvision.
+// isSuperior = feet >= 120 (>= not === for homebrew future-proofing, spec REQ-7).
+
+describe('computeCharacterSheet — DarkvisionView (PHB p.17, p.24)', () => {
+  // C-1: Dwarf 60 ft, no subrace darkvision override → standard view
+  it('C-1 (S-04): Dwarf raceData.darkvision=60 → { feet: 60, isSuperior: false }', () => {
+    // PHB p.20 — Dwarf: Darkvision 60 ft.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Thorin' },
+      raceData: { speed: 25, size: ['M'], darkvision: 60 },
+    });
+    expect(sheet.darkvision).toEqual({ feet: 60, isSuperior: false });
+  });
+
+  // C-2: Elf + Drow — API already merged subrace override → 120 ft (superior)
+  it('C-2 (S-05): raceData.darkvision=120 (merged Drow override) → { feet: 120, isSuperior: true }', () => {
+    // PHB p.24 — Drow: Superior Darkvision 120 ft (replaces base Elf 60).
+    const sheet = computeCharacterSheet({
+      character: { name: 'Zaknafein' },
+      raceData: { speed: 30, size: ['M'], darkvision: 120 },
+    });
+    expect(sheet.darkvision).toEqual({ feet: 120, isSuperior: true });
+  });
+
+  // C-3: Elf + High Elf — subrace has no darkvision field → API kept race value 60
+  it('C-3 (S-06): raceData.darkvision=60 (High Elf subrace absent → race preserved) → { feet: 60, isSuperior: false }', () => {
+    // PHB p.23 — Elf base: Darkvision 60 ft. High Elf subrace adds no override.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Legolas' },
+      raceData: { speed: 30, size: ['M'], darkvision: 60 },
+    });
+    expect(sheet.darkvision).toEqual({ feet: 60, isSuperior: false });
+  });
+
+  // C-4: Human — no darkvision at all → null
+  it('C-4 (S-07): Human raceData.darkvision=undefined → null', () => {
+    // PHB p.31 — Human: No darkvision.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Sigurd' },
+      raceData: { speed: 30, size: ['M'] },
+    });
+    expect(sheet.darkvision).toBeNull();
+  });
+
+  // C-5: Halfling + Lightfoot — neither has darkvision → null
+  it('C-5 (S-08): Halfling raceData.darkvision=undefined → null', () => {
+    // PHB p.28 — Halfling: No darkvision. Lightfoot subrace also grants none.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Bilbo' },
+      raceData: { speed: 25, size: ['S'] },
+    });
+    expect(sheet.darkvision).toBeNull();
+  });
+
+  // C-6: Subrace explicit null opt-out — API merged subrace null → raceData.darkvision=null → null
+  it('C-6 (S-09): raceData.darkvision=null (subrace explicit null opt-out) → null', () => {
+    // Decision #577: subrace null OVERRIDES race (even drops race darkvision to null).
+    const sheet = computeCharacterSheet({
+      character: { name: 'SunElf' },
+      raceData: { speed: 30, size: ['M'], darkvision: null },
+    });
+    expect(sheet.darkvision).toBeNull();
+  });
+
+  // C-7: PHB Dragonborn + ancestry — Batch 3 regression guard → null (no darkvision in PHB)
+  it('C-7 (S-10): PHB Dragonborn raceData.darkvision=undefined → null (PHB p.32–34 regression guard)', () => {
+    // PHB p.32–34 — Dragonborn: NO darkvision. Batch 3 ancestry subraces also lack it.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Qyara' },
+      raceData: { speed: 30, size: ['M'], breathWeapon: { damageType: 'fire', shape: 'cone', size: '15 ft', savingThrow: 'dex' } },
+    });
+    expect(sheet.darkvision).toBeNull();
+  });
+
+  // C-8: Hypothetical homebrew 150 ft → isSuperior true (>= 120 threshold, REQ-7)
+  it('C-8 (S-23): raceData.darkvision=150 (homebrew) → { feet: 150, isSuperior: true }', () => {
+    // Spec REQ-7: isSuperior = feet >= 120. Future-proofs against homebrew tiers.
+    const sheet = computeCharacterSheet({
+      character: { name: 'DeepDweller' },
+      raceData: { speed: 30, size: ['M'], darkvision: 150 },
+    });
+    expect(sheet.darkvision).toEqual({ feet: 150, isSuperior: true });
+  });
+});
+
 // ── Batch 3: BreathWeaponView computation (race-dragonborn-ancestry) ──────────
 // PHB p.34: saveDC = 8 + CON mod + PB; dice: 2d6(1-5), 3d6(6-10), 4d6(11-15), 5d6(16+)
 

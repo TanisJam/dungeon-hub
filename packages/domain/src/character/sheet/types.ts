@@ -68,6 +68,17 @@ export interface CharacterSnapshot {
 }
 
 /**
+ * Computed darkvision for the character sheet. PHB p.17, 24.
+ * Decisions: #577 (merge rule — subrace overrides race), #578 (field shape).
+ */
+export interface DarkvisionView {
+  /** Radius in feet. PHB 2014: 60 or 120 only. Type allows others for homebrew. */
+  feet: number;
+  /** True when feet >= 120. PHB p.24 "Superior Darkvision" labeling (Drow, Duergar, Deep Gnome). */
+  isSuperior: boolean;
+}
+
+/**
  * Computed breath weapon for the character sheet.
  * Combines subrace.breathWeapon data with CON modifier + proficiency bonus + total level.
  * PHB p.34 — Dragonborn breath weapon rules.
@@ -105,6 +116,12 @@ export interface RaceSheetData {
    * to compute BreathWeaponView. Null/absent for non-Dragonborn races.
    */
   breathWeapon?: BreathWeaponData | null;
+  /**
+   * Effective darkvision in feet after race+subrace merge (subrace wins per decision #577).
+   * null when race+subrace explicitly opt out. undefined when race has no darkvision.
+   * Consumed by computeCharacterSheet to derive DarkvisionView. PHB p.17.
+   */
+  darkvision?: number | null;
 }
 
 // Re-export for convenience (BreathWeaponData is consumed by compute.ts)
@@ -213,6 +230,8 @@ export interface CharacterSheet {
   feats: Array<{ slug: string; source: string }>;
   /** Null for all non-Dragonborn characters and legacy Dragonborn without an ancestry subrace. */
   breathWeapon: BreathWeaponView | null;
+  /** Null when the character has no darkvision (PHB Human, Halfling, Dragonborn). PHB p.17. */
+  darkvision: DarkvisionView | null;
   spellcasting: SpellcastingView[];
   currency: Currency;
   encumbrance: EncumbranceView;
