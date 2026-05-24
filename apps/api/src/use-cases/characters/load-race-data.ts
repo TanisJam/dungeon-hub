@@ -135,6 +135,9 @@ export async function loadRaceSheetData(input: {
     breathWeapon: (raceData['breathWeapon'] as BreathWeaponData | null | undefined) ?? null,
     // REQ-4: project race-level darkvision. null when field absent OR explicitly null. PHB p.17.
     darkvision: (raceData['darkvision'] as number | null | undefined) ?? null,
+    // Batch 5: project race-level weapon/armor profs. Subrace may override below (Decision #589).
+    weaponProficiencies: (raceData['weaponProficiencies'] as RaceSheetData['weaponProficiencies']) ?? null,
+    armorProficiencies: (raceData['armorProficiencies'] as RaceSheetData['armorProficiencies']) ?? null,
   } as RaceSheetData;
 
   // Merge languageProficiencies and breathWeapon from subrace if it exists.
@@ -178,6 +181,22 @@ export async function loadRaceSheetData(input: {
         result = {
           ...result,
           darkvision: typeof subDV === 'number' ? subDV : null,
+        };
+      }
+      // Batch 5 + Decision #589: subrace weaponProficiencies OVERRIDES race when field is PRESENT.
+      // `'weaponProficiencies' in subData` distinguishes "no field" (inherit race) from
+      // "field present" (even if empty array → override, i.e. zero race-level weapons).
+      // PHB: Drow replaces Elf weapon training; Mountain Dwarf adds armor (Dwarf race has none).
+      if ('weaponProficiencies' in subData) {
+        result = {
+          ...result,
+          weaponProficiencies: (subData['weaponProficiencies'] as RaceSheetData['weaponProficiencies']) ?? null,
+        };
+      }
+      if ('armorProficiencies' in subData) {
+        result = {
+          ...result,
+          armorProficiencies: (subData['armorProficiencies'] as RaceSheetData['armorProficiencies']) ?? null,
         };
       }
     }
