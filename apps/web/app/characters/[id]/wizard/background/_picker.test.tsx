@@ -541,6 +541,68 @@ describe('BackgroundPicker — customization round-trip (Bug 1)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Bug 2b RED — BackgroundPicker: fixed tool must NOT appear in choose-pool
+//
+// Regression: if a background grants a tool as a fixed proficiency AND also
+// lists that same tool in a choose-pool (toolChoose.from), the picker was
+// showing the tool in the dropdown, letting the user pick it, then the
+// domain gate fired BACKGROUND_TOOL_DUPLICATE.
+//
+// Fix: filter poolFor(kind) and toolChoose.from by parsed.fixedTools before
+// passing to <MultiSelectChoose>.
+// ---------------------------------------------------------------------------
+
+function makeCriminalLikeEntry(): BackgroundEntry {
+  // Simulates a background that grants "thieves' tools" as a fixed proficiency
+  // AND lists it in the choose-pool (the combination that triggers the bug).
+  return {
+    slug: 'criminal-like',
+    source: 'TEST',
+    name: 'Criminal-like',
+    data: {
+      name: 'Criminal-like',
+      source: 'TEST',
+      skillProficiencies: [{ choose: { from: ['deception', 'stealth'], count: 2 } }],
+      // Fixed: "thieves' tools". Choose pool: ["thieves' tools", "lute"] — overlap on purpose.
+      toolProficiencies: [
+        { "thieves' tools": true } as never,
+        { choose: { from: ["thieves' tools", 'lute'], count: 1 } } as never,
+      ],
+    },
+  };
+}
+
+describe("BackgroundPicker — Bug 2b: fixed tool excluded from choose-pool (Bug 2b)", () => {
+  it("does NOT render the fixed tool as a selectable button in the toolChoose MultiSelectChoose", () => {
+    const entry = makeCriminalLikeEntry();
+    const initialSelection = {
+      slug: entry.slug,
+      source: entry.source,
+      skillChoices: [],
+      languageChoices: [],
+      toolChoices: {},
+    };
+
+    render(
+      <BackgroundPicker
+        characterId="char-1"
+        entries={[entry]}
+        allBackgrounds={[]}
+        initialSelection={initialSelection}
+      />,
+    );
+
+    // "Lute" should be in the pool (not fixed) — present as a button.
+    expect(screen.getByRole('button', { name: 'Lute' })).toBeTruthy();
+
+    // "Thieves' Tools" is a fixed proficiency — it must NOT appear as a
+    // selectable button in the choose dropdown. Before the fix, this fails
+    // because the unfiltered pool exposes it as a pickable option.
+    expect(screen.queryByRole('button', { name: "Thieves' Tools" })).toBeNull();
+  });
+});
+
 describe('FeaturePicker — selection persists slug, shows preview', () => {
   it('calls onChange with the feature slug when user selects an option', () => {
     const onChange = vi.fn();

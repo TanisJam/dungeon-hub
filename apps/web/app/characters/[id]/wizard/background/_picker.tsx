@@ -385,7 +385,7 @@ function BackgroundDetailInline({
               <MultiSelectChoose
                 key={kind}
                 label={`Elegí ${count} ${KIND_LABEL[kind].toLowerCase()}${count > 1 ? 's' : ''}`}
-                pool={poolFor(kind)}
+                pool={poolFor(kind).filter((t) => !parsed.fixedTools.includes(t.toLowerCase()))}
                 selected={sel}
                 count={count}
                 onChange={(vals) => setToolsForKind(kind, vals)}
@@ -395,7 +395,7 @@ function BackgroundDetailInline({
           {parsed.toolChoose && (
             <MultiSelectChoose
               label={`Elegí ${parsed.toolChoose.count} herramienta${parsed.toolChoose.count > 1 ? 's' : ''}`}
-              pool={parsed.toolChoose.from}
+              pool={parsed.toolChoose.from.filter((t) => !parsed.fixedTools.includes(t.toLowerCase()))}
               selected={tools['choose'] ?? []}
               count={parsed.toolChoose.count}
               onChange={(vals) => setToolsForKind('choose', vals)}

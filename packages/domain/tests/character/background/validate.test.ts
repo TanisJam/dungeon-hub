@@ -232,6 +232,59 @@ describe('validateBackgroundSelection — Custom Background (numeric-any skill b
   });
 });
 
+// ── Bug 2b regression lock: BACKGROUND_TOOL_DUPLICATE fires when chosen tool
+// overlaps with fixed tool from same background ───────────────────────────────
+//
+// Domain gate at validate.ts:494-501 is CORRECT. This test locks the behavior
+// so future refactors cannot silently make it permissive.
+//
+// Criminal has: { anyGamingSet: 1, "thieves' tools": true }
+// Picking "thieves' tools" via toolChoices must trigger BACKGROUND_TOOL_DUPLICATE.
+// (The real fix is in the picker UI, not here — see _picker.tsx.)
+
+describe("validateBackgroundSelection — Bug 2b regression lock: BACKGROUND_TOOL_DUPLICATE on fixed-tool overlap", () => {
+  // A synthetic background that has "thieves' tools" as a fixed grant AND
+  // exposes it in a literal choose pool (the case that triggered the user bug).
+  const BG_FIXED_AND_CHOOSE_OVERLAP: BackgroundCompendiumData = {
+    slug: 'bg-overlap',
+    source: 'PHB',
+    name: 'BG Overlap',
+    skillProficiencies: [{ perception: true, stealth: true }],
+    languageProficiencies: null,
+    toolProficiencies: [
+      { "thieves' tools": true },
+      { choose: { from: ["thieves' tools", 'lute'], count: 1 } },
+    ],
+  };
+
+  it("emits BACKGROUND_TOOL_DUPLICATE when chosen tool matches the background's own fixed tool", () => {
+    const res = validateBackgroundSelection({
+      backgroundData: BG_FIXED_AND_CHOOSE_OVERLAP,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      toolChoices: { choose: ["thieves' tools"] },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues.find((i) => i.code === 'BACKGROUND_TOOL_DUPLICATE');
+    expect(issue).toBeDefined();
+    expect(issue!.code).toBe('BACKGROUND_TOOL_DUPLICATE');
+    // @ts-expect-error dynamic shape
+    expect(issue!.tool).toBe("thieves' tools");
+  });
+
+  it('accepts the same background when a non-fixed tool from the pool is chosen', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: BG_FIXED_AND_CHOOSE_OVERLAP,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      toolChoices: { choose: ['lute'] },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedBackground.tools).toContain("thieves' tools"); // fixed
+    expect(res.appliedBackground.tools).toContain('lute'); // chosen
+  });
+});
+
 describe('validateBackgroundSelection — source gating', () => {
   it('rechaza background cuya source está deshabilitada', () => {
     const profile = {
