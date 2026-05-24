@@ -27,6 +27,8 @@ export interface FiveeToolsRace extends FiveeToolsBase {
   traitTags?: string[];
   languageProficiencies?: Array<Record<string, boolean | number>>;
   entries?: unknown[];
+  /** Raw additionalSpells field from 5etools. Shape varies (A/B/C) — parsed by normalizer. */
+  additionalSpells?: unknown;
 }
 
 export interface FiveeToolsSubrace extends FiveeToolsBase {
@@ -34,6 +36,8 @@ export interface FiveeToolsSubrace extends FiveeToolsBase {
   raceSource: string;
   ability?: Array<Record<string, number>>;
   entries?: unknown[];
+  /** Raw additionalSpells field from 5etools. Shape varies (A/B/C) — parsed by normalizer. */
+  additionalSpells?: unknown;
 }
 
 export interface FiveeToolsClass extends FiveeToolsBase {

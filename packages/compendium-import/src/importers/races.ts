@@ -3,6 +3,7 @@ import { readJson } from '../reader.js';
 import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
 import type { FiveeToolsRace, FiveeToolsSubrace, NormalizedRace } from '../types.js';
 import { expandDragonbornAncestries } from './phb-dragonborn-ancestries.js';
+import { normalizeAdditionalSpells } from './normalize-additional-spells.js';
 
 interface RacesFile {
   race?: FiveeToolsRace[];
@@ -18,11 +19,25 @@ export async function importRaces(
 
   for (const r of file.race ?? []) {
     if (isExcludedSource(r.source)) continue;
+    // Normalize additionalSpells for this race and merge into data JSONB.
+    // PHB scope: Tiefling base race has additionalSpells (Infernal Legacy).
+    const additionalSpellsRaw = Array.isArray(r.additionalSpells)
+      ? r.additionalSpells[0]
+      : null;
+    const raceSpellsResult = normalizeAdditionalSpells(additionalSpellsRaw ?? null, r.name);
+    if (raceSpellsResult.warnings.length > 0) {
+      warnings.push(...raceSpellsResult.warnings);
+    }
+    const raceData: Record<string, unknown> = { ...(r as Record<string, unknown>) };
+    if (raceSpellsResult.spells.length > 0) {
+      raceData['additionalSpellsNormalized'] = raceSpellsResult.spells;
+    }
+
     const baseRow: NormalizedRace = {
       slug: slugify(r.name),
       source: r.source,
       name: r.name,
-      data: r,
+      data: raceData,
       reprintedAs: parseReprintedAs(r.reprintedAs),
       isSubrace: false,
       parentSlug: null,
@@ -47,11 +62,26 @@ export async function importRaces(
     if (isExcludedSource(s.raceSource)) continue;
     // Subraces a veces no tienen `name` propio (variantes anónimas) — usamos parent + suffix
     const displayName = s.name ?? `${s.raceName} Variant`;
+
+    // Normalize additionalSpells for this subrace and merge into data JSONB.
+    // PHB scope: Drow, High Elf, Forest Gnome subraces have additionalSpells.
+    const subraceSpellsRaw = Array.isArray(s.additionalSpells)
+      ? s.additionalSpells[0]
+      : null;
+    const subraceSpellsResult = normalizeAdditionalSpells(subraceSpellsRaw ?? null, displayName);
+    if (subraceSpellsResult.warnings.length > 0) {
+      warnings.push(...subraceSpellsResult.warnings);
+    }
+    const subraceData: Record<string, unknown> = { ...(s as Record<string, unknown>) };
+    if (subraceSpellsResult.spells.length > 0) {
+      subraceData['additionalSpellsNormalized'] = subraceSpellsResult.spells;
+    }
+
     out.push({
       slug: `${slugify(s.raceName)}--${slugify(displayName)}`,
       source: s.source,
       name: displayName,
-      data: s,
+      data: subraceData,
       reprintedAs: parseReprintedAs(s.reprintedAs),
       isSubrace: true,
       parentSlug: slugify(s.raceName),
