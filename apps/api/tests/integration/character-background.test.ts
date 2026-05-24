@@ -543,9 +543,11 @@ const CUSTOMIZATION_LANG2 = {
   equipment: { kind: 'coin' },
   feature: { slug: 'acolyte-shelter-of-the-faithful' },
 };
-// lang1tool1: 1 language + 2 tools (anyTool:1 in 5etools is patched to 2 by patchAnyToolCount per F-06)
+// lang1tool1: 1 language + 1 tool (PHB 125 "Choose one language and one tool")
+// patchAnyToolCount does NOT apply here — the data-bug fix is only for the pure
+// {anyTool:1} alt ("Choose two tools"), not the legitimate {anyLanguage:1, anyTool:1} alt.
 const CUSTOMIZATION_LANG1TOOL1 = {
-  mixedPool: { shape: 'lang1tool1', langs: ['dwarvish'], tools: ['lute', 'drum'] },
+  mixedPool: { shape: 'lang1tool1', langs: ['dwarvish'], tools: ['lute'] },
   equipment: { kind: 'coin' },
   feature: { slug: 'acolyte-shelter-of-the-faithful' },
 };
@@ -615,10 +617,10 @@ describe('PUT /characters/:id/background — Custom Background customization', (
     expect(bg.customization.feature.slug).toBe('acolyte-shelter-of-the-faithful');
   });
 
-  it('shape lang1tool1: 1 lang + 2 tools + coin equipment + feature → 200 + customization persisted', async () => {
+  it('shape lang1tool1: 1 lang + 1 tool + coin equipment + feature → 200 + customization persisted', async () => {
     const app = await getTestApp();
-    // Note: anyTool:1 in 5etools is patched to 2 by patchAnyToolCount (F-06 data fix).
-    // So lang1tool1 requires 1 lang + 2 tools.
+    // PHB 125: "Choose one language and one tool" — patchAnyToolCount does NOT
+    // apply to this alt (only to the pure {anyTool:1} alt which means "two tools").
     const res = await app.inject({
       method: 'PUT',
       url: `/api/v1/characters/${characterId}/background`,
@@ -635,7 +637,7 @@ describe('PUT /characters/:id/background — Custom Background customization', (
     const bg = res.json().data.background;
     expect(bg.customization.mixedPool.shape).toBe('lang1tool1');
     expect(bg.customization.mixedPool.langs).toEqual(['dwarvish']);
-    expect(bg.customization.mixedPool.tools).toEqual(['lute', 'drum']);
+    expect(bg.customization.mixedPool.tools).toEqual(['lute']);
   });
 
   it('shape tool2: 0 langs + 2 tools + coin equipment + feature → 200 + customization persisted', async () => {

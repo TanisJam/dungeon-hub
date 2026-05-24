@@ -600,10 +600,14 @@ describe('validateBackgroundSelection — 7 enabled backgrounds integration (A.6
 // ── A.8 TEST-RED: splitMixedPoolBlock ────────────────────────────────────────
 
 describe('splitMixedPoolBlock — three-alternative parse', () => {
+  // PHB p. 125 Custom Background — third skillToolLanguageProficiencies alt
+  // is "Choose two tools" but 5etools encodes it as {anyTool:1}. The data-bug
+  // patch only applies when the alt has NO anyLanguage (pure tool alt).
+  // The {anyLanguage:1, anyTool:1} alt is the legitimate "1 lang + 1 tool" choice.
   const THREE_ALT_FIELD = [
     { anyLanguage: 2 },
-    { anyLanguage: 1, anyTool: 1 }, // anyTool:1 gets patched to 2
-    { anyTool: 1 },                  // anyTool:1 gets patched to 2
+    { anyLanguage: 1, anyTool: 1 }, // legit "1 lang + 1 tool" — NOT patched
+    { anyTool: 1 },                  // 5etools data-bug → patched to 2
   ];
 
   it('returns 3 MixedPoolShape items for 3-alternative field', () => {
@@ -616,14 +620,24 @@ describe('splitMixedPoolBlock — three-alternative parse', () => {
     expect(result[0]).toMatchObject({ shapeKey: 'lang2', langCount: 2, toolCount: 0 });
   });
 
-  it('second alternative → lang1tool1 (langCount=1, toolCount=2 after patch)', () => {
+  it('second alternative → lang1tool1 (langCount=1, toolCount=1 — NOT patched, anyLanguage present)', () => {
     const result = splitMixedPoolBlock(THREE_ALT_FIELD);
-    expect(result[1]).toMatchObject({ shapeKey: 'lang1tool1', langCount: 1, toolCount: 2 });
+    expect(result[1]).toMatchObject({ shapeKey: 'lang1tool1', langCount: 1, toolCount: 1 });
   });
 
   it('third alternative → tool2 (langCount=0, toolCount=2 after patch)', () => {
     const result = splitMixedPoolBlock(THREE_ALT_FIELD);
     expect(result[2]).toMatchObject({ shapeKey: 'tool2', langCount: 0, toolCount: 2 });
+  });
+
+  it('lang1tool1 with anyTool:1 must NOT trigger patchAnyToolCount (PHB 125 legit "1 lang + 1 tool")', () => {
+    const result = splitMixedPoolBlock([{ anyLanguage: 1, anyTool: 1 }]);
+    expect(result[0]).toMatchObject({ shapeKey: 'lang1tool1', langCount: 1, toolCount: 1 });
+  });
+
+  it('pure tool2 alt with anyTool:1 DOES trigger patchAnyToolCount → 2', () => {
+    const result = splitMixedPoolBlock([{ anyTool: 1 }]);
+    expect(result[0]).toMatchObject({ shapeKey: 'tool2', langCount: 0, toolCount: 2 });
   });
 
   it('unrecognized key throws', () => {

@@ -81,13 +81,19 @@ export const TOOL_CATEGORY_MAP: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * Enforces the PHB rule for Custom Background: the third
- * `skillToolLanguageProficiencies` alternative should grant 2 tool proficiencies,
- * but 5etools encodes it as `{ anyTool: 1 }` — a known data bug.
+ * Enforces the PHB rule for Custom Background: the PURE-TOOL alt of
+ * `skillToolLanguageProficiencies` should grant 2 tool proficiencies
+ * ("Choose two tools"), but 5etools encodes it as `{ anyTool: 1 }` — a
+ * known data bug.
  *
- * This function patches the count at read time and must be called whenever
- * an `anyTool` value is extracted from that field. The compendium importer
- * emits a WARNING log when it detects `anyTool: 1` so upstream fixes are visible.
+ * IMPORTANT: this patch ONLY applies to the pure `{anyTool:N}` alt. It must
+ * NOT be applied when the alt also has `anyLanguage` (the legitimate
+ * `{anyLanguage:1, anyTool:1}` "1 lang + 1 tool" alt). Callers are
+ * responsible for that gate — see `splitMixedPoolBlock` in
+ * `../background/validate.ts`.
+ *
+ * The compendium importer emits a WARNING log when it detects `anyTool: 1`
+ * in a pure-tool alt so upstream fixes are visible.
  *
  * @param count - The raw count from the 5etools JSON
  * @returns 2 if count is 1 (data-bug enforcement), otherwise the original count

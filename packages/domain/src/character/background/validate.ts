@@ -121,8 +121,10 @@ function toKebab(s: string): string {
  *   - Entry with both `anyLanguage` and `anyTool` → `lang1tool1`
  *   - Entry with only `anyTool` key → `tool2`
  *
- * `anyTool` counts are patched from 1 → 2 via `patchAnyToolCount` to fix
- * the known 5etools data bug.
+ * `anyTool` counts are patched from 1 → 2 via `patchAnyToolCount` ONLY for
+ * the pure `tool2` alt (no `anyLanguage`), to fix the known 5etools data bug
+ * where "Choose two tools" was encoded as `{anyTool:1}`. The legitimate
+ * `{anyLanguage:1, anyTool:1}` ("1 lang + 1 tool") alt is left untouched.
  *
  * Throws if an alternative contains an unrecognized key.
  */
@@ -132,7 +134,8 @@ export function splitMixedPoolBlock(
   return field.map((alt) => {
     const langCount = typeof alt['anyLanguage'] === 'number' ? alt['anyLanguage'] : 0;
     const rawToolCount = typeof alt['anyTool'] === 'number' ? alt['anyTool'] : 0;
-    const toolCount = rawToolCount > 0 ? patchAnyToolCount(rawToolCount) : 0;
+    const toolCount =
+      rawToolCount > 0 && langCount === 0 ? patchAnyToolCount(rawToolCount) : rawToolCount;
 
     const knownKeys = new Set(['anyLanguage', 'anyTool']);
     for (const key of Object.keys(alt)) {
