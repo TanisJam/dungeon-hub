@@ -28,7 +28,7 @@ export async function importRaces(
     if (raceSpellsResult.warnings.length > 0) {
       warnings.push(...raceSpellsResult.warnings);
     }
-    const raceData: Record<string, unknown> = { ...(r as Record<string, unknown>) };
+    const raceData: Record<string, unknown> = { ...(r as unknown as Record<string, unknown>) };
     if (raceSpellsResult.spells.length > 0) {
       raceData['additionalSpellsNormalized'] = raceSpellsResult.spells;
     }
@@ -72,7 +72,7 @@ export async function importRaces(
     if (subraceSpellsResult.warnings.length > 0) {
       warnings.push(...subraceSpellsResult.warnings);
     }
-    const subraceData: Record<string, unknown> = { ...(s as Record<string, unknown>) };
+    const subraceData: Record<string, unknown> = { ...(s as unknown as Record<string, unknown>) };
     if (subraceSpellsResult.spells.length > 0) {
       subraceData['additionalSpellsNormalized'] = subraceSpellsResult.spells;
     }

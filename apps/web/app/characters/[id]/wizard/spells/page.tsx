@@ -22,6 +22,7 @@ type Character = {
   data: {
     classes?: AppliedClass[];
     spells?: Record<string, { cantrips: SpellRef[]; known: SpellRef[]; prepared: SpellRef[] }>;
+    raceCantrip?: { slug: string; source: string } | null;
   } | null;
 };
 
@@ -114,6 +115,7 @@ export default async function SpellsStepPage({ params }: Props) {
             availableSpells={options.availableSpells}
             subclassGrantedSlugs={options.subclassGrantedSlugs}
             initialSpells={initialSpells}
+            highElfWizardNotice={!!character.data?.raceCantrip}
           />
         )}
       </div>

@@ -151,6 +151,10 @@ importers:
         version: 2.1.9(@types/node@22.19.19)(jsdom@25.0.1)(lightningcss@1.32.0)
 
   packages/compendium-import:
+    dependencies:
+      '@dungeon-hub/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       vitest:
         specifier: ^2.1.8

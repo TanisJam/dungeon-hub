@@ -478,7 +478,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         raceLanguageChoices: data.raceLanguageChoices as never,
         raceSkillChoices: data.raceSkillChoices as never,
         // Batch 6: racial cantrip pick (High Elf). Read-path tolerance — may be absent.
-        raceCantrip: data.raceCantrip as never,
+        raceCantrip: data['raceCantrip'] as never,
       },
       raceData,
       itemWeights,
