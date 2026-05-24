@@ -6,10 +6,94 @@ import type {
   AppliedAsi,
   LanguageProficiencyBlock,
   RaceCompendiumData,
+  RaceFeatBlock,
+  RaceSkillProficiencyBlock,
   RaceValidationIssue,
   RaceValidationResult,
   SubraceCompendiumData,
 } from './types.js';
+import { validateFeatSelection } from '../feat/validate.js';
+import type {
+  AppliedFeat,
+  CharacterFeatContext,
+  FeatCompendiumData,
+} from '../feat/types.js';
+import { ALL_SKILLS } from '../sheet/types.js';
+
+/** Suma el total de `any` grants en un array de `RaceFeatBlock`. */
+function sumAnyFeats(blocks: RaceFeatBlock[] | null | undefined): number {
+  let n = 0;
+  for (const b of blocks ?? []) {
+    if (typeof b.any === 'number') n += b.any;
+  }
+  return n;
+}
+
+/**
+ * Valida los skill choices contra el bloque `skillProficiencies` de race + subrace.
+ * Devuelve issues (vacío si OK) y la lista normalizada (lowercase) a persistir.
+ */
+function validateRaceSkillChoices(input: {
+  race: RaceCompendiumData;
+  subrace?: SubraceCompendiumData | null;
+  choices: string[];
+}): { issues: RaceValidationIssue[]; applied: string[] } {
+  const issues: RaceValidationIssue[] = [];
+
+  // Contamos `any: N` y recopilamos skills fijos (para dedup futuro, ej Bugbear Stealth).
+  const fixedSkills = new Set<string>();
+  let expectedAnyCount = 0;
+
+  const collect = (blocks: RaceSkillProficiencyBlock[] | null | undefined) => {
+    for (const block of blocks ?? []) {
+      for (const [key, value] of Object.entries(block)) {
+        if (key === 'any' && typeof value === 'number') {
+          expectedAnyCount += value;
+        } else if (key === 'choose' && typeof value === 'object' && value !== null) {
+          // `choose: { count, from }` shape — treat count like `any` (Batch 6 validates from-list)
+          const cnt = (value as { count?: number }).count;
+          if (typeof cnt === 'number') expectedAnyCount += cnt;
+        } else if (value === true) {
+          fixedSkills.add(key.toLowerCase());
+        }
+      }
+    }
+  };
+
+  collect(input.race.skillProficiencies);
+  collect(input.subrace?.skillProficiencies);
+
+  // Si la raza no tiene skill grants, ignoramos silenciosamente los choices.
+  if (expectedAnyCount === 0) {
+    return { issues: [], applied: [] };
+  }
+
+  const normalized = input.choices.map((c) => c.toLowerCase());
+
+  if (normalized.length !== expectedAnyCount) {
+    issues.push({
+      code: 'RACE_SKILL_COUNT_MISMATCH',
+      expectedCount: expectedAnyCount,
+      gotCount: normalized.length,
+    });
+    return { issues, applied: normalized };
+  }
+
+  const seen = new Set<string>();
+  for (const skill of normalized) {
+    if (!(ALL_SKILLS as readonly string[]).includes(skill)) {
+      issues.push({ code: 'RACE_SKILL_UNKNOWN', skill });
+      continue;
+    }
+    if (seen.has(skill) || fixedSkills.has(skill)) {
+      issues.push({ code: 'RACE_SKILL_DUPLICATE', skill });
+      continue;
+    }
+    seen.add(skill);
+  }
+
+  return { issues, applied: normalized };
+}
 
 /** Suma fijos + cantidad total de slots `any*` para los language blocks dados. */
 function splitLanguageBlocks(blocks: LanguageProficiencyBlock[] | null | undefined): {
@@ -109,6 +193,22 @@ interface ValidateRaceInput {
   appliedAsis?: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>;
   /** Idiomas elegidos por el jugador (para satisfacer slots `any*` de raza + subrace). */
   languageChoices?: string[];
+  /** Skills elegidas para el bloque `skillProficiencies:[{any:N}]` de la raza. */
+  skillChoices?: string[];
+  /**
+   * Feat elegido para el bloque `feats:[{any:1}]` de la raza.
+   * La API pre-carga el FeatCompendiumData; el validator es puro.
+   */
+  featChoice?: {
+    featData: FeatCompendiumData;
+    asiChoice?: Array<{ ability: string; bonus: number }>;
+  } | null;
+  /**
+   * Contexto del personaje para validar prereqs del feat racial.
+   * REQUERIDO cuando featChoice está presente.
+   * Construido por la API con baseStats + ASIs raciales (misma call).
+   */
+  featContext?: CharacterFeatContext;
 }
 
 /**
@@ -262,12 +362,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       const mismatch = compareAsiSets(input.appliedAsis, derived);
       if (mismatch) return { ok: false, issues: [mismatch] };
     }
-    return {
-      ok: true,
-      appliedAsis: derived,
-      usedTashasCustomOrigin: false,
-      appliedLanguageChoices,
-    };
+    return finishWithSkillsAndFeats(derived, false, appliedLanguageChoices, input, raceData, subraceData);
   }
 
   // Para todos los demás casos, exigimos appliedAsis.
@@ -311,16 +406,18 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       });
       return { ok: false, issues };
     }
-    return {
-      ok: true,
-      appliedAsis: input.appliedAsis.map((a) => ({
+    return finishWithSkillsAndFeats(
+      input.appliedAsis.map((a) => ({
         ability: a.ability as AbilityKey,
         bonus: a.bonus,
         source: a.source,
       })),
-      usedTashasCustomOrigin: true,
+      true,
       appliedLanguageChoices,
-    };
+      input,
+      raceData,
+      subraceData,
+    );
   }
 
   // MPMM (ability null/missing) → bag fijo [+2, +1].
@@ -337,16 +434,18 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
       });
       return { ok: false, issues };
     }
-    return {
-      ok: true,
-      appliedAsis: input.appliedAsis.map((a) => ({
+    return finishWithSkillsAndFeats(
+      input.appliedAsis.map((a) => ({
         ability: a.ability as AbilityKey,
         bonus: a.bonus,
         source: a.source,
       })),
-      usedTashasCustomOrigin: false,
+      false,
       appliedLanguageChoices,
-    };
+      input,
+      raceData,
+      subraceData,
+    );
   }
 
   // ---- Tasha's OFF + choose shape ----------------------------------------
@@ -512,15 +611,114 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   const subraceOk = validateBlocks(subraceBlocks, subraceAsis, 'subrace');
   if (!subraceOk) return { ok: false, issues };
 
-  return {
-    ok: true,
-    appliedAsis: input.appliedAsis.map((a) => ({
+  return finishWithSkillsAndFeats(
+    input.appliedAsis.map((a) => ({
       ability: a.ability as AbilityKey,
       bonus: a.bonus,
       source: a.source,
     })),
-    usedTashasCustomOrigin: false,
+    false,
     appliedLanguageChoices,
+    input,
+    raceData,
+    subraceData,
+  );
+}
+
+/**
+ * Shared suffix for all ok-true paths in validateRaceSelection.
+ * Runs skill choice validation + feat grant validation, then returns the final result.
+ * Per decision #547: race feats BYPASS the `variantRules.feats === false` campaign toggle.
+ */
+function finishWithSkillsAndFeats(
+  appliedAsis: AppliedAsi[],
+  usedTashasCustomOrigin: boolean,
+  appliedLanguageChoices: string[],
+  input: ValidateRaceInput,
+  raceData: RaceCompendiumData,
+  subraceData: SubraceCompendiumData | null | undefined,
+): RaceValidationResult {
+  // ---- 6) Skill choices validation ----------------------------------------
+  const skillResult = validateRaceSkillChoices({
+    race: raceData,
+    // exactOptionalPropertyTypes: pass null instead of undefined
+    ...(subraceData !== undefined ? { subrace: subraceData } : {}),
+    choices: input.skillChoices ?? [],
+  });
+  if (skillResult.issues.length > 0) {
+    return { ok: false, issues: skillResult.issues };
+  }
+
+  // ---- 7) Feat grant validation -------------------------------------------
+  const expectedFeatCount =
+    sumAnyFeats(raceData.feats) + sumAnyFeats(subraceData?.feats);
+
+  let appliedFeat: AppliedFeat | null = null;
+  if (expectedFeatCount > 0) {
+    if (!input.featChoice || !input.featContext) {
+      // Missing feat pick for a race that requires one.
+      const raceSrc = subraceData?.feats && sumAnyFeats(subraceData.feats) > 0
+        ? { slug: subraceData.slug, source: subraceData.source }
+        : { slug: raceData.slug, source: raceData.source };
+      return {
+        ok: false,
+        issues: [{ code: 'RACE_FEAT_REQUIRED', race: raceSrc }],
+      };
+    }
+
+    if (expectedFeatCount > 1) {
+      // PHB has no race granting > 1 feat; defensive guard.
+      return {
+        ok: false,
+        issues: [{
+          code: 'RACE_CHOOSE_SHAPE_UNSUPPORTED',
+          where: 'race',
+          slug: raceData.slug,
+          source: raceData.source,
+        }],
+      };
+    }
+
+    // Per decision #547: bypass variantRules.feats toggle for racial feats.
+    // We build a synthetic rulesProfile with feats forced to true.
+    const bypassProfile: typeof input.rulesProfile = {
+      ...input.rulesProfile,
+      variantRules: { ...input.rulesProfile.variantRules, feats: true },
+    };
+
+    const featResult = validateFeatSelection({
+      featData: input.featChoice.featData,
+      rulesProfile: bypassProfile,
+      ctx: input.featContext,
+      // exactOptionalPropertyTypes: only pass asiChoice when defined
+      ...(input.featChoice.asiChoice !== undefined
+        ? { asiChoice: input.featChoice.asiChoice }
+        : {}),
+    });
+
+    if (!featResult.ok) {
+      return {
+        ok: false,
+        issues: [{
+          code: 'RACE_FEAT_INVALID',
+          feat: {
+            slug: input.featChoice.featData.slug,
+            source: input.featChoice.featData.source,
+          },
+          nested: featResult.issues,
+        }],
+      };
+    }
+    appliedFeat = featResult.appliedFeat;
+  }
+
+  return {
+    ok: true,
+    appliedAsis,
+    usedTashasCustomOrigin,
+    appliedLanguageChoices,
+    appliedFeat,
+    appliedSkillChoices: skillResult.applied,
   };
 }
 

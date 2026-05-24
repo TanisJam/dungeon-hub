@@ -4,6 +4,8 @@ import type {
   RaceCompendiumData,
   SubraceCompendiumData,
 } from '../../../src/character/race/types.js';
+import type { FeatCompendiumData } from '../../../src/character/feat/types.js';
+import type { CharacterFeatContext } from '../../../src/character/feat/types.js';
 import { DEFAULT_RULES_PROFILE } from '../../../src/rules-profile/default.js';
 import type { RulesProfile } from '../../../src/rules-profile/types.js';
 
@@ -585,5 +587,477 @@ describe('validateRaceSelection — subrace required (PHB gate)', () => {
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.issues[0]!.code).toBe('RACE_DISABLED');
+  });
+});
+
+// ============================================================
+// FASE A: feat + skill picks (race-variant-human-feat-skill)
+// ============================================================
+
+// ---- Fixtures ---------------------------------------------------------------
+
+/** Actor: sin prereqs, sin ASI choose (+1 CHA fixed) */
+const ACTOR_FEAT: FeatCompendiumData = {
+  slug: 'actor',
+  source: 'PHB',
+  name: 'Actor',
+  prerequisite: null,
+  ability: [{ cha: 1 }],
+};
+
+/** Resilient: sin prereqs, con `choose` block (elige 1 ability +1) */
+const RESILIENT_FEAT: FeatCompendiumData = {
+  slug: 'resilient',
+  source: 'PHB',
+  name: 'Resilient',
+  prerequisite: null,
+  ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 1 } }],
+};
+
+/** Heavy Armor Master: requiere proficiency heavy armor */
+const HEAVY_ARMOR_MASTER_FEAT: FeatCompendiumData = {
+  slug: 'heavy-armor-master',
+  source: 'PHB',
+  name: 'Heavy Armor Master',
+  prerequisite: [{ proficiency: [{ armor: 'heavy' }] }],
+  ability: [{ str: 1 }],
+};
+
+/** Variant Human como subrace (shape 5etools: feats + skillProficiencies en subrace) */
+const PHB_VARIANT_HUMAN_SUBRACE: SubraceCompendiumData = {
+  slug: 'variant-human',
+  source: 'PHB',
+  parentSlug: 'human',
+  parentSource: 'PHB',
+  feats: [{ any: 1 }],
+  skillProficiencies: [{ any: 1 }],
+};
+
+/** Human base para el Variant Human */
+const PHB_HUMAN_BASE: RaceCompendiumData = {
+  slug: 'human',
+  source: 'PHB',
+  // Variant Human: el subrace lleva los ASIs como choose también
+  // Para simplificar los tests de feat/skill usamos un human con ASIs fijos mínimos
+  ability: [{ str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }],
+};
+
+/** Human para Variant Human SIN ability (el subrace puede tener choose) */
+const PHB_HUMAN_NO_ABILITY: RaceCompendiumData = {
+  slug: 'human',
+  source: 'PHB',
+  ability: null,
+};
+
+/** Variant Human subrace sin ASI fijo (MPMM mode para simplificar test) */
+const PHB_VARIANT_HUMAN_MPMM: SubraceCompendiumData = {
+  slug: 'variant-human',
+  source: 'PHB',
+  parentSlug: 'human',
+  parentSource: 'PHB',
+  feats: [{ any: 1 }],
+  skillProficiencies: [{ any: 1 }],
+};
+
+/** Half-Elf con skillProficiencies: [{any:2}] */
+const PHB_HALF_ELF_WITH_SKILLS: RaceCompendiumData = {
+  slug: 'half-elf',
+  source: 'PHB',
+  ability: [{ cha: 2, choose: { from: ['str', 'dex', 'con', 'int', 'wis'], count: 2 } }],
+  skillProficiencies: [{ any: 2 }],
+};
+
+/** Custom Lineage (TCE): feats + skillProficiencies en la raza */
+const TCE_CUSTOM_LINEAGE_WITH_FEAT: RaceCompendiumData = {
+  slug: 'custom-lineage',
+  source: 'TCE',
+  ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], amount: 2 } }],
+  feats: [{ any: 1 }],
+  skillProficiencies: [{ any: 1 }],
+};
+
+/** Context for feat validation at race step (no class yet) */
+function makeFeatCtx(overrides?: Partial<CharacterFeatContext>): CharacterFeatContext {
+  return {
+    effectiveScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    race: { slug: 'human' },
+    armorProficiencies: [],
+    weaponProficiencies: [],
+    hasSpellcasting: false,
+    existingFeats: [],
+    ...overrides,
+  };
+}
+
+/** Profile with feats:true (default) */
+const PROFILE_FEATS_ON: RulesProfile = {
+  ...DEFAULT_RULES_PROFILE,
+  variantRules: { ...DEFAULT_RULES_PROFILE.variantRules, tashasCustomOrigin: false, feats: true },
+};
+
+/** Profile with feats:false (campaign toggle off) */
+const PROFILE_FEATS_OFF: RulesProfile = {
+  ...DEFAULT_RULES_PROFILE,
+  variantRules: { ...DEFAULT_RULES_PROFILE.variantRules, tashasCustomOrigin: false, feats: false },
+};
+
+const PROFILE_TCE: RulesProfile = {
+  ...PROFILE_FEATS_ON,
+  sources: { ...PROFILE_FEATS_ON.sources, TCE: true },
+};
+
+// ---- D-1: Variant Human, sin skillChoices ni featChoice → RACE_SKILL_COUNT_MISMATCH primero ---
+describe('validateRaceSelection — race skill choices (Variant Human / Half-Elf)', () => {
+  it('D-1: Variant Human, no skillChoices, no featChoice → RACE_SKILL_COUNT_MISMATCH (skill check runs first)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_SKILL_COUNT_MISMATCH');
+  });
+
+  it('D-2: Variant Human, skillChoices=[perception], no featChoice → RACE_FEAT_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['perception'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_FEAT_REQUIRED');
+  });
+
+  it('D-3: Variant Human, no skillChoices, featChoice valid → RACE_SKILL_COUNT_MISMATCH (skill runs first)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: [],
+      featChoice: { featData: ACTOR_FEAT },
+      featContext: makeFeatCtx(),
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_SKILL_COUNT_MISMATCH');
+  });
+
+  it('D-4: Variant Human, 2 skillChoices (needs 1) → RACE_SKILL_COUNT_MISMATCH expected=1 got=2', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['perception', 'stealth'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_SKILL_COUNT_MISMATCH');
+    if (issue.code !== 'RACE_SKILL_COUNT_MISMATCH') return;
+    expect(issue.expectedCount).toBe(1);
+    expect(issue.gotCount).toBe(2);
+  });
+
+  it('D-5: Half-Elf, duplicate skills → RACE_SKILL_DUPLICATE', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF_WITH_SKILLS,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['perception', 'perception'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_SKILL_DUPLICATE');
+    if (issue.code !== 'RACE_SKILL_DUPLICATE') return;
+    expect(issue.skill).toBe('perception');
+  });
+
+  it('D-6: Variant Human, unknown skill → RACE_SKILL_UNKNOWN', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['not-a-real-skill'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_SKILL_UNKNOWN');
+    if (issue.code !== 'RACE_SKILL_UNKNOWN') return;
+    expect(issue.skill).toBe('not-a-real-skill');
+  });
+
+  it('D-7: Half-Elf, 2 valid distinct skills → ok:true, appliedSkillChoices correct', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF_WITH_SKILLS,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['perception', 'stealth'],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedSkillChoices).toEqual(['perception', 'stealth']);
+    expect(res.appliedFeat).toBeFalsy();
+  });
+
+  it('D-8: Half-Elf, 1 skill (needs 2) → RACE_SKILL_COUNT_MISMATCH expected=2 got=1', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF_WITH_SKILLS,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'cha', bonus: 2, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['perception'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_SKILL_COUNT_MISMATCH');
+    if (issue.code !== 'RACE_SKILL_COUNT_MISMATCH') return;
+    expect(issue.expectedCount).toBe(2);
+    expect(issue.gotCount).toBe(1);
+  });
+
+  it('D-9: Dwarf (no skillProficiencies) with stray skillChoices → ok:true, appliedSkillChoices=[]', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_DWARF,
+      subraceData: PHB_HILL_DWARF,
+      rulesProfile: PROFILE_FEATS_ON,
+      skillChoices: ['perception'], // stray
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedSkillChoices).toEqual([]);
+  });
+
+  it('D-10: Plain Human (no feat/skill blocks) → ok:true, appliedSkillChoices=[], appliedFeat=null (regression)', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN,
+      rulesProfile: PROFILE_FEATS_ON,
+      skillChoices: ['perception'], // stray
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedSkillChoices).toEqual([]);
+    expect(res.appliedFeat).toBeFalsy();
+  });
+});
+
+describe('validateRaceSelection — race feat grant (Variant Human)', () => {
+  it('D-11: Variant Human + valid feat (Actor, no prereqs, fixed ASI) → ok:true, appliedFeat set', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      featChoice: { featData: ACTOR_FEAT },
+      featContext: makeFeatCtx(),
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedFeat).toBeDefined();
+    expect(res.appliedFeat!.slug).toBe('actor');
+    expect(res.appliedSkillChoices).toEqual(['insight']);
+  });
+
+  it('D-12: Variant Human + Resilient feat (choose ASI) without asiChoice → RACE_FEAT_INVALID wrapping FEAT_ASI_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      featChoice: { featData: RESILIENT_FEAT /* no asiChoice */ },
+      featContext: makeFeatCtx(),
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_FEAT_INVALID');
+    if (issue.code !== 'RACE_FEAT_INVALID') return;
+    expect(issue.nested[0]!.code).toBe('FEAT_ASI_REQUIRED');
+  });
+
+  it('D-13: Variant Human + Heavy Armor Master (prereq unmet) → RACE_FEAT_INVALID wrapping PREREQ_PROFICIENCY_NOT_MET', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      featChoice: { featData: HEAVY_ARMOR_MASTER_FEAT },
+      featContext: makeFeatCtx({ armorProficiencies: [] }), // no heavy armor at race step
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues[0]!;
+    expect(issue.code).toBe('RACE_FEAT_INVALID');
+    if (issue.code !== 'RACE_FEAT_INVALID') return;
+    expect(issue.nested[0]!.code).toBe('PREREQ_PROFICIENCY_NOT_MET');
+  });
+
+  it('D-14: Variant Human + Resilient feat with valid asiChoice → ok:true', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      featChoice: {
+        featData: RESILIENT_FEAT,
+        asiChoice: [{ ability: 'con', bonus: 1 }],
+      },
+      featContext: makeFeatCtx(),
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedFeat!.slug).toBe('resilient');
+    expect(res.appliedFeat!.asisApplied).toEqual([{ ability: 'con', bonus: 1 }]);
+  });
+
+  it('D-15: Variant Human + feat but feats disabled by campaign → bypass works (RACE_FEAT is NOT blocked)', () => {
+    // Per decision #547: race feat MUST bypass variantRules.feats=false
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_OFF,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      featChoice: { featData: ACTOR_FEAT },
+      featContext: makeFeatCtx(),
+    });
+    // Should succeed — race feat bypasses the feats toggle
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedFeat!.slug).toBe('actor');
+  });
+
+  it('D-16: Variant Human, no featChoice, no featContext → RACE_FEAT_REQUIRED', () => {
+    const res = validateRaceSelection({
+      raceData: PHB_HUMAN_BASE,
+      subraceData: PHB_VARIANT_HUMAN_SUBRACE,
+      rulesProfile: PROFILE_FEATS_ON,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+        { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['insight'],
+      // NO featChoice, NO featContext
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]!.code).toBe('RACE_FEAT_REQUIRED');
+  });
+
+  it('D-17: Custom Lineage (TCE) + skill + feat → ok:true (same shape as Variant Human)', () => {
+    const res = validateRaceSelection({
+      raceData: TCE_CUSTOM_LINEAGE_WITH_FEAT,
+      rulesProfile: PROFILE_TCE,
+      appliedAsis: [
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
+      ],
+      skillChoices: ['arcana'],
+      featChoice: { featData: ACTOR_FEAT },
+      featContext: makeFeatCtx(),
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedFeat!.slug).toBe('actor');
+    expect(res.appliedSkillChoices).toEqual(['arcana']);
   });
 });

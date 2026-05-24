@@ -256,11 +256,13 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   });
 
   // ---- Skills -----------------------------------------------------------
-  // Profs vienen de: class.skillChoices + background.skills + race? (race no, salvo features avanzadas).
-  // Expertise por ahora no la trackeamos (viene en una iteración futura).
+  // Profs vienen de: class.skillChoices + background.skills + race.raceSkillChoices
+  // (Variant Human / Half-Elf / Custom Lineage). Expertise: futura iteración.
+  // TODO(race-skill-prof-grant, Batch 6): add cross-step dedup gate in validateCharacterFinal.
   const proficientSkills = new Set<string>();
-  for (const c of classes) for (const s of c.skillChoices ?? []) proficientSkills.add(s);
-  for (const s of character.background?.skills ?? []) proficientSkills.add(s);
+  for (const c of classes) for (const s of c.skillChoices ?? []) proficientSkills.add(s.toLowerCase());
+  for (const s of character.background?.skills ?? []) proficientSkills.add(s.toLowerCase());
+  for (const s of character.raceSkillChoices ?? []) proficientSkills.add(s.toLowerCase());
 
   const skills: SkillView[] = ALL_SKILLS.map((name) => {
     const ab = SKILL_TO_ABILITY[name]!;

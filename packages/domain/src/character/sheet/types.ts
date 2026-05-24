@@ -61,6 +61,10 @@ export interface CharacterSnapshot {
   spells?: Record<string, { cantrips: Array<{ slug: string; source: string }>; known: Array<{ slug: string; source: string }>; prepared: Array<{ slug: string; source: string }> }>;
   /** Idiomas elegidos por el jugador para slots `any*` del linaje (raza + subrace). */
   raceLanguageChoices?: string[];
+  /** Skills picked at race step for `skillProficiencies:[{any:N}]` blocks (Variant Human, Half-Elf). */
+  raceSkillChoices?: string[];
+  /** Slug of the feat granted by the race (Variant Human / Custom Lineage). Marker for wizard re-edit. */
+  raceFeatSlug?: string | null;
 }
 
 /**
@@ -73,6 +77,11 @@ export interface RaceSheetData {
   size?: string[];
   /** "Standard" languages otorgados por la raza, ej: ['common', 'elvish']. */
   languageProficiencies?: Array<Record<string, boolean | number>>;
+  /**
+   * Reserved for Batch 6 (`race-skill-prof-grant`): fixed grants like Bugbear Stealth.
+   * NOT consumed by computeCharacterSheet in this batch.
+   */
+  skillProficiencies?: Array<Record<string, boolean | number | { from: string[]; count?: number }>>;
 }
 
 export interface AbilityScoreView {

@@ -558,3 +558,71 @@ describe('sheet: inventory views (1.6c)', () => {
     expect(sheet.currency).toEqual({ cp: 0, sp: 5, ep: 0, gp: 100, pp: 2 });
   });
 });
+
+// ============================================================
+// S-1..S-4: raceSkillChoices merged into proficientSkills
+// ============================================================
+describe('computeCharacterSheet — raceSkillChoices merged into proficientSkills', () => {
+  it('S-1: raceSkillChoices=[perception,stealth], no class skills → both proficient', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Test',
+        raceSkillChoices: ['perception', 'stealth'],
+      },
+    });
+    const perception = sheet.skills.find((s) => s.name === 'perception');
+    const stealth = sheet.skills.find((s) => s.name === 'stealth');
+    expect(perception?.proficient).toBe(true);
+    expect(stealth?.proficient).toBe(true);
+  });
+
+  it('S-2: raceSkillChoices=[perception] + class has perception → proficient once (Set dedup)', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Test',
+        raceSkillChoices: ['perception'],
+        classes: [
+          {
+            slug: 'fighter',
+            source: 'PHB',
+            level: 1,
+            subclass: null,
+            hitDie: 'd10',
+            savingThrows: ['str', 'con'],
+            armorProficiencies: ['light', 'medium', 'heavy', 'shields'],
+            weaponProficiencies: ['simple', 'martial'],
+            toolProficiencies: [],
+            skillChoices: ['perception', 'athletics'],
+          },
+        ],
+      },
+    });
+    const perceptionSkills = sheet.skills.filter((s) => s.name === 'perception');
+    expect(perceptionSkills).toHaveLength(1);
+    expect(perceptionSkills[0]!.proficient).toBe(true);
+  });
+
+  it('S-3: raceSkillChoices=[] → no race skills added', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Test',
+        raceSkillChoices: [],
+      },
+    });
+    // All skills should be non-proficient (no class/bg either)
+    const proficientSkills = sheet.skills.filter((s) => s.proficient);
+    expect(proficientSkills).toHaveLength(0);
+  });
+
+  it('S-4: raceSkillChoices undefined (legacy) → no crash, no race skill added', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Legacy Variant Human',
+        // No raceSkillChoices field at all
+      },
+    });
+    expect(sheet.skills).toHaveLength(18); // all 18 PHB skills
+    const proficientSkills = sheet.skills.filter((s) => s.proficient);
+    expect(proficientSkills).toHaveLength(0);
+  });
+});

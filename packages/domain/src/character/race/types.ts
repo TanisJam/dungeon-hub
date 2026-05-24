@@ -1,4 +1,5 @@
 import type { AbilityKey } from '../stats/types.js';
+import type { FeatValidationIssue, AppliedFeat } from '../feat/types.js';
 
 /**
  * Un bloque del campo `ability` de 5etools. Puede tener:
@@ -35,11 +36,30 @@ export interface LanguageProficiencyBlock {
   [language: string]: boolean | number | undefined;
 }
 
+/**
+ * Bloque del campo `feats` en 5etools races shape.
+ * PHB Variant Human / Custom Lineage (TCE): `[{ any: 1 }]`.
+ */
+export interface RaceFeatBlock {
+  any?: number;
+}
+
+/**
+ * Bloque del campo `skillProficiencies` en 5etools races shape.
+ * Puede ser `{ any: N }` (pick N from all skills) o `{ stealth: true }` (fixed).
+ * Reutilizamos un shape genérico porque es compatible con el BackgroundSkillBlock.
+ */
+export type RaceSkillProficiencyBlock = Record<string, boolean | number>;
+
 export interface RaceCompendiumData {
   slug: string;
   source: string;
   ability?: AbilityBlock[] | null;
   languageProficiencies?: LanguageProficiencyBlock[] | null;
+  /** Presente en Variant Human (subrace shape) y Custom Lineage. `[{any:1}]`. */
+  feats?: RaceFeatBlock[] | null;
+  /** Presente en Variant Human (any:1), Half-Elf (any:2), Custom Lineage (any:1). */
+  skillProficiencies?: RaceSkillProficiencyBlock[] | null;
 }
 
 export interface SubraceCompendiumData {
@@ -50,6 +70,10 @@ export interface SubraceCompendiumData {
   parentSource: string;
   ability?: AbilityBlock[] | null;
   languageProficiencies?: LanguageProficiencyBlock[] | null;
+  /** Presente en Variant Human subrace. `[{any:1}]`. */
+  feats?: RaceFeatBlock[] | null;
+  /** Presente en Variant Human subrace (any:1). */
+  skillProficiencies?: RaceSkillProficiencyBlock[] | null;
 }
 
 export interface AppliedAsi {
@@ -130,6 +154,33 @@ export type RaceValidationIssue =
       /** Idioma elegido aparece dos veces (o ya estaba fijo en la raza). */
       code: 'RACE_LANGUAGE_DUPLICATE';
       language: string;
+    }
+  | {
+      /** La raza/subrace requiere elegir un feat (`feats: [{any:1}]`) y no se proveyó. */
+      code: 'RACE_FEAT_REQUIRED';
+      race: { slug: string; source: string };
+    }
+  | {
+      /** El featChoice falló las validaciones del feat domain. Issues bubbled. */
+      code: 'RACE_FEAT_INVALID';
+      feat: { slug: string; source: string };
+      nested: FeatValidationIssue[];
+    }
+  | {
+      /** La raza requiere N skills pero el user proveyó otro número. */
+      code: 'RACE_SKILL_COUNT_MISMATCH';
+      expectedCount: number;
+      gotCount: number;
+    }
+  | {
+      /** El user picó la misma skill dos veces o picó una skill ya fija en la raza/subrace. */
+      code: 'RACE_SKILL_DUPLICATE';
+      skill: string;
+    }
+  | {
+      /** El user picó una skill que no existe en ALL_SKILLS. */
+      code: 'RACE_SKILL_UNKNOWN';
+      skill: string;
     };
 
 export type RaceValidationResult =
@@ -138,5 +189,9 @@ export type RaceValidationResult =
       appliedAsis: AppliedAsi[];
       usedTashasCustomOrigin: boolean;
       appliedLanguageChoices: string[];
+      /** Set only when the race/subrace had `feats: [{any:N}]` AND the player provided a valid pick. */
+      appliedFeat?: AppliedFeat | null;
+      /** Always set; empty array when the race carries no skill picks. */
+      appliedSkillChoices: string[];
     }
   | { ok: false; issues: RaceValidationIssue[] };
