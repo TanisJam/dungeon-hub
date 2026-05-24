@@ -3,7 +3,8 @@
  * Keyed by `slug|SOURCE` to match the entityKey() convention used in validate.ts
  * for disabledEntities lookups.
  *
- * Source of truth: PHB 2014 (Dwarf p.18, Elf p.21, Halfling p.26, Gnome p.35).
+ * Source of truth: PHB 2014 (Dwarf p.18, Elf p.21, Halfling p.26, Gnome p.35,
+ * Dragonborn p.32–34 — ancestry/draconic ancestry is required per RAW).
  *
  * Tech debt: when reference data migrates to DB+DI (see #513), this set moves
  * alongside STANDARD_LANGUAGES / EXOTIC_LANGUAGES in
@@ -14,6 +15,7 @@ export const RACES_REQUIRING_SUBRACE: ReadonlySet<string> = new Set([
   'elf|PHB',
   'gnome|PHB',
   'halfling|PHB',
+  'dragonborn|PHB', // Batch 3 (race-dragonborn-ancestry) — PHB p.32–34 RAW: ancestry required
 ]);
 
 /**

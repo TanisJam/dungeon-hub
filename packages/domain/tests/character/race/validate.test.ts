@@ -526,11 +526,37 @@ describe('validateRaceSelection — subrace required (PHB gate)', () => {
     expect(res.ok).toBe(true);
   });
 
-  it('V-8: Dragonborn without subrace → not in required set, ok: true', () => {
+  // Batch 3 (race-dragonborn-ancestry): dragonborn|PHB now in gate (PHB p.32-34 RAW).
+  it('V-8 (D-5): Dragonborn without subrace → RACE_SUBRACE_REQUIRED', () => {
     const res = validateRaceSelection({
       raceData: PHB_DRAGONBORN,
       subraceData: null,
       rulesProfile: PROFILE_TASHAS_OFF,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues[0]).toEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'dragonborn', source: 'PHB' },
+    });
+  });
+
+  it('V-8b (D-6): Dragonborn + valid ancestry dragonborn--red → ok: true', () => {
+    const dragonbornRed: SubraceCompendiumData = {
+      slug: 'dragonborn--red',
+      source: 'PHB',
+      parentSlug: 'dragonborn',
+      parentSource: 'PHB',
+    };
+    const res = validateRaceSelection({
+      raceData: PHB_DRAGONBORN,
+      subraceData: dragonbornRed,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      // Dragonborn: STR+2, CHA+1 — fixed, no choose
+      appliedAsis: [
+        { ability: 'str', bonus: 2, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
+      ],
     });
     expect(res.ok).toBe(true);
   });

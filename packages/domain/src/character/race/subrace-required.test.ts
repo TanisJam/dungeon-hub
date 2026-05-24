@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { requiresSubrace } from './subrace-required.js';
+import { requiresSubrace, RACES_REQUIRING_SUBRACE } from './subrace-required.js';
 
 describe('requiresSubrace — PHB required races', () => {
   it('D-1: dwarf PHB → true', () => {
@@ -17,6 +17,15 @@ describe('requiresSubrace — PHB required races', () => {
   it('D-4: halfling PHB → true', () => {
     expect(requiresSubrace({ slug: 'halfling', source: 'PHB' })).toBe(true);
   });
+
+  // NEW: Batch 3 — dragonborn|PHB joins the gate (PHB p.32–34 RAW: ancestry REQUIRED)
+  it('D-B3-1: dragonborn PHB → true (Batch 3 race-dragonborn-ancestry)', () => {
+    expect(requiresSubrace({ slug: 'dragonborn', source: 'PHB' })).toBe(true);
+  });
+
+  it('D-B3-2: RACES_REQUIRING_SUBRACE.size === 5 (dwarf|elf|gnome|halfling|dragonborn)', () => {
+    expect(RACES_REQUIRING_SUBRACE.size).toBe(5);
+  });
 });
 
 describe('requiresSubrace — non-required races', () => {
@@ -24,8 +33,9 @@ describe('requiresSubrace — non-required races', () => {
     expect(requiresSubrace({ slug: 'human', source: 'PHB' })).toBe(false);
   });
 
-  it('D-6: dragonborn PHB → false', () => {
-    expect(requiresSubrace({ slug: 'dragonborn', source: 'PHB' })).toBe(false);
+  // NOTE: dragonborn PHB is now REQUIRED (D-B3-1 above)
+  it('D-6-updated: dragonborn XPHB → false (slug alone is not enough; only PHB in gate)', () => {
+    expect(requiresSubrace({ slug: 'dragonborn', source: 'XPHB' })).toBe(false);
   });
 
   it('D-7: half-elf PHB → false', () => {

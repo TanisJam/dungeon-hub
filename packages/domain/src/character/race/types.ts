@@ -2,6 +2,35 @@ import type { AbilityKey } from '../stats/types.js';
 import type { FeatValidationIssue, AppliedFeat } from '../feat/types.js';
 
 /**
+ * Breath weapon shape variants for Dragonborn draconic ancestry.
+ * PHB p.34 — Draconic Ancestry table.
+ */
+export type BreathWeaponShape = 'line' | 'cone';
+
+/**
+ * Saving throw type for Dragonborn breath weapon.
+ * PHB p.34 — per-ancestry; NOT derivable from damage type (see Decision #562).
+ */
+export type BreathWeaponSavingThrow = 'dex' | 'con';
+
+/**
+ * Raw breath weapon data stored in subrace JSONB (populated by importer).
+ * Synthesized at import time per PHB p.34 Draconic Ancestry table.
+ *
+ * Tech debt per CLAUDE.md §1.2: damageType stored as string (not union) to
+ * accommodate potential future XPHB/FTD expansion. Domain validators can
+ * re-narrow if needed.
+ */
+export interface BreathWeaponData {
+  /** PHB-constrained: 'acid' | 'cold' | 'fire' | 'lightning' | 'poison'. */
+  damageType: string;
+  shape: BreathWeaponShape;
+  /** Display string: '5 ft × 30 ft' (line) or '15 ft' (cone). */
+  size: string;
+  savingThrow: BreathWeaponSavingThrow;
+}
+
+/**
  * Un bloque del campo `ability` de 5etools. Puede tener:
  *   - keys directos (str/dex/...) con bonus → ASIs fijos
  *   - choose: { from, count } → pick N stats, +1 cada uno
@@ -60,6 +89,8 @@ export interface RaceCompendiumData {
   feats?: RaceFeatBlock[] | null;
   /** Presente en Variant Human (any:1), Half-Elf (any:2), Custom Lineage (any:1). */
   skillProficiencies?: RaceSkillProficiencyBlock[] | null;
+  /** Set by importer for PHB Dragonborn synthetic subraces. Race-level for symmetry. */
+  breathWeapon?: BreathWeaponData | null;
 }
 
 export interface SubraceCompendiumData {
@@ -74,6 +105,8 @@ export interface SubraceCompendiumData {
   feats?: RaceFeatBlock[] | null;
   /** Presente en Variant Human subrace (any:1). */
   skillProficiencies?: RaceSkillProficiencyBlock[] | null;
+  /** Set by importer for PHB Dragonborn ancestry rows. PHB p.34. */
+  breathWeapon?: BreathWeaponData | null;
 }
 
 export interface AppliedAsi {
