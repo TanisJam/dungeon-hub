@@ -16,6 +16,7 @@ import {
   type RaceData,
 } from './_parsers';
 import { saveRace } from './actions';
+import { requiresSubrace } from '@dungeon-hub/domain/character/race';
 import { poolFor, titleCase } from '../background/_options';
 import { ChoiceList } from '@/components/wizard/choice-list';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
@@ -117,6 +118,14 @@ export function RacePicker({
     }
     setError(null);
 
+    // Preflight: base race that requires a subrace. Domain is still source of
+    // truth (the API will reject too), but we surface the error inline before
+    // the round-trip so the user gets a fast signal.
+    if (!selected.isSubrace && requiresSubrace({ slug: selected.slug, source: selected.source })) {
+      setError('Elegí un sublinaje para esta raza.');
+      return;
+    }
+
     const racePart = selected.isSubrace && parent
       ? { slug: parent.slug, source: parent.source }
       : { slug: selected.slug, source: selected.source };
@@ -205,8 +214,11 @@ export function RacePicker({
     const speedStr = formatSpeed(e.data.speed);
     const sizeStr = formatSize(e.data.size);
 
-    // Tag pills: ASI summary, size, speed
+    // Tag pills: subrace-required indicator, ASI summary, size, speed
     const pills: ChoiceOption<string>['pills'] = [];
+    if (!e.isSubrace && requiresSubrace({ slug: e.slug, source: e.source })) {
+      pills.push({ tone: 'amber', label: 'requiere sublinaje' });
+    }
     if (asiSummary && asiSummary !== '—') {
       pills.push({ tone: 'amber', label: asiSummary });
     }
@@ -331,6 +343,12 @@ function RaceDetailPanel({
 
   return (
     <div className="space-y-3">
+      {!entry.isSubrace && requiresSubrace({ slug: entry.slug, source: entry.source }) && (
+        <p className="rounded-md border border-accent-soft bg-paper px-2.5 py-1.5 text-xs text-accent-deep">
+          Esta raza requiere un sublinaje. Elegí uno de los sublinajes listados.
+        </p>
+      )}
+
       <p className="text-xs text-ink-mute">
         {size} · Velocidad {speed} · {entry.source}
       </p>
