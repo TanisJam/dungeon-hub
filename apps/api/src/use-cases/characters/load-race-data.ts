@@ -52,6 +52,9 @@ export async function loadRaceAndSubrace(input: {
         breathWeapon: (raceRow.data as { breathWeapon?: unknown }).breathWeapon as
           | RaceCompendiumData['breathWeapon']
           | undefined,
+        darkvision: (raceRow.data as { darkvision?: unknown }).darkvision as
+          | RaceCompendiumData['darkvision']
+          | undefined,
       } as RaceCompendiumData)
     : null;
 
@@ -87,6 +90,9 @@ export async function loadRaceAndSubrace(input: {
           .skillProficiencies as SubraceCompendiumData['skillProficiencies'] | undefined,
         breathWeapon: (subRow.data as { breathWeapon?: unknown }).breathWeapon as
           | SubraceCompendiumData['breathWeapon']
+          | undefined,
+        darkvision: (subRow.data as { darkvision?: unknown }).darkvision as
+          | SubraceCompendiumData['darkvision']
           | undefined,
       } as SubraceCompendiumData;
     }
@@ -127,6 +133,8 @@ export async function loadRaceSheetData(input: {
     languageProficiencies: raceData['languageProficiencies'] as RaceSheetData['languageProficiencies'],
     // Race-level breathWeapon for symmetry (null in 100% of PHB cases today).
     breathWeapon: (raceData['breathWeapon'] as BreathWeaponData | null | undefined) ?? null,
+    // REQ-4: project race-level darkvision. null when field absent OR explicitly null. PHB p.17.
+    darkvision: (raceData['darkvision'] as number | null | undefined) ?? null,
   } as RaceSheetData;
 
   // Merge languageProficiencies and breathWeapon from subrace if it exists.
@@ -159,6 +167,18 @@ export async function loadRaceSheetData(input: {
       const subBreath = subData['breathWeapon'] as BreathWeaponData | null | undefined;
       if (subBreath) {
         result = { ...result, breathWeapon: subBreath };
+      }
+      // REQ-4 + Decision #577: subrace darkvision OVERRIDES race when field is PRESENT (number or null).
+      // Use `'darkvision' in subData` to distinguish "property absent" (inherit race) from
+      // "property present with null" (explicit opt-out drops inherited darkvision). PHB p.24.
+      if ('darkvision' in subData) {
+        const subDV = subData['darkvision'];
+        // Narrow: subDV is number or null per 5etools schema.
+        // Defends against malformed JSONB — defaults to null instead of propagating garbage.
+        result = {
+          ...result,
+          darkvision: typeof subDV === 'number' ? subDV : null,
+        };
       }
     }
   }

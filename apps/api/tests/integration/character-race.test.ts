@@ -911,3 +911,183 @@ describe('Dragonborn ancestry — PHB Batch 3 (race-dragonborn-ancestry)', () =>
     expect(c.data.subrace).toBeNull();
   });
 });
+
+// ============================================================
+// Phase E — Darkvision grant (race-darkvision-grant Batch 4)
+// ============================================================
+
+describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Darkvision Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Darkvision Test Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+
+    // Set base stats + class so sheet computes
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/stats`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        method: 'standard-array',
+        scores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+      },
+    });
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/class`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  // A-1: Dwarf + Hill Dwarf → darkvision 60 ft (standard)
+  it('A-1 (S-11, S-16): GET /sheet Dwarf + Hill Dwarf → darkvision { feet: 60, isSuperior: false }', async () => {
+    // PHB p.20 — Dwarf: Darkvision 60 ft. Hill Dwarf subrace grants no darkvision override.
+    const app = await getTestApp();
+
+    const putRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'dwarf', source: 'PHB' },
+        subrace: { slug: 'dwarf--hill', source: 'PHB' },
+        languageChoices: [],
+      },
+    });
+    if (putRes.statusCode !== 200) throw new Error(`PUT race failed: ${putRes.body}`);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.darkvision).toEqual({ feet: 60, isSuperior: false });
+  });
+
+  // A-2: Elf + Drow → darkvision 120 ft superior (subrace override wins)
+  it('A-2 (S-12, S-18): GET /sheet Elf + Drow → darkvision { feet: 120, isSuperior: true }', async () => {
+    // PHB p.24 — Drow: Superior Darkvision 120 ft (replaces base Elf 60 ft).
+    const app = await getTestApp();
+
+    const putRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--drow', source: 'PHB' },
+        languageChoices: [],
+      },
+    });
+    if (putRes.statusCode !== 200) throw new Error(`PUT race failed: ${putRes.body}`);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.darkvision).toEqual({ feet: 120, isSuperior: true });
+  });
+
+  // A-3: Elf + High Elf → darkvision 60 ft (subrace has no override → race value preserved)
+  it('A-3 (S-13): GET /sheet Elf + High Elf → darkvision { feet: 60, isSuperior: false } (race preserved)', async () => {
+    // PHB p.23 — Elf base: Darkvision 60 ft. High Elf adds no darkvision field in data JSONB.
+    const app = await getTestApp();
+
+    const putRes = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/race`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        race: { slug: 'elf', source: 'PHB' },
+        subrace: { slug: 'elf--high', source: 'PHB' },
+        languageChoices: ['dwarvish'],
+      },
+    });
+    if (putRes.statusCode !== 200) throw new Error(`PUT race failed: ${putRes.body}`);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.darkvision).toEqual({ feet: 60, isSuperior: false });
+  });
+
+  // A-4: Human → darkvision null (PHB Human has no darkvision)
+  it('A-4 (S-14, S-17): GET /sheet Human → darkvision null', async () => {
+    // PHB p.31 — Human: No darkvision trait.
+    // Seed directly to avoid ASI-validation complexity from earlier campaign patches.
+    const app = await getTestApp();
+
+    await db
+      .update(characters)
+      .set({
+        data: {
+          race: { slug: 'human', source: 'PHB' },
+          subrace: null,
+          asisApplied: [
+            { ability: 'str', bonus: 1, source: 'race' },
+            { ability: 'dex', bonus: 1, source: 'race' },
+            { ability: 'con', bonus: 1, source: 'race' },
+            { ability: 'int', bonus: 1, source: 'race' },
+            { ability: 'wis', bonus: 1, source: 'race' },
+            { ability: 'cha', bonus: 1, source: 'race' },
+          ],
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, characterId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.darkvision).toBeNull();
+  });
+});
