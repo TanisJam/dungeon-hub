@@ -58,6 +58,7 @@ import {
   loadAllBackgrounds,
 } from '../../use-cases/characters/load-background-data.js';
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
+import { buildFeatContext } from '../../use-cases/characters/build-feat-context.js';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import { recordSessionEventForCharacter } from '../../use-cases/sessions/events.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
@@ -966,31 +967,22 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
     const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
-    // Sumamos también las ASIs ya aplicadas por feats anteriores para los effective scores
-    const featAsis = existingFeats.flatMap((f) =>
-      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
-    );
-    const effectiveScores = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
-
     const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
-    const armorProficiencies = classes.flatMap((c) => c.armorProficiencies);
-    const weaponProficiencies = classes.flatMap((c) => c.weaponProficiencies);
-    const hasSpellcasting = classes.some((c) => classGrantsSpellcasting(c.slug));
-
     const raceField = charData.race as { slug: string; source: string } | null | undefined;
+
+    const ctx = buildFeatContext({
+      baseStats,
+      racialAsis,
+      existingFeats,
+      classes,
+      race: raceField ?? null,
+    });
 
     const result = validateFeatSelection({
       featData,
       rulesProfile: campaign.rulesProfile,
-      ctx: {
-        effectiveScores,
-        race: raceField ? { slug: raceField.slug } : null,
-        armorProficiencies,
-        weaponProficiencies,
-        hasSpellcasting,
-        existingFeats: existingFeats.map((f) => ({ slug: f.slug, source: f.source })),
-      },
-      asiChoice: body.asiChoice,
+      ctx,
+      ...(body.asiChoice !== undefined ? { asiChoice: body.asiChoice } : {}),
     });
 
     if (!result.ok) {
