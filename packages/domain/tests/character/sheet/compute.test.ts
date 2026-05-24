@@ -626,3 +626,204 @@ describe('computeCharacterSheet — raceSkillChoices merged into proficientSkill
     expect(proficientSkills).toHaveLength(0);
   });
 });
+
+// ── Batch 3: BreathWeaponView computation (race-dragonborn-ancestry) ──────────
+// PHB p.34: saveDC = 8 + CON mod + PB; dice: 2d6(1-5), 3d6(6-10), 4d6(11-15), 5d6(16+)
+
+function makeWizardCharacter(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
+  return {
+    name: 'Dragonborn Test',
+    baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    classes: [
+      {
+        slug: 'wizard',
+        source: 'PHB',
+        level: 1,
+        subclass: null,
+        hitDie: 'd6',
+        savingThrows: ['int', 'wis'],
+        armorProficiencies: [],
+        weaponProficiencies: [],
+        toolProficiencies: [],
+        skillChoices: [],
+      },
+    ],
+    feats: [],
+    ...overrides,
+  };
+}
+
+function makeBreathWeaponRaceData(overrides: {
+  damageType: string;
+  shape: 'line' | 'cone';
+  size: string;
+  savingThrow: 'dex' | 'con';
+}): RaceSheetData {
+  return {
+    speed: 30,
+    size: ['M'],
+    breathWeapon: overrides,
+  };
+}
+
+describe('computeCharacterSheet — BreathWeaponView (PHB p.34)', () => {
+  // S-15: Green Dragonborn, CON 14 (+2 mod), level 1 (PB +2)
+  it('S-1 (S-15): dragonborn--green, CON 14, level 1 → cone/con/poison, DC 12, 2d6', () => {
+    const character = makeWizardCharacter({
+      baseStats: { str: 10, dex: 10, con: 14, int: 10, wis: 10, cha: 10 },
+      race: { slug: 'dragonborn', source: 'PHB' },
+      subrace: { slug: 'dragonborn--green', source: 'PHB' },
+    });
+    const raceData = makeBreathWeaponRaceData({
+      damageType: 'poison',
+      shape: 'cone',
+      size: '15 ft',
+      savingThrow: 'con',
+    });
+
+    const sheet = computeCharacterSheet({ character, raceData });
+
+    expect(sheet.breathWeapon).not.toBeNull();
+    expect(sheet.breathWeapon?.damageType).toBe('poison');
+    expect(sheet.breathWeapon?.shape).toBe('cone');
+    expect(sheet.breathWeapon?.area).toBe('15 ft');
+    expect(sheet.breathWeapon?.savingThrow).toBe('con');
+    expect(sheet.breathWeapon?.saveDC).toBe(12); // 8 + 2 (CON) + 2 (PB)
+    expect(sheet.breathWeapon?.damageDice).toBe('2d6');
+  });
+
+  // S-16: Blue Dragonborn, CON 16 (+3 mod), level 6 (PB +3)
+  it('S-2 (S-16): dragonborn--blue, CON 16, level 6 → line/dex/lightning, DC 14, 3d6', () => {
+    const character = makeWizardCharacter({
+      baseStats: { str: 10, dex: 10, con: 16, int: 10, wis: 10, cha: 10 },
+      race: { slug: 'dragonborn', source: 'PHB' },
+      subrace: { slug: 'dragonborn--blue', source: 'PHB' },
+      classes: [
+        {
+          slug: 'wizard',
+          source: 'PHB',
+          level: 6,
+          subclass: null,
+          hitDie: 'd6',
+          savingThrows: ['int', 'wis'],
+          armorProficiencies: [],
+          weaponProficiencies: [],
+          toolProficiencies: [],
+          skillChoices: [],
+        },
+      ],
+    });
+    const raceData = makeBreathWeaponRaceData({
+      damageType: 'lightning',
+      shape: 'line',
+      size: '5 ft × 30 ft',
+      savingThrow: 'dex',
+    });
+
+    const sheet = computeCharacterSheet({ character, raceData });
+
+    expect(sheet.breathWeapon?.damageType).toBe('lightning');
+    expect(sheet.breathWeapon?.shape).toBe('line');
+    expect(sheet.breathWeapon?.area).toBe('5 ft × 30 ft');
+    expect(sheet.breathWeapon?.savingThrow).toBe('dex');
+    expect(sheet.breathWeapon?.saveDC).toBe(14); // 8 + 3 (CON) + 3 (PB)
+    expect(sheet.breathWeapon?.damageDice).toBe('3d6');
+  });
+
+  // S-17: Level 11 → 4d6 (CON 14, PB 4)
+  it('S-3 (S-17): level 11, CON 14 → 4d6, DC 14', () => {
+    const character = makeWizardCharacter({
+      baseStats: { str: 10, dex: 10, con: 14, int: 10, wis: 10, cha: 10 },
+      race: { slug: 'dragonborn', source: 'PHB' },
+      subrace: { slug: 'dragonborn--red', source: 'PHB' },
+      classes: [
+        {
+          slug: 'wizard',
+          source: 'PHB',
+          level: 11,
+          subclass: null,
+          hitDie: 'd6',
+          savingThrows: ['int', 'wis'],
+          armorProficiencies: [],
+          weaponProficiencies: [],
+          toolProficiencies: [],
+          skillChoices: [],
+        },
+      ],
+    });
+    const raceData = makeBreathWeaponRaceData({
+      damageType: 'fire',
+      shape: 'cone',
+      size: '15 ft',
+      savingThrow: 'dex',
+    });
+
+    const sheet = computeCharacterSheet({ character, raceData });
+
+    expect(sheet.breathWeapon?.damageDice).toBe('4d6');
+    expect(sheet.breathWeapon?.saveDC).toBe(14); // 8 + 2 (CON) + 4 (PB)
+  });
+
+  // S-18: Level 16 → 5d6 (CON 14, PB 5)
+  it('S-4 (S-18): level 16, CON 14 → 5d6, DC 15', () => {
+    const character = makeWizardCharacter({
+      baseStats: { str: 10, dex: 10, con: 14, int: 10, wis: 10, cha: 10 },
+      race: { slug: 'dragonborn', source: 'PHB' },
+      subrace: { slug: 'dragonborn--white', source: 'PHB' },
+      classes: [
+        {
+          slug: 'wizard',
+          source: 'PHB',
+          level: 16,
+          subclass: null,
+          hitDie: 'd6',
+          savingThrows: ['int', 'wis'],
+          armorProficiencies: [],
+          weaponProficiencies: [],
+          toolProficiencies: [],
+          skillChoices: [],
+        },
+      ],
+    });
+    const raceData = makeBreathWeaponRaceData({
+      damageType: 'cold',
+      shape: 'cone',
+      size: '15 ft',
+      savingThrow: 'con',
+    });
+
+    const sheet = computeCharacterSheet({ character, raceData });
+
+    expect(sheet.breathWeapon?.damageDice).toBe('5d6');
+    expect(sheet.breathWeapon?.saveDC).toBe(15); // 8 + 2 (CON) + 5 (PB)
+  });
+
+  // S-19: Non-Dragonborn character → breathWeapon is null
+  it('S-5 (S-19): non-Dragonborn (Hill Dwarf) → breathWeapon is null', () => {
+    const character = makeWizardCharacter({
+      race: { slug: 'dwarf', source: 'PHB' },
+      subrace: { slug: 'dwarf--hill', source: 'PHB' },
+    });
+    // raceData without breathWeapon
+    const raceData: RaceSheetData = { speed: 25, size: ['M'] };
+
+    const sheet = computeCharacterSheet({ character, raceData });
+
+    expect(sheet.breathWeapon).toBeNull();
+  });
+
+  // S-20: Legacy Dragonborn with no subrace → breathWeapon null (read-tolerant)
+  it('S-6 (S-20): legacy Dragonborn (no subrace, raceData.breathWeapon undefined) → null, no throw', () => {
+    const character = makeWizardCharacter({
+      race: { slug: 'dragonborn', source: 'PHB' },
+      subrace: null, // pre-Batch-3 character
+    });
+    // raceData without breathWeapon field
+    const raceData: RaceSheetData = { speed: 30, size: ['M'] };
+
+    expect(() => {
+      const sheet = computeCharacterSheet({ character, raceData });
+      expect(sheet.breathWeapon).toBeNull();
+    }).not.toThrow();
+  });
+});

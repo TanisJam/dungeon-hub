@@ -12,6 +12,8 @@ import {
   type CharacterSnapshot,
   type RaceSheetData,
   type SkillView,
+  type BreathWeaponView,
+  type BreathWeaponData,
 } from './types.js';
 import {
   buildWeightLookup,
@@ -158,6 +160,37 @@ function stripInlineTag(s: string): string {
   return s.replace(/\{@\w+\s+([^|}]+)(?:\|[^}]*?\|([^}]+))?(?:\|[^}]*)?\}/g, (_, first, last) => {
     return (last ?? first).trim();
   });
+}
+
+/**
+ * Computes BreathWeaponView from subrace breathWeapon data + character stats.
+ * PHB p.34 formulas:
+ *   - saveDC = 8 + CON modifier + proficiency bonus
+ *   - damageDice by total level: 2d6 (1-5), 3d6 (6-10), 4d6 (11-15), 5d6 (16+)
+ *   - area mirrors the size field from BreathWeaponData (display-ready string)
+ *
+ * Returns null when data is absent/null (non-Dragonborn or legacy character).
+ */
+function computeBreathWeapon(
+  data: BreathWeaponData | null | undefined,
+  conMod: number,
+  pb: number,
+  totalLevel: number,
+): BreathWeaponView | null {
+  if (!data) return null;
+  let damageDice: string;
+  if (totalLevel >= 16) damageDice = '5d6';
+  else if (totalLevel >= 11) damageDice = '4d6';
+  else if (totalLevel >= 6) damageDice = '3d6';
+  else damageDice = '2d6';
+  return {
+    damageType: data.damageType,
+    shape: data.shape,
+    area: data.size,
+    savingThrow: data.savingThrow,
+    saveDC: 8 + conMod + pb,
+    damageDice,
+  };
 }
 
 interface ComputeInput {
@@ -319,6 +352,9 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };
   const size = raceData?.size?.[0] ?? DEFAULT_SIZE;
 
+  // ---- Breath weapon (Dragonborn ancestries — PHB p.34) -----------------
+  const breathWeapon = computeBreathWeapon(raceData?.breathWeapon, conMod, pb, totalLevel);
+
   // ---- Encumbrance (con o sin variant) ----------------------------------
   const totalCarryWeight = totalWeight(
     character.inventory ?? [],
@@ -381,6 +417,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
       languages: [...languages].sort(),
     },
     feats: (character.feats ?? []).map((f) => ({ slug: f.slug, source: f.source })),
+    breathWeapon,
     spellcasting,
     currency: character.currency ?? { ...EMPTY_CURRENCY },
     encumbrance: encumbranceView,

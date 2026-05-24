@@ -2,7 +2,7 @@ import type { AbilityKey, AbilityScores } from '../stats/types.js';
 import type { AppliedClass } from '../class/types.js';
 import type { AppliedFeat } from '../feat/types.js';
 import type { AppliedBackground } from '../background/types.js';
-import type { AppliedAsi } from '../race/types.js';
+import type { AppliedAsi, BreathWeaponData, BreathWeaponShape, BreathWeaponSavingThrow } from '../race/types.js';
 import type { InventoryItem } from '../inventory/types.js';
 import type { EncumbranceView } from '../inventory/encumbrance.js';
 
@@ -68,6 +68,24 @@ export interface CharacterSnapshot {
 }
 
 /**
+ * Computed breath weapon for the character sheet.
+ * Combines subrace.breathWeapon data with CON modifier + proficiency bonus + total level.
+ * PHB p.34 — Dragonborn breath weapon rules.
+ */
+export interface BreathWeaponView {
+  /** Carried from subrace data (PHB: acid | cold | fire | lightning | poison). */
+  damageType: string;
+  shape: BreathWeaponShape;
+  /** Display: '5 ft × 30 ft' (line) or '15 ft' (cone). */
+  area: string;
+  savingThrow: BreathWeaponSavingThrow;
+  /** 8 + CON mod + proficiency bonus. PHB p.34. */
+  saveDC: number;
+  /** Scaled by character total level: 2d6 (1-5), 3d6 (6-10), 4d6 (11-15), 5d6 (16+). PHB p.34. */
+  damageDice: string;
+}
+
+/**
  * Data de la raza relevante para el sheet (subset del compendio).
  * Lo extrae el caller; el domain validator no toca DB.
  */
@@ -82,7 +100,15 @@ export interface RaceSheetData {
    * NOT consumed by computeCharacterSheet in this batch.
    */
   skillProficiencies?: Array<Record<string, boolean | number | { from: string[]; count?: number }>>;
+  /**
+   * Carried from subrace JSONB by loadRaceSheetData. Consumed by computeCharacterSheet
+   * to compute BreathWeaponView. Null/absent for non-Dragonborn races.
+   */
+  breathWeapon?: BreathWeaponData | null;
 }
+
+// Re-export for convenience (BreathWeaponData is consumed by compute.ts)
+export type { BreathWeaponData };
 
 export interface AbilityScoreView {
   score: number;
@@ -185,6 +211,8 @@ export interface CharacterSheet {
     languages: string[];
   };
   feats: Array<{ slug: string; source: string }>;
+  /** Null for all non-Dragonborn characters and legacy Dragonborn without an ancestry subrace. */
+  breathWeapon: BreathWeaponView | null;
   spellcasting: SpellcastingView[];
   currency: Currency;
   encumbrance: EncumbranceView;
