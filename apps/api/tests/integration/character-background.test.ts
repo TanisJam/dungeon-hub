@@ -660,6 +660,46 @@ describe('PUT /characters/:id/background — Custom Background customization', (
     expect(bg.customization.mixedPool.tools).toEqual(['lute', 'drum']);
   });
 
+  // ── W-02 happy path: equipment kind='package' end-to-end ──────────────────
+
+  it('equipment kind=package (acolyte): persists + GET round-trips with backgroundSlug/Source', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: CUSTOM_BG,
+        skillChoices: BASE_SKILL_CHOICES,
+        languageChoices: [],
+        customization: {
+          mixedPool: { shape: 'lang2', langs: ['draconic', 'elvish'], tools: [] },
+          equipment: { kind: 'package', backgroundSlug: 'acolyte', backgroundSource: 'PHB' },
+          feature: { slug: 'acolyte-shelter-of-the-faithful' },
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const putBg = res.json().data.background;
+    expect(putBg.customization.equipment.kind).toBe('package');
+    expect(putBg.customization.equipment.backgroundSlug).toBe('acolyte');
+    expect(putBg.customization.equipment.backgroundSource).toBe('PHB');
+
+    // Round-trip via GET — must include normalized customization with equipment package intact
+    const getRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBg = getRes.json().data.background;
+    expect(getBg.customization.equipment.kind).toBe('package');
+    expect(getBg.customization.equipment.backgroundSlug).toBe('acolyte');
+    expect(getBg.customization.equipment.backgroundSource).toBe('PHB');
+    expect(getBg.customization.feature.slug).toBe('acolyte-shelter-of-the-faithful');
+  });
+
   // ── Error: missing customization entirely ─────────────────────────────────
 
   it('no customization sent → 400 BACKGROUND_MIXED_POOL_SHAPE_REQUIRED', async () => {

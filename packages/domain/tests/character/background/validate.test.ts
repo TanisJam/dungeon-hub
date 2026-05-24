@@ -925,6 +925,45 @@ describe('validateBackgroundSelection — Custom Background: BACKGROUND_FEATURE_
   });
 });
 
+// W-01 happy-path: equipment.kind='package' validates clean end-to-end.
+// Needs allBackgrounds with both startingEquipment._ (for package lookup) AND
+// data.isFeature entries (for feature slug lookup), so we inline-merge here.
+const ACOLYTE_COMPLETE: BackgroundCompendiumData = {
+  slug: 'acolyte',
+  source: 'PHB',
+  name: 'Acolyte',
+  skillProficiencies: [{ insight: true, religion: true }],
+  languageProficiencies: [{ anyStandard: 2 }],
+  toolProficiencies: null,
+  startingEquipment: [
+    { _: ['a holy symbol', 'a prayer book', '15 gp'] },
+  ],
+  entries: [
+    {
+      name: 'Feature: Shelter of the Faithful',
+      data: { isFeature: true },
+      entries: ['You receive shelter and healing at temples...'],
+    },
+  ],
+};
+
+describe('validateBackgroundSelection — Custom Background: happy path with equipment.kind=package (W-01)', () => {
+  it('passes validation when customization.equipment is a valid package reference', () => {
+    const res = validateBackgroundSelection({
+      backgroundData: CUSTOM_BG_FULL,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      skillChoices: ['perception', 'stealth'],
+      allBackgrounds: [ACOLYTE_COMPLETE],
+      customization: {
+        mixedPool: { shape: 'lang2', langs: ['elvish', 'dwarvish'], tools: [] },
+        equipment: { kind: 'package', backgroundSlug: 'acolyte', backgroundSource: 'PHB' },
+        feature: { slug: 'acolyte-shelter-of-the-faithful' },
+      },
+    });
+    expect(res.ok).toBe(true);
+  });
+});
+
 describe('validateBackgroundSelection — Custom Background: BACKGROUND_FEATURE_UNKNOWN', () => {
   it('emits BACKGROUND_FEATURE_UNKNOWN for unknown feature slug', () => {
     const res = validateBackgroundSelection({
