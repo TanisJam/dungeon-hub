@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { eq } from 'drizzle-orm';
 
 /**
  * Rests — short (hit dice → HP, recovery de pact slots) y long (HP full,
@@ -346,5 +347,387 @@ describe('POST /characters/:id/rest', () => {
       payload: {},
     });
     expect(res2.statusCode).toBe(403);
+  });
+});
+
+// ---- REST-02 Integration Tests -----------------------------------------------
+// REQ-R02-API-LONG-REST-DOWNED, REQ-R02-API-SHORT-REST-RECHARGES-SHORT,
+// REQ-R02-API-LONG-REST-RECHARGES-LONG, REQ-R02-API-LONG-REST-RECHARGES-DAWN
+// Uses synthetic compendium items with source='TEST_REST02' for safe cleanup.
+describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
+  let dm: TestUser;
+  let player: TestUser;
+  let charId: string;
+
+  // Slugs of synthetic items seeded per test. Cleaned up in afterEach.
+  const seededSlugs: string[] = [];
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    dm = await createTestUser();
+    player = await createTestUser();
+
+    const campaignId = (
+      await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${dm.accessToken}` },
+          payload: { name: 'REST-02 Test' },
+        })
+        .then((r) => r.json())
+    ).id;
+
+    const { db } = await import('../../src/infra/db/client.js');
+    const { campaignMembers } = await import('../../src/infra/db/schema.js');
+    await db.insert(campaignMembers).values({ campaignId, userId: player.id, role: 'player' });
+
+    // Fighter L1, CON 10 (mod 0). Simple character for rest tests.
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { campaignId, name: 'RestTestChar' },
+      })
+      .then((r) => r.json());
+    charId = c.id;
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${charId}/stats`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        method: 'standard-array',
+        scores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+      },
+    });
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${charId}/class`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up any synthetic items seeded in this test
+    if (seededSlugs.length > 0) {
+      const { db } = await import('../../src/infra/db/client.js');
+      const { compendiumItems } = await import('../../src/infra/db/schema.js');
+      for (const slug of seededSlugs) {
+        await db
+          .delete(compendiumItems)
+          .where(eq(compendiumItems.slug, slug));
+      }
+      seededSlugs.length = 0;
+    }
+  });
+
+  afterAll(async () => {
+    // Final cleanup: delete all TEST_REST02 items in case any leaked
+    const { db } = await import('../../src/infra/db/client.js');
+    const { compendiumItems } = await import('../../src/infra/db/schema.js');
+    await db.delete(compendiumItems).where(eq(compendiumItems.source, 'TEST_REST02'));
+
+    if (dm) await deleteTestUser(dm.id);
+    if (player) await deleteTestUser(player.id);
+  });
+
+  /**
+   * Seeds a synthetic compendium item with a raw 5etools-style recharge value
+   * and a known charges count. source='TEST_REST02' for safe cleanup.
+   *
+   * @param slug - Unique slug for the item
+   * @param rawRecharge - Raw 5etools recharge string (e.g. 'restLong', 'restShort', 'dawn')
+   * @param maxCharges - Max charges for the item
+   */
+  async function seedItemWithRecharge(
+    slug: string,
+    rawRecharge: string,
+    maxCharges: number,
+  ): Promise<void> {
+    const { db } = await import('../../src/infra/db/client.js');
+    const { compendiumItems } = await import('../../src/infra/db/schema.js');
+    await db.insert(compendiumItems).values({
+      slug,
+      source: 'TEST_REST02',
+      name: `Test Item (${slug})`,
+      type: 'WD',
+      data: { recharge: rawRecharge, charges: maxCharges },
+    });
+    seededSlugs.push(slug);
+  }
+
+  /**
+   * Sets the character's inventory to contain a single item instance with the
+   * specified charges. Uses PATCH /characters/:id directly via DB.
+   */
+  async function patchInventoryWithItem(
+    slug: string,
+    charges: number,
+    maxCharges: number,
+  ): Promise<void> {
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    await db
+      .update(characters)
+      .set({
+        inventory: [
+          {
+            instanceId: 'test-rest02-instance-001',
+            itemSlug: slug,
+            itemSource: 'TEST_REST02',
+            quantity: 1,
+            charges,
+            equipped: false,
+            attuned: false,
+            notes: null,
+            containerId: null,
+          },
+        ],
+      })
+      .where(eq(characters.id, charId));
+  }
+
+  // ---- REQ-R02-API-LONG-REST-DOWNED ----------------------------------------
+
+  it('R-02: long rest with hp=0 → 400 VALIDATION_FAILED LONG_REST_DOWNED', async () => {
+    const app = await getTestApp();
+
+    // Set character HP to 0 (downed)
+    const charPre = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        data: {
+          ...charPre.data,
+          hp: { current: 0, max: 10, temp: 0 },
+        },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/long`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-LONG-REST-DOWNED
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    expect(body.issues).toHaveLength(1);
+    expect(body.issues[0]).toEqual({ code: 'LONG_REST_DOWNED', expected: 1, got: 0 });
+
+    // Verify DB unchanged (HP still 0)
+    const charAfter = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(charAfter.data.hp.current).toBe(0);
+
+    // Restore HP for subsequent tests
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { data: { ...charAfter.data, hp: { current: 10, max: 10, temp: 0 } } },
+    });
+  });
+
+  // ---- REQ-R02-API-LONG-REST-1HP -------------------------------------------
+
+  it('R-02: long rest with hp=1 (boundary) → 200', async () => {
+    const app = await getTestApp();
+
+    const charPre = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { data: { ...charPre.data, hp: { current: 1, max: 10, temp: 0 } } },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/long`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-LONG-REST-1HP: exactly 1 HP is eligible
+    expect(res.statusCode).toBe(200);
+  });
+
+  // ---- REQ-R02-API-LONG-REST-RECHARGES-LONG --------------------------------
+
+  it('R-06: long rest recharges items with recharge=restLong (→ long)', async () => {
+    const app = await getTestApp();
+
+    // Seed synthetic item with 5etools recharge='restLong'
+    // extractRecharge maps it to 'long'; rechargeInventoryItems(trigger:'long') fires.
+    await seedItemWithRecharge('test-rest02-long-item', 'restLong', 5);
+    await patchInventoryWithItem('test-rest02-long-item', 0, 5);
+
+    // Ensure character has HP > 0
+    const charPre = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { data: { ...charPre.data, hp: { current: 5, max: 10, temp: 0 } } },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/long`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-LONG-REST-RECHARGES-LONG
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.longRest.itemsRecharged).toHaveLength(1);
+    expect(body.longRest.itemsRecharged[0]).toMatchObject({ instanceId: 'test-rest02-instance-001', to: 5 });
+
+    // Verify DB inventory updated
+    const charAfter = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    const item = (charAfter.inventory as Array<{ itemSlug: string; charges: number }>).find(
+      (i) => i.itemSlug === 'test-rest02-long-item',
+    );
+    expect(item?.charges).toBe(5);
+  });
+
+  // ---- REQ-R02-API-LONG-REST-RECHARGES-DAWN --------------------------------
+
+  it('R-06 regression: long rest still recharges items with recharge=dawn', async () => {
+    const app = await getTestApp();
+
+    // Seed synthetic item with 5etools recharge='dawn' (direct domain value pass-through)
+    await seedItemWithRecharge('test-rest02-dawn-item', 'dawn', 7);
+    await patchInventoryWithItem('test-rest02-dawn-item', 2, 7);
+
+    const charPre = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { data: { ...charPre.data, hp: { current: 5, max: 10, temp: 0 } } },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/long`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-LONG-REST-RECHARGES-DAWN — dawn items still recharged on long rest
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.longRest.itemsRecharged).toHaveLength(1);
+    expect(body.longRest.itemsRecharged[0]).toMatchObject({ instanceId: 'test-rest02-instance-001', to: 7 });
+  });
+
+  // ---- REQ-R02-API-SHORT-REST-RECHARGES-SHORT ------------------------------
+
+  it('R-05: short rest recharges items with recharge=restShort (→ short)', async () => {
+    const app = await getTestApp();
+
+    // Seed synthetic item with 5etools recharge='restShort'
+    // extractRecharge maps it to 'short'; rechargeInventoryItems(trigger:'short') fires.
+    await seedItemWithRecharge('test-rest02-short-item', 'restShort', 3);
+    await patchInventoryWithItem('test-rest02-short-item', 0, 3);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/short`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-SHORT-REST-RECHARGES-SHORT
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.shortRest.itemsRecharged).toHaveLength(1);
+    expect(body.shortRest.itemsRecharged[0]).toMatchObject({ instanceId: 'test-rest02-instance-001', to: 3 });
+
+    // REQ-R02-API-SHORT-REST-PERSISTS-INVENTORY: inventory column written to DB
+    const charAfter = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    const item = (charAfter.inventory as Array<{ itemSlug: string; charges: number }>).find(
+      (i) => i.itemSlug === 'test-rest02-short-item',
+    );
+    expect(item?.charges).toBe(3);
+  });
+
+  // ---- REQ-R02-API-SHORT-REST-PERSISTS-INVENTORY (empty inventory no-op) ----
+
+  it('R-05: short rest with empty inventory → 200, no error', async () => {
+    const app = await getTestApp();
+
+    // Clear inventory via DB
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    await db.update(characters).set({ inventory: [] }).where(eq(characters.id, charId));
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/short`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {},
+    });
+
+    // REQ-R02-API-SHORT-REST-PERSISTS-INVENTORY: empty-inventory no error
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.shortRest.itemsRecharged).toHaveLength(0);
   });
 });

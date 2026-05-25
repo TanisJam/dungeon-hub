@@ -23,11 +23,31 @@ function extractCharges(data: unknown): number | null {
   return Math.floor(c);
 }
 
+/**
+ * Maps raw 5etools `recharge` strings to domain Recharge values.
+ *
+ * PHB p.141 / 5etools alignment:
+ * - `"restLong"` → `'long'`  (5etools value for "recharges on long rest")
+ * - `"restShort"` → `'short'` (defensive; mirrors restLong — not in PHB data today)
+ * - `"dawn"` → `'dawn'`      (pass-through, already a domain value)
+ *
+ * Unknown values pass through unchanged — the domain `recharge` field
+ * permits `string | null` as an escape hatch for future/custom values.
+ * REQ-R02-EXTRACT-RECHARGE-UNKNOWN.
+ *
+ * Exported for unit testing.
+ */
+export const RECHARGE_5ETOOLS_MAP: Record<string, string> = {
+  dawn: 'dawn',
+  restLong: 'long',
+  restShort: 'short', // defensive; parallels restLong; not in PHB data today
+};
+
 function extractRecharge(data: unknown): string | null {
   if (data == null || typeof data !== 'object') return null;
   const r = (data as Record<string, unknown>)['recharge'];
   if (typeof r !== 'string' || r.length === 0) return null;
-  return r;
+  return RECHARGE_5ETOOLS_MAP[r] ?? r;
 }
 
 /**

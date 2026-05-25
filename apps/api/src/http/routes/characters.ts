@@ -22,6 +22,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@dungeon-hub/domain/character/inventory';
+import { validateLongRestEligibility } from '@dungeon-hub/domain/character/rest';
 import {
   SPELLCASTING_ABILITY,
   validateClassSpells,
@@ -2022,9 +2023,26 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       warlockSlotsUsed: 0,
     };
 
+    // Inventory recharge — PHB p.141: items with recharge='short' regain charges
+    // at the end of a short rest. Mirror the long-rest inventory block (R02-D-05).
+    const shortRestInventory = (character.inventory as InventoryItem[] | null) ?? [];
+    const shortRestInventoryRefs = shortRestInventory.map((it) => ({
+      slug: it.itemSlug,
+      source: it.itemSource,
+    }));
+    const shortRestWeights =
+      shortRestInventoryRefs.length === 0
+        ? []
+        : await loadItemDataMany(shortRestInventoryRefs);
+    const shortRechargeResult = rechargeInventoryItems({
+      inventory: shortRestInventory,
+      weights: shortRestWeights,
+      trigger: 'short',
+    });
+
     const [updated] = await db
       .update(characters)
-      .set({ data: nextData, updatedAt: new Date() })
+      .set({ data: nextData, inventory: shortRechargeResult.inventory, updatedAt: new Date() })
       .where(eq(characters.id, id))
       .returning();
 
@@ -2038,6 +2056,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         hpBefore: existingHp.current - hpRecovered,
         hpAfter: newCurrent,
         rollsUsed,
+        itemsRecharged: shortRechargeResult.recharged,
       },
     });
 
@@ -2047,6 +2066,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         hpRecovered,
         rollsUsed,
         newHp,
+        itemsRecharged: shortRechargeResult.recharged,
       },
     };
   });
@@ -2068,6 +2088,17 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
+
+    // PHB p.186 — "A character must have at least 1 hit point at the start of
+    // the rest to gain its benefits." Gate runs after 404/403 to avoid leaking
+    // existence info to non-owners (R02-D-06).
+    const currentHp =
+      (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined)?.current ?? null;
+    const eligibility = validateLongRestEligibility(currentHp);
+    if (!eligibility.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: eligibility.issues });
+    }
+
     const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
     // CON mod para auto-init de HP si falta.
@@ -2135,7 +2166,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const newHp = { current: max, max, temp: 0 };
 
-    // Inventory recharge — items con compendium.recharge='dawn' vuelven al máximo.
+    // Inventory recharge — PHB p.141: items con recharge='long' o 'dawn' vuelven
+    // al máximo en un long rest. trigger='long' incluye 'dawn' por R-04 DOC deferral
+    // (dawn items son long-rest-equivalent hasta que se implemente el campaign clock).
     const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
     const inventoryRefs = existingInventory.map((it) => ({
       slug: it.itemSlug,
@@ -2146,6 +2179,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const rechargeResult = rechargeInventoryItems({
       inventory: existingInventory,
       weights: inventoryWeights,
+      trigger: 'long',
     });
 
     const nextData = {
