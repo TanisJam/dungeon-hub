@@ -8,15 +8,18 @@
  * Returns null when traits is empty — no card rendered for legacy characters.
  * Mobile-first (375px primary). No client-side interactivity needed for v1.
  *
- * 5etools {@...} tokens preserved raw — render-time parsing is a future web concern.
+ * 5etools {@...} tokens in trait.text are rendered via the shared InlineRenderer
+ * (apps/web/components/compendium/inline.tsx) which dispatches to TAG_REGISTRY
+ * for spell/skill/dice/damage/condition/etc.
  *
  * PHB 2014: racial traits sourced from race/subrace entries arrays.
  * Decision #628: blocklist applied in domain (Age/Size/Speed/Languages/Darkvision/Alignment excluded).
- * Decision #630: heading "Rasgos raciales", source order preserved, tokens raw.
+ * Decision #630: heading "Rasgos raciales", source order preserved, tokens raw at domain layer.
  * Batch 8 — race-traits-on-sheet.
  */
 import { Card } from '@/components/ui';
 import { Pill } from '@/components/ui';
+import { InlineRenderer } from '@/components/compendium/inline';
 import type { RacialTrait } from '@/lib/sheet-types';
 
 interface RacialTraitsBlockProps {
@@ -58,10 +61,12 @@ function TraitRow({ trait }: TraitRowProps) {
         )}
       </div>
 
-      {/* Text body — whitespace-pre-wrap so \n\n produces visible paragraph breaks */}
+      {/* Text body — whitespace-pre-wrap so \n\n produces visible paragraph breaks.
+          InlineRenderer parses 5etools {@spell ...}, {@dice ...}, {@condition ...} tokens
+          and renders each via TAG_REGISTRY. Unknown tags fall through to UnknownTag so prose
+          stays readable if a new tag appears upstream before its handler is added. */}
       <p className="text-xs text-ink-soft whitespace-pre-wrap leading-relaxed">
-        {/* 5etools {@...} tokens preserved raw — render-time parsing is a future web concern. */}
-        {trait.text}
+        <InlineRenderer text={trait.text} />
       </p>
     </div>
   );

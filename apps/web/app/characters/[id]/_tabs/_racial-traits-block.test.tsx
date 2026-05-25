@@ -111,3 +111,50 @@ describe('Multi-paragraph text: \\n\\n separator produces visible breaks', () =>
     expect(screen.getByText(/When you roll a 1 on the d20/i)).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 5etools tokens: {@spell ...}, {@dice ...}, {@condition ...} render via InlineRenderer
+// (deuda menor follow-up — previously these were shown raw)
+// ---------------------------------------------------------------------------
+describe('5etools tokens: parsed and rendered by InlineRenderer', () => {
+  it('renders the display text of {@spell ...} tokens instead of the raw token', () => {
+    const traits: RacialTrait[] = [
+      {
+        name: 'Cantrip',
+        text: 'You know one cantrip of your choice from the wizard spell list, such as {@spell fire bolt}.',
+        source: 'subrace',
+      },
+    ];
+    render(<RacialTraitsBlock traits={traits} />);
+    // The raw token must NOT appear verbatim
+    expect(screen.queryByText(/\{@spell/)).toBeNull();
+    // The display text "fire bolt" must appear somewhere in the rendered output
+    expect(screen.getByText(/fire bolt/i)).toBeTruthy();
+  });
+
+  it('renders {@dice ...} display text', () => {
+    const traits: RacialTrait[] = [
+      {
+        name: 'Breath Weapon',
+        text: 'You exhale destructive energy dealing {@dice 2d6} damage.',
+        source: 'race',
+      },
+    ];
+    render(<RacialTraitsBlock traits={traits} />);
+    expect(screen.queryByText(/\{@dice/)).toBeNull();
+    expect(screen.getByText(/2d6/)).toBeTruthy();
+  });
+
+  it('renders {@condition ...} display text', () => {
+    const traits: RacialTrait[] = [
+      {
+        name: 'Fey Ancestry',
+        text: 'You have advantage on saving throws against being {@condition charmed}, and magic can\'t put you to sleep.',
+        source: 'race',
+      },
+    ];
+    render(<RacialTraitsBlock traits={traits} />);
+    expect(screen.queryByText(/\{@condition/)).toBeNull();
+    expect(screen.getByText(/charmed/i)).toBeTruthy();
+  });
+});
