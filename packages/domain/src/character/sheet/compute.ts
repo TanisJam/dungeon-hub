@@ -553,7 +553,22 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     classFeatures: character.classFeatures ?? {},
     spellSlots: ((): SpellSlotsView => {
       const r = computeSpellSlots(classes);
-      return { slots: r.slots, pactMagic: r.pactMagic };
+      // SP-05: thread persisted usage counts from CharacterSnapshot.
+      // Read-path tolerance: default to zeros for pre-SP-05 characters.
+      const rawUsed = character.spellSlotsUsed;
+      const slotsUsed: [number, number, number, number, number, number, number, number, number] = [
+        rawUsed?.[0] ?? 0,
+        rawUsed?.[1] ?? 0,
+        rawUsed?.[2] ?? 0,
+        rawUsed?.[3] ?? 0,
+        rawUsed?.[4] ?? 0,
+        rawUsed?.[5] ?? 0,
+        rawUsed?.[6] ?? 0,
+        rawUsed?.[7] ?? 0,
+        rawUsed?.[8] ?? 0,
+      ];
+      const pactSlotsUsed = character.warlockSlotsUsed ?? 0;
+      return { slots: r.slots, pactMagic: r.pactMagic, slotsUsed, pactSlotsUsed };
     })(),
     spellsByClass: classes.flatMap((c): ClassSpellSummary[] => {
       const ability = SPELLCASTING_ABILITY[c.slug];

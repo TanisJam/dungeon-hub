@@ -108,6 +108,16 @@ export interface CharacterSnapshot {
   raceFeatSlug?: string | null;
   /** Wizard cantrip chosen for High Elf race step. Decision #606. Null when not yet chosen. */
   raceCantrip?: { slug: string; source: string } | null;
+  /**
+   * Regular spell slots used per level (SP-05). Length 9, index 0 = level 1.
+   * Absent for pre-SP-05 characters — defaults to [0×9] in computeCharacterSheet.
+   */
+  spellSlotsUsed?: readonly number[];
+  /**
+   * Warlock pact slots used (SP-05). Scalar (single slot level per warlock level).
+   * Absent for pre-SP-05 characters — defaults to 0 in computeCharacterSheet.
+   */
+  warlockSlotsUsed?: number;
 }
 
 /**
@@ -245,10 +255,20 @@ export interface ExhaustionView {
 }
 
 export interface SpellSlotsView {
-  /** 9 valores correspondientes a 1st..9th level slots. */
+  /** 9 valores correspondientes a 1st..9th level slots (MAX). */
   slots: readonly [number, number, number, number, number, number, number, number, number];
   /** Pact magic separado (Warlock). */
   pactMagic: { slotLevel: number; slotCount: number } | null;
+  /**
+   * Slots usados por nivel (SP-05). Siempre presente, defaults a [0×9].
+   * exactOptionalPropertyTypes: never optional.
+   */
+  slotsUsed: readonly [number, number, number, number, number, number, number, number, number];
+  /**
+   * Pact slots usados (SP-05). Siempre presente, defaults a 0.
+   * exactOptionalPropertyTypes: never optional.
+   */
+  pactSlotsUsed: number;
 }
 
 export interface SpellSheetRef {
@@ -260,8 +280,8 @@ export interface SpellSheetRef {
   ritual: boolean;
   concentration: boolean;
   componentsM: boolean;
-  /** gp cost when material component is costly; null otherwise */
-  componentsMCost: string | null;
+  /** gp cost in gp when material component is costly; null otherwise */
+  componentsMCost: number | null;
 }
 
 export interface ClassSpellSummary {

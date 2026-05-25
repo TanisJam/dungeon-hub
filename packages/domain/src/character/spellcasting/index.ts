@@ -1,5 +1,6 @@
 export * from './types.js';
 export { computeSpellSlots } from './compute.js';
+export { consumeSpellSlot } from './consume.js';
 export { classifyCaster, casterContribution } from './caster-type.js';
 export {
   FULL_CASTER_TABLE,
