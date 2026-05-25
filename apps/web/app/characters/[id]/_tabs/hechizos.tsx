@@ -2,7 +2,7 @@ import type { CharacterSheet, SpellcastingView, ClassSpellSummary, SpellSheetRef
 import { Card } from '@/components/ui';
 import { RacialSpellsBlock } from './_racial-spells-block';
 import { SpellBadges } from '@/app/_components/spells/badges';
-import { SlotGrid, PactSlotGrid, ShortRestButton } from './_slot-grid';
+import { SlotGrid, PactSlotGrid } from './_slot-grid';
 
 const ABILITY_ES: Record<string, string> = {
   str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
@@ -170,48 +170,58 @@ export function HechizosTab({ sheet, charId }: HechizosTabProps) {
           />
         ))}
 
-      {/* Spell slots (SP-05: tap-to-consume bubbles) */}
-      {slots && (
+      {/* Spell slots (SP-05). Short/Long rest live at the sheet header
+          (_rest-actions.tsx) since they affect HP + hit dice + class resources
+          beyond hechizos — transversal action, not tab-scoped. */}
+      {(slots || pact) && (
         <Card variant="surface" className="p-4">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
             Espacios de Hechizo
           </p>
-          <div className="space-y-3">
-            {slots.map((count, idx) =>
-              count > 0 ? (
-                <div key={idx}>
-                  <p className="mb-1 text-[9px] font-bold text-ink-mute">Nv {idx + 1}</p>
-                  <SlotGrid
-                    charId={charId}
-                    level={idx + 1}
-                    max={count}
-                    used={slotsUsed[idx] ?? 0}
-                  />
-                </div>
-              ) : null,
-            )}
-          </div>
-        </Card>
-      )}
 
-      {/* Pact magic (SP-05): ShortRestButton above, PactSlotGrid inside */}
-      {pact && (
-        <Card variant="surface" className="p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-              Magia de Pacto
-            </p>
-            <ShortRestButton charId={charId} />
-          </div>
-          <div className="border-l-2 border-purple-400 pl-3">
-            <p className="mb-1 text-[9px] font-bold text-ink-mute">Nv {pact.slotLevel}</p>
-            <PactSlotGrid
-              charId={charId}
-              pactLevel={pact.slotLevel}
-              max={pact.slotCount}
-              used={pactSlotsUsed}
-            />
-          </div>
+          {slots && (
+            <div className="space-y-4">
+              {slots.map((count, idx) =>
+                count > 0 ? (
+                  <div key={idx}>
+                    <div className="mb-1.5 flex items-baseline justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+                        Nivel {idx + 1}
+                      </span>
+                      <span className="text-xs font-medium tabular-nums text-ink-mute">
+                        {count - (slotsUsed[idx] ?? 0)}/{count}
+                      </span>
+                    </div>
+                    <SlotGrid
+                      charId={charId}
+                      level={idx + 1}
+                      max={count}
+                      used={slotsUsed[idx] ?? 0}
+                    />
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
+
+          {pact && (
+            <div className={slots ? 'mt-5 border-t border-line pt-4' : ''}>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-purple-700">
+                  Magia de Pacto · Nivel {pact.slotLevel}
+                </span>
+                <span className="text-xs font-medium tabular-nums text-ink-mute">
+                  {pact.slotCount - pactSlotsUsed}/{pact.slotCount}
+                </span>
+              </div>
+              <PactSlotGrid
+                charId={charId}
+                pactLevel={pact.slotLevel}
+                max={pact.slotCount}
+                used={pactSlotsUsed}
+              />
+            </div>
+          )}
         </Card>
       )}
     </div>

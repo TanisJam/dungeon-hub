@@ -1,6 +1,9 @@
 /**
- * Component tests for SlotGrid, PactSlotGrid, ShortRestButton (SP-05).
- * REQ-SP05-UX-CONSUME, REQ-SP05-UX-BUBBLE-STATE, REQ-SP05-UX-SHORT-REST.
+ * Component tests for SlotGrid + PactSlotGrid (SP-05).
+ * REQ-SP05-UX-CONSUME, REQ-SP05-UX-BUBBLE-STATE.
+ *
+ * Rest buttons (short/long) are tested in _rest-actions.test.tsx — they live at
+ * the sheet header, not in the hechizos tab.
  *
  * PHB p.201 — tapping filled bubble consumes a slot.
  * PHB p.107 — pact slot uses separate pool.
@@ -8,12 +11,11 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SlotGrid, PactSlotGrid, ShortRestButton } from './_slot-grid';
+import { SlotGrid, PactSlotGrid } from './_slot-grid';
 
 // Mock the server actions — they are async and we only want to verify they're called.
 vi.mock('../actions', () => ({
   useSpellSlot: vi.fn().mockResolvedValue({ ok: true }),
-  shortRest: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 // Import after mock to get the mocked versions.
@@ -81,19 +83,3 @@ describe('PactSlotGrid', () => {
   });
 });
 
-// ── ShortRestButton ───────────────────────────────────────────────────────────
-
-describe('ShortRestButton', () => {
-  it('clicking button calls shortRest with charId', async () => {
-    const { shortRest } = await import('../actions');
-    render(<ShortRestButton charId="char-789" />);
-
-    const button = screen.getByRole('button');
-    expect(button.textContent).toContain('Descanso Corto');
-    fireEvent.click(button);
-
-    await vi.waitFor(() => {
-      expect(shortRest).toHaveBeenCalledWith('char-789');
-    });
-  });
-});

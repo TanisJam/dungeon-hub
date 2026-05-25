@@ -308,13 +308,13 @@ describe('REQ-SP05-UX-CONSUME: HechizosTab renders SlotGrid when slots > 0', () 
 
     render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     // Level label should be visible
-    expect(screen.getByText('Nv 1')).toBeTruthy();
-    // Two slot bubbles rendered
+    expect(screen.getByText('Nivel 1')).toBeTruthy();
+    // Two slot bubbles rendered (plus ShortRestButton)
     const buttons = screen.getAllByRole('button');
     expect(buttons.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders ShortRestButton and PactSlotGrid when pactMagic !== null', () => {
+  it('renders PactSlotGrid when pactMagic !== null', () => {
     const sheet = makeSheet([makeClericSummary()]);
     sheet.spellSlots = {
       slots: [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -324,10 +324,24 @@ describe('REQ-SP05-UX-CONSUME: HechizosTab renders SlotGrid when slots > 0', () 
     };
 
     render(<HechizosTab sheet={sheet} charId="test-char-id" />);
-    expect(screen.getByText('Descanso Corto')).toBeTruthy();
-    // Pact bubbles rendered
+    // 2 pact bubbles rendered
     const buttons = screen.getAllByRole('button');
-    // 2 pact bubbles + 1 short rest button = 3 buttons minimum
-    expect(buttons.length).toBeGreaterThanOrEqual(3);
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
+    // Rest buttons no longer live in this tab — they're at the sheet header.
+    expect(screen.queryByText('Descanso Corto')).toBeNull();
+  });
+
+  it('shows per-level availability counter "X/Y" next to slot bubbles', () => {
+    const sheet = makeSheet([makeClericSummary()]);
+    sheet.spellSlots = {
+      slots: [2, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactMagic: null,
+      slotsUsed: [1, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactSlotsUsed: 0,
+    };
+
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
+    // 1 used, 1 available out of 2 at level 1 → "1/2"
+    expect(screen.getByText('1/2')).toBeTruthy();
   });
 });

@@ -6,7 +6,7 @@
  * PHB p.201 — expend a spell slot. PHB p.107 — pact magic: separate pool.
  */
 import { useTransition } from 'react';
-import { useSpellSlot, shortRest } from '../actions';
+import { useSpellSlot } from '../actions';
 
 // ── SlotGrid ─────────────────────────────────────────────────────────────────
 
@@ -40,25 +40,33 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-6 gap-1 md:grid-cols-9">
+    <div className="flex flex-wrap gap-1">
       {Array.from({ length: max }, (_, i) => {
         const isFilled = i < max - used;
         return (
-          <div key={i} className="p-1">
-            <button
-              type="button"
-              aria-label={isFilled ? `Gastar slot nivel ${level}` : `Slot nivel ${level} gastado`}
-              disabled={!isFilled || isPending}
-              onClick={() => handleTap(i)}
+          <button
+            key={i}
+            type="button"
+            aria-label={isFilled ? `Gastar slot nivel ${level}` : `Slot nivel ${level} gastado`}
+            disabled={!isFilled || isPending}
+            onClick={() => handleTap(i)}
+            className={[
+              'inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors',
+              isFilled ? 'cursor-pointer hover:bg-amber-100/60 active:bg-amber-100' : 'cursor-default',
+              isPending && 'opacity-60 cursor-wait',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <span
               className={[
-                'w-10 h-10 rounded-full transition-opacity',
+                'block h-6 w-6 rounded-full border-2 transition-colors',
                 isFilled
-                  ? 'bg-amber-400 hover:bg-amber-500'
-                  : 'bg-transparent border border-zinc-600',
-                !isFilled || isPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                  ? 'border-amber-500 bg-amber-400'
+                  : 'border-amber-300/50 bg-transparent',
               ].join(' ')}
             />
-          </div>
+          </button>
         );
       })}
     </div>
@@ -94,60 +102,36 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
   }
 
   return (
-    <div className="grid grid-cols-6 gap-1 md:grid-cols-9">
+    <div className="flex flex-wrap gap-1">
       {Array.from({ length: max }, (_, i) => {
         const isFilled = i < max - used;
         return (
-          <div key={i} className="p-1">
-            <button
-              type="button"
-              aria-label={isFilled ? `Gastar slot de pacto nivel ${pactLevel}` : `Slot de pacto nivel ${pactLevel} gastado`}
-              disabled={!isFilled || isPending}
-              onClick={() => handleTap(i)}
+          <button
+            key={i}
+            type="button"
+            aria-label={isFilled ? `Gastar slot de pacto nivel ${pactLevel}` : `Slot de pacto nivel ${pactLevel} gastado`}
+            disabled={!isFilled || isPending}
+            onClick={() => handleTap(i)}
+            className={[
+              'inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors',
+              isFilled ? 'cursor-pointer hover:bg-purple-100/60 active:bg-purple-100' : 'cursor-default',
+              isPending && 'opacity-60 cursor-wait',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <span
               className={[
-                'w-10 h-10 rounded-full transition-opacity',
+                'block h-6 w-6 rounded-full border-2 transition-colors',
                 isFilled
-                  ? 'bg-purple-500 hover:bg-purple-600'
-                  : 'bg-transparent border border-purple-400',
-                !isFilled || isPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                  ? 'border-purple-600 bg-purple-500'
+                  : 'border-purple-300/50 bg-transparent',
               ].join(' ')}
             />
-          </div>
+          </button>
         );
       })}
     </div>
   );
 }
 
-// ── ShortRestButton ───────────────────────────────────────────────────────────
-
-interface ShortRestButtonProps {
-  charId: string;
-}
-
-/**
- * "Descanso Corto" button that calls POST /rest/short.
- * PHB p.107 — short rest resets warlock pact slots.
- * PHB p.186 — short rest does NOT reset regular spell slots.
- */
-export function ShortRestButton({ charId }: ShortRestButtonProps) {
-  const [isPending, startTransition] = useTransition();
-
-  function handleClick() {
-    if (isPending) return;
-    startTransition(async () => {
-      await shortRest(charId);
-    });
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isPending}
-      className="w-full md:w-auto rounded-lg bg-paper-soft px-4 py-2 text-sm font-medium text-ink hover:bg-paper-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-    >
-      {isPending ? 'Descansando…' : 'Descanso Corto'}
-    </button>
-  );
-}

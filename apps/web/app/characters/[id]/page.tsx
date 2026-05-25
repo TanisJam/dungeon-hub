@@ -15,6 +15,7 @@ import { HechizosTab } from './_tabs/hechizos';
 import { InventarioTab } from './_tabs/inventario';
 import { NotasTab } from './_tabs/notas';
 import { DeleteCharacterButton } from './_delete-button';
+import { RestActions } from './_rest-actions';
 
 const VALID_TABS = ['resumen', 'habilidades', 'hechizos', 'inventario', 'notas'] as const;
 
@@ -129,6 +130,8 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           armorFormula={sheet.armorClass.formula}
           walkSpeed={sheet.speed.walk}
         />
+
+        <RestActions charId={id} />
 
         <SheetTabs activeTab={tab} characterId={id} />
 

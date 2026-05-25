@@ -45,6 +45,34 @@ export async function useSpellSlot(
 }
 
 /**
+ * Perform a long rest for the character.
+ * PHB p.186 — restores HP to max, half of total hit dice, and all expended spell slots
+ * (except warlock pact slots, which recover on short rest).
+ */
+export async function longRest(characterId: string): Promise<SlotActionState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(`/characters/${characterId}/rest/long`, {}, session.access_token);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/**
  * Perform a short rest for the character.
  * PHB p.186 + p.107 — restores warlock pact slots; does NOT restore regular spell slots.
  */
