@@ -251,6 +251,19 @@ export interface SpellSlotsView {
   pactMagic: { slotLevel: number; slotCount: number } | null;
 }
 
+export interface SpellSheetRef {
+  slug: string;
+  source: string;
+  name: string;
+  /** 0 = cantrip */
+  level: number;
+  ritual: boolean;
+  concentration: boolean;
+  componentsM: boolean;
+  /** gp cost when material component is costly; null otherwise */
+  componentsMCost: string | null;
+}
+
 export interface ClassSpellSummary {
   classSlug: string;
   classSource: string;
@@ -258,6 +271,8 @@ export interface ClassSpellSummary {
   spellsKnown: { count: number; max: number } | null;
   spellsPrepared: { count: number; max: number } | null;
   wizardSpellbookSize?: number;
+  /** Always present. Empty arrays when class has no picks or map is absent. */
+  spells: { cantrips: SpellSheetRef[]; leveled: SpellSheetRef[] };
 }
 
 export interface CharacterSheet {

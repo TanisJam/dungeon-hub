@@ -32,7 +32,7 @@ import {
   computeSpellLimits,
   SPELLCASTING_ABILITY,
 } from '../spellcasting/index.js';
-import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSlotsView } from './types.js';
+import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
 
 /**
  * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
@@ -281,6 +281,12 @@ interface ComputeInput {
   itemWeights?: ReadonlyArray<ItemCompendiumLite>;
   /** Si el Rules Profile tiene encumbranceVariant ON, los 3 umbrales aplican. */
   encumbranceVariant?: boolean;
+  /**
+   * Compendium spell data indexed by composite key `"slug|source"`.
+   * Populated by the API caller; domain never performs IO.
+   * Absent → all ClassSpellSummary.spells default to empty arrays.
+   */
+  spellRefsBySlug?: ReadonlyMap<string, SpellSheetRef>;
 }
 
 export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
@@ -558,6 +564,31 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
       const cantripsCount = spellsForClass?.cantrips.length ?? 0;
       const knownCount = spellsForClass?.known.length ?? 0;
       const preparedCount = spellsForClass?.prepared.length ?? 0;
+
+      // ---- Spell projection (SP-04) ----------------------------------------
+      const refMap = input.spellRefsBySlug;
+      const resolveRef = (entry: { slug: string; source: string }): SpellSheetRef | undefined =>
+        refMap?.get(`${entry.slug}|${entry.source}`);
+
+      // Cantrips: always from cantrips bucket, resolved by composite key.
+      const cantrips: SpellSheetRef[] = (spellsForClass?.cantrips ?? [])
+        .map(resolveRef)
+        .filter((r): r is SpellSheetRef => r !== undefined)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Leveled: prepared casters use prepared bucket; known casters use known bucket.
+      // Prepared: Cleric, Druid, Paladin, Wizard (lim.spellsPrepared !== null).
+      // Known: Bard, Ranger, Sorcerer, Warlock, EK, AT (lim.spellsKnown !== null).
+      const leveledSource: Array<{ slug: string; source: string }> =
+        lim.spellsPrepared !== null
+          ? (spellsForClass?.prepared ?? [])
+          : (spellsForClass?.known ?? []);
+
+      const leveled: SpellSheetRef[] = leveledSource
+        .map(resolveRef)
+        .filter((r): r is SpellSheetRef => r !== undefined)
+        .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+
       const view: ClassSpellSummary = {
         classSlug: c.slug,
         classSource: c.source,
@@ -570,6 +601,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
           lim.spellsPrepared !== null
             ? { count: preparedCount, max: lim.spellsPrepared }
             : null,
+        spells: { cantrips, leveled },
       };
       if (lim.wizardSpellbookSize !== undefined) view.wizardSpellbookSize = lim.wizardSpellbookSize;
       return [view];
