@@ -22,7 +22,7 @@ export async function loadFeatData(input: {
     slug: row.slug,
     source: row.source,
     name: row.name,
-    prerequisite: data.prerequisite as FeatCompendiumData['prerequisite'],
-    ability: data.ability as FeatCompendiumData['ability'],
+    prerequisite: data['prerequisite'] as FeatCompendiumData['prerequisite'],
+    ability: data['ability'] as FeatCompendiumData['ability'],
   };
 }

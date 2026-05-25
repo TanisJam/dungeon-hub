@@ -665,7 +665,7 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
         };
 
         const nextXp = char.xp + xpPerPlayer;
-        const nextCurrency = { ...currency, gp: (currency.gp ?? 0) + goldPerPlayer };
+        const nextCurrency = { ...currency, gp: (currency['gp'] ?? 0) + goldPerPlayer };
 
         // Items de este char.
         const myItems = itemRewards.filter((it) => it.characterId === p.characterId);
@@ -744,8 +744,8 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
             payload: {
               characterId: p.characterId,
               amount: goldPerPlayer,
-              before: currency.gp ?? 0,
-              after: nextCurrency.gp,
+              before: currency['gp'] ?? 0,
+              after: nextCurrency['gp'],
             },
             visibility: 'public',
           });

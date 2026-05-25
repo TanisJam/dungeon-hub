@@ -31,7 +31,7 @@ export async function loadFeatureProgression(input: {
 
   const classData: ClassFeatureSource = {
     optionalfeatureProgression:
-      (classRow.data as Record<string, unknown>).optionalfeatureProgression as ClassFeatureSource['optionalfeatureProgression'],
+      (classRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'],
   };
 
   let subclassData: ClassFeatureSource | null = null;
@@ -50,7 +50,7 @@ export async function loadFeatureProgression(input: {
     if (subRow) {
       subclassData = {
         optionalfeatureProgression:
-          (subRow.data as Record<string, unknown>).optionalfeatureProgression as ClassFeatureSource['optionalfeatureProgression'],
+          (subRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'],
       };
     }
   }

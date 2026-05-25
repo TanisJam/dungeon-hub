@@ -440,8 +440,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
-    const raceField = data.race as { slug: string; source: string } | null | undefined;
-    const subraceField = data.subrace as { slug: string; source: string } | null | undefined;
+    const raceField = data['race'] as { slug: string; source: string } | null | undefined;
+    const subraceField = data['subrace'] as { slug: string; source: string } | null | undefined;
 
     const raceData = raceField
       ? await loadRaceSheetData({
@@ -462,21 +462,21 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const sheet = computeCharacterSheet({
       character: {
         name: character.name,
-        baseStats: data.baseStats as never,
-        asisApplied: data.asisApplied as never,
-        levelUpAsis: data.levelUpAsis as never,
-        classes: data.classes as never,
-        background: data.background as never,
-        feats: data.feats as never,
+        baseStats: data['baseStats'] as never,
+        asisApplied: data['asisApplied'] as never,
+        levelUpAsis: data['levelUpAsis'] as never,
+        classes: data['classes'] as never,
+        background: data['background'] as never,
+        feats: data['feats'] as never,
         race: raceField ?? null,
         subrace: subraceField ?? null,
         inventory,
-        currency: data.currency as never,
-        spells: data.spells as never,
-        exhaustion: data.exhaustion as never,
-        classFeatures: data.classFeatures as never,
-        raceLanguageChoices: data.raceLanguageChoices as never,
-        raceSkillChoices: data.raceSkillChoices as never,
+        currency: data['currency'] as never,
+        spells: data['spells'] as never,
+        exhaustion: data['exhaustion'] as never,
+        classFeatures: data['classFeatures'] as never,
+        raceLanguageChoices: data['raceLanguageChoices'] as never,
+        raceSkillChoices: data['raceSkillChoices'] as never,
         // Batch 6: racial cantrip pick (High Elf). Read-path tolerance — may be absent.
         raceCantrip: data['raceCantrip'] as never,
       },
@@ -699,7 +699,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // the appliedAsis from the body — the validator will derive or verify them.
     // Per decision #547: bypass is handled inside validateRaceSelection / finishWithSkillsAndFeats.
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const baseStats = charData.baseStats as AbilityScores | undefined;
+    const baseStats = charData['baseStats'] as AbilityScores | undefined;
 
     let featContext = undefined;
     if (body.featChoice && featData) {
@@ -713,8 +713,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       // For purelyFixed races, the validator will derive the same ASIs from raceData.
       // For choose/Tasha races, body.appliedAsis is what the user submitted.
       const racialAsis: AppliedAsi[] = (body.appliedAsis ?? []) as AppliedAsi[];
-      const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
-      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const existingFeats = (charData['feats'] as AppliedFeat[] | undefined) ?? [];
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
       featContext = buildFeatContext({
         baseStats,
         racialAsis,
@@ -759,7 +759,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Persist: re-edit replaces previous race-granted feat (if any) then appends the new one.
     const prevData = (character.data as Record<string, unknown> | null) ?? {};
-    const prevFeats = (prevData.feats as AppliedFeat[] | undefined) ?? [];
+    const prevFeats = (prevData['feats'] as AppliedFeat[] | undefined) ?? [];
     const prevRaceFeatSlug = (prevData as { raceFeatSlug?: string | null }).raceFeatSlug ?? null;
 
     // Remove the previous race-granted feat entry (re-edit path).
@@ -1008,12 +1008,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const existingClasses = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const existingClasses = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
     const result = validateMulticlassAddition({
       rulesProfile: campaign.rulesProfile,
-      baseStats: (charData.baseStats as AbilityScores | undefined) ?? null,
-      asisApplied: (charData.asisApplied as AppliedAsi[] | undefined) ?? [],
+      baseStats: (charData['baseStats'] as AbilityScores | undefined) ?? null,
+      asisApplied: (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [],
       existingClasses: existingClasses.map((c) => ({ slug: c.slug, source: c.source })),
       newClassData: classData,
       newSubclassData: subclassData,
@@ -1073,7 +1073,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Construir el context del personaje a partir de character.data
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const baseStats = charData.baseStats as AbilityScores | undefined;
+    const baseStats = charData['baseStats'] as AbilityScores | undefined;
     if (!baseStats) {
       return reply.code(400).send({
         error: 'VALIDATION_FAILED',
@@ -1081,10 +1081,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-    const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
-    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
-    const raceField = charData.race as { slug: string; source: string } | null | undefined;
+    const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+    const existingFeats = (charData['feats'] as AppliedFeat[] | undefined) ?? [];
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
+    const raceField = charData['race'] as { slug: string; source: string } | null | undefined;
 
     const ctx = buildFeatContext({
       baseStats,
@@ -1218,7 +1218,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
-    const current = (data.currency as Record<string, number> | undefined) ?? {
+    const current = (data['currency'] as Record<string, number> | undefined) ?? {
       cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
     };
 
@@ -1498,7 +1498,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
     const wizard = classes.find((c) => c.slug === 'wizard');
     if (!wizard) {
       return reply.code(400).send({
@@ -1530,9 +1530,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     // ¿Ya lo tiene en el spellbook?
-    const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+    const allSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
     const wizardSpellsState: AppliedClassSpells =
-      allSpells.wizard ?? { cantrips: [], known: [], prepared: [] };
+      allSpells['wizard'] ?? { cantrips: [], known: [], prepared: [] };
     const alreadyKnown = wizardSpellsState.known.some(
       (s) => s.slug === body.spell.slug && s.source === body.spell.source,
     );
@@ -1545,24 +1545,24 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Costo en gold: 50 × nivel.
     const costGp = 50 * spellLite.level;
-    const currency = (charData.currency as Record<string, number> | undefined) ?? {
+    const currency = (charData['currency'] as Record<string, number> | undefined) ?? {
       cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
     };
-    if ((currency.gp ?? 0) < costGp) {
+    if ((currency['gp'] ?? 0) < costGp) {
       return reply.code(400).send({
         error: 'VALIDATION_FAILED',
         issues: [
           {
             code: 'INSUFFICIENT_GOLD',
             costGp,
-            availableGp: currency.gp ?? 0,
+            availableGp: currency['gp'] ?? 0,
             spellLevel: spellLite.level,
           },
         ],
       });
     }
 
-    const nextCurrency = { ...currency, gp: (currency.gp ?? 0) - costGp };
+    const nextCurrency = { ...currency, gp: (currency['gp'] ?? 0) - costGp };
     const nextWizardSpells: AppliedClassSpells = {
       ...wizardSpellsState,
       known: [...wizardSpellsState.known, { slug: body.spell.slug, source: body.spell.source }],
@@ -1625,7 +1625,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
-      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
       const appliedClass = classes.find((c) => c.slug === classSlug);
       if (!appliedClass) {
         return reply.code(400).send({
@@ -1654,11 +1654,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       }
 
       // Calcular abilityMod del personaje (misma lógica que PUT .../spells).
-      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+      const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
         str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
       };
-      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
         f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
@@ -1739,7 +1739,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
-      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
       const appliedClass = classes.find((c) => c.slug === classSlug);
       if (!appliedClass) {
         return reply.code(400).send({
@@ -1757,11 +1757,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+      const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
         str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
       };
-      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
         f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
@@ -1791,7 +1791,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
       }
 
-      const existingSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const existingSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
       const nextSpells = { ...existingSpells, [classSlug]: result.applied };
 
       const [updated] = await db
@@ -1823,15 +1823,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
     // CON mod efectivo.
-    const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+    const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
       str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
     };
-    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-    const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
-    const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+    const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+    const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
       f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
     );
     const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
@@ -1839,7 +1839,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Auto-init hit dice si no existe.
     const totalsFromClasses = hitDiceTotalsByDie(classes);
-    const existingHitDice = (charData.hitDice as Record<string, { total: number; available: number }> | undefined);
+    const existingHitDice = (charData['hitDice'] as Record<string, { total: number; available: number }> | undefined);
     const hitDice: Record<string, { total: number; available: number }> = {};
     for (const [die, total] of Object.entries(totalsFromClasses)) {
       hitDice[die] = existingHitDice?.[die] ?? { total, available: total };
@@ -1900,7 +1900,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Auto-init HP si falta. Si no hay max, computamos vía sheet calculator
     // (simple: bypass usando el snapshot).
-    const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+    const existingHp = (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined) ?? {};
     if (existingHp.max == null) {
       // Computar max desde la composición de clases. Reusamos lo del sheet:
       // L1 de primera clase = faces + con; L2+ = avg + con.
@@ -1977,22 +1977,22 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
     // CON mod para auto-init de HP si falta.
-    const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+    const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
       str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
     };
-    const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-    const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
-    const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+    const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+    const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
       f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
     );
     const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
     const conMod = abilityModifier(effective.con);
 
     // HP max auto-init si falta.
-    let max = (charData.hp as { max?: number } | undefined)?.max;
+    let max = (charData['hp'] as { max?: number } | undefined)?.max;
     if (max == null) {
       let m = 0;
       let first = true;
@@ -2015,7 +2015,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // los dice con más spent count (siempre que respete el total).
     const totalLevel = classes.reduce((acc, c) => acc + c.level, 0);
     const totalsFromClasses = hitDiceTotalsByDie(classes);
-    const existingHitDice = (charData.hitDice as Record<string, { total: number; available: number }> | undefined);
+    const existingHitDice = (charData['hitDice'] as Record<string, { total: number; available: number }> | undefined);
     const hitDice: Record<string, { total: number; available: number }> = {};
     for (const [die, total] of Object.entries(totalsFromClasses)) {
       hitDice[die] = existingHitDice?.[die] ?? { total, available: total };
@@ -2040,7 +2040,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const deathSaves = { successes: 0, failures: 0 };
 
     // Exhaustion -1 (mínimo 0).
-    const exhaustion = Math.max(0, ((charData.exhaustion as number | undefined) ?? 0) - 1);
+    const exhaustion = Math.max(0, ((charData['exhaustion'] as number | undefined) ?? 0) - 1);
 
     const newHp = { current: max, max, temp: 0 };
 
@@ -2122,7 +2122,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
-    const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+    const existingHp = (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined) ?? {};
 
     if (existingHp.max === undefined || existingHp.current === undefined) {
       return reply.code(400).send({
@@ -2217,7 +2217,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
-      const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
       const classIdx = classes.findIndex((c) => c.slug === classSlug);
       if (classIdx === -1) {
         return reply.code(400).send({
@@ -2248,12 +2248,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       }
 
       // CON mod efectivo para el HP delta.
-      const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+      const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
         str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
       };
-      const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-      const levelUpAsis = (charData.levelUpAsis as AppliedAsi[] | undefined) ?? [];
-      const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+      const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+      const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
         f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
@@ -2369,11 +2369,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
             });
           }
           // Reusar el validador de feats existente.
-          const existingFeats = (charData.feats as AppliedFeat[] | undefined) ?? [];
+          const existingFeats = (charData['feats'] as AppliedFeat[] | undefined) ?? [];
           const armorProfs = classes.flatMap((c) => c.armorProficiencies);
           const weaponProfs = classes.flatMap((c) => c.weaponProficiencies);
           const hasSpellcasting = classes.some((c) => classGrantsSpellcasting(c.slug));
-          const raceField = charData.race as { slug: string; source: string } | null | undefined;
+          const raceField = charData['race'] as { slug: string; source: string } | null | undefined;
           const featResult = validateFeatSelection({
             featData,
             rulesProfile: campaign.rulesProfile,
@@ -2413,8 +2413,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           classSlug: 'wizard',
           rulesProfile: campaign.rulesProfile,
         });
-        const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
-        const currentKnown = allSpells.wizard?.known ?? [];
+        const allSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
+        const currentKnown = allSpells['wizard']?.known ?? [];
         const knownKeys = new Set(currentKnown.map((s) => `${s.slug}|${s.source}`));
         for (const fs of body.wizardFreeSpells) {
           const found = wizardSpells.find((s) => s.slug === fs.slug && s.source === fs.source);
@@ -2445,24 +2445,24 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const updatedClasses = [...classes];
       updatedClasses[classIdx] = { ...currentClass, level: newClassLevel, subclass: newSubclass };
 
-      const existingHp = (charData.hp as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+      const existingHp = (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined) ?? {};
       const newMax = (existingHp.max ?? 0) + hpResult.delta;
       const newCurrent = (existingHp.current ?? existingHp.max ?? 0) + hpResult.delta;
       const newHp = { current: newCurrent, max: newMax, temp: existingHp.temp ?? 0 };
 
       const newLevelUpAsis = [...levelUpAsis, ...asiToApply];
       const newFeats = featToApply
-        ? [...((charData.feats as AppliedFeat[] | undefined) ?? []), featToApply]
-        : (charData.feats as AppliedFeat[] | undefined);
+        ? [...((charData['feats'] as AppliedFeat[] | undefined) ?? []), featToApply]
+        : (charData['feats'] as AppliedFeat[] | undefined);
 
-      const allSpells = (charData.spells as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const allSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
       const newSpells = wizardFreeAdded.length > 0
         ? {
             ...allSpells,
             wizard: {
-              cantrips: allSpells.wizard?.cantrips ?? [],
-              known: [...(allSpells.wizard?.known ?? []), ...wizardFreeAdded],
-              prepared: allSpells.wizard?.prepared ?? [],
+              cantrips: allSpells['wizard']?.cantrips ?? [],
+              known: [...(allSpells['wizard']?.known ?? []), ...wizardFreeAdded],
+              prepared: allSpells['wizard']?.prepared ?? [],
             },
           }
         : allSpells;
@@ -2545,7 +2545,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
-      const charClasses = (charData.classes as AppliedClass[] | undefined) ?? [];
+      const charClasses = (charData['classes'] as AppliedClass[] | undefined) ?? [];
       const appliedClass = charClasses.find((c) => c.slug === classSlug);
       if (!appliedClass) {
         return reply.code(400).send({
@@ -2589,7 +2589,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
       }
 
-      const existing = (charData.classFeatures as Record<string, FeaturePicks> | undefined) ?? {};
+      const existing = (charData['classFeatures'] as Record<string, FeaturePicks> | undefined) ?? {};
       const nextClassFeatures = { ...existing, [classSlug]: result.applied };
 
       const [updated] = await db
@@ -2620,7 +2620,7 @@ async function buildInventoryContext(character: typeof characters.$inferSelect):
   weaponProficiencies: string[];
 }> {
   const charData = (character.data as Record<string, unknown> | null) ?? {};
-  const baseStats = (charData.baseStats as AbilityScores | undefined) ?? {
+  const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
     str: 10,
     dex: 10,
     con: 10,
@@ -2628,12 +2628,12 @@ async function buildInventoryContext(character: typeof characters.$inferSelect):
     wis: 10,
     cha: 10,
   };
-  const racialAsis = (charData.asisApplied as AppliedAsi[] | undefined) ?? [];
-  const featAsis = ((charData.feats as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+  const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+  const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
     f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
   );
   const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
-  const classes = (charData.classes as AppliedClass[] | undefined) ?? [];
+  const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
   return {
     strScore: effective.str,

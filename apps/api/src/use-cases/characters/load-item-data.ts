@@ -11,7 +11,7 @@ function parseWeight(raw: string | null): number | null {
 
 function extractProperty(data: unknown): string[] {
   if (data == null || typeof data !== 'object') return [];
-  const p = (data as Record<string, unknown>).property;
+  const p = (data as Record<string, unknown>)['property'];
   if (!Array.isArray(p)) return [];
   return p.filter((x): x is string => typeof x === 'string');
 }

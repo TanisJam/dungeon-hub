@@ -33,12 +33,12 @@ export async function loadClassAndSubclass(input: {
     classData = {
       slug: classRow.slug,
       source: classRow.source,
-      hd: data.hd as ClassCompendiumData['hd'],
-      proficiency: (data.proficiency as ClassCompendiumData['proficiency']) ?? [],
+      hd: data['hd'] as ClassCompendiumData['hd'],
+      proficiency: (data['proficiency'] as ClassCompendiumData['proficiency']) ?? [],
       startingProficiencies:
-        (data.startingProficiencies as ClassCompendiumData['startingProficiencies']) ?? {},
-      subclassTitle: (data.subclassTitle as string | null | undefined) ?? null,
-      classFeatures: (data.classFeatures as ClassCompendiumData['classFeatures']) ?? [],
+        (data['startingProficiencies'] as ClassCompendiumData['startingProficiencies']) ?? {},
+      subclassTitle: (data['subclassTitle'] as string | null | undefined) ?? null,
+      classFeatures: (data['classFeatures'] as ClassCompendiumData['classFeatures']) ?? [],
     };
   }
 
