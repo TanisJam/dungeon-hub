@@ -1267,8 +1267,11 @@ const TIEFLING_MTOF_SUBRACE = makeRaceEntry({
 
 // Variant Human subrace with name "Variant" (realistic: displayName produces "Variant Human")
 // PHB p.31 sidebar — optional alternate Human, not a required subrace pick.
+// Slug matches the real compendium importer shape: `${slugify(raceName)}--${slugify(subraceName)}`.
+// This is REQUIRED for W-G (REPLACE-parent-ASI check) to fire — the domain constant keys by the
+// compound slug `human--variant|PHB`, not the bare `variant|PHB`.
 const VARIANT_HUMAN_SUBRACE_PEER = makeRaceEntry({
-  slug: 'variant',
+  slug: 'human--variant',
   source: 'PHB',
   name: 'Variant',
   isSubrace: true,
@@ -1646,7 +1649,7 @@ describe('W-G: Variant Human REPLACES parent ASI (PHB p.31 sidebar)', () => {
         initialSelection={{
           raceSlug: 'human',
           raceSource: 'PHB',
-          subraceSlug: 'variant',
+          subraceSlug: 'human--variant',
           subraceSource: 'PHB',
         }}
         initialChosenAsis={{ 'subrace:0': ['str', 'dex'] }}

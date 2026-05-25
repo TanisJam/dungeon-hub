@@ -12,7 +12,10 @@
  * migrates these lookups to a runtime registry.
  */
 export const SUBRACES_REPLACING_PARENT_ABILITY: ReadonlySet<string> = new Set([
-  'variant|PHB', // Variant Human — PHB p.31 sidebar
+  // Variant Human — PHB p.31 sidebar.
+  // Importer produces compound slugs: `${slugify(raceName)}--${slugify(subraceName)}`
+  // → for "Variant" subrace under "Human" race → 'human--variant'.
+  'human--variant|PHB',
 ]);
 
 /**

@@ -12,14 +12,14 @@ import {
 } from './subraces-replacing-parent-ability.js';
 
 describe('SUBRACES_REPLACING_PARENT_ABILITY — domain constant', () => {
-  it('contains variant|PHB (Variant Human, PHB p.31 sidebar)', () => {
-    expect(SUBRACES_REPLACING_PARENT_ABILITY.has('variant|PHB')).toBe(true);
+  it('contains human--variant|PHB (Variant Human, PHB p.31 sidebar — compound importer slug)', () => {
+    expect(SUBRACES_REPLACING_PARENT_ABILITY.has('human--variant|PHB')).toBe(true);
   });
 });
 
 describe('subraceReplacesParentAbility — lookup helper', () => {
-  it('returns true for Variant Human (slug=variant, source=PHB)', () => {
-    expect(subraceReplacesParentAbility({ slug: 'variant', source: 'PHB' })).toBe(true);
+  it('returns true for Variant Human (slug=human--variant, source=PHB)', () => {
+    expect(subraceReplacesParentAbility({ slug: 'human--variant', source: 'PHB' })).toBe(true);
   });
 
   it('returns false for Hill Dwarf (subrace stacks per PHB p.20)', () => {
