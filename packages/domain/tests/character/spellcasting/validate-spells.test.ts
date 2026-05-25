@@ -276,6 +276,247 @@ describe('validateClassSpells — clase no caster', () => {
   });
 });
 
+// ── SP-07: Warlock (known + pact magic, no prepared) ──────────────────────
+
+describe('validateClassSpells — Warlock (SP-07)', () => {
+  // PHB p.107: Warlock L1 — 2 cantrips known, 2 spells known, pact slots (not prepared)
+  const warlockSpells: SpellLite[] = [
+    { slug: 'eldritch-blast', source: 'PHB', level: 0 },
+    { slug: 'mage-hand', source: 'PHB', level: 0 },
+    { slug: 'prestidigitation', source: 'PHB', level: 0 }, // extra cantrip for over-limit test
+    { slug: 'hex', source: 'PHB', level: 1 },
+    { slug: 'armor-of-agathys', source: 'PHB', level: 1 },
+    { slug: 'hellish-rebuke', source: 'PHB', level: 1 },  // extra spell for over-limit test
+  ];
+
+  it('REQ-SP07-WARLOCK-VALIDATE-PICKS: happy path — L1 2 cantrips + 2 known → ok:true (PHB p.107)', () => {
+    // PHB p.107: Warlock L1 has cantrips_known=2, spells_known=2
+    const r = validateClassSpells({
+      appliedClass: mk('warlock', 1, 'fiend'),
+      abilityMod: 3,
+      availableSpells: warlockSpells,
+      input: {
+        cantrips: [
+          { slug: 'eldritch-blast', source: 'PHB' },
+          { slug: 'mage-hand', source: 'PHB' },
+        ],
+        known: [
+          { slug: 'hex', source: 'PHB' },
+          { slug: 'armor-of-agathys', source: 'PHB' },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('REQ-SP07-WARLOCK-VALIDATE-PICKS: prepared field non-null → PREPARED_NOT_ALLOWED (PHB p.107)', () => {
+    // PHB p.107: Warlock uses spells known, not prepared
+    const r = validateClassSpells({
+      appliedClass: mk('warlock', 1, 'fiend'),
+      abilityMod: 3,
+      availableSpells: warlockSpells,
+      input: {
+        prepared: [{ slug: 'hex', source: 'PHB' }],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'PREPARED_NOT_ALLOWED')).toBeDefined();
+  });
+
+  it('REQ-SP07-WARLOCK-VALIDATE-PICKS: 3 known (over limit=2) → SPELLS_KNOWN_EXCEEDED (PHB p.107)', () => {
+    // PHB p.107: Warlock L1 can only know 2 spells
+    const r = validateClassSpells({
+      appliedClass: mk('warlock', 1, 'fiend'),
+      abilityMod: 3,
+      availableSpells: warlockSpells,
+      input: {
+        known: [
+          { slug: 'hex', source: 'PHB' },
+          { slug: 'armor-of-agathys', source: 'PHB' },
+          { slug: 'hellish-rebuke', source: 'PHB' },
+        ],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'SPELLS_KNOWN_EXCEEDED')).toBeDefined();
+  });
+});
+
+// ── SP-07: Arcane Trickster Rogue ─────────────────────────────────────────
+
+describe('validateClassSpells — Rogue / Arcane Trickster (SP-07)', () => {
+  const atSpells: SpellLite[] = [
+    { slug: 'mage-hand', source: 'PHB', level: 0 },
+    { slug: 'minor-illusion', source: 'PHB', level: 0 },
+    { slug: 'prestidigitation', source: 'PHB', level: 0 },
+    { slug: 'silent-image', source: 'PHB', level: 1 },
+    { slug: 'disguise-self', source: 'PHB', level: 1 },
+    { slug: 'charm-person', source: 'PHB', level: 1 },
+    { slug: 'mirror-image', source: 'PHB', level: 2 }, // L2 for over-limit test
+  ];
+
+  it('REQ-SP07-AT-L1-NO-PICKS: Rogue L1 without subclass → CLASS_NOT_CASTER (PHB p.97)', () => {
+    // PHB p.97: Arcane Trickster subclass is unlocked at Rogue L3; L1 has no spellcasting
+    const r = validateClassSpells({
+      appliedClass: mk('rogue', 1),
+      abilityMod: 3,
+      availableSpells: atSpells,
+      input: { known: [] },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'CLASS_NOT_CASTER')).toBeDefined();
+  });
+
+  it('REQ-SP07-AT-L3-SPELLS: Rogue L3 AT happy path — 3 cantrips + 3 known maxLvl 1 → ok:true (PHB p.97-98)', () => {
+    // PHB p.97-98: AT L3 → 3 cantrips known, 3 spells known, max spell level 1
+    const r = validateClassSpells({
+      appliedClass: mk('rogue', 3, 'arcane-trickster'),
+      abilityMod: 3,
+      availableSpells: atSpells,
+      input: {
+        cantrips: [
+          { slug: 'mage-hand', source: 'PHB' },
+          { slug: 'minor-illusion', source: 'PHB' },
+          { slug: 'prestidigitation', source: 'PHB' },
+        ],
+        known: [
+          { slug: 'silent-image', source: 'PHB' },
+          { slug: 'disguise-self', source: 'PHB' },
+          { slug: 'charm-person', source: 'PHB' },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('REQ-SP07-AT-L3-SPELLS: Rogue L3 AT with L2 spell in known → SPELL_LEVEL_TOO_HIGH (PHB p.97-98)', () => {
+    // PHB p.97-98: AT L3 can only access L1 spells; L2 slots unlock at higher levels
+    const r = validateClassSpells({
+      appliedClass: mk('rogue', 3, 'arcane-trickster'),
+      abilityMod: 3,
+      availableSpells: atSpells,
+      input: {
+        known: [{ slug: 'mirror-image', source: 'PHB' }],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'SPELL_LEVEL_TOO_HIGH')).toBeDefined();
+  });
+});
+
+// ── SP-07: Eldritch Knight Fighter ───────────────────────────────────────
+
+describe('validateClassSpells — Fighter / Eldritch Knight (SP-07)', () => {
+  const ekSpells: SpellLite[] = [
+    { slug: 'fire-bolt', source: 'PHB', level: 0 },
+    { slug: 'shocking-grasp', source: 'PHB', level: 0 },
+    { slug: 'blade-ward', source: 'PHB', level: 0 }, // extra cantrip
+    { slug: 'shield', source: 'PHB', level: 1 },
+    { slug: 'absorb-elements', source: 'PHB', level: 1 },
+    { slug: 'burning-hands', source: 'PHB', level: 1 },
+    { slug: 'shatter', source: 'PHB', level: 2 }, // L2 for over-limit test
+  ];
+
+  it('REQ-SP07-EK-L1-NO-PICKS: Fighter L1 without EK subclass → CLASS_NOT_CASTER (PHB p.74)', () => {
+    // PHB p.74: Eldritch Knight subclass unlocks at Fighter L3; L1 has no spellcasting
+    const r = validateClassSpells({
+      appliedClass: mk('fighter', 1),
+      abilityMod: 3,
+      availableSpells: ekSpells,
+      input: { known: [] },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'CLASS_NOT_CASTER')).toBeDefined();
+  });
+
+  it('REQ-SP07-EK-L3-SPELLS: Fighter L3 EK happy path — 2 cantrips + 3 known maxLvl 1 → ok:true (PHB p.74)', () => {
+    // PHB p.74: EK L3 → 2 cantrips known, 3 spells known, max spell level 1
+    const r = validateClassSpells({
+      appliedClass: mk('fighter', 3, 'eldritch-knight'),
+      abilityMod: 3,
+      availableSpells: ekSpells,
+      input: {
+        cantrips: [
+          { slug: 'fire-bolt', source: 'PHB' },
+          { slug: 'shocking-grasp', source: 'PHB' },
+        ],
+        known: [
+          { slug: 'shield', source: 'PHB' },
+          { slug: 'absorb-elements', source: 'PHB' },
+          { slug: 'burning-hands', source: 'PHB' },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it('REQ-SP07-EK-L3-SPELLS: Fighter L3 EK with L2 spell in known → SPELL_LEVEL_TOO_HIGH (PHB p.74)', () => {
+    // PHB p.74: EK L3 max spell level = 1; L2 slots unlock at L7
+    const r = validateClassSpells({
+      appliedClass: mk('fighter', 3, 'eldritch-knight'),
+      abilityMod: 3,
+      availableSpells: ekSpells,
+      input: {
+        known: [{ slug: 'shatter', source: 'PHB' }],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues.find((i) => i.code === 'SPELL_LEVEL_TOO_HIGH')).toBeDefined();
+  });
+});
+
+// ── SP-07: Paladin L1 + Ranger L1 (zero slots / zero known) ──────────────
+
+describe('validateClassSpells — half-casters at L1 (SP-07)', () => {
+  const halfCasterSpells: SpellLite[] = [
+    { slug: 'cure-wounds', source: 'PHB', level: 1 },
+    { slug: 'hunters-mark', source: 'PHB', level: 1 },
+  ];
+
+  it('REQ-SP07-PALADIN-L1-ZERO-SPELLS: Paladin L1 — prepared limit = 0; sending prepared → PREPARED_LIMIT_EXCEEDED (PHB p.207)', () => {
+    // PHB p.84/p.207: Paladin is a half-caster; spell slots (and thus prepared spells) start at L2
+    const r = validateClassSpells({
+      appliedClass: mk('paladin', 1),
+      abilityMod: 3,
+      availableSpells: halfCasterSpells,
+      input: {
+        prepared: [{ slug: 'cure-wounds', source: 'PHB' }],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    // No slots at L1 → prepared limit = 0 → PREPARED_LIMIT_EXCEEDED or class not caster
+    const hasPreparedIssue = r.issues.some(
+      (i) => i.code === 'PREPARED_LIMIT_EXCEEDED' || i.code === 'CLASS_NOT_CASTER',
+    );
+    expect(hasPreparedIssue).toBe(true);
+  });
+
+  it('REQ-SP07-RANGER-L1-ZERO-SPELLS: Ranger L1 — spells known = 0; sending known → SPELLS_KNOWN_EXCEEDED (PHB p.207)', () => {
+    // PHB p.91/p.207: Ranger is a half-caster; spells known start at L2
+    const r = validateClassSpells({
+      appliedClass: mk('ranger', 1),
+      abilityMod: 3,
+      availableSpells: halfCasterSpells,
+      input: {
+        known: [{ slug: 'hunters-mark', source: 'PHB' }],
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    const hasKnownIssue = r.issues.some(
+      (i) => i.code === 'SPELLS_KNOWN_EXCEEDED' || i.code === 'CLASS_NOT_CASTER',
+    );
+    expect(hasKnownIssue).toBe(true);
+  });
+});
+
 describe('validateClassSpells — duplicados', () => {
   it('reporta duplicate y dedupea', () => {
     const r = validateClassSpells({

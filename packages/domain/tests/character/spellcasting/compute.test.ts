@@ -142,6 +142,21 @@ describe('computeSpellSlots — half / third / artificer single class', () => {
 });
 
 describe('computeSpellSlots — Warlock Pact Magic', () => {
+  // SP-07: L1 and L3 were missing from prior coverage
+  it('SP-07 REQ-SP07-WARLOCK-PACT-L1: Warlock L1 — 1 pact slot de nivel 1 (PHB p.107)', () => {
+    // PHB p.107: Warlock L1 has 1 pact slot at level 1
+    const r = computeSpellSlots([makeClass('warlock', 1)]);
+    expect(r.slots).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(r.pactMagic).toEqual({ slotCount: 1, slotLevel: 1 });
+  });
+
+  it('SP-07 REQ-SP07-WARLOCK-PACT-L3: Warlock L3 — 2 pact slots de nivel 2 (PHB p.107)', () => {
+    // PHB p.107: Warlock L3 has 2 pact slots at level 2
+    const r = computeSpellSlots([makeClass('warlock', 3)]);
+    expect(r.slots).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(r.pactMagic).toEqual({ slotCount: 2, slotLevel: 2 });
+  });
+
   it('Warlock L5: 2 slots de nivel 3, slots regulares vacíos', () => {
     const r = computeSpellSlots([makeClass('warlock', 5)]);
     expect(r.slots).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -193,5 +208,23 @@ describe('computeSpellSlots — Multiclass', () => {
     const r = computeSpellSlots([makeClass('barbarian', 10)]);
     expect(r.slots).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect(r.pactMagic).toBeNull();
+  });
+
+  it('SP-07 REQ-SP07-MULTICLASS-COMPUTE-SLOTS: Cleric 1 + Wizard 1 → effective level 2 → PHB p.165 table row 2', () => {
+    // PHB p.165: multiclass spell slot table — effective caster level 2 = 3 L1 slots
+    // Full-caster Cleric (contributes 1) + Full-caster Wizard (contributes 1) = 2
+    const r = computeSpellSlots([makeClass('cleric', 1), makeClass('wizard', 1)]);
+    expect(r.slots).toEqual([3, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(r.pactMagic).toBeNull();
+  });
+
+  it('SP-07 REQ-SP07-MULTICLASS-COMPUTE-SLOTS: Warlock L5 + Cleric L1 — pact reflects Warlock L5, regular slots from Cleric L1 only', () => {
+    // PHB p.164-165: Warlock pact slots are independent; regular multiclass slots
+    // only count non-warlock caster contributions. Cleric L1 contributes 1 full-caster level.
+    const r = computeSpellSlots([makeClass('warlock', 5), makeClass('cleric', 1)]);
+    // pactMagic = Warlock L5: 2 slots of level 3
+    expect(r.pactMagic).toEqual({ slotCount: 2, slotLevel: 3 });
+    // regularSlots = Cleric L1 only (effective level 1 → 2 L1 slots per PHB p.165 row 1)
+    expect(r.slots).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 });
