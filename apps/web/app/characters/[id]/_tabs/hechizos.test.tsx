@@ -10,10 +10,17 @@
  * PHB ch.10 p.201 — Casting Spells
  */
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { CharacterSheet, SpellSheetRef, ClassSpellSummary } from '@/lib/sheet-types';
 import { HechizosTab } from './hechizos';
+
+// SP-05: mock server actions so this test file doesn't need Supabase env.
+vi.mock('../actions', () => ({
+  useSpellSlot: vi.fn().mockResolvedValue({ ok: true }),
+  shortRest: vi.fn().mockResolvedValue({ ok: true }),
+  deleteCharacter: vi.fn().mockResolvedValue({ ok: true }),
+}));
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -132,7 +139,7 @@ const sacredFlame = makeSpellRef('sacred-flame', 0);
       }),
     ]);
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
 
     // REQ-SP04-10: "Trucos" group visible
     expect(screen.getByText('Trucos')).toBeTruthy();
@@ -157,7 +164,7 @@ const sheet = makeSheet([
       }),
     ]);
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     expect(screen.getByText('Sin hechizos seleccionados')).toBeTruthy();
   });
 });
@@ -189,7 +196,7 @@ const sheet: CharacterSheet = {
       ],
     };
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     expect(screen.getByText('Conocidos')).toBeTruthy();
     expect(screen.queryByText('Preparados')).toBeNull();
   });
@@ -224,7 +231,7 @@ const clericSpell = makeSpellRef('bless', 1);
       ],
     };
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
 
     // Should find BOTH spell names, not blended
     expect(screen.getByText(/Bless/i)).toBeTruthy();
@@ -255,7 +262,7 @@ const allFlagsSpell = makeSpellRef('plane-shift', 7, {
       }),
     ]);
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     expect(screen.getByTitle('Ritual')).toBeTruthy();
     expect(screen.getByTitle('Concentración')).toBeTruthy();
     expect(screen.getByTitle('Componente material')).toBeTruthy();
@@ -279,9 +286,48 @@ const plainSpell = makeSpellRef('magic-missile', 1, {
       }),
     ]);
 
-    render(<HechizosTab sheet={sheet} />);
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     expect(screen.queryByTitle('Ritual')).toBeNull();
     expect(screen.queryByTitle('Concentración')).toBeNull();
     expect(screen.queryByTitle('Componente material')).toBeNull();
+  });
+});
+
+// ── SP-05: Slot grid integration ──────────────────────────────────────────────
+
+describe('REQ-SP05-UX-CONSUME: HechizosTab renders SlotGrid when slots > 0', () => {
+  it('renders "Nv 1" label and slot bubbles when spellSlots.slots[0] > 0', () => {
+    const sheet = makeSheet([makeClericSummary()]);
+    // slots[0]=2, slotsUsed[0]=0 → 2 filled bubbles at level 1
+    sheet.spellSlots = {
+      slots: [2, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactMagic: null,
+      slotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactSlotsUsed: 0,
+    };
+
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
+    // Level label should be visible
+    expect(screen.getByText('Nv 1')).toBeTruthy();
+    // Two slot bubbles rendered
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders ShortRestButton and PactSlotGrid when pactMagic !== null', () => {
+    const sheet = makeSheet([makeClericSummary()]);
+    sheet.spellSlots = {
+      slots: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactMagic: { slotLevel: 3, slotCount: 2 },
+      slotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactSlotsUsed: 0,
+    };
+
+    render(<HechizosTab sheet={sheet} charId="test-char-id" />);
+    expect(screen.getByText('Descanso Corto')).toBeTruthy();
+    // Pact bubbles rendered
+    const buttons = screen.getAllByRole('button');
+    // 2 pact bubbles + 1 short rest button = 3 buttons minimum
+    expect(buttons.length).toBeGreaterThanOrEqual(3);
   });
 });

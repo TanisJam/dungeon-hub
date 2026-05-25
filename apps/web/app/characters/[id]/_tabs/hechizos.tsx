@@ -2,6 +2,7 @@ import type { CharacterSheet, SpellcastingView, ClassSpellSummary, SpellSheetRef
 import { Card } from '@/components/ui';
 import { RacialSpellsBlock } from './_racial-spells-block';
 import { SpellBadges } from '@/app/_components/spells/badges';
+import { SlotGrid, PactSlotGrid, ShortRestButton } from './_slot-grid';
 
 const ABILITY_ES: Record<string, string> = {
   str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
@@ -129,9 +130,10 @@ function ClassSpellSection({
 
 interface HechizosTabProps {
   sheet: CharacterSheet;
+  charId: string;
 }
 
-export function HechizosTab({ sheet }: HechizosTabProps) {
+export function HechizosTab({ sheet, charId }: HechizosTabProps) {
   const hasClassSpells = sheet.spellcasting && sheet.spellcasting.length > 0;
   const hasRacialSpells = sheet.racialSpells && sheet.racialSpells.length > 0;
 
@@ -145,6 +147,8 @@ export function HechizosTab({ sheet }: HechizosTabProps) {
 
   const slots = sheet.spellSlots?.slots ?? null;
   const pact = sheet.spellSlots?.pactMagic ?? null;
+  const slotsUsed = sheet.spellSlots?.slotsUsed ?? ([0, 0, 0, 0, 0, 0, 0, 0, 0] as const);
+  const pactSlotsUsed = sheet.spellSlots?.pactSlotsUsed ?? 0;
 
   // Build summary lookup by classSlug for O(1) access.
   const summaryByClass = new Map<string, ClassSpellSummary>(
@@ -166,18 +170,23 @@ export function HechizosTab({ sheet }: HechizosTabProps) {
           />
         ))}
 
-      {/* Spell slots */}
+      {/* Spell slots (SP-05: tap-to-consume bubbles) */}
       {slots && (
         <Card variant="surface" className="p-4">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
             Espacios de Hechizo
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-3">
             {slots.map((count, idx) =>
               count > 0 ? (
-                <div key={idx} className="flex flex-col items-center gap-0.5 rounded-md bg-paper-soft p-2">
-                  <span className="text-[9px] font-bold text-ink-mute">Nv {idx + 1}</span>
-                  <span className="text-base font-bold text-ink">{count}</span>
+                <div key={idx}>
+                  <p className="mb-1 text-[9px] font-bold text-ink-mute">Nv {idx + 1}</p>
+                  <SlotGrid
+                    charId={charId}
+                    level={idx + 1}
+                    max={count}
+                    used={slotsUsed[idx] ?? 0}
+                  />
                 </div>
               ) : null,
             )}
@@ -185,14 +194,24 @@ export function HechizosTab({ sheet }: HechizosTabProps) {
         </Card>
       )}
 
+      {/* Pact magic (SP-05): ShortRestButton above, PactSlotGrid inside */}
       {pact && (
         <Card variant="surface" className="p-4">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
-            Magia de Pacto
-          </p>
-          <p className="text-sm text-ink">
-            {pact.slotCount} espacio{pact.slotCount !== 1 ? 's' : ''} de nivel {pact.slotLevel}
-          </p>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+              Magia de Pacto
+            </p>
+            <ShortRestButton charId={charId} />
+          </div>
+          <div className="border-l-2 border-purple-400 pl-3">
+            <p className="mb-1 text-[9px] font-bold text-ink-mute">Nv {pact.slotLevel}</p>
+            <PactSlotGrid
+              charId={charId}
+              pactLevel={pact.slotLevel}
+              max={pact.slotCount}
+              used={pactSlotsUsed}
+            />
+          </div>
         </Card>
       )}
     </div>

@@ -135,7 +135,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         <div>
           {tab === 'resumen' && <ResumenTab sheet={sheet} />}
           {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
-          {tab === 'hechizos' && <HechizosTab sheet={sheet} />}
+          {tab === 'hechizos' && <HechizosTab sheet={sheet} charId={id} />}
           {tab === 'inventario' && <InventarioTab inventory={inventory} />}
           {tab === 'notas' && <NotasTab />}
         </div>
