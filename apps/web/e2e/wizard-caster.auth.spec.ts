@@ -105,6 +105,9 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       // Human PHB has two choose blocks: +2 then +1
       await page.getByRole('button', { name: 'STR', exact: true }).first().click();
       await page.getByRole('button', { name: 'CON', exact: true }).last().click();
+      // Human PHB grants Common (fixed) + 1 standard language of choice (commit 1d3e594).
+      // Pick Dwarvish (no overlap with class/background skills).
+      await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
@@ -123,16 +126,18 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
     });
 
-    await test.step('trasfondo: Sage PHB → guardar y seguir', async () => {
-      // Sage PHB: fixed skills Arcana + History — but Wizard already picked both.
-      // If the UI blocks duplicate skills, pick Scholar instead, or use any
-      // background that does not conflict. Acolyte PHB has Insight + Religion.
+    await test.step('trasfondo: Acolyte PHB → guardar y seguir', async () => {
+      // Acolyte PHB: fixed skills Insight + Religion (no overlap with Wizard's Arcana + History).
+      // PHB p.127: Acolyte grants 2 languages of choice — pick Elvish + Gnomish.
       await page
         .locator('[class*="rounded-md border"]')
         .filter({ hasText: 'Acolyte' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
+      // Pick 2 standard languages (PHB p.127 — "Two of your choice")
+      await page.getByRole('button', { name: 'Elvish', exact: true }).click();
+      await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
     });
@@ -183,12 +188,12 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
     await test.step('hechizos: seleccionar Prepara según el límite real (intMod + nivel)', async () => {
       // Wizard L1 prepared = INT mod + level. INT mod depends on how the
       // Standard Array was distributed across abilities, so the limit is
-      // not known statically. Read it from the UI counter ("Prepara X/N")
-      // and pick exactly N.
-      const prepCounter = page.locator('text=/Prepara\\s+\\d+\\/\\d+/').first();
+      // not known statically. Read it from the UI counter ("Preparados: X/N").
+      // The counter appears after Conoce selections are made.
+      const prepCounter = page.locator('text=/Preparados:\\s*\\d+\\/\\d+/').first();
       await expect(prepCounter).toBeVisible({ timeout: 3_000 });
       const counterText = (await prepCounter.textContent()) ?? '';
-      const match = counterText.match(/Prepara\s+\d+\s*\/\s*(\d+)/);
+      const match = counterText.match(/Preparados:\s*\d+\s*\/\s*(\d+)/);
       const targetPrepared = match ? Number(match[1]) : 0;
 
       if (targetPrepared > 0) {

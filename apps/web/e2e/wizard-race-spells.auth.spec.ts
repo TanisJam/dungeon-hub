@@ -46,13 +46,15 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
     });
 
     await test.step('race step: select High Elf subrace', async () => {
-      // Select the High Elf subrace card (displayed as "High Elf")
-      await page
-        .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'High Elf' })
-        .filter({ hasText: 'PHB' })
-        .first()
-        .click();
+      // Elf (PHB) is in RACES_REQUIRING_SUBRACE → renders as a collapsible accordion group.
+      // Expand the Elf group first, then select the High Elf subrace card inside.
+      await page.locator('[data-testid="subrace-group-elf"]').click();
+
+      // Select the High Elf subrace card inside the expanded accordion.
+      // Use getByRole('button', { name: /^high elf/i }) to target the ChoiceCard button
+      // directly — avoids the ambiguity of class-based selectors when the accordion outer
+      // div also contains 'High Elf' text and matches [class*="rounded-md border"].
+      await page.getByRole('button', { name: /^high elf/i }).click();
 
       // The "Cantrip de linaje" section must be visible (PHB p.23).
       await expect(page.getByText(/cantrip de linaje/i).first()).toBeVisible({ timeout: 5_000 });
@@ -84,29 +86,36 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
     });
 
     await test.step('complete wizard (class → background → review → publish)', async () => {
-      // Class: Wizard
+      // Class: Fighter (non-caster) — E2E-RS-1 focuses on the race cantrip picker, not
+      // class spells. Using Fighter means the spells step shows the no-picks panel and
+      // siguiente is enabled immediately, avoiding the need to fill Wizard spell picks.
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Wizard' })
+        .filter({ hasText: 'Fighter' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
-      await page.getByRole('button', { name: 'Arcana', exact: true }).first().click();
-      await page.getByRole('button', { name: 'History', exact: true }).first().click();
+      await page.getByRole('button', { name: 'Acrobatics', exact: true }).first().click();
+      await page.getByRole('button', { name: 'Intimidation', exact: true }).first().click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
 
-      // Background: Sage PHB
+      // Background: Acolyte PHB (fixed skills Insight + Religion).
+      // PHB p.127: Acolyte grants 2 languages of choice — pick Gnomish + Halfling.
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Sage' })
+        .filter({ hasText: 'Acolyte' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
+      // Pick 2 standard languages (PHB p.127 — "Two of your choice")
+      await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
+      await page.getByRole('button', { name: 'Halfling', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
 
-      // Spells step → review
+      // Spells step: Fighter is a non-caster at L1 → shows "no picks" panel
+      // with an enabled siguiente that navigates directly to /review.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
 
@@ -174,27 +183,34 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
 
-    await test.step('class: Wizard + skills to satisfy class step', async () => {
+    await test.step('class: Fighter + skills to satisfy class step', async () => {
+      // Use Fighter (non-caster) so the spells step shows a "no picks needed" panel
+      // and allows skipping directly to review — the test only cares about Tiefling racial spells on sheet.
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Wizard' })
+        .filter({ hasText: 'Fighter' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
-      // Wizard class skill choices (pick 2)
-      await page.getByRole('button', { name: 'Arcana', exact: true }).first().click();
-      await page.getByRole('button', { name: 'History', exact: true }).first().click();
+      // Fighter class skill choices (pick 2 from its list)
+      await page.getByRole('button', { name: 'Acrobatics', exact: true }).first().click();
+      await page.getByRole('button', { name: 'Intimidation', exact: true }).first().click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
     });
 
-    await test.step('background: Sage PHB', async () => {
+    await test.step('background: Acolyte PHB', async () => {
+      // Use Acolyte PHB (fixed skills: Insight + Religion).
+      // PHB p.127: Acolyte grants 2 languages of choice — pick Gnomish + Halfling.
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Sage' })
+        .filter({ hasText: 'Acolyte' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
+      // Pick 2 standard languages (PHB p.127 — "Two of your choice")
+      await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
+      await page.getByRole('button', { name: 'Halfling', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
     });

@@ -19,7 +19,7 @@ import {
   type RaceInnateSpellLite,
 } from './_parsers';
 import { saveRace } from './actions';
-import { requiresSubrace } from '@dungeon-hub/domain/character/race';
+import { RACES_REQUIRING_SUBRACE, requiresSubrace } from '@dungeon-hub/domain/character/race';
 import { poolFor, titleCase } from '../background/_options';
 import { ChoiceCard } from '@/components/wizard/choice-card';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
@@ -122,22 +122,17 @@ export function RacePicker({
 
   /**
    * Partition the entry list into three buckets:
-   * - groups: parents that have at least one subrace in the full dataset (accordion)
-   * - standalones: races that have NO subraces in the full dataset (direct ChoiceCards)
+   * - groups: parents that REQUIRE a subrace pick per PHB 2014 (accordion)
+   * - standalones: all other base races, including those with optional variants (direct ChoiceCards)
    * - orphanGroups: subraces whose parent is filtered out (e.g. search matched the subrace but not the parent)
    *
-   * We compute which parent slugs have subraces in the FULL entries list (not just filtered),
-   * so that a base race like "Elf" is always rendered as a group header even when filtered.
+   * The predicate is RACES_REQUIRING_SUBRACE from domain, NOT "has any subraces in data".
+   * Human, Half-Elf, Half-Orc, Tiefling are valid standalone PHB races whose SCAG/MToF/MPMM
+   * variants are optional alternatives — hiding them behind an accordion makes them unselectable.
+   * Only elf|PHB, dwarf|PHB, gnome|PHB, halfling|PHB, dragonborn|PHB require a subrace pick.
    */
-  const parentSlugsWithSubraces = useMemo(() => {
-    const set = new Set<string>();
-    for (const e of entries) {
-      if (e.isSubrace && e.parentSlug) {
-        set.add(`${e.parentSlug}|${e.parentSource}`);
-      }
-    }
-    return set;
-  }, [entries]);
+  // RACES_REQUIRING_SUBRACE is a stable module-level constant — no memo needed.
+  const parentSlugsWithSubraces = RACES_REQUIRING_SUBRACE;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -185,17 +180,27 @@ export function RacePicker({
       const key = entryKey(p);
       emittedParentKeys.add(key);
 
-      const isParentWithSubraces = parentSlugsWithSubraces.has(key);
-      if (isParentWithSubraces) {
-        // This parent has subraces globally → render as accordion group
-        const subraces = subracesByParent.get(key) ?? [];
+      const requiresSubraceForThisRace = parentSlugsWithSubraces.has(key);
+      const subraces = subracesByParent.get(key) ?? [];
+      const hasSubracesInData = subraces.length > 0;
+
+      if (requiresSubraceForThisRace && hasSubracesInData) {
+        // This parent REQUIRES a subrace (PHB 2014) AND has subraces available → accordion group.
         // Auto-expand when: a search query matches (any subrace is visible = we have results in filtered),
         // OR the current query is non-empty (the search itself filtered these in)
         const hasQueryMatch = !!q;
         items.push({ kind: 'group', parent: p, subraces, autoExpand: hasQueryMatch });
       } else {
-        // No subraces in the dataset → standalone ChoiceCard
+        // Either: (a) race is not in RACES_REQUIRING_SUBRACE (optional variants), OR
+        //         (b) race requires a subrace but none are present in the current dataset.
+        // In both cases render as standalone ChoiceCard.
+        // Optional variants (Human/Variant Human, Half-Orc SCAG, Tiefling MToF) emit their
+        // subraces as peer standalone cards sorted right after the parent.
         items.push({ kind: 'standalone', entry: p });
+        // Emit optional subraces (or zero subraces for required-but-no-data case) as peers.
+        for (const s of subraces) {
+          items.push({ kind: 'standalone', entry: s });
+        }
       }
     }
 
@@ -225,7 +230,7 @@ export function RacePicker({
     }
 
     return items;
-  }, [filtered, entries, query, parentSlugsWithSubraces]);
+  }, [filtered, entries, query]);
 
   const selected = useMemo(
     () => entries.find((e) => entryKey(e) === selectedKey) ?? null,

@@ -1211,3 +1211,136 @@ describe('W-E6: standalone races (no subraces) still render as direct ChoiceCard
     expect(screen.getByText('Half-Elf')).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// W-E7: Regression — races NOT in RACES_REQUIRING_SUBRACE stay standalone
+//         even when subraces ARE present in the entries array (real-data scenario).
+//
+// Commit 938a811 bug: partition predicate was "has any subraces in data"
+// which hid Human (Variant Human subrace), Half-Orc (SCAG variants), and
+// Tiefling (MToF variants) inside accordion groups, making them unselectable.
+// The correct predicate is "is in RACES_REQUIRING_SUBRACE" (PHB source of truth).
+// ---------------------------------------------------------------------------
+
+const HALF_ORC_BASE = makeRaceEntry({
+  slug: 'half-orc',
+  source: 'PHB',
+  name: 'Half-Orc',
+  isSubrace: false,
+  data: { name: 'Half-Orc', source: 'PHB', ability: [{ str: 2, con: 1 }], size: ['M'], speed: 30 },
+});
+
+// A SCAG variant of Half-Orc (optional, not required)
+const HALF_ORC_SCAG_SUBRACE = makeRaceEntry({
+  slug: 'half-orc--scag-variant',
+  source: 'SCAG',
+  name: 'Variant',
+  isSubrace: true,
+  parentSlug: 'half-orc',
+  parentSource: 'PHB',
+  data: { name: 'Variant', source: 'SCAG', ability: [], size: ['M'], speed: 30 },
+});
+
+const TIEFLING_BASE = makeRaceEntry({
+  slug: 'tiefling',
+  source: 'PHB',
+  name: 'Tiefling',
+  isSubrace: false,
+  data: { name: 'Tiefling', source: 'PHB', ability: [{ int: 1, cha: 2 }], size: ['M'], speed: 30 },
+});
+
+// An MToF variant of Tiefling (optional, not required)
+const TIEFLING_MTOF_SUBRACE = makeRaceEntry({
+  slug: 'tiefling--asmodeus',
+  source: 'MTF',
+  name: 'Asmodeus',
+  isSubrace: true,
+  parentSlug: 'tiefling',
+  parentSource: 'PHB',
+  data: { name: 'Asmodeus', source: 'MTF', ability: [], size: ['M'], speed: 30 },
+});
+
+// Variant Human subrace with name "Variant" (realistic: displayName produces "Variant Human")
+// PHB p.31 sidebar — optional alternate Human, not a required subrace pick.
+const VARIANT_HUMAN_SUBRACE_PEER = makeRaceEntry({
+  slug: 'variant',
+  source: 'PHB',
+  name: 'Variant',
+  isSubrace: true,
+  parentSlug: 'human',
+  parentSource: 'PHB',
+  data: {
+    name: 'Variant',
+    source: 'PHB',
+    ability: [{ choose: { from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], count: 2, amount: 1 } }],
+    size: ['M'],
+    speed: 30,
+    skillProficiencies: [{ any: 1 }],
+    feats: [{ any: 1 }],
+  },
+});
+
+describe('W-E7: non-required races stay standalone even when they have subraces in entries', () => {
+  it('Human stays a standalone ChoiceCard when Variant Human subrace is also in entries', () => {
+    // PHB p.31 — Human is a valid standalone race. Variant Human (PHB p.31 sidebar) is optional.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE_PEER, DRAGONBORN_BASE, DRAGONBORN_BLACK]}
+        initialSelection={null}
+      />,
+    );
+
+    // Human must NOT be wrapped in an accordion group
+    expect(getGroupBtn('human')).toBeNull();
+    // Human must be directly visible as a card (not hidden inside collapsed accordion)
+    expect(screen.getByText('Human')).toBeTruthy();
+    // Dragonborn SHOULD be a group (required subrace)
+    expect(getGroupBtn('dragonborn')).toBeTruthy();
+  });
+
+  it('Half-Orc stays a standalone ChoiceCard when a SCAG variant subrace is in entries', () => {
+    // PHB p.40 — Half-Orc is standalone. SCAG subraces are optional alternatives.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ORC_BASE, HALF_ORC_SCAG_SUBRACE]}
+        initialSelection={null}
+      />,
+    );
+
+    expect(getGroupBtn('half-orc')).toBeNull();
+    expect(screen.getByText('Half-Orc')).toBeTruthy();
+  });
+
+  it('Tiefling stays a standalone ChoiceCard when MToF variant subraces are in entries', () => {
+    // PHB p.42 — Tiefling is standalone. MToF subrace variants (Asmodeus, etc.) are optional.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[TIEFLING_BASE, TIEFLING_MTOF_SUBRACE]}
+        initialSelection={null}
+      />,
+    );
+
+    expect(getGroupBtn('tiefling')).toBeNull();
+    expect(screen.getByText('Tiefling')).toBeTruthy();
+  });
+
+  it('Variant Human subrace appears as a standalone peer card alongside Human', () => {
+    // PHB p.31 — When Human is not an accordion, Variant Human subrace appears as a flat peer card.
+    // displayName for a subrace: "${subrace.name} ${parent.name}" = "Variant Human".
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE_PEER]}
+        initialSelection={null}
+      />,
+    );
+
+    // Both Human and Variant Human must be visible as separate selectable items.
+    // "Human" is the parent card; "Variant Human" is the subrace card title (displayName).
+    expect(screen.getByText('Human')).toBeTruthy();
+    expect(screen.getByText('Variant Human')).toBeTruthy();
+  });
+});
