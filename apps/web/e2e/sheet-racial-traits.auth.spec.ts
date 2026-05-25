@@ -39,13 +39,19 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
 
-      // Standard array — tap all 6 tiles once each
+      // Standard array — tap all 6 tiles once each. Matches the existing
+      // working pattern from wizard.auth.spec.ts. The toBeEnabled wait is REQUIRED:
+      // without it, the Siguiente click can fire before React re-renders with the
+      // 6th assigned value, landing on a still-disabled button (no-op).
       await page.getByRole('tab', { name: 'Estándar' }).click();
       const tileButtons = page.locator(
         'button[aria-label*="FUE"], button[aria-label*="DES"], button[aria-label*="CON"], button[aria-label*="INT"], button[aria-label*="SAB"], button[aria-label*="CAR"]',
       );
       const count = await tileButtons.count();
       for (let i = 0; i < count; i++) await tileButtons.nth(i).click();
+      await expect(page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({
+        timeout: 3000,
+      });
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
     });
