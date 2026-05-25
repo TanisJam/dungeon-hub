@@ -461,6 +461,12 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   // ALL entries returned; renderer dims by characterLevelAvailable (design #608 §5).
   const racialSpells = computeRacialSpells(raceData, character.raceCantrip ?? null);
 
+  // ---- Racial descriptive traits (Batch 8 — race-traits-on-sheet) ----------
+  // Pass-through from RaceSheetData.racialTraits (pre-computed by loadRaceSheetData).
+  // ?? [] guard: backward compat for legacy snapshots predating Batch 8 (SCEN-RT-12,
+  // REQ-RT-COMPAT-01). Mirrors darkvision / racialSpells pass-through pattern.
+  const racialTraits = raceData?.racialTraits ?? [];
+
   // ---- Encumbrance (con o sin variant) ----------------------------------
   const totalCarryWeight = totalWeight(
     character.inventory ?? [],
@@ -526,6 +532,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     breathWeapon,
     darkvision,
     racialSpells,
+    racialTraits,
     spellcasting,
     currency: character.currency ?? { ...EMPTY_CURRENCY },
     encumbrance: encumbranceView,

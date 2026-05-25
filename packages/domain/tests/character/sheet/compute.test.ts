@@ -1328,3 +1328,56 @@ describe('computeRacialSpells — Batch 6 (race-additional-spells)', () => {
     expect(thaumaturgy?.castLevel ?? null).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// SCEN-RT-08 — compute.ts passes racialTraits through into CharacterSheet
+// SCEN-RT-12 — backward-compat: absent racialTraits field defaults to []
+// REQ-RT-DOMAIN-02, REQ-RT-DOMAIN-03, REQ-RT-DOMAIN-11, REQ-RT-COMPAT-01
+// ---------------------------------------------------------------------------
+describe('SCEN-RT-08 + SCEN-RT-12: CharacterSheet.racialTraits pass-through + backward compat', () => {
+  it('SCEN-RT-08 variant A: RaceSheetData with racialTraits populated → CharacterSheet.racialTraits equals same array', () => {
+    const traits = [{ name: 'Brave', text: 'You have advantage on saving throws against being frightened.', source: 'race' as const }];
+    const sheet = computeCharacterSheet({
+      character: { name: 'Brave Char' },
+      raceData: { speed: 30, size: ['M'], racialTraits: traits },
+    });
+    expect(sheet.racialTraits).toEqual(traits);
+  });
+
+  it('SCEN-RT-08 variant B: multiple traits returned in source order', () => {
+    const traits = [
+      { name: 'Keen Senses', text: 'You have proficiency in the Perception skill.', source: 'race' as const },
+      { name: 'Fey Ancestry', text: 'You have advantage on saving throws against being charmed.', source: 'race' as const },
+      { name: 'Elf Weapon Training', text: 'You have proficiency with longswords.', source: 'subrace' as const },
+    ];
+    const sheet = computeCharacterSheet({
+      character: { name: 'Elf Char' },
+      raceData: { speed: 30, size: ['M'], racialTraits: traits },
+    });
+    expect(sheet.racialTraits).toHaveLength(3);
+    expect(sheet.racialTraits[0]!.name).toBe('Keen Senses');
+    expect(sheet.racialTraits[1]!.name).toBe('Fey Ancestry');
+    expect(sheet.racialTraits[2]!.name).toBe('Elf Weapon Training');
+    expect(sheet.racialTraits[2]!.source).toBe('subrace');
+  });
+
+  it('SCEN-RT-12 backward compat: RaceSheetData without racialTraits (pre-Batch-8) → CharacterSheet.racialTraits is [] (no throw)', () => {
+    // Simulates a pre-Batch-8 RaceSheetData where racialTraits field is absent.
+    // The ?? [] guard in compute.ts must handle this.
+    const legacyRaceData = { speed: 30, size: ['M'] } as unknown as RaceSheetData;
+    const sheet = computeCharacterSheet({
+      character: { name: 'Legacy Char' },
+      raceData: legacyRaceData,
+    });
+    expect(sheet.racialTraits).toEqual([]);
+    expect(sheet.racialTraits.length).toBe(0);
+  });
+
+  it('SCEN-RT-12 backward compat: raceData=null → racialTraits=[] (no throw)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'No Race Char' },
+      raceData: null,
+    });
+    expect(sheet.racialTraits).toEqual([]);
+  });
+});

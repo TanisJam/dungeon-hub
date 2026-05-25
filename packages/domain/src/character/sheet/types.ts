@@ -6,6 +6,25 @@ import type { AppliedAsi, BreathWeaponData, BreathWeaponShape, BreathWeaponSavin
 import type { InventoryItem } from '../inventory/types.js';
 import type { EncumbranceView } from '../inventory/encumbrance.js';
 
+/**
+ * A descriptive racial trait surfaced on the sheet's "Rasgos raciales" card.
+ * Mechanical projections (speed, languages, darkvision, weapon profs, racial
+ * spells) are NOT represented here — they have dedicated sheet fields.
+ * Decision #628 defines the blocklist. Decision #630 locks the 5 defaults.
+ */
+export interface RacialTrait {
+  /** Trait name as it appears in the 5etools source (English, raw). */
+  name: string;
+  /**
+   * Full text body. Multi-paragraph content is joined with '\n\n'.
+   * Inline 5etools formatting tokens (e.g. `{@spell fire bolt}`) are
+   * preserved RAW — render-time parsing happens in the web layer.
+   */
+  text: string;
+  /** Whether the trait comes from the base race or the chosen subrace. */
+  source: 'race' | 'subrace';
+}
+
 export const CURRENCY_KEYS = ['cp', 'sp', 'ep', 'gp', 'pp'] as const;
 export type CurrencyKey = (typeof CURRENCY_KEYS)[number];
 export type Currency = Record<CurrencyKey, number>;
@@ -167,6 +186,14 @@ export interface RaceSheetData {
    * null/undefined when race+subrace grant no innate spells. PHB p.17/23/24/37/42-43.
    */
   additionalSpellsNormalized?: RaceInnateSpell[] | null;
+  /**
+   * Projected racial traits in source order (race first, subrace appended).
+   * Populated by loadRaceSheetData via extractRacialTraits. Consumed by
+   * computeCharacterSheet as a pass-through. Required at the projection boundary;
+   * defaults to [] when absent (backward compat for pre-Batch-8 snapshots).
+   * Batch 8 — race-traits-on-sheet, decision #628, decision #630.
+   */
+  racialTraits: RacialTrait[];
 }
 
 // Re-export for convenience (BreathWeaponData is consumed by compute.ts)
@@ -283,6 +310,13 @@ export interface CharacterSheet {
    * REQ-D-COMPUTE-01, REQ-D-COMPUTE-02. Batch 6.
    */
   racialSpells: RacialSpellView[];
+  /**
+   * Descriptive racial traits in source order (race first, then subrace appended).
+   * Empty for legacy characters whose race data lacked an `entries` projection at
+   * compute time. Defaults to [] when absent (SCEN-RT-12 / REQ-RT-COMPAT-01).
+   * Batch 8 — race-traits-on-sheet.
+   */
+  racialTraits: RacialTrait[];
   spellcasting: SpellcastingView[];
   currency: Currency;
   encumbrance: EncumbranceView;
