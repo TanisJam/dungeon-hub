@@ -636,6 +636,10 @@ export const compendiumSpells = pgTable(
      *   { classSlug, classSource, subclassSlug, subclassSource, subclassName }
      */
     subclassGrants: jsonb('subclass_grants').notNull().default(sql`'[]'::jsonb`),
+    ritual: boolean('ritual').notNull().default(false),
+    concentration: boolean('concentration').notNull().default(false),
+    componentsM: boolean('components_m').notNull().default(false),
+    componentsMCost: integer('components_m_cost'),
     data: jsonb('data').notNull(),
     reprintedAs: text('reprinted_as').array(),
   },
