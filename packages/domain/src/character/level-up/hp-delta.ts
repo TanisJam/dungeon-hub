@@ -74,6 +74,15 @@ export function hpDeltaForLevelUp(args: {
 }
 
 /**
+ * HP recuperados al gastar un hit die en un short rest.
+ * PHB p.186 — "the character regains hit points equal to the total (minimum of 0)".
+ * NOTA: el piso es 0, NO 1. El nivel-up usa min 1 — ver hpDeltaForLevelUp.
+ */
+export function hitDieHpGain(roll: number, conMod: number): number {
+  return Math.max(0, roll + conMod);
+}
+
+/**
  * Genera un roll aleatorio para un hit die. El caller usa esto cuando el cliente
  * NO mandó `hpRoll` y quiere que el server tire. Usa crypto.getRandomValues
  * para que sea no-trivial de manipular.

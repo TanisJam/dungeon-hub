@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hpDeltaForLevelUp, hitDieFaces } from '../../../src/character/level-up/hp-delta.js';
+import { hpDeltaForLevelUp, hitDieFaces, hitDieHpGain } from '../../../src/character/level-up/hp-delta.js';
 
 describe('hpDeltaForLevelUp — average', () => {
   it('d10 + CON 2 = 8 (avg 6 + 2)', () => {
@@ -48,6 +48,25 @@ describe('hpDeltaForLevelUp — roll', () => {
   it('roll = 0 inválido', () => {
     const r = hpDeltaForLevelUp({ hitDie: 'd8', conMod: 2, method: 'roll', roll: 0 });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('hitDieHpGain', () => {
+  it('floor es 0, no 1: roll 0 + conMod -1 = 0 (PHB p.186)', () => {
+    // PHB p.186: "the character regains hit points equal to the total (minimum of 0)"
+    expect(hitDieHpGain(0, -1)).toBe(0);
+  });
+  it('clamped below zero: roll 1 + conMod -5 = 0 (PHB p.186)', () => {
+    // PHB p.186: minimum is 0, not 1 — negative conMod cannot produce negative HP gain
+    expect(hitDieHpGain(1, -5)).toBe(0);
+  });
+  it('caso positivo normal: roll 5 + conMod 2 = 7 (PHB p.186)', () => {
+    // PHB p.186: total = roll + conMod, minimum 0
+    expect(hitDieHpGain(5, 2)).toBe(7);
+  });
+  it('conMod cero: roll 8 + conMod 0 = 8 (PHB p.186)', () => {
+    // PHB p.186: conMod 0 has no effect
+    expect(hitDieHpGain(8, 0)).toBe(8);
   });
 });
 

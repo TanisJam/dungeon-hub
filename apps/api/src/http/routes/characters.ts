@@ -38,6 +38,7 @@ import {
   hitDiceRecoveredOnLongRest,
   hitDiceTotalsByDie,
   hitDieFaces,
+  hitDieHpGain,
   rollHitDie,
   type HpMethod,
 } from '@dungeon-hub/domain/character/level-up';
@@ -1982,7 +1983,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           roll = rollHitDie(die);
         }
         rollsForDie.push(roll);
-        hpRecovered += Math.max(1, roll + conMod);
+        hpRecovered += hitDieHpGain(roll, conMod);
       }
       hitDice[die] = { ...hitDice[die], available: hitDice[die].available - countToSpend };
       rollsUsed[die] = rollsForDie;

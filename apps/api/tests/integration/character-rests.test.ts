@@ -169,6 +169,66 @@ describe('POST /characters/:id/rest', () => {
     expect(res.json().issues[0].code).toBe('NOT_ENOUGH_HIT_DICE');
   });
 
+  it('Short rest con CON negativo: roll 1 + conMod -1 recupera 0 HP (PHB p.186 min 0)', async () => {
+    // PHB p.186: minimum is 0, not 1. This test pins the corrected behavior.
+    // CON 8 → conMod -1. Force via PATCH to simulate a character with negative conMod.
+    const app = await getTestApp();
+    const charPre = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        data: {
+          ...charPre.data,
+          // The route reads charData['baseStats'] to compute conMod; set it directly.
+          baseStats: { ...charPre.data.baseStats, con: 8 },
+          hp: { current: 10, max: 24, temp: 0 },
+          hitDice: { d10: { total: 3, available: 3 } },
+        },
+      },
+    });
+
+    // Force a roll of 1 on d10. conMod = -1 (CON 8). 1 + (-1) = 0 (clamped at 0 per PHB p.186).
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/rest/short`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        hitDiceToSpend: { d10: 1 },
+        rolls: { d10: [1] },
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // PHB p.186: total = 1 + (-1) = 0, minimum 0 → hpRecovered must be 0
+    expect(body.shortRest.hpRecovered).toBe(0);
+    // HP must not change since recovery was 0
+    expect(body.shortRest.newHp.current).toBe(10);
+
+    // Restore CON for subsequent tests
+    const charPost = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { data: { ...charPost.data, baseStats: { ...charPost.data.baseStats, con: 13 } } },
+    });
+  });
+
   it('Short rest sin spendear hit dice todavía resetea warlock slots', async () => {
     const app = await getTestApp();
     // Setear warlockSlotsUsed = 2 vía PATCH.

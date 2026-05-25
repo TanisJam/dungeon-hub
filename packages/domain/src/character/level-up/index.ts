@@ -8,6 +8,7 @@ export {
   HIT_DIE_AVG,
   hitDieFaces,
   hpDeltaForLevelUp,
+  hitDieHpGain,
   rollHitDie,
   type HpMethod,
   type HpDeltaIssue,
