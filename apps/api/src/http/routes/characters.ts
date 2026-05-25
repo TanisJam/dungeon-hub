@@ -1647,7 +1647,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!ability) {
         const emptyLimits: SpellLimitsView = {
           cantripsKnown: 0,
-          spellsKnown: 0,
+          spellsKnown: null,
           spellsPrepared: null,
           maxSpellLevel: 0,
           ability: null,
@@ -1664,10 +1664,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
       };
       const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+      const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
       const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
         f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
       );
-      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
       const abilityMod = abilityModifier(effective[ability]);
 
       const limits = computeSpellLimits(appliedClass, abilityMod);
@@ -1767,10 +1768,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
       };
       const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
+      const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
       const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
         f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
       );
-      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
+      const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
       const abilityMod = abilityModifier(effective[ability]);
 
       // Cargar el universo de spells permitidos para esta clase (ya filtrado por

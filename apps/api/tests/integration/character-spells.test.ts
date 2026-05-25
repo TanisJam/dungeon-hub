@@ -10,6 +10,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
   let user: TestUser;
   let campaignId: string;
   let wizardCharId: string;
+  let wizardL4AsiCharId: string;
   let clericCharId: string;
   let sorcCharId: string;
 
@@ -34,6 +35,10 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
     clericCharId = await setupChar('Clericen', 'cleric', { wis: 15 });
     // Sorcerer L1 con CHA 15 (mod 2) — known caster, no prep.
     sorcCharId = await setupChar('Sorceress', 'sorcerer', { cha: 15 });
+
+    // SP01-S2: Wizard L4 with base INT 15, +2 INT ASI at L4 → INT 17 (mod +3).
+    // Post-ASI prep limit = 3 + 4 = 7. PHB p.114.
+    wizardL4AsiCharId = await setupWizardL4WithIntAsi();
 
     async function setupChar(name: string, classSlug: string, scoreOverrides: Record<string, number>): Promise<string> {
       const baseScores = { str: 8, dex: 14, con: 13, int: 12, wis: 10, cha: 15 };
@@ -87,6 +92,95 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
         url: `/api/v1/characters/${c.id}/class`,
         headers: { authorization: `Bearer ${user.accessToken}` },
         payload: classPayload,
+      });
+
+      return c.id;
+    }
+
+    /**
+     * SP01-S2: Wizard L4 with +2 INT ASI at L4.
+     * Base INT 15 (mod +2). After ASI: INT 17 (mod +3).
+     * Expected prep limit = 3 + 4 = 7. PHB p.114.
+     */
+    async function setupWizardL4WithIntAsi(): Promise<string> {
+      const scores = { str: 10, dex: 12, con: 13, int: 15, wis: 8, cha: 14 };
+
+      const c = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/characters',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { campaignId, name: 'Wizard L4 ASI Spells' },
+        })
+        .then((r) => r.json());
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${c.id}/stats`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { method: 'standard-array', scores },
+      });
+
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${c.id}/class`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          class: { slug: 'wizard', source: 'PHB' },
+          level: 1,
+          skillChoices: ['arcana', 'investigation'],
+        },
+      });
+
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${c.id}/xp`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { award: 2700 },
+      });
+
+      // L1→L2: unlock subclass + 2 free spells.
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${c.id}/classes/wizard/level-up`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          hpMethod: 'average',
+          subclass: { slug: 'wizard--evocation', source: 'PHB' },
+          wizardFreeSpells: [
+            { slug: 'magic-missile', source: 'PHB' },
+            { slug: 'shield', source: 'PHB' },
+          ],
+        },
+      });
+
+      // L2→L3: 2 more free spells.
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${c.id}/classes/wizard/level-up`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          hpMethod: 'average',
+          wizardFreeSpells: [
+            { slug: 'mage-armor', source: 'PHB' },
+            { slug: 'detect-magic', source: 'PHB' },
+          ],
+        },
+      });
+
+      // L3→L4: ASI level — +2 INT.
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${c.id}/classes/wizard/level-up`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          hpMethod: 'average',
+          asi: { choices: [{ ability: 'int', bonus: 2 }] },
+          wizardFreeSpells: [
+            { slug: 'counterspell', source: 'PHB' },
+            { slug: 'fireball', source: 'PHB' },
+          ],
+        },
       });
 
       return c.id;
@@ -401,5 +495,78 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().issues[0].code).toBe('NO_WIZARD_CLASS');
+  });
+
+  // SP01-S2 (REQ-SP01-PREP-LIMIT): PUT /spells MUST use post-ASI prep limit.
+  // Wizard L4, base INT 15, +2 INT ASI → INT 17 (mod +3), prep limit = 7.
+  // PHB p.114: "equal to your Intelligence modifier + your wizard level".
+  it('SP01-S2: Wizard L4 with +2 INT ASI → PUT /spells accepts 7 prepared (post-ASI limit)', async () => {
+    const app = await getTestApp();
+
+    // Wizard L4 max spell level = 2 (full caster: L3 → max 2). PHB Wizard table.
+    // Spells in spellbook (known): all must be ≤ L2 to be preparable.
+    // We use L1 and L2 wizard spells only. counterspell/fireball (L3) stay in the
+    // known list but cannot be in prepared (SPELL_LEVEL_TOO_HIGH).
+    // Need at least 8 L1/L2 spells in the known list to prepare 7 + test 8.
+    const knownSpells = [
+      { slug: 'magic-missile', source: 'PHB' },   // L1
+      { slug: 'shield', source: 'PHB' },            // L1
+      { slug: 'mage-armor', source: 'PHB' },        // L1
+      { slug: 'detect-magic', source: 'PHB' },      // L1
+      { slug: 'identify', source: 'PHB' },           // L1
+      { slug: 'sleep', source: 'PHB' },              // L1
+      { slug: 'misty-step', source: 'PHB' },         // L2
+      { slug: 'mirror-image', source: 'PHB' },       // L2
+      { slug: 'web', source: 'PHB' },                // L2
+    ];
+
+    // Prepared list of 7 — all ≤ L2, all in knownSpells above.
+    const sevenPrepared = [
+      { slug: 'magic-missile', source: 'PHB' },
+      { slug: 'shield', source: 'PHB' },
+      { slug: 'mage-armor', source: 'PHB' },
+      { slug: 'detect-magic', source: 'PHB' },
+      { slug: 'identify', source: 'PHB' },
+      { slug: 'sleep', source: 'PHB' },
+      { slug: 'misty-step', source: 'PHB' },
+    ];
+
+    // First set the spellbook (known), then prepare 7 — should succeed with post-ASI limit.
+    const ok = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${wizardL4AsiCharId}/classes/wizard/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        cantrips: [
+          { slug: 'fire-bolt', source: 'PHB' },
+          { slug: 'mage-hand', source: 'PHB' },
+          { slug: 'light', source: 'PHB' },
+          { slug: 'prestidigitation', source: 'PHB' },
+        ],
+        known: knownSpells,
+        prepared: sevenPrepared,
+      },
+    });
+    // Without the fix: limit = 6 (drops levelUpAsis), 7 prepared → 400 PREPARED_LIMIT_EXCEEDED.
+    // With the fix: limit = 7, 7 prepared → 200.
+    expect(ok.statusCode).toBe(200);
+
+    // 8 prepared → must still reject even after the fix (8 > 7).
+    const tooMany = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${wizardL4AsiCharId}/classes/wizard/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        known: knownSpells,
+        prepared: [
+          ...sevenPrepared,
+          { slug: 'mirror-image', source: 'PHB' },  // +1 → 8 total
+        ],
+      },
+    });
+    expect(tooMany.statusCode).toBe(400);
+    expect(
+      tooMany.json().issues.find((i: { code: string }) => i.code === 'PREPARED_LIMIT_EXCEEDED'),
+    ).toBeDefined();
   });
 });
