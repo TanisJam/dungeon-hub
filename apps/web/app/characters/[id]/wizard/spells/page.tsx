@@ -1,9 +1,12 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
+import type { AppliedClass as DomainAppliedClass } from '@dungeon-hub/domain/character/class';
+import { classifyCaster } from '@dungeon-hub/domain/character/spellcasting';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 import { NoPicksPanel } from './_no-picks-panel';
 import { SinglePickerView } from './_single-picker-view';
+import { MulticlassSpellsView, type CasterTabData } from './_multiclass-view';
 import { RaceCantripCard } from './_race-cantrip-card';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -15,6 +18,13 @@ type AppliedClass = {
   source: string;
   level: number;
   subclass?: { slug: string; source: string } | null;
+  // domain AppliedClass has more fields; page only needs these
+  hitDie?: string;
+  savingThrows?: string[];
+  armorProficiencies?: string[];
+  weaponProficiencies?: string[];
+  toolProficiencies?: string[];
+  skillChoices?: string[];
 };
 
 type RaceRow = {
@@ -72,6 +82,22 @@ type WizardCantrip = {
   level: number;
 };
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function hasPicks(limits: SpellLimitsView): boolean {
+  return (
+    limits.cantripsKnown > 0 ||
+    (limits.spellsKnown !== null && limits.spellsKnown > 0) ||
+    (limits.spellsPrepared !== null && limits.spellsPrepared > 0) ||
+    limits.maxSpellLevel > 0
+  );
+}
+
+// Capitalize the first character of the class slug for display
+function classLabel(slug: string): string {
+  return slug.charAt(0).toUpperCase() + slug.slice(1);
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 type Props = { params: Promise<{ id: string }> };
@@ -88,18 +114,19 @@ export default async function SpellsStepPage({ params }: Props) {
 
   const character = await api.get<Character>(`/characters/${id}`, token);
 
-  const primaryClass = character.data?.classes?.[0];
-  if (!primaryClass) redirect(`/characters/${id}/wizard/class`);
+  const allClasses = character.data?.classes ?? [];
+  if (allClasses.length === 0) redirect(`/characters/${id}/wizard/class`);
 
-  // C1: placeholder; C2 will fan out over all caster classes
+  // Filter to caster classes using domain classifyCaster (REQ-SP06-LOOP-CASTERS)
+  // classifyCaster only reads slug + subclass; cast the minimal shape to satisfy typing
+  const casterClasses = allClasses.filter((c) =>
+    classifyCaster({ slug: c.slug, subclass: c.subclass ?? null } as DomainAppliedClass) !== 'none',
+  );
 
   const raceCantripRef = character.data?.raceCantrip ?? null;
 
-  const [options, wizardCantripsResp, raceListResp] = await Promise.all([
-    api.get<SpellOptionsResponse>(
-      `/characters/${id}/classes/${primaryClass.slug}/spells/options`,
-      token,
-    ),
+  // ── Race cantrip meta-fetch (unchanged) ───────────────────────────────────
+  const [wizardCantripsResp, raceListResp] = await Promise.all([
     raceCantripRef
       ? api.get<{ data: WizardCantrip[] }>(
           `/compendium/spells?campaign=${character.campaignId}&class=wizard&level=0&limit=200`,
@@ -114,9 +141,7 @@ export default async function SpellsStepPage({ params }: Props) {
       : Promise.resolve(null),
   ]);
 
-  // Resolve cantrip name from the fetched list; fall back to slug if not found.
   let raceCantripName: string | null = null;
-  // Resolve race name: prefer subrace name, fall back to race name, then slug.
   let raceName: string | null = null;
   if (raceCantripRef) {
     const match = wizardCantripsResp?.data?.find(
@@ -145,27 +170,126 @@ export default async function SpellsStepPage({ params }: Props) {
       );
       raceName = raceRow?.name ?? null;
     }
-    // Final fallback: use slug as display
     if (!raceName) {
       raceName = subraceRef?.slug ?? raceRef?.slug ?? null;
     }
   }
 
-  const { limits } = options;
+  // ── Branch: 0 casters ─────────────────────────────────────────────────────
+  if (casterClasses.length === 0) {
+    const primaryClass = allClasses[0]!;
+    return (
+      <section>
+        <NumberedSectionHead
+          num="05"
+          title="Hechizos"
+          meta="Paso 5 de 6"
+          description="Elegí los hechizos de tu clase."
+        />
+        <div className="mt-6 space-y-4">
+          <NoPicksPanel
+            characterId={id}
+            variant="non-caster"
+            className={primaryClass.slug}
+            level={primaryClass.level}
+          />
+        </div>
+      </section>
+    );
+  }
 
-  const needsPicks =
-    limits.cantripsKnown > 0 ||
-    (limits.spellsKnown !== null && limits.spellsKnown > 0) ||
-    (limits.spellsPrepared !== null && limits.spellsPrepared > 0) ||
-    limits.maxSpellLevel > 0;
+  // ── Branch: 1 caster — direct fetch (REQ-SP06-MULTICLASS-PARALLEL-FETCH) ──
+  if (casterClasses.length === 1) {
+    const primaryClass = casterClasses[0]!;
+    const options = await api.get<SpellOptionsResponse>(
+      `/characters/${id}/classes/${primaryClass.slug}/spells/options`,
+      token,
+    );
+    const { limits } = options;
 
-  const nonCaster = limits.ability === null;
+    if (!hasPicks(limits)) {
+      return (
+        <section>
+          <NumberedSectionHead
+            num="05"
+            title="Hechizos"
+            meta="Paso 5 de 6"
+            description="Elegí los hechizos de tu clase."
+          />
+          <div className="mt-6 space-y-4">
+            {raceCantripName && raceName && (
+              <RaceCantripCard cantripName={raceCantripName} raceName={raceName} />
+            )}
+            <NoPicksPanel
+              characterId={id}
+              variant="too-early"
+              className={primaryClass.slug}
+              level={primaryClass.level}
+            />
+          </div>
+        </section>
+      );
+    }
 
-  const initialSpells = character.data?.spells?.[primaryClass.slug] ?? {
-    cantrips: [],
-    known: [],
-    prepared: [],
-  };
+    const initialPicks = character.data?.spells?.[primaryClass.slug] ?? {
+      cantrips: [],
+      known: [],
+      prepared: [],
+    };
+
+    return (
+      <section>
+        <NumberedSectionHead
+          num="05"
+          title="Hechizos"
+          meta="Paso 5 de 6"
+          description="Elegí los hechizos de tu clase."
+        />
+        <div className="mt-6 space-y-4">
+          {raceCantripName && raceName && (
+            <RaceCantripCard cantripName={raceCantripName} raceName={raceName} />
+          )}
+          <SinglePickerView
+            characterId={id}
+            classSlug={primaryClass.slug}
+            classSource={primaryClass.source}
+            limits={limits}
+            availableSpells={options.availableSpells}
+            subclassGrantedSlugs={options.subclassGrantedSlugs}
+            backHref={`/characters/${id}/wizard/background`}
+            initialPicks={initialPicks}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  // ── Branch: 2+ casters — parallel fetch (REQ-SP06-MULTICLASS-PARALLEL-FETCH) ─
+  const optionsPerClass = await Promise.all(
+    casterClasses.map((c) =>
+      api.get<SpellOptionsResponse>(
+        `/characters/${id}/classes/${c.slug}/spells/options`,
+        token,
+      ),
+    ),
+  );
+
+  const casterTabData: CasterTabData[] = casterClasses.map((c, i) => {
+    const opts = optionsPerClass[i]!;
+    return {
+      classSlug: c.slug,
+      classSource: c.source,
+      className: classLabel(c.slug),
+      limits: opts.limits,
+      availableSpells: opts.availableSpells,
+      subclassGrantedSlugs: opts.subclassGrantedSlugs,
+      initialPicks: character.data?.spells?.[c.slug] ?? {
+        cantrips: [],
+        known: [],
+        prepared: [],
+      },
+    };
+  });
 
   return (
     <section>
@@ -175,31 +299,14 @@ export default async function SpellsStepPage({ params }: Props) {
         meta="Paso 5 de 6"
         description="Elegí los hechizos de tu clase."
       />
-
       <div className="mt-6 space-y-4">
         {raceCantripName && raceName && (
           <RaceCantripCard cantripName={raceCantripName} raceName={raceName} />
         )}
-
-        {!needsPicks ? (
-          <NoPicksPanel
-            characterId={id}
-            variant={nonCaster ? 'non-caster' : 'too-early'}
-            className={primaryClass.slug}
-            level={primaryClass.level}
-          />
-        ) : (
-          <SinglePickerView
-            characterId={id}
-            classSlug={primaryClass.slug}
-            classSource={primaryClass.source}
-            limits={limits}
-            availableSpells={options.availableSpells}
-            subclassGrantedSlugs={options.subclassGrantedSlugs}
-            backHref={`/characters/${id}/wizard/background`}
-            initialPicks={initialSpells}
-          />
-        )}
+        <MulticlassSpellsView
+          characterId={id}
+          casterClasses={casterTabData}
+        />
       </div>
     </section>
   );
