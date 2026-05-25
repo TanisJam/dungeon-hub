@@ -195,6 +195,12 @@ export function SpellsPicker({
     return map;
   }, [filteredSpells]);
 
+  // D-03: Lowest available leveled level defaults open; all others collapsed
+  const lowestLeveledLevel = useMemo(
+    () => (leveledByLevel.size > 0 ? Math.min(...leveledByLevel.keys()) : null),
+    [leveledByLevel],
+  );
+
   // ── Active leveled key set for non-Wizard single-column ─────────────────
 
   // For known-casters: the checkbox writes to knownKeys
@@ -529,7 +535,7 @@ export function SpellsPicker({
       {Array.from(leveledByLevel.entries())
         .sort(([a], [b]) => a - b)
         .map(([lvl, spells]) => (
-          <details key={lvl} open>
+          <details key={lvl} open={lvl === lowestLeveledLevel}>
             <summary className="cursor-pointer list-none">
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
                 Nivel {lvl}

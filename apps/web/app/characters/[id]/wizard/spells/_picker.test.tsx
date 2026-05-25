@@ -289,3 +289,57 @@ describe('SpellsPicker — filter chips (REQ-SP03-FILTER-RITUAL, SP03-S1)', () =
     expect(screen.getByText('Preparados: 2/3')).toBeDefined();
   });
 });
+
+// ── Collapse default (REQ-SP03-COLLAPSE-DEFAULT) ────────────────────────────
+
+/**
+ * Fixture: L1 + L2 + L3 spells. Lowest leveled level = 1 → open. L2, L3 → closed.
+ * Spec #689, SP03-S5 + SP03-S6.
+ * PHB p.201 (Ritual) / CLAUDE.md §2 (mobile-first — reduce scroll).
+ */
+const collapseFixtureSpells = [
+  makeSpell({ slug: 'shield', name: 'Shield', level: 1 }),
+  makeSpell({ slug: 'misty-step', name: 'Misty Step', level: 2 }),
+  makeSpell({ slug: 'fireball', name: 'Fireball', level: 3 }),
+];
+
+const collapseProps: SpellsPickerProps = {
+  ...defaultProps,
+  limits: makeLimits({ cantripsKnown: 0, spellsPrepared: 3, maxSpellLevel: 3 }),
+  availableSpells: collapseFixtureSpells,
+};
+
+describe('SpellsPicker — collapse default (REQ-SP03-COLLAPSE-DEFAULT, SP03-S5)', () => {
+  it('B-RED-1: Lowest non-empty leveled group has open, others do not', () => {
+    const { container } = render(<SpellsPicker {...collapseProps} />);
+    const detailsEls = container.querySelectorAll('details');
+    // Should have 3 <details> elements — one per level
+    expect(detailsEls.length).toBe(3);
+    // L1 details must have `open` attribute
+    expect(detailsEls[0]?.hasAttribute('open')).toBe(true);
+    // L2 details must NOT have `open`
+    expect(detailsEls[1]?.hasAttribute('open')).toBe(false);
+    // L3 details must NOT have `open`
+    expect(detailsEls[2]?.hasAttribute('open')).toBe(false);
+  });
+
+  it('B-RED-2: Cantrip group unaffected — renders with open when cantrips present (SP03-S6)', () => {
+    // Add a cantrip to the fixture
+    const cantrip = makeSpell({ slug: 'fire-bolt', name: 'Fire Bolt', level: 0 });
+    const propsWithCantrip: SpellsPickerProps = {
+      ...collapseProps,
+      limits: makeLimits({ cantripsKnown: 2, spellsPrepared: 3, maxSpellLevel: 3 }),
+      availableSpells: [cantrip, ...collapseFixtureSpells],
+    };
+    const { container } = render(<SpellsPicker {...propsWithCantrip} />);
+    // Cantrip section is a <div> (not <details>) — it always shows
+    // The leveled <details> elements: L1 open, L2+L3 closed
+    const detailsEls = container.querySelectorAll('details');
+    expect(detailsEls.length).toBe(3);
+    expect(detailsEls[0]?.hasAttribute('open')).toBe(true);
+    expect(detailsEls[1]?.hasAttribute('open')).toBe(false);
+    expect(detailsEls[2]?.hasAttribute('open')).toBe(false);
+    // Cantrip row is still visible (in a <div>, always open)
+    expect(screen.getByText('Fire Bolt')).toBeDefined();
+  });
+});
