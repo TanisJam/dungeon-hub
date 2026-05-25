@@ -5,6 +5,7 @@ import { Pill } from '@/components/ui/pill';
 import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 import { decodeSchool } from '@/lib/spells/school-decode';
 import { saveSpells } from './actions';
+import { SpellBadges } from '@/app/_components/spells/badges';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -643,21 +644,11 @@ function SpellRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium text-ink">{spell.name}</span>
           <span className="text-xs text-ink-mute">{decodeSchool(spell.school)}</span>
-          {spell.ritual && (
-            <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Ritual">
-              R
-            </span>
-          )}
-          {spell.concentration && (
-            <span className="rounded bg-blue-100 px-1 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Concentración">
-              C
-            </span>
-          )}
-          {spell.componentsM && (
-            <span className="rounded bg-purple-100 px-1 text-[10px] font-bold text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" title="Componente material">
-              M
-            </span>
-          )}
+          <SpellBadges
+            ritual={spell.ritual}
+            concentration={spell.concentration}
+            componentsM={spell.componentsM}
+          />
           {locked && (
             <Pill tone="pink" size="sm">
               Subclase
@@ -710,21 +701,11 @@ function WizardSpellRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium text-ink">{spell.name}</span>
           <span className="text-xs text-ink-mute">{decodeSchool(spell.school)}</span>
-          {spell.ritual && (
-            <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Ritual">
-              R
-            </span>
-          )}
-          {spell.concentration && (
-            <span className="rounded bg-blue-100 px-1 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" title="Concentración">
-              C
-            </span>
-          )}
-          {spell.componentsM && (
-            <span className="rounded bg-purple-100 px-1 text-[10px] font-bold text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" title="Componente material">
-              M
-            </span>
-          )}
+          <SpellBadges
+            ritual={spell.ritual}
+            concentration={spell.concentration}
+            componentsM={spell.componentsM}
+          />
           {locked && (
             <Pill tone="pink" size="sm">
               Subclase

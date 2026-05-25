@@ -80,6 +80,38 @@ export interface SpellSlotsView {
   pactMagic: { slotLevel: number; slotCount: number } | null;
 }
 
+/**
+ * Compendium spell reference for a single picked spell.
+ * Mirrors domain SpellSheetRef (SP-04). Populated via spellRefsBySlug enrichment.
+ */
+export interface SpellSheetRef {
+  slug: string;
+  source: string;
+  name: string;
+  /** 0 = cantrip */
+  level: number;
+  ritual: boolean;
+  concentration: boolean;
+  componentsM: boolean;
+  /** gp cost when material component is costly; null otherwise */
+  componentsMCost: number | null;
+}
+
+/**
+ * Spell summary per caster class on the sheet.
+ * Mirrors domain ClassSpellSummary (SP-04).
+ */
+export interface ClassSpellSummary {
+  classSlug: string;
+  classSource: string;
+  cantripsKnown: { count: number; max: number };
+  spellsKnown: { count: number; max: number } | null;
+  spellsPrepared: { count: number; max: number } | null;
+  wizardSpellbookSize?: number;
+  /** Always present. Empty arrays when class has no picks or map is absent. */
+  spells: { cantrips: SpellSheetRef[]; leveled: SpellSheetRef[] };
+}
+
 export interface CharacterSheet {
   identity: {
     name: string;
@@ -126,6 +158,12 @@ export interface CharacterSheet {
   racialTraits: RacialTrait[];
   spellcasting: SpellcastingView[];
   spellSlots: SpellSlotsView;
+  /**
+   * Per-class spell list enriched from compendium (SP-04).
+   * Always present when the character has at least one caster class.
+   * Empty array for non-casters.
+   */
+  spellsByClass: ClassSpellSummary[];
 }
 
 export interface InventoryItem {
