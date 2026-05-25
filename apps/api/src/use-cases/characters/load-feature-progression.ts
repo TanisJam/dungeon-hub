@@ -29,9 +29,9 @@ export async function loadFeatureProgression(input: {
   const classRow = classRows[0];
   if (!classRow) return null;
 
+  const classOFP = (classRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'];
   const classData: ClassFeatureSource = {
-    optionalfeatureProgression:
-      (classRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'],
+    ...(classOFP !== undefined ? { optionalfeatureProgression: classOFP } : {}),
   };
 
   let subclassData: ClassFeatureSource | null = null;
@@ -48,9 +48,9 @@ export async function loadFeatureProgression(input: {
       .limit(1);
     const subRow = subRows[0];
     if (subRow) {
+      const subOFP = (subRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'];
       subclassData = {
-        optionalfeatureProgression:
-          (subRow.data as Record<string, unknown>)['optionalfeatureProgression'] as ClassFeatureSource['optionalfeatureProgression'],
+        ...(subOFP !== undefined ? { optionalfeatureProgression: subOFP } : {}),
       };
     }
   }

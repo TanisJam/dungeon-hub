@@ -842,7 +842,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       classData,
       subclassData,
       level: body.level,
-      skillChoices: body.skillChoices,
+      ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
       rulesProfile: campaign.rulesProfile,
     });
 
@@ -1016,8 +1016,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       asisApplied: (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [],
       existingClasses: existingClasses.map((c) => ({ slug: c.slug, source: c.source })),
       newClassData: classData,
-      newSubclassData: subclassData,
-      skillChoices: body.skillChoices,
+      ...(subclassData !== undefined ? { newSubclassData: subclassData } : {}),
+      ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
     });
 
     if (!result.ok) {
@@ -1157,14 +1157,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       inventory: existingInventory,
       itemData,
       input: {
-        quantity: body.quantity,
-        state: body.state,
-        attuned: body.attuned,
-        customName: body.customName,
-        notes: body.notes,
-        equipHand: body.equipHand,
-        charges: body.charges,
-        containerId: body.containerId,
+        ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+        ...(body.state !== undefined ? { state: body.state } : {}),
+        ...(body.attuned !== undefined ? { attuned: body.attuned } : {}),
+        ...(body.customName !== undefined ? { customName: body.customName } : {}),
+        ...(body.notes !== undefined ? { notes: body.notes } : {}),
+        ...(body.equipHand !== undefined ? { equipHand: body.equipHand } : {}),
+        ...(body.charges !== undefined ? { charges: body.charges } : {}),
+        ...(body.containerId !== undefined ? { containerId: body.containerId } : {}),
       },
       weights,
       ctx,
@@ -1305,14 +1305,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         inventory: existingInventory,
         instanceId,
         patch: {
-          quantity: body.quantity,
-          state: body.state,
-          attuned: body.attuned,
-          customName: body.customName,
-          notes: body.notes,
-          equipHand: body.equipHand,
-          charges: body.charges,
-          containerId: body.containerId,
+          ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+          ...(body.state !== undefined ? { state: body.state } : {}),
+          ...(body.attuned !== undefined ? { attuned: body.attuned } : {}),
+          ...(body.customName !== undefined ? { customName: body.customName } : {}),
+          ...(body.notes !== undefined ? { notes: body.notes } : {}),
+          ...(body.equipHand !== undefined ? { equipHand: body.equipHand } : {}),
+          ...(body.charges !== undefined ? { charges: body.charges } : {}),
+          ...(body.containerId !== undefined ? { containerId: body.containerId } : {}),
         },
         itemData,
         weights,
@@ -1398,7 +1398,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         inventory: existingInventory,
         instanceId,
         itemData,
-        count: body?.count,
+        ...(body?.count !== undefined ? { count: body.count } : {}),
       });
 
       if (!result.ok) {
@@ -1781,9 +1781,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         abilityMod,
         availableSpells,
         input: {
-          cantrips: body.cantrips,
-          known: body.known,
-          prepared: body.prepared,
+          ...(body.cantrips !== undefined ? { cantrips: body.cantrips } : {}),
+          ...(body.known !== undefined ? { known: body.known } : {}),
+          ...(body.prepared !== undefined ? { prepared: body.prepared } : {}),
         },
       });
 
@@ -2385,7 +2385,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
               hasSpellcasting,
               existingFeats: existingFeats.map((f) => ({ slug: f.slug, source: f.source })),
             },
-            asiChoice: body.feat.asiChoice,
+            ...(body.feat.asiChoice !== undefined ? { asiChoice: body.feat.asiChoice } : {}),
           });
           if (!featResult.ok) {
             return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: featResult.issues });

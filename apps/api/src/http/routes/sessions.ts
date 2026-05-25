@@ -533,7 +533,7 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
       sessionId: id,
       actorUserId: userId,
       eventType: body.eventType,
-      payload: body.payload,
+      ...(body.payload !== undefined ? { payload: body.payload } : {}),
       visibility,
       ...(body.occurredAt && { occurredAt: new Date(body.occurredAt) }),
     });

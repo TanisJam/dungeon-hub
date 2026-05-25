@@ -14,12 +14,12 @@ function rowToBackgroundCompendiumData(row: {
     slug: row.slug,
     source: row.source,
     name: row.name,
-    skillProficiencies: data['skillProficiencies'] as BackgroundCompendiumData['skillProficiencies'],
-    languageProficiencies: data['languageProficiencies'] as BackgroundCompendiumData['languageProficiencies'],
-    toolProficiencies: data['toolProficiencies'] as BackgroundCompendiumData['toolProficiencies'],
-    skillToolLanguageProficiencies: data['skillToolLanguageProficiencies'] as BackgroundCompendiumData['skillToolLanguageProficiencies'],
-    startingEquipment: data['startingEquipment'] as BackgroundCompendiumData['startingEquipment'],
-    entries: data['entries'] as BackgroundCompendiumData['entries'],
+    skillProficiencies: (data['skillProficiencies'] as BackgroundCompendiumData['skillProficiencies']) ?? null,
+    languageProficiencies: (data['languageProficiencies'] as BackgroundCompendiumData['languageProficiencies']) ?? null,
+    toolProficiencies: (data['toolProficiencies'] as BackgroundCompendiumData['toolProficiencies']) ?? null,
+    skillToolLanguageProficiencies: (data['skillToolLanguageProficiencies'] as BackgroundCompendiumData['skillToolLanguageProficiencies']) ?? null,
+    startingEquipment: (data['startingEquipment'] as BackgroundCompendiumData['startingEquipment']) ?? null,
+    entries: (data['entries'] as BackgroundCompendiumData['entries']) ?? null,
   };
 }
 
