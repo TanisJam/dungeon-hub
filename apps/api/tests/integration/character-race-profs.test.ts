@@ -194,10 +194,16 @@ describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5
         skillChoices: ['arcana', 'investigation'],
       },
       languageChoices: ['dwarvish'],
-      // Human in 5etools PHB has ability:null → MPMM-style, requires explicit ASI distribution
+      // PHB p.31 base Human: +1 to each ability (six fixed +1s, no choice).
+      // The compendium-import lift (`0496976`) put this ability onto the base Human row;
+      // the validator expects all six fixed ASIs to be present.
       appliedAsis: [
-        { ability: 'str', bonus: 2, source: 'race' },
+        { ability: 'str', bonus: 1, source: 'race' },
+        { ability: 'dex', bonus: 1, source: 'race' },
         { ability: 'con', bonus: 1, source: 'race' },
+        { ability: 'int', bonus: 1, source: 'race' },
+        { ability: 'wis', bonus: 1, source: 'race' },
+        { ability: 'cha', bonus: 1, source: 'race' },
       ],
     });
 
