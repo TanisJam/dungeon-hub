@@ -1,8 +1,12 @@
 /**
- * Component tests for SpellsPickerProps — school decode + R/C/M badges.
+ * Component tests for SpellsPickerProps — school decode + R/C/M badges + filter chips + collapse.
  *
  * REQ-SP02-WEB-SCHOOL-DECODE: titleCase(spell.school) → decodeSchool(spell.school)
  * REQ-SP02-WEB-BADGES: R/C/M badge presence for ritual/concentration/componentsM
+ * REQ-SP03-FILTER-RITUAL: Ritual chip narrows visible spells (spec #689 SP03-S1)
+ * REQ-SP03-FILTER-CONCENTRATION: Concentration chip narrows visible spells (spec #689 SP03-S2)
+ * REQ-SP03-COLLAPSE-DEFAULT: Lowest non-empty level open, others closed (spec #689 SP03-S5,S6)
+ * REQ-SP03-COUNTER-CONSISTENCY: Counters read selection sets, not filtered rows (spec #689 SP03-S8)
  *
  * Spec #680, Scenario SP02-S7:
  *   GIVEN a spell with school "V" (Evocation) and ritual=true, concentration=true
@@ -14,7 +18,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
 // Mock next/navigation to prevent router errors in component tests
 vi.mock('next/navigation', () => ({
@@ -190,5 +194,98 @@ describe('SpellsPicker — R/C/M badges (REQ-SP02-WEB-BADGES)', () => {
     expect(screen.getByText('R')).toBeDefined();
     expect(screen.getByText('C')).toBeDefined();
     expect(screen.getByText('M')).toBeDefined();
+  });
+});
+
+// ── Filter chips (REQ-SP03-FILTER-RITUAL / REQ-SP03-FILTER-CONCENTRATION) ──
+
+/**
+ * Fixture: 5 leveled spells covering all ritual/concentration combos.
+ * PHB p.201 (ritual designation) + PHB p.203 (concentration).
+ */
+const filterFixtureSpells = [
+  makeSpell({ slug: 'identify', name: 'Identify', level: 1, ritual: true, concentration: false }),
+  makeSpell({ slug: 'detect-magic', name: 'Detect Magic', level: 1, ritual: true, concentration: true }),
+  makeSpell({ slug: 'bless', name: 'Bless', level: 1, ritual: false, concentration: true }),
+  makeSpell({ slug: 'magic-missile', name: 'Magic Missile', level: 1, ritual: false, concentration: false }),
+  makeSpell({ slug: 'shield', name: 'Shield', level: 1, ritual: false, concentration: false }),
+];
+
+const filterProps: SpellsPickerProps = {
+  ...defaultProps,
+  limits: makeLimits({ cantripsKnown: 0, spellsPrepared: 3, maxSpellLevel: 1 }),
+  availableSpells: filterFixtureSpells,
+};
+
+describe('SpellsPicker — filter chips (REQ-SP03-FILTER-RITUAL, SP03-S1)', () => {
+  it('A-RED-1: Ritual chip narrows visible spell rows to ritual=true only', () => {
+    render(<SpellsPicker {...filterProps} />);
+    // Ritual chip must exist
+    const ritualChip = screen.getByRole('button', { name: /ritual/i });
+    // Before filter: all 5 spells visible
+    expect(screen.getByText('Identify')).toBeDefined();
+    expect(screen.getByText('Magic Missile')).toBeDefined();
+    // Toggle Ritual chip ON
+    fireEvent.click(ritualChip);
+    // Only ritual=true spells should remain
+    expect(screen.getByText('Identify')).toBeDefined();
+    expect(screen.getByText('Detect Magic')).toBeDefined();
+    // Non-ritual spells must not render
+    expect(screen.queryByText('Magic Missile')).toBeNull();
+    expect(screen.queryByText('Bless')).toBeNull();
+    expect(screen.queryByText('Shield')).toBeNull();
+  });
+
+  it('A-RED-2: Concentration chip narrows visible spell rows to concentration=true only', () => {
+    render(<SpellsPicker {...filterProps} />);
+    const concChip = screen.getByRole('button', { name: /concentrac/i });
+    fireEvent.click(concChip);
+    // Only concentration=true spells should remain
+    expect(screen.getByText('Detect Magic')).toBeDefined();
+    expect(screen.getByText('Bless')).toBeDefined();
+    // Non-concentration spells must not render
+    expect(screen.queryByText('Identify')).toBeNull();
+    expect(screen.queryByText('Magic Missile')).toBeNull();
+    expect(screen.queryByText('Shield')).toBeNull();
+  });
+
+  it('A-RED-3: Both chips ON = AND intersection (ritual && concentration)', () => {
+    render(<SpellsPicker {...filterProps} />);
+    const ritualChip = screen.getByRole('button', { name: /ritual/i });
+    const concChip = screen.getByRole('button', { name: /concentrac/i });
+    fireEvent.click(ritualChip);
+    fireEvent.click(concChip);
+    // Only ritual && concentration: Detect Magic
+    expect(screen.getByText('Detect Magic')).toBeDefined();
+    // All others hidden
+    expect(screen.queryByText('Identify')).toBeNull();
+    expect(screen.queryByText('Bless')).toBeNull();
+    expect(screen.queryByText('Magic Missile')).toBeNull();
+    expect(screen.queryByText('Shield')).toBeNull();
+  });
+
+  it('A-RED-4: Counter unchanged when Ritual chip is ON (REQ-SP03-COUNTER-CONSISTENCY, SP03-S8)', () => {
+    // Pre-select 2 non-ritual spells (Bless + Magic Missile) as initial prepared
+    const bless = filterFixtureSpells.find((s) => s.slug === 'bless')!;
+    const mm = filterFixtureSpells.find((s) => s.slug === 'magic-missile')!;
+    const propsWithSelected: SpellsPickerProps = {
+      ...filterProps,
+      initialSpells: {
+        cantrips: [],
+        known: [],
+        prepared: [
+          { slug: bless.slug, source: bless.source },
+          { slug: mm.slug, source: mm.source },
+        ],
+      },
+    };
+    render(<SpellsPicker {...propsWithSelected} />);
+    // Counter shows 2/3 before filter
+    expect(screen.getByText('Preparados: 2/3')).toBeDefined();
+    // Toggle Ritual chip ON — hides Bless and Magic Missile from view
+    const ritualChip = screen.getByRole('button', { name: /ritual/i });
+    fireEvent.click(ritualChip);
+    // Counter must STILL show 2/3 (selection sets unchanged)
+    expect(screen.getByText('Preparados: 2/3')).toBeDefined();
   });
 });

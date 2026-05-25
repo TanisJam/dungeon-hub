@@ -164,23 +164,36 @@ export function SpellsPicker({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // ── Filter chip state (D-01: client-side, D-04: AND semantics) ───────────
+  const [filterRitual, setFilterRitual] = useState(false);
+  const [filterConcentration, setFilterConcentration] = useState(false);
+
   // ── Derived spell lists ──────────────────────────────────────────────────
 
+  // Apply filter chips BEFORE the cantrips/leveled split (D-01, D-04)
+  const filteredSpells = useMemo(
+    () =>
+      availableSpells.filter(
+        (s) => (!filterRitual || s.ritual) && (!filterConcentration || s.concentration),
+      ),
+    [availableSpells, filterRitual, filterConcentration],
+  );
+
   const cantripList = useMemo(
-    () => availableSpells.filter((s) => s.level === 0),
-    [availableSpells],
+    () => filteredSpells.filter((s) => s.level === 0),
+    [filteredSpells],
   );
 
   const leveledByLevel = useMemo(() => {
     const map = new Map<number, AvailableSpell[]>();
-    for (const spell of availableSpells) {
+    for (const spell of filteredSpells) {
       if (spell.level < 1) continue;
       const arr = map.get(spell.level) ?? [];
       arr.push(spell);
       map.set(spell.level, arr);
     }
     return map;
-  }, [availableSpells]);
+  }, [filteredSpells]);
 
   // ── Active leveled key set for non-Wizard single-column ─────────────────
 
@@ -439,6 +452,36 @@ export function SpellsPicker({
             )}
           </>
         )}
+      </div>
+
+      {/* ── Filter chips (D-01 client-side, D-04 AND semantics) ──────────── */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setFilterRitual((v) => !v)}
+          aria-pressed={filterRitual}
+          className={[
+            'rounded-full border px-3 py-1 text-xs font-medium transition',
+            filterRitual
+              ? 'border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+              : 'border-line bg-paper-soft text-ink-mute hover:border-amber-400 hover:text-amber-700',
+          ].join(' ')}
+        >
+          Ritual
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterConcentration((v) => !v)}
+          aria-pressed={filterConcentration}
+          className={[
+            'rounded-full border px-3 py-1 text-xs font-medium transition',
+            filterConcentration
+              ? 'border-blue-500 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+              : 'border-line bg-paper-soft text-ink-mute hover:border-blue-400 hover:text-blue-700',
+          ].join(' ')}
+        >
+          Concentración
+        </button>
       </div>
 
       {/* ── Cantrips section ──────────────────────────────────────────────── */}
