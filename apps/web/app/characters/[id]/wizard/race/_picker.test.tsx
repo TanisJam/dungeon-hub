@@ -1123,8 +1123,11 @@ describe('W-E3: subraces are hidden by default; visible after expanding the grou
   });
 });
 
-describe('W-E4: search matching a subrace name auto-expands the parent group', () => {
-  it('searching "high" auto-expands the Elf group and shows High Elf', () => {
+describe('W-E4: search behavior — orphan groups auto-expand, matching parents stay closed', () => {
+  it('searching "high" auto-expands the Elf group (orphan: parent name did not match) and shows High Elf', () => {
+    // Orphan case: "Elf" base doesn't include "high", so the parent is filtered out.
+    // The orphan group must auto-expand — otherwise the user sees the parent header
+    // with no obvious indicator of which subrace matched the search.
     render(
       <RacePicker
         characterId="char-1"
@@ -1136,11 +1139,13 @@ describe('W-E4: search matching a subrace name auto-expands the parent group', (
     const searchInput = screen.getByPlaceholderText(/buscar linaje/i);
     fireEvent.change(searchInput, { target: { value: 'high' } });
 
-    // Elf group should be auto-expanded, showing High Elf
     expect(screen.getByText('High Elf')).toBeTruthy();
   });
 
-  it('searching "elf" auto-expands the Elf group (parent name also matches)', () => {
+  it('searching "elf" keeps the Elf group CLOSED (non-orphan: parent name matched, subraces hidden until user clicks)', () => {
+    // Non-orphan case: "Elf" base matches the query → parent is in the filtered list →
+    // group renders normally, collapsed by default. User clicks the header to expand.
+    // Decision: groups stay collapsed by default to keep the list visually orderly.
     render(
       <RacePicker
         characterId="char-1"
@@ -1152,9 +1157,9 @@ describe('W-E4: search matching a subrace name auto-expands the parent group', (
     const searchInput = screen.getByPlaceholderText(/buscar linaje/i);
     fireEvent.change(searchInput, { target: { value: 'elf' } });
 
-    // Group header remains in the DOM with aria-expanded true
     const groupBtn = getGroupBtn('elf');
-    expect(groupBtn.getAttribute('aria-expanded')).toBe('true');
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('High Elf')).toBeNull();
   });
 });
 
@@ -1280,9 +1285,15 @@ const VARIANT_HUMAN_SUBRACE_PEER = makeRaceEntry({
   },
 });
 
-describe('W-E7: non-required races stay standalone even when they have subraces in entries', () => {
-  it('Human stays a standalone ChoiceCard when Variant Human subrace is also in entries', () => {
-    // PHB p.31 — Human is a valid standalone race. Variant Human (PHB p.31 sidebar) is optional.
+describe('W-E7: non-required races with subraces render as groups with SELECTABLE parent', () => {
+  // Updated semantics (Symptom 1 fix): Half-Elf/Half-Orc/Tiefling/Human are still
+  // selectable as PHB-base races, but when they have subraces in entries they render
+  // as an accordion group whose header is a ChoiceCard (parentSelectable=true) plus a
+  // separate "Mostrar variantes" toggle below — the variants are hidden by default
+  // and shown when the toggle is clicked. This eliminates the peer-card UX confusion
+  // where "Variant; Aquatic Elf Descent Half-Elf" floated unanchored next to the parent.
+
+  it('Human renders as a group with selectable parent ChoiceCard when Variant Human is in entries', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1291,16 +1302,15 @@ describe('W-E7: non-required races stay standalone even when they have subraces 
       />,
     );
 
-    // Human must NOT be wrapped in an accordion group
-    expect(getGroupBtn('human')).toBeNull();
-    // Human must be directly visible as a card (not hidden inside collapsed accordion)
+    // Human IS still visible as a selectable card (the parent ChoiceCard inside the group).
     expect(screen.getByText('Human')).toBeTruthy();
-    // Dragonborn SHOULD be a group (required subrace)
+    // The group exposes a "Mostrar 1 variante opcional" toggle with the expected data-testid.
+    expect(getGroupBtn('human')).toBeTruthy();
+    // Dragonborn SHOULD still be a group (required subrace, non-selectable header).
     expect(getGroupBtn('dragonborn')).toBeTruthy();
   });
 
-  it('Half-Orc stays a standalone ChoiceCard when a SCAG variant subrace is in entries', () => {
-    // PHB p.40 — Half-Orc is standalone. SCAG subraces are optional alternatives.
+  it('Half-Orc renders as a group with selectable parent when a SCAG variant is in entries', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1309,12 +1319,11 @@ describe('W-E7: non-required races stay standalone even when they have subraces 
       />,
     );
 
-    expect(getGroupBtn('half-orc')).toBeNull();
     expect(screen.getByText('Half-Orc')).toBeTruthy();
+    expect(getGroupBtn('half-orc')).toBeTruthy();
   });
 
-  it('Tiefling stays a standalone ChoiceCard when MToF variant subraces are in entries', () => {
-    // PHB p.42 — Tiefling is standalone. MToF subrace variants (Asmodeus, etc.) are optional.
+  it('Tiefling renders as a group with selectable parent when MToF variants are in entries', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1323,13 +1332,11 @@ describe('W-E7: non-required races stay standalone even when they have subraces 
       />,
     );
 
-    expect(getGroupBtn('tiefling')).toBeNull();
     expect(screen.getByText('Tiefling')).toBeTruthy();
+    expect(getGroupBtn('tiefling')).toBeTruthy();
   });
 
-  it('Variant Human subrace appears as a standalone peer card alongside Human', () => {
-    // PHB p.31 — When Human is not an accordion, Variant Human subrace appears as a flat peer card.
-    // displayName for a subrace: "${subrace.name} ${parent.name}" = "Variant Human".
+  it('Variant Human variant is hidden by default and visible after clicking the variants toggle', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1338,9 +1345,276 @@ describe('W-E7: non-required races stay standalone even when they have subraces 
       />,
     );
 
-    // Both Human and Variant Human must be visible as separate selectable items.
-    // "Human" is the parent card; "Variant Human" is the subrace card title (displayName).
+    // Initially: parent Human is visible, Variant Human variant card is NOT (toggle collapsed).
     expect(screen.getByText('Human')).toBeTruthy();
+    expect(screen.queryByText('Variant Human')).toBeNull();
+
+    // Click the variants toggle button → variants become visible.
+    fireEvent.click(getGroupBtn('human'));
     expect(screen.getByText('Variant Human')).toBeTruthy();
+  });
+
+  it('clicking the parent Human card selects Human without expanding the variants list', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE_FOR_VARIANT, VARIANT_HUMAN_SUBRACE_PEER]}
+        initialSelection={null}
+      />,
+    );
+
+    // Click the parent ChoiceCard's button — that should select Human and NOT toggle the variants.
+    const humanCard = screen.getByText('Human').closest('button');
+    expect(humanCard).toBeTruthy();
+    fireEvent.click(humanCard!);
+
+    // Variant Human is still hidden (the toggle was not clicked).
+    expect(screen.queryByText('Variant Human')).toBeNull();
+    // Variants toggle is still present and collapsed (aria-expanded='false').
+    expect(getGroupBtn('human').getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-F: Same-name cross-source merging (Sintoma 2)
+//
+// W-F1: Two standalone base races with the same display name merge into ONE card.
+// W-F2: A base race whose name matches a subrace under some parent is absorbed
+//       into that parent's accordion (cross-level merge, option A).
+// W-F3: Merged cards (2+ variants) render a source chip selector in the detail panel.
+// W-F4: Clicking a source chip while the merged card is selected switches selectedKey
+//       to the new variant.
+// ---------------------------------------------------------------------------
+
+// A second "Sea Elf" appearing as a base race MPMM, while "Sea Elf" also exists
+// as a subrace of elf|PHB (SEA_ELF_SUBRACE below).
+const SEA_ELF_SUBRACE = makeRaceEntry({
+  slug: 'elf--sea',
+  source: 'MPMM',
+  name: 'Sea',
+  isSubrace: true,
+  parentSlug: 'elf',
+  parentSource: 'PHB',
+  data: { name: 'Sea', source: 'MPMM', ability: [{ con: 1 }], size: ['M'], speed: 30 },
+});
+
+const SEA_ELF_BASE = makeRaceEntry({
+  slug: 'sea-elf',
+  source: 'MPMM',
+  name: 'Sea Elf',
+  isSubrace: false,
+  data: { name: 'Sea Elf', source: 'MPMM', ability: [{ con: 1 }], size: ['M'], speed: 30 },
+});
+
+// Two same-named standalone Aasimar base races from different sources
+const AASIMAR_VGM = makeRaceEntry({
+  slug: 'aasimar',
+  source: 'VGM',
+  name: 'Aasimar',
+  isSubrace: false,
+  data: { name: 'Aasimar', source: 'VGM', ability: [{ cha: 2 }], size: ['M'], speed: 30 },
+});
+const AASIMAR_MPMM = makeRaceEntry({
+  slug: 'aasimar',
+  source: 'MPMM',
+  name: 'Aasimar',
+  isSubrace: false,
+  // Explicit fixed ASI so effectiveAsiSlots does NOT synthesize MPMM-style flexible slots
+  // (which would require chosenAsis to be pre-populated for the saveRace preflight to pass).
+  data: { name: 'Aasimar', source: 'MPMM', ability: [{ cha: 2, wis: 1 }], size: ['M'], speed: 30 },
+});
+
+describe('W-F1: same-named standalone base races merge into one card', () => {
+  it('Aasimar VGM and Aasimar MPMM render as a single card (not two separate cards)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[AASIMAR_VGM, AASIMAR_MPMM]}
+        initialSelection={null}
+      />,
+    );
+
+    // Exactly one "Aasimar" title should be in the document
+    const titles = screen.getAllByText('Aasimar');
+    expect(titles.length).toBe(1);
+  });
+});
+
+describe('W-F2: cross-level absorption — base race merges into parent accordion (option A)', () => {
+  it('Sea Elf MPMM base race is absorbed into the Elf accordion (no top-level Sea Elf card)', () => {
+    // Elf accordion already has a "Sea" subrace (displayName: "Sea Elf"). The standalone
+    // sea-elf|MPMM base race shares that displayName → it must be absorbed inside the
+    // Elf accordion, not rendered as a separate top-level card.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[ELF_BASE, SEA_ELF_SUBRACE, SEA_ELF_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    // The Elf accordion group must exist
+    expect(getGroupBtn('elf')).toBeTruthy();
+
+    // Expand Elf accordion
+    fireEvent.click(getGroupBtn('elf'));
+
+    // Sea Elf must appear EXACTLY ONCE (inside the accordion), not twice
+    const titles = screen.getAllByText('Sea Elf');
+    expect(titles.length).toBe(1);
+  });
+});
+
+describe('W-F3: merged cards render a source chip selector in the detail panel', () => {
+  it('selecting the merged Aasimar card shows a "Fuente · 2 variantes" chip selector', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[AASIMAR_VGM, AASIMAR_MPMM]}
+        initialSelection={{ raceSlug: 'aasimar', raceSource: 'VGM', subraceSlug: null, subraceSource: null }}
+      />,
+    );
+
+    // Source chip selector label appears in the detail panel
+    expect(screen.getByText(/fuente.*2 variantes/i)).toBeTruthy();
+    // Both source chips render
+    expect(screen.getByRole('button', { name: 'VGM' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'MPMM' })).toBeTruthy();
+  });
+
+  it('single-variant cards do NOT render the source chip selector', () => {
+    // Standalone with no merge → no chip selector
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE]}
+        initialSelection={{ raceSlug: 'human', raceSource: 'PHB', subraceSlug: null, subraceSource: null }}
+      />,
+    );
+
+    expect(screen.queryByText(/fuente.*variantes/i)).toBeNull();
+  });
+});
+
+// W-F5: Parent-level merge — when a same-named race exists both as an accordion parent
+// (with subraces, e.g. Aasimar VGM) AND as base races without subraces (Aasimar MPMM, DMG),
+// they collapse into a SINGLE card. The parent header carries a source chip selector.
+// The "variantes opcionales" toggle appears only when the active variant has subraces.
+
+const AASIMAR_VGM_WITH_SUBRACES = makeRaceEntry({
+  slug: 'aasimar',
+  source: 'VGM',
+  name: 'Aasimar',
+  isSubrace: false,
+  data: { name: 'Aasimar', source: 'VGM', ability: [{ cha: 2 }], size: ['M'], speed: 30 },
+});
+
+const AASIMAR_PROTECTOR_SUBRACE = makeRaceEntry({
+  slug: 'aasimar--protector',
+  source: 'VGM',
+  name: 'Protector',
+  isSubrace: true,
+  parentSlug: 'aasimar',
+  parentSource: 'VGM',
+  data: { name: 'Protector', source: 'VGM', ability: [{ wis: 1 }], size: ['M'], speed: 30 },
+});
+
+const AASIMAR_DMG_BASE = makeRaceEntry({
+  slug: 'aasimar',
+  source: 'DMG',
+  name: 'Aasimar',
+  isSubrace: false,
+  data: { name: 'Aasimar', source: 'DMG', ability: [{ cha: 2, wis: 1 }], size: ['M'], speed: 30 },
+});
+
+describe('W-F5: parent-level merge — accordion parent + standalone base races same-named collapse into one card', () => {
+  it('Aasimar VGM (with subraces) + Aasimar MPMM + Aasimar DMG render as a single card with 3 source chips', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[
+          AASIMAR_VGM_WITH_SUBRACES,
+          AASIMAR_PROTECTOR_SUBRACE,
+          AASIMAR_MPMM,
+          AASIMAR_DMG_BASE,
+        ]}
+        // Pre-select VGM Aasimar so the detail panel (with chip selector) is visible
+        initialSelection={{ raceSlug: 'aasimar', raceSource: 'VGM', subraceSlug: null, subraceSource: null }}
+      />,
+    );
+
+    // Exactly ONE "Aasimar" title — not three separate cards
+    const titles = screen.getAllByText('Aasimar');
+    expect(titles.length).toBe(1);
+
+    // All 3 source chips present
+    expect(screen.getByRole('button', { name: 'VGM' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'MPMM' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'DMG' })).toBeTruthy();
+  });
+
+  it('variants toggle appears only when the active source has subraces (VGM yes, MPMM no)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[
+          AASIMAR_VGM_WITH_SUBRACES,
+          AASIMAR_PROTECTOR_SUBRACE,
+          AASIMAR_MPMM,
+        ]}
+        // VGM active → variants toggle should appear (VGM has Protector subrace)
+        initialSelection={{ raceSlug: 'aasimar', raceSource: 'VGM', subraceSlug: null, subraceSource: null }}
+      />,
+    );
+
+    // VGM is active by default → toggle is visible
+    expect(getGroupBtn('aasimar')).toBeTruthy();
+
+    // Click MPMM chip → active switches to MPMM (which has no subraces) → toggle disappears
+    fireEvent.click(screen.getByRole('button', { name: 'MPMM' }));
+
+    expect(getGroupBtn('aasimar')).toBeNull();
+  });
+});
+
+describe('W-F4: clicking a source chip switches the active variant', () => {
+  it('clicking MPMM chip on selected Aasimar card updates the active source pill', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+    vi.mocked(saveRace).mockResolvedValue({ error: null });
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[AASIMAR_VGM, AASIMAR_MPMM]}
+        initialSelection={{ raceSlug: 'aasimar', raceSource: 'VGM', subraceSlug: null, subraceSource: null }}
+      />,
+    );
+
+    // The active source pill (last pill in the card header) is VGM initially
+    // (Aasimar VGM came first by source priority — neither in priority list, both fall back
+    // to alphabetical, so MPMM < VGM lexically → MPMM is first). Re-verify by clicking VGM
+    // chip first to force VGM-active.
+    fireEvent.click(screen.getByRole('button', { name: 'VGM' }));
+
+    // Now click MPMM chip → switches active to MPMM
+    fireEvent.click(screen.getByRole('button', { name: 'MPMM' }));
+
+    // Click Siguiente — saveRace should be called with source: 'MPMM'
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    await vi.waitFor(() => {
+      expect(saveRace).toHaveBeenCalledWith(
+        'char-1',
+        { slug: 'aasimar', source: 'MPMM' },
+        null,
+        expect.any(Array),
+        expect.any(Array),
+        expect.any(Array),
+        null,
+        null,
+      );
+    });
   });
 });

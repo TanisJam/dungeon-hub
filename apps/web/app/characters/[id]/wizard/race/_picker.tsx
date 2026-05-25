@@ -76,6 +76,40 @@ function displayName(e: RaceEntry, all: RaceEntry[]): string {
   return e.name;
 }
 
+/** Normalize a display name for cross-source merge grouping. */
+function normalizeForMerge(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Source priority for variant ordering inside a merged card. PHB is canonical; supplements
+ * fall back to alphabetical. Used to decide which variant is shown first in the chip selector.
+ */
+const SOURCE_PRIORITY: Record<string, number> = {
+  PHB: 0, DMG: 1, MTF: 2, MPMM: 3, SCAG: 4, TCE: 5, XGE: 6, EGW: 7,
+};
+function compareSource(a: string, b: string): number {
+  const pa = SOURCE_PRIORITY[a] ?? 99;
+  const pb = SOURCE_PRIORITY[b] ?? 99;
+  if (pa !== pb) return pa - pb;
+  return a.localeCompare(b);
+}
+
+/**
+ * A group of entries that share the same normalized display name across sources.
+ * When `variants.length === 1` the card renders identically to a single entry.
+ * When `variants.length > 1` the card prepends a source chip selector to its detail panel
+ * so the user can switch which variant's mechanics drive the selection.
+ */
+type MergedEntry = {
+  /** Normalized merge key — lowercase trimmed displayName. */
+  normalizedName: string;
+  /** Human-readable display name (taken from the primary/first variant). */
+  displayName: string;
+  /** Variants sorted by source priority (PHB first, then supplement alphabetical). */
+  variants: RaceEntry[];
+};
+
 export function RacePicker({
   characterId,
   entries,
@@ -121,18 +155,29 @@ export function RacePicker({
   const [pending, startTransition] = useTransition();
 
   /**
+   * Per-MergedEntry active-variant override. Keyed by normalized display name.
+   * When the user clicks a source chip on a merged card, we record their choice here
+   * so the active variant persists across re-renders. Without an override the active
+   * variant is derived from `selectedKey` (if the selection lives in the merge) or
+   * defaults to index 0 (PHB-priority).
+   */
+  const [activeVariantByName, setActiveVariantByName] = useState<Record<string, number>>({});
+
+  /**
    * Partition the entry list into three buckets:
-   * - groups: parents that REQUIRE a subrace pick per PHB 2014 (accordion)
-   * - standalones: all other base races, including those with optional variants (direct ChoiceCards)
+   * - groups: parents with any subraces in data (accordion). Header is selectable
+   *   when the parent is NOT in RACES_REQUIRING_SUBRACE (Half-Elf, Half-Orc, Tiefling, Human, etc.)
+   *   and non-selectable for required-subrace races (Elf/Dwarf/Gnome/Halfling/Dragonborn PHB).
+   * - standalones: base races without subraces in data (direct ChoiceCards)
    * - orphanGroups: subraces whose parent is filtered out (e.g. search matched the subrace but not the parent)
    *
-   * The predicate is RACES_REQUIRING_SUBRACE from domain, NOT "has any subraces in data".
-   * Human, Half-Elf, Half-Orc, Tiefling are valid standalone PHB races whose SCAG/MToF/MPMM
-   * variants are optional alternatives — hiding them behind an accordion makes them unselectable.
-   * Only elf|PHB, dwarf|PHB, gnome|PHB, halfling|PHB, dragonborn|PHB require a subrace pick.
+   * Rationale: producing peer subrace cards next to a non-required parent (the previous
+   * approach) yielded confusing titles like "Variant; Aquatic Elf Descent Half-Elf" floating
+   * unanchored. Grouping all sub-raced races visually + making the PHB-base race selectable
+   * via the header card preserves PHB-RAW semantics without losing the variants' affordance.
    */
   // RACES_REQUIRING_SUBRACE is a stable module-level constant — no memo needed.
-  const parentSlugsWithSubraces = RACES_REQUIRING_SUBRACE;
+  const requiredSubraceParents = RACES_REQUIRING_SUBRACE;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -146,12 +191,21 @@ export function RacePicker({
 
   /**
    * Partition filtered entries into groups, standalones, and orphan groups.
-   * Each group collects the parent entry + its subraces from the filtered set.
+   *
+   * Three levels of same-name cross-source merging:
+   * - SUBRACE level: subraces sharing the same normalized display name within a parent
+   *   collapse into one MergedEntry.
+   * - CROSS-LEVEL absorb: a base race (no subraces of its own) whose normalized name
+   *   matches a SUBRACE name under some parent is absorbed into that parent's matching
+   *   MergedEntry. Example: `sea-elf|MPMM` base race merges with the Sea Elf subrace
+   *   under elf|PHB.
+   * - PARENT level: non-required parents (Aasimar VGM with subraces, Aasimar MPMM and DMG
+   *   without) sharing the same normalized name collapse into a single GroupItem whose
+   *   parent header is a merged ChoiceCard with chips. The subraces shown below depend on
+   *   the currently active parent variant. RACES_REQUIRING_SUBRACE parents (Elf PHB, etc.)
+   *   never merge — they always emit as their own single-variant GroupItem.
    */
   const partitioned = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    // Collect subraces present in filtered, keyed by parentSlug|parentSource
     const subracesByParent = new Map<string, RaceEntry[]>();
     for (const e of filtered) {
       if (e.isSubrace && e.parentSlug) {
@@ -164,73 +218,190 @@ export function RacePicker({
       group.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
     }
 
-    // Walk non-subrace entries sorted by name
+    const subraceNamesByParent = new Map<string, Map<string, RaceEntry[]>>();
+    for (const [pKey, subs] of subracesByParent.entries()) {
+      const byName = new Map<string, RaceEntry[]>();
+      for (const s of subs) {
+        const nm = normalizeForMerge(displayName(s, entries));
+        if (!byName.has(nm)) byName.set(nm, []);
+        byName.get(nm)!.push(s);
+      }
+      subraceNamesByParent.set(pKey, byName);
+    }
+
     const parents = filtered
       .filter((e) => !e.isSubrace)
       .sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
 
-    type GroupItem = { kind: 'group'; parent: RaceEntry; subraces: RaceEntry[]; autoExpand: boolean };
-    type StandaloneItem = { kind: 'standalone'; entry: RaceEntry };
+    // Cross-level absorption: a base race (no subraces of its own) gets absorbed iff its
+    // normalized name matches a subrace name under some parent. Deterministic when multiple
+    // parents qualify: alphabetical-first wins.
+    const baseRaceAbsorptionTarget = new Map<string, { parentKey: string; nm: string }>();
+    for (const p of parents) {
+      const pKey = entryKey(p);
+      const hasOwnSubraces = (subracesByParent.get(pKey)?.length ?? 0) > 0;
+      if (hasOwnSubraces) continue;
+      const nm = normalizeForMerge(displayName(p, entries));
+      const matchingParentKeys = [...subraceNamesByParent.entries()]
+        .filter(([_, byName]) => byName.has(nm))
+        .map(([k]) => k)
+        .sort();
+      if (matchingParentKeys.length > 0) {
+        baseRaceAbsorptionTarget.set(pKey, { parentKey: matchingParentKeys[0]!, nm });
+      }
+    }
+    const absorbedBaseKeys = new Set<string>(baseRaceAbsorptionTarget.keys());
+
+    function mergeEntries(list: RaceEntry[]): MergedEntry[] {
+      const byName = new Map<string, RaceEntry[]>();
+      for (const e of list) {
+        const nm = normalizeForMerge(displayName(e, entries));
+        if (!byName.has(nm)) byName.set(nm, []);
+        byName.get(nm)!.push(e);
+      }
+      const merged: MergedEntry[] = [];
+      for (const [nm, variants] of byName.entries()) {
+        const sorted = [...variants].sort((a, b) => compareSource(a.source, b.source));
+        merged.push({
+          normalizedName: nm,
+          displayName: displayName(sorted[0]!, entries),
+          variants: sorted,
+        });
+      }
+      merged.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      return merged;
+    }
+
+    /** Merged subraces for a single parent variant: its own subraces + any absorbed base races. */
+    function subracesForParent(variantKey: string): MergedEntry[] {
+      const ownSubs = subracesByParent.get(variantKey) ?? [];
+      const merged = mergeEntries(ownSubs);
+      for (const [baseKey, target] of baseRaceAbsorptionTarget.entries()) {
+        if (target.parentKey !== variantKey) continue;
+        const baseEntry = parents.find((p) => entryKey(p) === baseKey);
+        if (!baseEntry) continue;
+        const slot = merged.find((m) => m.normalizedName === target.nm);
+        if (slot) {
+          slot.variants = [...slot.variants, baseEntry].sort((a, b) =>
+            compareSource(a.source, b.source),
+          );
+        }
+      }
+      return merged;
+    }
+
+    type GroupItem = {
+      kind: 'group';
+      parentMerged: MergedEntry;
+      /** Subraces per parent-variant idx, aligned with parentMerged.variants order. */
+      subracesByVariantIdx: MergedEntry[][];
+      autoExpand: boolean;
+    };
+    type StandaloneItem = { kind: 'standalone'; merged: MergedEntry };
     type ListItem = GroupItem | StandaloneItem;
 
     const items: ListItem[] = [];
     const emittedParentKeys = new Set<string>();
 
+    // Pass 1: REQUIRED-subrace parents emit individually — they NEVER merge with other parents.
+    // If no subraces present in the filtered entries (e.g. unit-test fixtures that omit them),
+    // fall back to a standalone card so the "requiere sublinaje" pill / preflight hint remain visible.
     for (const p of parents) {
-      const key = entryKey(p);
-      emittedParentKeys.add(key);
-
-      const requiresSubraceForThisRace = parentSlugsWithSubraces.has(key);
-      const subraces = subracesByParent.get(key) ?? [];
-      const hasSubracesInData = subraces.length > 0;
-
-      if (requiresSubraceForThisRace && hasSubracesInData) {
-        // This parent REQUIRES a subrace (PHB 2014) AND has subraces available → accordion group.
-        // Auto-expand when: a search query matches (any subrace is visible = we have results in filtered),
-        // OR the current query is non-empty (the search itself filtered these in)
-        const hasQueryMatch = !!q;
-        items.push({ kind: 'group', parent: p, subraces, autoExpand: hasQueryMatch });
+      const pKey = entryKey(p);
+      if (absorbedBaseKeys.has(pKey)) continue;
+      if (!requiredSubraceParents.has(pKey)) continue;
+      emittedParentKeys.add(pKey);
+      const subs = subracesForParent(pKey);
+      const singletonMerged: MergedEntry = {
+        normalizedName: normalizeForMerge(displayName(p, entries)),
+        displayName: displayName(p, entries),
+        variants: [p],
+      };
+      if (subs.length > 0) {
+        items.push({
+          kind: 'group',
+          parentMerged: singletonMerged,
+          subracesByVariantIdx: [subs],
+          autoExpand: false,
+        });
       } else {
-        // Either: (a) race is not in RACES_REQUIRING_SUBRACE (optional variants), OR
-        //         (b) race requires a subrace but none are present in the current dataset.
-        // In both cases render as standalone ChoiceCard.
-        // Optional variants (Human/Variant Human, Half-Orc SCAG, Tiefling MToF) emit their
-        // subraces as peer standalone cards sorted right after the parent.
-        items.push({ kind: 'standalone', entry: p });
-        // Emit optional subraces (or zero subraces for required-but-no-data case) as peers.
-        for (const s of subraces) {
-          items.push({ kind: 'standalone', entry: s });
-        }
+        items.push({ kind: 'standalone', merged: singletonMerged });
       }
     }
 
-    // Orphan subraces: their parent is not in the filtered set (subrace matched but parent didn't).
-    // Group them by parent key and append at the end. The parent entry is resolved from `entries`.
-    const orphanGroups = new Map<string, { parent: RaceEntry | null; subraces: RaceEntry[] }>();
+    // Pass 2: Non-REQUIRED, non-absorbed parents — group by normalized name (parent-level merge).
+    const nonReqByName = new Map<string, RaceEntry[]>();
+    for (const p of parents) {
+      const pKey = entryKey(p);
+      if (absorbedBaseKeys.has(pKey)) continue;
+      if (requiredSubraceParents.has(pKey)) continue;
+      const nm = normalizeForMerge(displayName(p, entries));
+      if (!nonReqByName.has(nm)) nonReqByName.set(nm, []);
+      nonReqByName.get(nm)!.push(p);
+    }
+
+    for (const [nm, variants] of nonReqByName.entries()) {
+      const sortedVariants = [...variants].sort((a, b) => compareSource(a.source, b.source));
+      for (const v of sortedVariants) emittedParentKeys.add(entryKey(v));
+      const parentMerged: MergedEntry = {
+        normalizedName: nm,
+        displayName: displayName(sortedVariants[0]!, entries),
+        variants: sortedVariants,
+      };
+      const subracesByVariantIdx = sortedVariants.map((v) => subracesForParent(entryKey(v)));
+      const hasAnySubraces = subracesByVariantIdx.some((s) => s.length > 0);
+      if (hasAnySubraces) {
+        items.push({
+          kind: 'group',
+          parentMerged,
+          subracesByVariantIdx,
+          autoExpand: false,
+        });
+      } else {
+        items.push({ kind: 'standalone', merged: parentMerged });
+      }
+    }
+
+    // Sort by display name
+    function itemDisplayName(it: ListItem): string {
+      return it.kind === 'group' ? it.parentMerged.displayName : it.merged.displayName;
+    }
+    items.sort((a, b) => itemDisplayName(a).localeCompare(itemDisplayName(b)));
+
+    // Orphan groups: subraces whose parent is not in the filtered set
+    const orphanByParent = new Map<string, { parent: RaceEntry | null; subraces: RaceEntry[] }>();
     for (const e of filtered) {
       if (e.isSubrace && e.parentSlug) {
         const key = `${e.parentSlug}|${e.parentSource}`;
         if (!emittedParentKeys.has(key)) {
-          if (!orphanGroups.has(key)) {
+          if (!orphanByParent.has(key)) {
             const parentEntry = entries.find(
               (p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace,
             ) ?? null;
-            orphanGroups.set(key, { parent: parentEntry, subraces: [] });
+            orphanByParent.set(key, { parent: parentEntry, subraces: [] });
           }
-          orphanGroups.get(key)!.subraces.push(e);
+          orphanByParent.get(key)!.subraces.push(e);
         }
       }
     }
-    for (const { parent, subraces } of orphanGroups.values()) {
+    for (const [_key, { parent, subraces }] of orphanByParent.entries()) {
       if (parent) {
-        subraces.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
-        // Orphan groups always auto-expand (the search matched a subrace)
-        items.push({ kind: 'group', parent, subraces, autoExpand: true });
+        const merged = mergeEntries(subraces);
+        items.push({
+          kind: 'group',
+          parentMerged: {
+            normalizedName: normalizeForMerge(displayName(parent, entries)),
+            displayName: displayName(parent, entries),
+            variants: [parent],
+          },
+          subracesByVariantIdx: [merged],
+          autoExpand: true,
+        });
       }
     }
 
     return items;
-  }, [filtered, entries, query]);
+  }, [filtered, entries, requiredSubraceParents]);
 
   const selected = useMemo(
     () => entries.find((e) => entryKey(e) === selectedKey) ?? null,
@@ -395,6 +566,66 @@ export function RacePicker({
     });
   }
 
+  /**
+   * Determine which variant of a MergedEntry is currently "active" — the one whose
+   * mechanics drive the card's detail panel and would be persisted on selection.
+   *
+   * Priority: explicit user chip override > matches selectedKey > first variant (PHB-priority).
+   */
+  function getActiveIdx(m: MergedEntry): number {
+    const stored = activeVariantByName[m.normalizedName];
+    if (stored !== undefined && stored >= 0 && stored < m.variants.length) return stored;
+    const fromSelection = m.variants.findIndex((v) => entryKey(v) === selectedKey);
+    if (fromSelection >= 0) return fromSelection;
+    return 0;
+  }
+
+  /**
+   * Switch the active variant of a merged card. If the card is currently selected,
+   * also update `selectedKey` to point at the new variant so the chip and the selection stay in sync.
+   */
+  function switchVariant(m: MergedEntry, newIdx: number) {
+    setActiveVariantByName({ ...activeVariantByName, [m.normalizedName]: newIdx });
+    const isMergeSelected = m.variants.some((v) => entryKey(v) === selectedKey);
+    if (isMergeSelected) {
+      const newKey = entryKey(m.variants[newIdx]!);
+      if (newKey !== selectedKey) {
+        // Reset per-source picks because mechanics may differ between variants.
+        setChosenAsis({});
+        setChosenLangs([]);
+        setChosenSkills([]);
+        setChosenFeatSlug(null);
+        setChosenCantrip(null);
+        setSelectedKey(newKey);
+        setError(null);
+      }
+    }
+  }
+
+  /**
+   * Build a ChoiceOption for a MergedEntry. Single-variant merges render identically to
+   * a single RaceEntry. Multi-variant merges prepend a source chip selector to the detail panel.
+   */
+  function buildMergedOption(m: MergedEntry): ChoiceOption<string> {
+    const activeIdx = getActiveIdx(m);
+    const active = m.variants[activeIdx]!;
+    const baseOpt = buildOption(active);
+    if (m.variants.length === 1) return baseOpt;
+    return {
+      ...baseOpt,
+      detail: (
+        <div className="space-y-3">
+          <SourceChipSelector
+            variants={m.variants}
+            activeIdx={activeIdx}
+            onSelect={(idx) => switchVariant(m, idx)}
+          />
+          {baseOpt.detail}
+        </div>
+      ),
+    };
+  }
+
   /** Build a ChoiceOption for any single RaceEntry. Used by both standalone cards and subrace group items. */
   function buildOption(e: RaceEntry): ChoiceOption<string> {
     const key = entryKey(e);
@@ -497,25 +728,43 @@ export function RacePicker({
         <div className="space-y-2">
           {partitioned.map((item) => {
             if (item.kind === 'group') {
-              const { parent, subraces, autoExpand } = item;
-              // Auto-expand when the current selection is inside this group
-              const selectionInGroup = subraces.some((s) => entryKey(s) === selectedKey);
-              const subraceOptions = subraces.map((s) => buildOption(s));
+              const { parentMerged, subracesByVariantIdx, autoExpand } = item;
+              const activeIdx = getActiveIdx(parentMerged);
+              const activeParent = parentMerged.variants[activeIdx]!;
+              const activeSubraces = subracesByVariantIdx[activeIdx] ?? [];
+              const parentSelectable = !requiredSubraceParents.has(entryKey(activeParent));
+
+              // Auto-expand only when the current selection is one of the variant subraces.
+              // A selected parent variant does NOT auto-expand — the chip selector lives
+              // inside the (already-visible) parent detail panel, so the variants list can
+              // stay collapsed unless the user explicitly chose a variant.
+              const selectionInSubraces = activeSubraces.some((m) =>
+                m.variants.some((v) => entryKey(v) === selectedKey),
+              );
+
+              const subraceOptions = activeSubraces.map((m) => buildMergedOption(m));
+              // Parent option: when the parent merge has 2+ variants, the chip selector lives
+              // inside parentOption.detail via buildMergedOption. When parentSelectable=false
+              // (RACES_REQUIRING_SUBRACE), parentMerged has only 1 variant by construction.
+              const parentOption = parentSelectable ? buildMergedOption(parentMerged) : undefined;
+
               return (
                 <SubraceGroup
-                  key={entryKey(parent)}
-                  parentName={parent.name}
-                  parentSlug={parent.slug}
+                  key={parentMerged.normalizedName}
+                  parentName={activeParent.name}
+                  parentSlug={activeParent.slug}
                   subraces={subraceOptions}
                   selectedSubraceKey={selectedKey}
-                  defaultOpen={selectionInGroup || autoExpand}
+                  defaultOpen={selectionInSubraces || autoExpand}
                   onSelect={handleSelect}
+                  parentSelectable={parentSelectable}
+                  parentOption={parentOption}
                 />
               );
             } else {
-              // Standalone: direct ChoiceCard
-              const opt = buildOption(item.entry);
-              const isSelected = opt.key === selectedKey;
+              // Standalone: a merged card (1+ variants), no subraces under any variant
+              const opt = buildMergedOption(item.merged);
+              const isSelected = item.merged.variants.some((v) => entryKey(v) === selectedKey);
               return (
                 <ChoiceCard
                   key={opt.key}
@@ -1119,6 +1368,54 @@ function HighElfCantripPicker({
             );
           })
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Source chip selector — shown inside a merged card's detail panel when the
+// same display name exists across multiple sources (Sea Elf PHB+MPMM, Deep
+// Gnome PHB-MTF+MPMM, etc.). Clicking a chip switches the variant whose
+// mechanics drive the card and (if the card is selected) follows the selection.
+// ---------------------------------------------------------------------------
+
+function SourceChipSelector({
+  variants,
+  activeIdx,
+  onSelect,
+}: {
+  variants: RaceEntry[];
+  activeIdx: number;
+  onSelect: (idx: number) => void;
+}) {
+  return (
+    <div className="rounded-md border border-accent-soft bg-paper p-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-accent-deep">
+        Fuente · {variants.length} variantes
+      </p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {variants.map((v, i) => {
+          const isOn = i === activeIdx;
+          return (
+            <button
+              key={`${v.slug}|${v.source}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(i);
+              }}
+              className={[
+                'rounded px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
+                isOn
+                  ? 'bg-accent-soft text-accent-deep ring-accent'
+                  : 'text-ink-soft ring-line hover:ring-accent-soft',
+              ].join(' ')}
+            >
+              {v.source}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

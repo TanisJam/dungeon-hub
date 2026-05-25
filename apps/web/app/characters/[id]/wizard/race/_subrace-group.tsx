@@ -16,6 +16,18 @@ export interface SubraceGroupProps {
    */
   defaultOpen?: boolean;
   onSelect: (key: string | null) => void;
+  /**
+   * When true, the parent itself is selectable as a PHB-base race (Half-Elf, Half-Orc,
+   * Tiefling, Human, etc. — races whose subraces are optional variants, not required).
+   * In that case the header is rendered as a ChoiceCard for the parent, with a separate
+   * "Mostrar variantes" toggle below.
+   *
+   * When false (default), the header is a non-selectable group toggle — used for
+   * RACES_REQUIRING_SUBRACE (Elf/Dwarf/Gnome/Halfling/Dragonborn PHB).
+   */
+  parentSelectable?: boolean;
+  /** Parent's ChoiceOption — required when parentSelectable is true. */
+  parentOption?: ChoiceOption<string>;
 }
 
 export function SubraceGroup({
@@ -25,6 +37,8 @@ export function SubraceGroup({
   selectedSubraceKey,
   defaultOpen = false,
   onSelect,
+  parentSelectable = false,
+  parentOption,
 }: SubraceGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -35,9 +49,116 @@ export function SubraceGroup({
 
   const count = subraces.length;
 
+  if (parentSelectable && parentOption) {
+    const isParentSelected = parentOption.key === selectedSubraceKey;
+    // When the active parent variant has no subraces (e.g. multi-source merged parent where
+    // the active source is a base race without subraces), render just the ChoiceCard — no
+    // variants toggle, no expanded section.
+    if (count === 0) {
+      return (
+        <ChoiceCard
+          id={parentOption.key}
+          title={parentOption.title}
+          subtitle={parentOption.subtitle ?? parentOption.sub}
+          pills={parentOption.pills ?? parentOption.metaPills}
+          iconName={parentOption.iconName}
+          selected={isParentSelected}
+          onClick={() => onSelect(isParentSelected ? null : parentOption.key)}
+          detail={parentOption.detail}
+        />
+      );
+    }
+    return (
+      <div
+        className={[
+          'rounded-md border overflow-hidden transition-all',
+          isParentSelected
+            ? 'border-accent shadow-[0_0_0_1px_var(--color-accent)]'
+            : 'border-line',
+        ].join(' ')}
+      >
+        {/* Parent ChoiceCard — borderless so the outer wrapper provides the border */}
+        <div className="[&>div]:!border-0 [&>div]:!rounded-none [&>div]:!shadow-none">
+          <ChoiceCard
+            id={parentOption.key}
+            title={parentOption.title}
+            subtitle={parentOption.subtitle ?? parentOption.sub}
+            pills={parentOption.pills ?? parentOption.metaPills}
+            iconName={parentOption.iconName}
+            selected={isParentSelected}
+            onClick={() => onSelect(isParentSelected ? null : parentOption.key)}
+            detail={parentOption.detail}
+          />
+        </div>
+
+        {/* Variants toggle — visually attached to the parent card */}
+        <button
+          type="button"
+          data-testid={`subrace-group-${parentSlug}`}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center justify-between gap-2 border-t border-line bg-surface/60 px-3 py-2 text-left text-[11px] uppercase tracking-wide text-ink-mute transition hover:bg-accent-soft/30"
+        >
+          <span className="flex items-center gap-1.5">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {count} variante{count !== 1 ? 's' : ''} opcional{count !== 1 ? 'es' : ''} ({open ? 'ocultar' : 'mostrar'})
+          </span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={['transition-transform duration-200', open ? 'rotate-180' : ''].join(' ')}
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {/* Variants list — inside the same outer container, indented to signal nesting */}
+        {open && (
+          <div className="space-y-2 border-t border-line bg-paper px-2 py-2 pl-4">
+            {subraces.map((opt) => {
+              const isSelected = opt.key === selectedSubraceKey;
+              return (
+                <ChoiceCard
+                  key={opt.key}
+                  id={opt.key}
+                  title={opt.title}
+                  subtitle={opt.subtitle ?? opt.sub}
+                  pills={opt.pills ?? opt.metaPills}
+                  iconName={opt.iconName}
+                  selected={isSelected}
+                  onClick={() => onSelect(isSelected ? null : opt.key)}
+                  detail={opt.detail}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-line bg-surface overflow-hidden">
-      {/* Group header — NOT selectable, only toggles expand/collapse */}
+      {/* Group header — NOT selectable, only toggles expand/collapse (required-subrace races) */}
       <button
         type="button"
         data-testid={`subrace-group-${parentSlug}`}
