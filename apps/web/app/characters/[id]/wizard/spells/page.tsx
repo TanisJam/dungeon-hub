@@ -53,6 +53,10 @@ type AvailableSpell = {
   name: string;
   level: number;
   school: string;
+  ritual: boolean;
+  concentration: boolean;
+  componentsM: boolean;
+  componentsMCost: number | null;
 };
 
 type SpellOptionsResponse = {
