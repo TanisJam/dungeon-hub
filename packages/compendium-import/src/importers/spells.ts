@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { listFiles, readJson } from '../reader.js';
 import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
+import { parseComponentsM, parseConcentration, parseRitual } from './spells-meta.js';
 import type { FiveeToolsSpell, NormalizedSpell, SubclassGrant } from '../types.js';
 
 interface SpellsFile {
@@ -145,6 +146,9 @@ export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> 
       const slug = slugify(s.name);
       const classes = extractBaseClasses(slug, s.source, lookup);
       const subclassGrants = extractSubclassGrants(slug, s.source, lookup);
+      const ritual = parseRitual(s.meta);
+      const concentration = parseConcentration(s.duration);
+      const { componentsM, componentsMCost } = parseComponentsM(s.components?.m);
 
       out.push({
         slug,
@@ -156,6 +160,10 @@ export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> 
         school: s.school,
         classes,
         subclassGrants,
+        ritual,
+        concentration,
+        componentsM,
+        componentsMCost,
       });
     }
   }

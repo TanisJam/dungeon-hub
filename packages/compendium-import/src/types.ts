@@ -67,8 +67,14 @@ export interface FiveeToolsSpell extends FiveeToolsBase {
   school: string;
   time?: unknown[];
   range?: unknown;
-  components?: Record<string, unknown>;
-  duration?: unknown[];
+  meta?: { ritual?: boolean; [key: string]: unknown };
+  components?: {
+    v?: boolean;
+    s?: boolean;
+    m?: string | { text: string; cost?: number; consume?: boolean } | undefined;
+    [key: string]: unknown;
+  };
+  duration?: Array<{ concentration?: boolean; [key: string]: unknown }>;
   classes?: { fromClassList?: Array<{ name: string; source: string }> };
   entries?: unknown[];
 }
@@ -129,6 +135,14 @@ export interface NormalizedSpell extends NormalizedRecord {
   classes: string[];
   /** Subclases que otorgan el spell como bonus (NO está en la lista base). */
   subclassGrants: SubclassGrant[];
+  /** TRUE when spell.meta.ritual === true (PHB p.201–202). */
+  ritual: boolean;
+  /** TRUE when any duration entry has concentration: true (PHB p.203). */
+  concentration: boolean;
+  /** TRUE when any material component is present (PHB p.203). */
+  componentsM: boolean;
+  /** Cost in copper pieces when 5etools provides it; null otherwise. */
+  componentsMCost: number | null;
 }
 
 export interface NormalizedItem extends NormalizedRecord {
