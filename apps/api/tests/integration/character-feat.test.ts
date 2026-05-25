@@ -149,4 +149,29 @@ describe('POST /characters/:id/feats', () => {
     const athlete = res.json().data.feats.find((f: { slug: string }) => f.slug === 'athlete');
     expect(athlete.asisApplied).toEqual([{ ability: 'dex', bonus: 1 }]);
   });
+
+  it('CL08-S2: feat ASI (Athlete +1 DEX) se incluye en el cómputo de la sheet (PHB Ch.5)', async () => {
+    // PHB Ch.5 — Feats (half-feats) grant +1 to an ability score.
+    // REQ-CL08-FEAT-TAG: the ephemeral AppliedAsi built from feat.asisApplied in
+    // compute.ts and build-feat-context.ts MUST carry source: 'feat'.
+    // Observable proxy: after adding Athlete (+1 DEX, accepted in previous test),
+    // GET /sheet must reflect the feat ASI in abilityScores.dex.score.
+    // Base DEX was 13. Athlete grants +1 → effective DEX should be 14.
+    // This test also guards that the compute path includes feat ASIs at all.
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const sheet = res.json().sheet;
+    // Base DEX = 13 (from beforeAll setup). Athlete +1 → should be 14.
+    // If feat ASIs are NOT included in computeCharacterSheet, this will fail.
+    expect(sheet.abilityScores.dex.score).toBe(14);
+    // No source field is exposed in the API response (source is ephemeral/internal).
+    // The compute path correctness is validated here; source tag correctness is
+    // validated via TypeScript (pnpm typecheck) after correcting write sites.
+  });
 });

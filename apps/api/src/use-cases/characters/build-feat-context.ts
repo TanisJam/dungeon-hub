@@ -35,7 +35,7 @@ export interface BuildFeatContextInput {
 export function buildFeatContext(input: BuildFeatContextInput): CharacterFeatContext {
   // Feat ASIs contribute to effective scores for prereq evaluation.
   const featAsis: AppliedAsi[] = input.existingFeats.flatMap((f) =>
-    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
   );
   const effectiveScores = computeEffectiveScores(input.baseStats, [
     ...input.racialAsis,

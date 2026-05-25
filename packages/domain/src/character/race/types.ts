@@ -214,7 +214,7 @@ export interface SubraceCompendiumData {
 export interface AppliedAsi {
   ability: AbilityKey;
   bonus: number;
-  source: 'race' | 'subrace';
+  source: 'race' | 'subrace' | 'levelup' | 'feat';
 }
 
 export type RaceValidationIssue =

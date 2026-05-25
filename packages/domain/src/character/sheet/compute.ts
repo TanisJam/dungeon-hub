@@ -294,7 +294,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   const racialAsis: AppliedAsi[] = character.asisApplied ?? [];
   const levelUpAsis: AppliedAsi[] = character.levelUpAsis ?? [];
   const featAsis: AppliedAsi[] = (character.feats ?? []).flatMap((f) =>
-    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
   );
   const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
 

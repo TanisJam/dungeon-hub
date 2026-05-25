@@ -1666,7 +1666,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
       const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
       const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
       const abilityMod = abilityModifier(effective[ability]);
@@ -1770,7 +1770,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
       const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
       const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
       const abilityMod = abilityModifier(effective[ability]);
@@ -1840,7 +1840,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
     const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
     const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
     );
     const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
     const conMod = abilityModifier(effective.con);
@@ -1994,7 +1994,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
     const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
     const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
     );
     const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
     const conMod = abilityModifier(effective.con);
@@ -2262,7 +2262,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
       const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
       const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+        f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
       );
       const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
       const conMod = abilityModifier(effective.con);
@@ -2362,7 +2362,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           asiToApply = body.asi.choices.map((c) => ({
             ability: c.ability,
             bonus: c.bonus,
-            source: 'race' as const,
+            source: 'levelup' as const,
           }));
         } else if (body.feat) {
           if (!campaign.rulesProfile.variantRules.feats) {
@@ -2640,7 +2640,7 @@ async function buildInventoryContext(character: typeof characters.$inferSelect):
   };
   const racialAsis = (charData['asisApplied'] as AppliedAsi[] | undefined) ?? [];
   const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
-    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'race' as const })),
+    f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
   );
   const effective = computeEffectiveScores(baseStats, [...racialAsis, ...featAsis]);
   const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];

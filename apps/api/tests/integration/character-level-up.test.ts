@@ -353,6 +353,54 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it('CL08-S1: Fighter L3→L4 persiste levelUpAsis con source levelup (PHB Ch.3)', async () => {
+    // PHB Ch.3 — Ability Score Improvement at Fighter L4.
+    // REQ-CL08-LEVELUP-TAG: levelUpAsis entries MUST carry source: 'levelup', NOT 'race'.
+    const app = await getTestApp();
+    const charId = await setupChar({ name: 'ASI Source Fighter', classSlug: 'fighter' });
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/xp`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { award: 2700 },
+    });
+    // L1→L2
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average' },
+    });
+    // L2→L3 (subclass unlock — Champion)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average', subclass: { slug: 'fighter--champion', source: 'PHB' } },
+    });
+    // L3→L4 (ASI level)
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        hpMethod: 'average',
+        asi: { choices: [{ ability: 'str', bonus: 1 }, { ability: 'con', bonus: 1 }] },
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const levelUpAsis: Array<{ ability: string; bonus: number; source: string }> =
+      res.json().character.data.levelUpAsis;
+    expect(levelUpAsis.length).toBeGreaterThan(0);
+    // Every persisted entry must carry source: 'levelup'
+    for (const asi of levelUpAsis) {
+      expect(asi.source).toBe('levelup');
+    }
+    // Regression: no entry should be mis-tagged as 'race'
+    expect(levelUpAsis.some((a) => a.source === 'race')).toBe(false);
+  });
+
   it('B-RED-1: Fighter L5 → L6 sin ASI → 400 ASI_OR_FEAT_REQUIRED (PHB p.72)', async () => {
     // PHB p.72 — Fighter gains ASI at level 6 (not standard cadence).
     // Hardcoded set [4,8,12,16,19] misses level 6, so current code returns 200 here
