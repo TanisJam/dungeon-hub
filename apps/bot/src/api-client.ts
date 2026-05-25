@@ -102,11 +102,11 @@ export class ApiClient {
   }
 
   async get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
-    return this.request<T>('GET', path, { params });
+    return this.request<T>('GET', path, params !== undefined ? { params } : {});
   }
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>('POST', path, { body });
+    return this.request<T>('POST', path, body !== undefined ? { body } : {});
   }
 
   /**
@@ -115,15 +115,24 @@ export class ApiClient {
    * Lanza LinkRequiredError si el backend responde DISCORD_USER_NOT_LINKED.
    */
   async getAs<T>(discordId: string, path: string, params?: Record<string, string | number>): Promise<T> {
-    return this.request<T>('GET', path, { params, actingAs: discordId });
+    return this.request<T>('GET', path, {
+      actingAs: discordId,
+      ...(params !== undefined ? { params } : {}),
+    });
   }
 
   async postAs<T>(discordId: string, path: string, body?: unknown): Promise<T> {
-    return this.request<T>('POST', path, { body, actingAs: discordId });
+    return this.request<T>('POST', path, {
+      actingAs: discordId,
+      ...(body !== undefined ? { body } : {}),
+    });
   }
 
   async patchAs<T>(discordId: string, path: string, body?: unknown): Promise<T> {
-    return this.request<T>('PATCH', path, { body, actingAs: discordId });
+    return this.request<T>('PATCH', path, {
+      actingAs: discordId,
+      ...(body !== undefined ? { body } : {}),
+    });
   }
 
   private async request<T>(
@@ -149,7 +158,7 @@ export class ApiClient {
     const res = await fetch(url, {
       method,
       headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
     });
     if (!res.ok) {
       const text = await res.text();
