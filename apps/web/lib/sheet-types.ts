@@ -2,9 +2,30 @@
  * Web-side types for the character sheet page.
  * Mirrors the API response from GET /characters/:id/sheet.
  * The domain package is NOT a web dependency — these types are maintained manually.
+ *
+ * NOTE: domain IS actually a web dependency (package.json). Types here are mirrored
+ * manually for explicit control and to avoid pulling the entire domain into client bundles.
  */
 
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+
+/**
+ * A descriptive racial trait surfaced on the sheet's "Rasgos raciales" card.
+ * Mirrors domain RacialTrait. Populated by GET /characters/:id/sheet via
+ * loadRaceSheetData + extractRacialTraits. Batch 8 — race-traits-on-sheet.
+ */
+export interface RacialTrait {
+  /** Trait name (English, raw). */
+  name: string;
+  /**
+   * Full text body. Multi-paragraph content joined with '\n\n'.
+   * Inline 5etools tokens (e.g. `{@spell fire bolt}`) preserved RAW.
+   * Render-time token parsing is a future concern.
+   */
+  text: string;
+  /** Whether from the base race or the chosen subrace. */
+  source: 'race' | 'subrace';
+}
 
 export type RaceInnateSpellFrequency = 'at-will' | 'daily-1';
 
@@ -98,6 +119,11 @@ export interface CharacterSheet {
    * has not yet chosen a cantrip (read-path tolerance). Batch 6 REQ-W-RENDER-01.
    */
   racialSpells: RacialSpellView[];
+  /**
+   * Descriptive racial traits in source order (race first, subrace appended).
+   * Empty for legacy characters predating Batch 8. REQ-RT-RENDER-01.
+   */
+  racialTraits: RacialTrait[];
   spellcasting: SpellcastingView[];
   spellSlots: SpellSlotsView;
 }

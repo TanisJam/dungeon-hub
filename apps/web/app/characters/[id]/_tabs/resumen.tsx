@@ -1,6 +1,7 @@
 import type { CharacterSheet } from '@/lib/sheet-types';
 import { Card } from '@/components/ui';
 import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
+import { RacialTraitsBlock } from './_racial-traits-block';
 
 const ABILITY_ES: Record<string, string> = {
   str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
@@ -141,6 +142,9 @@ export function ResumenTab({ sheet }: ResumenTabProps) {
           </div>
         </Card>
       )}
+
+      {/* Rasgos raciales (Batch 8 — race-traits-on-sheet) */}
+      <RacialTraitsBlock traits={sheet.racialTraits ?? []} />
 
       {/* Rasgos de clase */}
       <RasgosSection sheet={sheet} />
