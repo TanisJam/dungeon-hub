@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
@@ -288,9 +288,13 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
 
   // ---- POST /sessions/:id/{start,pause,resume,cancel} ----------------------
   // Solo el GM ejecuta transiciones. Complete vive en slice futuro (rewards).
+  // Note: the previous signature used `Parameters<Parameters<typeof app.post>[2]>[0]`
+  // which TS could not resolve to a concrete overload, defaulting to `never` and
+  // cascading 11 type errors. FastifyRequest/FastifyReply express the same intent
+  // directly. We don't decorate with a Body since these endpoints take no body.
   async function handleTransition(
-    request: Parameters<Parameters<typeof app.post>[2]>[0],
-    reply: Parameters<Parameters<typeof app.post>[2]>[1],
+    request: FastifyRequest,
+    reply: FastifyReply,
     action: StateAction,
   ) {
     const { id } = ParamsWithId.parse(request.params);

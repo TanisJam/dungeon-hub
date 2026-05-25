@@ -8,6 +8,7 @@ import {
   validateBackgroundSelection,
   SetBackgroundBodyCustomizationSchema,
   normalizeAppliedBackground,
+  type Customization,
 } from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
@@ -928,10 +929,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const result = validateBackgroundSelection({
       backgroundData,
       rulesProfile: campaign.rulesProfile,
-      skillChoices: body.skillChoices,
-      languageChoices: body.languageChoices,
-      toolChoices: body.toolChoices,
-      customization: body.customization,
+      ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
+      ...(body.languageChoices !== undefined ? { languageChoices: body.languageChoices } : {}),
+      ...(body.toolChoices !== undefined ? { toolChoices: body.toolChoices } : {}),
+      // Cast through Customization — Zod-inferred body.customization has `mixedPool?: T | undefined`
+      // which TS cannot prove equivalent to the domain `mixedPool?: T` shape under exactOpt.
+      // The Zod schema validates the runtime shape; the cast is safe.
+      ...(body.customization !== undefined
+        ? { customization: body.customization as Customization }
+        : {}),
       allBackgrounds,
     });
 

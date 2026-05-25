@@ -14,13 +14,20 @@ import { worldRoute } from './http/routes/world.js';
 import { journalRoute } from './http/routes/journal.js';
 
 export async function buildServer() {
+  const isDev = env.NODE_ENV === 'development';
+  // Spread transport conditionally so the key is OMITTED in non-dev — exactOptionalPropertyTypes
+  // rejects an explicit `transport: undefined` against Fastify's typed config.
   const app = Fastify({
     logger: {
-      level: env.NODE_ENV === 'development' ? 'debug' : 'info',
-      transport:
-        env.NODE_ENV === 'development'
-          ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'HH:MM:ss' } }
-          : undefined,
+      level: isDev ? 'debug' : 'info',
+      ...(isDev
+        ? {
+            transport: {
+              target: 'pino-pretty',
+              options: { colorize: true, translateTime: 'HH:MM:ss' },
+            },
+          }
+        : {}),
     },
   });
 
