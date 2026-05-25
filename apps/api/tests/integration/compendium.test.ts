@@ -154,4 +154,73 @@ describe('compendium', () => {
     // Fireball está
     expect(data.some((s: { slug: string }) => s.slug === 'fireball')).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // REQ-SP02-API-FLAGS: ritual/concentration/componentsM/componentsMCost
+  // -------------------------------------------------------------------------
+
+  it('SP02: GET /compendium/spells includes ritual/concentration/componentsM/componentsMCost on each spell', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/spells?campaign=${campaignId}&q=fireball`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json();
+    const fireball = data.find(
+      (s: { slug: string; source: string }) => s.slug === 'fireball' && s.source === 'PHB',
+    );
+    expect(fireball).toBeDefined();
+    // 4 new fields must be present (REQ-SP02-API-FLAGS)
+    expect(typeof fireball.ritual).toBe('boolean');
+    expect(typeof fireball.concentration).toBe('boolean');
+    expect(typeof fireball.componentsM).toBe('boolean');
+    // componentsMCost is number | null
+    expect(fireball.componentsMCost === null || typeof fireball.componentsMCost === 'number').toBe(true);
+    // Fireball: not ritual, not concentration, has material (string shape, no cost)
+    expect(fireball.ritual).toBe(false);
+    expect(fireball.concentration).toBe(false);
+    expect(fireball.componentsM).toBe(true);
+    expect(fireball.componentsMCost).toBeNull();
+  });
+
+  it('SP02: GET /compendium/spells?ritual=true returns only ritual spells', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/spells?campaign=${campaignId}&ritual=true`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data, total } = res.json();
+    expect(total).toBeGreaterThan(0);
+    // Every returned spell must have ritual=true
+    for (const s of data) {
+      expect(s.ritual).toBe(true);
+    }
+    // Detect Magic (PHB ritual) must be included
+    expect(data.some((s: { slug: string }) => s.slug === 'detect-magic')).toBe(true);
+  });
+
+  it('SP02: GET /compendium/spells?concentration=true returns only concentration spells', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/compendium/spells?campaign=${campaignId}&concentration=true`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data, total } = res.json();
+    expect(total).toBeGreaterThan(0);
+    // Every returned spell must have concentration=true
+    for (const s of data) {
+      expect(s.concentration).toBe(true);
+    }
+    // Bless is a concentration spell
+    expect(data.some((s: { slug: string }) => s.slug === 'bless')).toBe(true);
+  });
 });

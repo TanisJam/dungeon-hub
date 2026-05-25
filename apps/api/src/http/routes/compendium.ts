@@ -302,11 +302,28 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     class: z.string().min(1).optional(),
     level: z.coerce.number().int().min(0).max(9).optional(),
     school: z.string().length(1).optional(),
+    ritual: z
+      .string()
+      .transform((v) => v === 'true')
+      .optional(),
+    concentration: z
+      .string()
+      .transform((v) => v === 'true')
+      .optional(),
   });
   app.get('/compendium/spells', { preHandler: app.authenticate }, async (request, reply) => {
     const campaign = await resolveProfile(request, reply);
     if (!campaign) return;
-    const { limit, offset, q, class: classSlug, level, school } = SpellsQuery.parse(request.query);
+    const {
+      limit,
+      offset,
+      q,
+      class: classSlug,
+      level,
+      school,
+      ritual,
+      concentration,
+    } = SpellsQuery.parse(request.query);
 
     const filter = profileFilterConditions({
       profile: campaign.rulesProfile,
@@ -322,6 +339,9 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     if (school) where.push(eq(compendiumSpells.school, school));
     if (classSlug)
       where.push(sql`${classSlug} = ANY(${compendiumSpells.classes})`);
+    if (ritual !== undefined) where.push(eq(compendiumSpells.ritual, ritual));
+    if (concentration !== undefined)
+      where.push(eq(compendiumSpells.concentration, concentration));
     const conds = and(...where)!;
 
     const [rows, totalRow] = await Promise.all([
@@ -335,6 +355,10 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           school: compendiumSpells.school,
           classes: compendiumSpells.classes,
           subclassGrants: compendiumSpells.subclassGrants,
+          ritual: compendiumSpells.ritual,
+          concentration: compendiumSpells.concentration,
+          componentsM: compendiumSpells.componentsM,
+          componentsMCost: compendiumSpells.componentsMCost,
         })
         .from(compendiumSpells)
         .where(conds)

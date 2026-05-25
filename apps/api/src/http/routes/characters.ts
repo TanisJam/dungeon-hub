@@ -1690,9 +1690,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .filter((s) => !baseSet.has(`${s.slug}|${s.source}`))
         .map((s) => s.slug);
 
-      // Hidratar la lista con name + school via una query a compendiumSpells.
+      // Hidratar la lista con name + school + metadata via una query a compendiumSpells.
       const slugs = withSubclass.map((s) => s.slug);
-      type SpellRow = { slug: string; source: string; name: string; level: number; school: string };
+      type SpellRow = {
+        slug: string;
+        source: string;
+        name: string;
+        level: number;
+        school: string;
+        ritual: boolean;
+        concentration: boolean;
+        componentsM: boolean;
+        componentsMCost: number | null;
+      };
       let availableSpells: SpellRow[] = [];
       if (slugs.length > 0) {
         const rows = await db
@@ -1702,6 +1712,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
             name: compendiumSpells.name,
             level: compendiumSpells.level,
             school: compendiumSpells.school,
+            ritual: compendiumSpells.ritual,
+            concentration: compendiumSpells.concentration,
+            componentsM: compendiumSpells.componentsM,
+            componentsMCost: compendiumSpells.componentsMCost,
           })
           .from(compendiumSpells)
           .where(inArray(compendiumSpells.slug, slugs));
