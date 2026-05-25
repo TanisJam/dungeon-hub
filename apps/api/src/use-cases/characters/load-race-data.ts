@@ -3,6 +3,7 @@ import type {
   RaceCompendiumData,
   SubraceCompendiumData,
 } from '@dungeon-hub/domain/character/race';
+import { extractRacialTraits } from '@dungeon-hub/domain/character/race';
 import type { RaceSheetData, BreathWeaponData, RaceInnateSpell } from '@dungeon-hub/domain/character/sheet';
 import { db } from '../../infra/db/client.js';
 import { compendiumRaces } from '../../infra/db/schema.js';
@@ -133,6 +134,11 @@ export async function loadRaceSheetData(input: {
   if (!raceRow) return null;
   const raceData = raceRow.data as Record<string, unknown>;
 
+  // Stash race-level entries for racial trait projection (Batch 8 — race-traits-on-sheet).
+  // Both raceEntries and subraceEntries are read BEFORE the result object is assembled,
+  // so we can pass them to extractRacialTraits at the end. REQ-RT-PROJECT-01.
+  const raceEntries = (raceData['entries'] as unknown[] | undefined);
+
   let result: RaceSheetData = {
     speed: raceData['speed'] as RaceSheetData['speed'],
     size: raceData['size'] as RaceSheetData['size'],
@@ -146,7 +152,12 @@ export async function loadRaceSheetData(input: {
     armorProficiencies: (raceData['armorProficiencies'] as RaceSheetData['armorProficiencies']) ?? null,
     // Batch 6: project race-level additionalSpellsNormalized. Subrace may override below (Decision #605 family).
     additionalSpellsNormalized: (raceData['additionalSpellsNormalized'] as RaceInnateSpell[] | null | undefined) ?? null,
+    // Batch 8: placeholder — will be replaced with computed value after subrace merge below.
+    racialTraits: [],
   } as RaceSheetData;
+
+  // Stash subraceEntries for racial trait projection below.
+  let subraceEntries: unknown[] | undefined;
 
   // Merge languageProficiencies and breathWeapon from subrace if it exists.
   // Subrace breathWeapon OVERRIDES race-level (per design D-5: only subraces carry it).
@@ -165,6 +176,10 @@ export async function loadRaceSheetData(input: {
     const subRow = subRows[0];
     if (subRow) {
       const subData = subRow.data as Record<string, unknown>;
+
+      // Capture subrace entries for racial trait projection (Batch 8). REQ-RT-PROJECT-01.
+      subraceEntries = subData['entries'] as unknown[] | undefined;
+
       const subLangs = subData['languageProficiencies'] as
         | RaceSheetData['languageProficiencies']
         | undefined;
@@ -218,6 +233,15 @@ export async function loadRaceSheetData(input: {
       }
     }
   }
+
+  // Batch 8 — race-traits-on-sheet (REQ-RT-PROJECT-02):
+  // Project racial traits from JSONB `entries` arrays via the domain pure helper.
+  // extractRacialTraits handles undefined/null defensively (REQ-RT-PROJECT-03).
+  // 5etools {@...} tokens preserved raw in trait.text (decision #630 item 1).
+  result = {
+    ...result,
+    racialTraits: extractRacialTraits(raceEntries, subraceEntries),
+  };
 
   return result;
 }
