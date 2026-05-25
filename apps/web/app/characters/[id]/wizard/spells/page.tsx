@@ -8,6 +8,9 @@ import { NoPicksPanel } from './_no-picks-panel';
 import { SinglePickerView } from './_single-picker-view';
 import { MulticlassSpellsView, type CasterTabData } from './_multiclass-view';
 import { RaceCantripCard } from './_race-cantrip-card';
+// SP-07: Spanish class label helper — extracted to _class-labels.ts for testability
+import { classLabel } from './_class-labels';
+export { classLabel, CLASS_LABEL_ES } from './_class-labels';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -93,10 +96,7 @@ function hasPicks(limits: SpellLimitsView): boolean {
   );
 }
 
-// Capitalize the first character of the class slug for display
-function classLabel(slug: string): string {
-  return slug.charAt(0).toUpperCase() + slug.slice(1);
-}
+// classLabel imported from _class-labels.ts at top of file (SP-07: Spanish labels)
 
 // ── Page ───────────────────────────────────────────────────────────────────
 

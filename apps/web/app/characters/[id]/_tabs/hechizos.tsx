@@ -77,7 +77,7 @@ function ClassSpellSection({
 
   // Label mapping: prepared casters → "Preparados"; known casters → "Conocidos".
   // Driven by ClassSpellSummary.spellsPrepared !== null (design §6).
-  const leveledLabel = summary?.spellsPrepared !== null ? 'Preparados' : 'Conocidos';
+  const leveledLabel = summary?.spellsPrepared != null ? 'Preparados' : 'Conocidos';
 
   return (
     <Card variant="surface" className="p-4">

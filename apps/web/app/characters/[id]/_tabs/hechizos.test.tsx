@@ -293,6 +293,45 @@ const plainSpell = makeSpellRef('magic-missile', 1, {
   });
 });
 
+// ── SP-07: REQ-SP07-HECHIZOS-SPELLSPREPARED-UNDEFINED ─────────────────────
+// Drive-by fix: hechizos.tsx:80 uses `!== null` which treats `undefined` as falsy,
+// showing "Preparados" label even when spellsPrepared is undefined.
+// Fix: change to `!= null` (loose inequality also catches undefined).
+
+describe('REQ-SP07-HECHIZOS-SPELLSPREPARED-UNDEFINED: undefined spellsPrepared → no Preparados label', () => {
+  it('SP-07: ClassSpellSummary with spellsPrepared=undefined → "Conocidos" not "Preparados"', () => {
+    // This test verifies the fix for the latent bug SP-04 S-01:
+    // `summary?.spellsPrepared !== null` evaluates TRUE when spellsPrepared is undefined,
+    // incorrectly showing "Preparados". After fix (`!= null`), undefined is also excluded.
+    const summaryWithUndefinedPrepared: ClassSpellSummary = {
+      classSlug: 'warlock',
+      classSource: 'PHB',
+      cantripsKnown: { count: 2, max: 2 },
+      spellsKnown: { count: 2, max: 4 },
+      // spellsPrepared deliberately omitted — TypeScript allows this via Partial
+      // but we simulate via explicit undefined cast
+      spellsPrepared: undefined as unknown as null,
+      spells: {
+        cantrips: [],
+        leveled: [makeSpellRef('hex', 1, { name: 'Hex' })],
+      },
+    };
+
+    const sheet: CharacterSheet = {
+      ...makeSheet([]),
+      spellcasting: [{ classSlug: 'warlock', classSource: 'PHB', ability: 'cha', saveDC: 13, attackBonus: 5 }],
+      spellsByClass: [summaryWithUndefinedPrepared],
+    };
+
+    render(<HechizosTab sheet={sheet} charId="test-char-sp07" />);
+
+    // "Preparados" must NOT appear — warlock has spells known, not prepared
+    expect(screen.queryByText('Preparados')).toBeNull();
+    // "Conocidos" MUST appear (or the section header for known casters)
+    expect(screen.getByText('Conocidos')).toBeDefined();
+  });
+});
+
 // ── SP-05: Slot grid integration ──────────────────────────────────────────────
 
 describe('REQ-SP05-UX-CONSUME: HechizosTab renders SlotGrid when slots > 0', () => {

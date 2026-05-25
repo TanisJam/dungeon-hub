@@ -79,6 +79,37 @@ const wizardTab: CasterTabData = {
   initialPicks: { cantrips: [], known: [], prepared: [] },
 };
 
+const sorcererTab: CasterTabData = {
+  classSlug: 'sorcerer',
+  classSource: 'PHB',
+  className: 'Hechicero',
+  limits: makeLimits({ ability: 'cha' }),
+  availableSpells: [makeSpell({ slug: 'fire-bolt', name: 'Fire Bolt', school: 'V' })],
+  subclassGrantedSlugs: [],
+  initialPicks: { cantrips: [], known: [], prepared: [] },
+};
+
+// SP-07: EK Fighter tab (Guerrero) and AT Rogue tab (Pícaro)
+const guerreroEkTab: CasterTabData = {
+  classSlug: 'fighter',
+  classSource: 'PHB',
+  className: 'Guerrero',
+  limits: makeLimits({ ability: 'int' }),
+  availableSpells: [makeSpell({ slug: 'shield', name: 'Shield', school: 'A' })],
+  subclassGrantedSlugs: [],
+  initialPicks: { cantrips: [], known: [], prepared: [] },
+};
+
+const picaroAtTab: CasterTabData = {
+  classSlug: 'rogue',
+  classSource: 'PHB',
+  className: 'Pícaro',
+  limits: makeLimits({ ability: 'int' }),
+  availableSpells: [makeSpell({ slug: 'silent-image', name: 'Silent Image', school: 'I' })],
+  subclassGrantedSlugs: [],
+  initialPicks: { cantrips: [], known: [], prepared: [] },
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -258,6 +289,90 @@ describe('MulticlassSpellsView — save failure (REQ-SP06-SEQUENTIAL-SAVE failur
 
     // Only one save call (stopped at first failure)
     expect(saveSpellsForClass).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── SP-07 6.7: 3-tab render (Cleric + Wizard + Sorcerer) ─────────────────────
+
+describe('MulticlassSpellsView — 3-tab render (REQ-SP07-MULTICLASS-3-TABS)', () => {
+  it('SP-07 6.7: Cleric + Wizard + Sorcerer character → 3 tab buttons in DOM', () => {
+    // REQ-SP07-MULTICLASS-3-TABS: triple caster must render 3 tabs
+    render(
+      <MulticlassSpellsView
+        characterId="char-3"
+        casterClasses={[clericTab, wizardTab, sorcererTab]}
+      />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(3);
+    expect(screen.getByRole('tab', { name: /clérigo/i })).toBeDefined();
+    expect(screen.getByRole('tab', { name: /mago/i })).toBeDefined();
+    expect(screen.getByRole('tab', { name: /hechicero/i })).toBeDefined();
+  });
+});
+
+// ── SP-07 6.8: EK Fighter + AT Rogue tabs labeled "Guerrero" + "Pícaro" ─────
+
+describe('MulticlassSpellsView — EK+AT tab labels (REQ-SP07-MULTICLASS-EK-AT-PAGE)', () => {
+  it('SP-07 6.8: Fighter L3 EK + Rogue L3 AT → 2 tabs labeled Guerrero and Pícaro', () => {
+    // REQ-SP07-MULTICLASS-EK-AT-PAGE: EK and AT subclass casters get Spanish labels
+    render(
+      <MulticlassSpellsView
+        characterId="char-ek-at"
+        casterClasses={[guerreroEkTab, picaroAtTab]}
+      />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(screen.getByRole('tab', { name: /guerrero/i })).toBeDefined();
+    expect(screen.getByRole('tab', { name: /pícaro/i })).toBeDefined();
+  });
+});
+
+// ── SP-07 6.9: Cleric (1st) succeeds, Wizard (2nd) fails → tab + error ───────
+
+describe('MulticlassSpellsView — 2nd class save fail (REQ-SP07-MULTICLASS-2ND-CLASS-SAVE-FAIL)', () => {
+  it('SP-07 6.9: Cleric save OK, Wizard save 400 → active tab switches to Wizard + error banner', async () => {
+    // REQ-SP07-MULTICLASS-2ND-CLASS-SAVE-FAIL: first class save succeeds, second fails
+    vi.mocked(saveSpellsForClass)
+      .mockResolvedValueOnce({ ok: true })           // Cleric: success
+      .mockResolvedValueOnce({ ok: false, error: 'Wizard SP07 save failed' }); // Wizard: fail
+
+    const clericComplete: CasterTabData = {
+      ...clericTab,
+      initialPicks: { cantrips: [], known: [], prepared: [{ slug: 'cure-wounds', source: 'PHB' }] },
+    };
+    const wizardComplete: CasterTabData = {
+      ...wizardTab,
+      initialPicks: { cantrips: [], known: [], prepared: [{ slug: 'magic-missile', source: 'PHB' }] },
+    };
+
+    render(
+      <MulticlassSpellsView
+        characterId="char-sp07"
+        casterClasses={[clericComplete, wizardComplete]}
+      />,
+    );
+
+    // Initially on Cleric tab
+    expect(screen.getByText('Cure Wounds')).toBeDefined();
+
+    const siguienteBtn = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguienteBtn);
+
+    await waitFor(() => {
+      // Error banner for Wizard must be visible
+      expect(screen.getByText('Wizard SP07 save failed')).toBeDefined();
+    });
+
+    // Cleric save happened first, then Wizard save failed
+    expect(saveSpellsForClass).toHaveBeenCalledTimes(2);
+    const calls = vi.mocked(saveSpellsForClass).mock.calls;
+    expect(calls[0]?.[0]?.classSlug).toBe('cleric');
+    expect(calls[1]?.[0]?.classSlug).toBe('wizard');
+
+    // proceedToReview must NOT have been called (stopped at Wizard failure)
+    expect(proceedToReview).not.toHaveBeenCalled();
   });
 });
 
