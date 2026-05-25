@@ -1,6 +1,7 @@
 import { ABILITY_KEYS, type AbilityKey } from '../stats/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
 import { RACES_REQUIRING_SUBRACE } from './subrace-required.js';
+import { subraceReplacesParentAbility } from './subraces-replacing-parent-ability.js';
 import type {
   AbilityBlock,
   AppliedAsi,
@@ -327,7 +328,15 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   const appliedLanguageChoices = langResult.applied;
 
   // ---- 2) Procesar bloques race + subrace --------------------------------
-  const raceBlocks = (raceData.ability ?? []).map(processAbilityBlock);
+  // REPLACE semantics (PHB p.31 Variant Human): when the subrace is in
+  // SUBRACES_REPLACING_PARENT_ABILITY, its ASI fully replaces the parent's —
+  // we drop the parent's blocks so the validator only expects the subrace ASIs.
+  const subraceReplacesParent =
+    subraceData != null &&
+    subraceReplacesParentAbility({ slug: subraceData.slug, source: subraceData.source });
+  const raceBlocks = subraceReplacesParent
+    ? []
+    : (raceData.ability ?? []).map(processAbilityBlock);
   const subraceBlocks = (subraceData?.ability ?? []).map(processAbilityBlock);
 
   for (const b of raceBlocks) {
