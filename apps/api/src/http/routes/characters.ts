@@ -13,7 +13,7 @@ import {
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
-import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
+import { computeCharacterSheet, type SpellSheetRef } from '@dungeon-hub/domain/character/sheet';
 import {
   addItemToInventory,
   consumeInventoryItem,
@@ -460,6 +460,60 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         )
       : [];
 
+    // ---- SP-04: spell ref enrichment ----------------------------------------
+    // Collect all (slug, source) pairs from character.data.spells across all classes.
+    const spellsData = (data['spells'] as Record<string, { cantrips?: Array<{ slug: string; source: string }>; known?: Array<{ slug: string; source: string }>; prepared?: Array<{ slug: string; source: string }> }> | null | undefined) ?? {};
+    const allSpellPairs: Array<{ slug: string; source: string }> = [];
+    for (const classSpells of Object.values(spellsData)) {
+      if (!classSpells) continue;
+      for (const entry of [...(classSpells.cantrips ?? []), ...(classSpells.known ?? []), ...(classSpells.prepared ?? [])]) {
+        allSpellPairs.push(entry);
+      }
+    }
+    // Deduplicate by slug|source
+    const uniqueSlugs = [...new Set(allSpellPairs.map((e) => e.slug))];
+    let spellRefsBySlug: ReadonlyMap<string, SpellSheetRef> = new Map();
+    if (uniqueSlugs.length > 0) {
+      const rows = await db
+        .select({
+          slug: compendiumSpells.slug,
+          source: compendiumSpells.source,
+          name: compendiumSpells.name,
+          level: compendiumSpells.level,
+          ritual: compendiumSpells.ritual,
+          concentration: compendiumSpells.concentration,
+          componentsM: compendiumSpells.componentsM,
+          componentsMCost: compendiumSpells.componentsMCost,
+        })
+        .from(compendiumSpells)
+        .where(inArray(compendiumSpells.slug, uniqueSlugs));
+
+      // Build composite-key map (source-aware per SP04-D-03)
+      const refMap = new Map<string, SpellSheetRef>();
+      for (const row of rows) {
+        refMap.set(`${row.slug}|${row.source}`, {
+          slug: row.slug,
+          source: row.source,
+          name: row.name,
+          level: row.level,
+          ritual: row.ritual,
+          concentration: row.concentration,
+          componentsM: row.componentsM,
+          componentsMCost: row.componentsMCost ?? null,
+        });
+      }
+
+      // Warn-log any picked (slug|source) absent from query result (REQ-SP04-08)
+      const missing = allSpellPairs.filter((e) => !refMap.has(`${e.slug}|${e.source}`));
+      if (missing.length > 0) {
+        const missingKeys = [...new Set(missing.map((e) => `${e.slug}|${e.source}`))];
+        app.log.warn({ missingSpellRefs: missingKeys }, 'SP-04: picked spell refs not found in compendium');
+      }
+
+      spellRefsBySlug = refMap;
+    }
+    // -------------------------------------------------------------------------
+
     const sheet = computeCharacterSheet({
       character: {
         name: character.name,
@@ -483,6 +537,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       },
       raceData,
       itemWeights,
+      spellRefsBySlug,
       encumbranceVariant: campaign.rulesProfile.variantRules.encumbranceVariant,
     });
 

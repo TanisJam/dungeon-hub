@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { eq, sql } from 'drizzle-orm';
+import { db } from '../../src/infra/db/client.js';
+import { characters } from '../../src/infra/db/schema.js';
 
 /**
  * Crea un High Elf Wizard 1 con Sage background usando los endpoints reales
@@ -352,5 +355,196 @@ describe('GET /characters/:id/sheet — SCEN-RT-09: racialTraits for Dwarf + Hil
     expect(names).not.toContain('Languages');
     expect(names).not.toContain('Darkvision');
     expect(names).not.toContain('Alignment');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SP-04: REQ-SP04-07/08 — GET /characters/:id/sheet enriches spellsByClass.spells
+// Tests: C2-5.1 (Cleric with picks), C2-5.2 (stale slug), C2-5.3 (empty caster)
+// PHB ch.10 p.201 — Casting Spells
+// ---------------------------------------------------------------------------
+describe('GET /characters/:id/sheet — SP-04: spellsByClass.spells enrichment', () => {
+  let user: TestUser;
+  let clericCharId: string;
+  let emptyCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+      if (res.statusCode !== 200 && res.statusCode !== 201) {
+        throw new Error(`${label}: ${res.statusCode} ${res.body}`);
+      }
+    };
+
+    // ── Create campaign ─────────────────────────────────────────────────────
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'SP-04 Sheet Spell Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    // ── Cleric character ─────────────────────────────────────────────────────
+    const clericChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Cleric of Light' },
+      })
+      .then((r) => r.json());
+    clericCharId = clericChar.id;
+
+    await expectOk('cleric-stats', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${clericCharId}/stats`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { method: 'point-buy', scores: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 } },
+    }));
+
+    await expectOk('cleric-class', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${clericCharId}/class`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        class: { slug: 'cleric', source: 'PHB' },
+        level: 1,
+        skillChoices: ['medicine', 'insight'],
+        subclass: { slug: 'cleric--life', source: 'PHB' },
+      },
+    }));
+
+    // Set cleric spells: 2 cantrips + 2 prepared
+    await expectOk('cleric-spells', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${clericCharId}/classes/cleric/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        cantrips: [
+          { slug: 'sacred-flame', source: 'PHB' },
+          { slug: 'guidance', source: 'PHB' },
+        ],
+        prepared: [
+          { slug: 'cure-wounds', source: 'PHB' },
+          { slug: 'bless', source: 'PHB' },
+        ],
+      },
+    }));
+
+    // ── Empty caster character (Wizard, no spells set) ────────────────────
+    const emptyChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { campaignId: campaign.id, name: 'Wizard No Spells' },
+      })
+      .then((r) => r.json());
+    emptyCharId = emptyChar.id;
+
+    await expectOk('empty-stats', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${emptyCharId}/stats`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { method: 'point-buy', scores: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 } },
+    }));
+
+    await expectOk('empty-class', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${emptyCharId}/class`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { class: { slug: 'wizard', source: 'PHB' }, level: 1, skillChoices: ['investigation', 'religion'] },
+    }));
+    // No spell SET call — wizard has no picks yet
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  // ── C2-5.1: Cleric with picks → spells populated ─────────────────────────
+  it('REQ-SP04-07: cleric with cantrips + prepared → spellsByClass[0].spells populated', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${clericCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+
+    const clericSummary = sheet.spellsByClass.find(
+      (s: { classSlug: string }) => s.classSlug === 'cleric',
+    );
+    expect(clericSummary).toBeDefined();
+
+    // Cantrips should have names and badge fields
+    expect(clericSummary.spells.cantrips).toHaveLength(2);
+    const cantripSlugs = clericSummary.spells.cantrips.map((c: { slug: string }) => c.slug).sort();
+    expect(cantripSlugs).toEqual(['guidance', 'sacred-flame']);
+    for (const cantrip of clericSummary.spells.cantrips) {
+      expect(cantrip.name).toBeTruthy();
+      expect(cantrip.level).toBe(0);
+      expect(typeof cantrip.ritual).toBe('boolean');
+      expect(typeof cantrip.concentration).toBe('boolean');
+      expect(typeof cantrip.componentsM).toBe('boolean');
+    }
+
+    // Prepared spells (not known — cleric is prepared caster)
+    expect(clericSummary.spells.leveled).toHaveLength(2);
+    const leveledSlugs = clericSummary.spells.leveled.map((s: { slug: string }) => s.slug).sort();
+    expect(leveledSlugs).toEqual(['bless', 'cure-wounds']);
+  });
+
+  // ── C2-5.2: Stale slug → 200 + entry absent ──────────────────────────────
+  it('REQ-SP04-08: stale slug picked → 200 response; stale entry absent from spells.leveled', async () => {
+    const app = await getTestApp();
+
+    // Patch the character's spells data directly in the DB to simulate a stale
+    // compendium entry (a slug that no longer exists in compendium_spells).
+    await db
+      .update(characters)
+      .set({
+        data: sql`data || '{"spells":{"cleric":{"cantrips":[{"slug":"sacred-flame","source":"PHB"}],"known":[],"prepared":[{"slug":"cure-wounds","source":"PHB"},{"slug":"old-deleted-spell","source":"PHB"}]}}}'::jsonb`,
+      })
+      .where(eq(characters.id, clericCharId));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${clericCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    const clericSummary = sheet.spellsByClass.find(
+      (s: { classSlug: string }) => s.classSlug === 'cleric',
+    );
+    // The stale entry 'old-deleted-spell' should NOT be in leveled
+    const leveledSlugs = clericSummary.spells.leveled.map((s: { slug: string }) => s.slug);
+    expect(leveledSlugs).not.toContain('old-deleted-spell');
+    expect(leveledSlugs).toContain('cure-wounds');
+  });
+
+  // ── C2-5.3: Empty caster (no picks) → spells = { cantrips: [], leveled: [] } ─
+  it('REQ-SP04-06: wizard with no spell picks → spells = { cantrips: [], leveled: [] }', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${emptyCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+
+    const wizardSummary = sheet.spellsByClass.find(
+      (s: { classSlug: string }) => s.classSlug === 'wizard',
+    );
+    expect(wizardSummary).toBeDefined();
+    expect(wizardSummary.spells).toEqual({ cantrips: [], leveled: [] });
   });
 });
