@@ -234,7 +234,11 @@ describe('W-2: non-required base races do NOT show "requiere sublinaje" pill', (
 // ---------------------------------------------------------------------------
 
 describe('W-3: subrace entries do NOT show "requiere sublinaje" pill', () => {
-  it('Hill Dwarf subrace entry has no pill', () => {
+  // With the accordion layout, Dwarf renders as a group header (not a ChoiceCard).
+  // The "requiere sublinaje" pill only appears on individual ChoiceCards.
+  // When the group is expanded, the subraces render as cards — none of them should show the pill.
+
+  it('Hill Dwarf subrace card (when expanded) has no "requiere sublinaje" pill', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -242,12 +246,15 @@ describe('W-3: subrace entries do NOT show "requiere sublinaje" pill', () => {
         initialSelection={null}
       />,
     );
-    // Dwarf base should show one pill; Hill Dwarf should not add a second
-    const pills = screen.getAllByText('requiere sublinaje');
-    expect(pills).toHaveLength(1); // only from DWARF_BASE
+    // Expand the Dwarf group to reveal subrace cards
+    const dwarfGroupBtn = document.querySelector('[data-testid="subrace-group-dwarf"]') as HTMLElement;
+    fireEvent.click(dwarfGroupBtn);
+
+    // Hill Dwarf card should not show the pill (only base races that require a subrace show it)
+    expect(screen.queryByText('requiere sublinaje')).toBeNull();
   });
 
-  it('Mountain Dwarf subrace entry has no pill', () => {
+  it('Mountain Dwarf subrace card (when expanded) has no "requiere sublinaje" pill', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -255,17 +262,22 @@ describe('W-3: subrace entries do NOT show "requiere sublinaje" pill', () => {
         initialSelection={null}
       />,
     );
-    const pills = screen.getAllByText('requiere sublinaje');
-    expect(pills).toHaveLength(1); // only from DWARF_BASE
+    const dwarfGroupBtn = document.querySelector('[data-testid="subrace-group-dwarf"]') as HTMLElement;
+    fireEvent.click(dwarfGroupBtn);
+
+    expect(screen.queryByText('requiere sublinaje')).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// W-4: Clicking Siguiente with required-subrace base race → inline error
+// W-4: Siguiente is disabled when nothing is selected
+// (Previously: clicking the base race as a card → RACE_SUBRACE_REQUIRED error.
+// After accordion refactor: parent races with subraces are group headers, not selectable.
+// The Siguiente button is disabled when no race/subrace has been chosen yet.)
 // ---------------------------------------------------------------------------
 
-describe('W-4: Siguiente with required-subrace base race and no subrace selected → inline error', () => {
-  it('shows error "Elegí un sublinaje para esta raza." and does not call saveRace', async () => {
+describe('W-4: Siguiente is disabled when nothing is selected', () => {
+  it('Siguiente button is disabled when no race is selected', async () => {
     const { saveRace } = await import('./actions');
     vi.mocked(saveRace).mockClear();
 
@@ -277,22 +289,16 @@ describe('W-4: Siguiente with required-subrace base race and no subrace selected
       />,
     );
 
-    // Click on Dwarf base to select it
-    fireEvent.click(screen.getByText('Dwarf'));
-
-    // Find and click Siguiente button
+    // Siguiente must be disabled (not clickable) with no selection
     const siguiente = screen.getByRole('button', { name: /siguiente/i });
-    fireEvent.click(siguiente);
-
-    // Inline error should appear
-    expect(screen.getByText('Elegí un sublinaje para esta raza.')).toBeTruthy();
-    // saveRace should NOT have been called
+    expect(siguiente.hasAttribute('disabled')).toBe(true);
     expect(saveRace).not.toHaveBeenCalled();
   });
 });
 
 // ---------------------------------------------------------------------------
 // W-5: Clicking Siguiente with Hill Dwarf subrace → saveRace IS called
+// (Updated: must expand the group first, then select the subrace.)
 // ---------------------------------------------------------------------------
 
 describe('W-5: Siguiente with Hill Dwarf subrace selected passes preflight', () => {
@@ -305,7 +311,11 @@ describe('W-5: Siguiente with Hill Dwarf subrace selected passes preflight', () 
       />,
     );
 
-    // Select Hill Dwarf subrace
+    // Expand the Dwarf group first
+    const dwarfGroupBtn = document.querySelector('[data-testid="subrace-group-dwarf"]') as HTMLElement;
+    fireEvent.click(dwarfGroupBtn);
+
+    // Now select Hill Dwarf subrace
     fireEvent.click(screen.getByText('Hill Dwarf'));
 
     // Click Siguiente — should NOT emit "Elegí un sublinaje para esta raza."
@@ -979,8 +989,14 @@ describe('W-D2: handleContinue passes raceCantrip to saveRace; preflight blocks 
 });
 
 // ---------------------------------------------------------------------------
-// W-E1: Subraces are rendered immediately after their parent race in the list
-// W-E2: Grouping works even after a search query filters the list
+// W-E: Collapsible subrace groups (accordion layout)
+//
+// W-E1: Races with subraces render as a group header, NOT as a selectable card
+// W-E2: Clicking the group header toggles expansion (aria-expanded flips)
+// W-E3: Subraces are hidden by default; visible after expanding the group
+// W-E4: When search matches a subrace name, the parent group auto-expands
+// W-E5: When initial selection is a subrace, its group renders open
+// W-E6: Standalone races (Human) still render as direct ChoiceCards
 // ---------------------------------------------------------------------------
 
 const DRAGONBORN_BLACK = makeRaceEntry({
@@ -1014,25 +1030,15 @@ const HIGH_ELF = makeRaceEntry({
 });
 
 /**
- * Helper: returns the rendered order of race title <p> elements by their text content.
- * ChoiceCard renders each card's title in a <p> inside the button. We collect
- * all such elements and map their position in the DOM — later elements have higher index.
+ * Helper: find the group header button by data-testid.
+ * SubraceGroup renders its toggle as <button data-testid="subrace-group-{parentSlug}">
  */
-function getTitleOrder(titles: string[]): number[] {
-  // getAllByText returns elements in DOM order
-  const all: string[] = [];
-  const container = document.body;
-  const paragraphs = container.querySelectorAll('p');
-  paragraphs.forEach((p) => {
-    const text = p.textContent?.trim() ?? '';
-    if (titles.includes(text)) all.push(text);
-  });
-  return titles.map((t) => all.indexOf(t));
+function getGroupBtn(slug: string): HTMLElement {
+  return document.querySelector(`[data-testid="subrace-group-${slug}"]`) as HTMLElement;
 }
 
-describe('W-E1: subraces are rendered immediately after their parent in the list', () => {
-  it('Dragonborn parent appears before its subraces (Black Dragonborn, Red Dragonborn)', () => {
-    // Entries intentionally out of natural order to test the sort
+describe('W-E1: races with subraces render as group header, NOT as a selectable card', () => {
+  it('Dragonborn renders a group header button with aria-expanded, not a selectable ChoiceCard', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1041,21 +1047,28 @@ describe('W-E1: subraces are rendered immediately after their parent in the list
       />,
     );
 
-    const order = getTitleOrder(['Dragonborn', 'Black Dragonborn', 'Red Dragonborn', 'Human']);
-    const [dragonbornIdx, blackIdx, redIdx, humanIdx] = order;
-
-    // Parent must appear in DOM (index >= 0)
-    expect(dragonbornIdx).toBeGreaterThanOrEqual(0);
-    // Parent must come before both subraces
-    expect(dragonbornIdx).toBeLessThan(blackIdx);
-    expect(dragonbornIdx).toBeLessThan(redIdx);
-    // Human must NOT appear between Dragonborn and its subraces
-    const lastSubraceIdx = Math.max(blackIdx, redIdx);
-    const humanInBetween = humanIdx > dragonbornIdx && humanIdx < lastSubraceIdx;
-    expect(humanInBetween).toBe(false);
+    // The group header must be a button with aria-expanded attribute
+    const groupBtn = getGroupBtn('dragonborn');
+    expect(groupBtn).toBeTruthy();
+    expect(groupBtn.hasAttribute('aria-expanded')).toBe(true);
   });
 
-  it('Elf parent appears before High Elf subrace', () => {
+  it('Dragonborn group header shows "N sublinajes" counter', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DRAGONBORN_BLACK, DRAGONBORN_RED, DRAGONBORN_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    // Should show "2 sublinajes"
+    expect(screen.getByText(/2 sublinajes/i)).toBeTruthy();
+  });
+});
+
+describe('W-E2: clicking the group header toggles aria-expanded', () => {
+  it('Elf group header starts collapsed (aria-expanded=false) and toggles to true on click', () => {
     render(
       <RacePicker
         characterId="char-1"
@@ -1064,21 +1077,74 @@ describe('W-E1: subraces are rendered immediately after their parent in the list
       />,
     );
 
-    const order = getTitleOrder(['Elf', 'High Elf', 'Human']);
-    const [elfIdx, highElfIdx] = order;
+    const groupBtn = getGroupBtn('elf');
+    expect(groupBtn).toBeTruthy();
+    // Default: collapsed
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('false');
 
-    expect(elfIdx).toBeGreaterThanOrEqual(0);
-    expect(highElfIdx).toBeGreaterThanOrEqual(0);
-    expect(elfIdx).toBeLessThan(highElfIdx);
+    // Click to expand
+    fireEvent.click(groupBtn);
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('true');
+
+    // Click again to collapse
+    fireEvent.click(groupBtn);
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('false');
   });
 });
 
-describe('W-E2: grouping is preserved after a search filter', () => {
-  it('searching "elf" shows Elf parent before High Elf subrace', () => {
+describe('W-E3: subraces are hidden by default; visible after expanding the group', () => {
+  it('High Elf subrace card is NOT in the document before expanding the Elf group', () => {
     render(
       <RacePicker
         characterId="char-1"
-        entries={[HIGH_ELF, DRAGONBORN_BASE, DRAGONBORN_BLACK, ELF_BASE, HUMAN_BASE]}
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    // "High Elf" text should not be visible while collapsed
+    expect(screen.queryByText('High Elf')).toBeNull();
+  });
+
+  it('High Elf subrace card IS visible after clicking the Elf group header', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    const groupBtn = getGroupBtn('elf');
+    fireEvent.click(groupBtn);
+
+    // After expand, "High Elf" should appear as a selectable item
+    expect(screen.getByText('High Elf')).toBeTruthy();
+  });
+});
+
+describe('W-E4: search matching a subrace name auto-expands the parent group', () => {
+  it('searching "high" auto-expands the Elf group and shows High Elf', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
+        initialSelection={null}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/buscar linaje/i);
+    fireEvent.change(searchInput, { target: { value: 'high' } });
+
+    // Elf group should be auto-expanded, showing High Elf
+    expect(screen.getByText('High Elf')).toBeTruthy();
+  });
+
+  it('searching "elf" auto-expands the Elf group (parent name also matches)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
         initialSelection={null}
       />,
     );
@@ -1086,11 +1152,62 @@ describe('W-E2: grouping is preserved after a search filter', () => {
     const searchInput = screen.getByPlaceholderText(/buscar linaje/i);
     fireEvent.change(searchInput, { target: { value: 'elf' } });
 
-    const order = getTitleOrder(['Elf', 'High Elf']);
-    const [elfIdx, highElfIdx] = order;
+    // Group header remains in the DOM with aria-expanded true
+    const groupBtn = getGroupBtn('elf');
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('true');
+  });
+});
 
-    expect(elfIdx).toBeGreaterThanOrEqual(0);
-    expect(highElfIdx).toBeGreaterThanOrEqual(0);
-    expect(elfIdx).toBeLessThan(highElfIdx);
+describe('W-E5: when initial selection is a subrace, its group renders open', () => {
+  it('Elf group starts expanded when initialSelection is High Elf subrace', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HIGH_ELF, ELF_BASE, HUMAN_BASE]}
+        initialSelection={{
+          raceSlug: 'elf',
+          raceSource: 'PHB',
+          subraceSlug: 'elf--high',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    // Group must start open — High Elf card is visible without clicking
+    expect(screen.getByText('High Elf')).toBeTruthy();
+
+    // aria-expanded must be true
+    const groupBtn = getGroupBtn('elf');
+    expect(groupBtn.getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('W-E6: standalone races (no subraces) still render as direct ChoiceCards', () => {
+  it('Human renders as a selectable ChoiceCard, not a group header (no data-testid subrace-group)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE, ELF_BASE, HIGH_ELF]}
+        initialSelection={null}
+      />,
+    );
+
+    // Human should NOT have a group header button
+    expect(getGroupBtn('human')).toBeNull();
+    // Human text is visible as a ChoiceCard title
+    expect(screen.getByText('Human')).toBeTruthy();
+  });
+
+  it('Half-Elf renders as a selectable ChoiceCard (no subraces in data)', () => {
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HALF_ELF_BASE, ELF_BASE, HIGH_ELF]}
+        initialSelection={null}
+      />,
+    );
+
+    expect(getGroupBtn('half-elf')).toBeNull();
+    expect(screen.getByText('Half-Elf')).toBeTruthy();
   });
 });

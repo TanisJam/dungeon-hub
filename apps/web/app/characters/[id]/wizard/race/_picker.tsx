@@ -21,8 +21,9 @@ import {
 import { saveRace } from './actions';
 import { requiresSubrace } from '@dungeon-hub/domain/character/race';
 import { poolFor, titleCase } from '../background/_options';
-import { ChoiceList } from '@/components/wizard/choice-list';
+import { ChoiceCard } from '@/components/wizard/choice-card';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
+import { SubraceGroup } from './_subrace-group';
 import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 
 const LANG_KIND_LABEL: Record<string, string> = {
@@ -119,67 +120,112 @@ export function RacePicker({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /**
+   * Partition the entry list into three buckets:
+   * - groups: parents that have at least one subrace in the full dataset (accordion)
+   * - standalones: races that have NO subraces in the full dataset (direct ChoiceCards)
+   * - orphanGroups: subraces whose parent is filtered out (e.g. search matched the subrace but not the parent)
+   *
+   * We compute which parent slugs have subraces in the FULL entries list (not just filtered),
+   * so that a base race like "Elf" is always rendered as a group header even when filtered.
+   */
+  const parentSlugsWithSubraces = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) {
+      if (e.isSubrace && e.parentSlug) {
+        set.add(`${e.parentSlug}|${e.parentSource}`);
+      }
+    }
+    return set;
+  }, [entries]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const raw = !q
+    return !q
       ? entries
       : entries.filter((e) => {
           const display = displayName(e, entries).toLowerCase();
           return display.includes(q) || e.source.toLowerCase().includes(q);
         });
+  }, [entries, query]);
 
-    // Group subraces under their parent: each parent is followed immediately by its subraces.
-    // Parents and standalone races are interleaved alphabetically by display name.
-    // Algorithm:
-    //   1. Collect subraces in the filtered set (keyed by parentSlug|parentSource).
-    //   2. Walk the non-subrace entries sorted by name. For each parent, append it
-    //      then its matching subraces (sorted by name). Standalone races are emitted as-is.
+  /**
+   * Partition filtered entries into groups, standalones, and orphan groups.
+   * Each group collects the parent entry + its subraces from the filtered set.
+   */
+  const partitioned = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    // Collect subraces present in filtered, keyed by parentSlug|parentSource
     const subracesByParent = new Map<string, RaceEntry[]>();
-    for (const e of raw) {
+    for (const e of filtered) {
       if (e.isSubrace && e.parentSlug) {
         const key = `${e.parentSlug}|${e.parentSource}`;
         if (!subracesByParent.has(key)) subracesByParent.set(key, []);
         subracesByParent.get(key)!.push(e);
       }
     }
-
-    // Sort each subrace group by display name
     for (const group of subracesByParent.values()) {
       group.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
     }
 
-    const parents = raw
+    // Walk non-subrace entries sorted by name
+    const parents = filtered
       .filter((e) => !e.isSubrace)
       .sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
 
-    const ordered: RaceEntry[] = [];
+    type GroupItem = { kind: 'group'; parent: RaceEntry; subraces: RaceEntry[]; autoExpand: boolean };
+    type StandaloneItem = { kind: 'standalone'; entry: RaceEntry };
+    type ListItem = GroupItem | StandaloneItem;
+
+    const items: ListItem[] = [];
+    const emittedParentKeys = new Set<string>();
+
     for (const p of parents) {
-      ordered.push(p);
-      const key = `${p.slug}|${p.source}`;
-      const children = subracesByParent.get(key);
-      if (children) ordered.push(...children);
+      const key = entryKey(p);
+      emittedParentKeys.add(key);
+
+      const isParentWithSubraces = parentSlugsWithSubraces.has(key);
+      if (isParentWithSubraces) {
+        // This parent has subraces globally → render as accordion group
+        const subraces = subracesByParent.get(key) ?? [];
+        // Auto-expand when: a search query matches (any subrace is visible = we have results in filtered),
+        // OR the current query is non-empty (the search itself filtered these in)
+        const hasQueryMatch = !!q;
+        items.push({ kind: 'group', parent: p, subraces, autoExpand: hasQueryMatch });
+      } else {
+        // No subraces in the dataset → standalone ChoiceCard
+        items.push({ kind: 'standalone', entry: p });
+      }
     }
 
-    // Orphan subraces: their parent is not in the filtered set (e.g. search matched
-    // the subrace name but not the parent). Append them at the end, grouped by parent key.
-    const emittedParentKeys = new Set(parents.map((p) => `${p.slug}|${p.source}`));
-    const orphanGroups = new Map<string, RaceEntry[]>();
-    for (const e of raw) {
+    // Orphan subraces: their parent is not in the filtered set (subrace matched but parent didn't).
+    // Group them by parent key and append at the end. The parent entry is resolved from `entries`.
+    const orphanGroups = new Map<string, { parent: RaceEntry | null; subraces: RaceEntry[] }>();
+    for (const e of filtered) {
       if (e.isSubrace && e.parentSlug) {
         const key = `${e.parentSlug}|${e.parentSource}`;
         if (!emittedParentKeys.has(key)) {
-          if (!orphanGroups.has(key)) orphanGroups.set(key, []);
-          orphanGroups.get(key)!.push(e);
+          if (!orphanGroups.has(key)) {
+            const parentEntry = entries.find(
+              (p) => p.slug === e.parentSlug && p.source === e.parentSource && !p.isSubrace,
+            ) ?? null;
+            orphanGroups.set(key, { parent: parentEntry, subraces: [] });
+          }
+          orphanGroups.get(key)!.subraces.push(e);
         }
       }
     }
-    for (const group of orphanGroups.values()) {
-      group.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
-      ordered.push(...group);
+    for (const { parent, subraces } of orphanGroups.values()) {
+      if (parent) {
+        subraces.sort((a, b) => displayName(a, entries).localeCompare(displayName(b, entries)));
+        // Orphan groups always auto-expand (the search matched a subrace)
+        items.push({ kind: 'group', parent, subraces, autoExpand: true });
+      }
     }
 
-    return ordered;
-  }, [entries, query]);
+    return items;
+  }, [filtered, entries, query, parentSlugsWithSubraces]);
 
   const selected = useMemo(
     () => entries.find((e) => entryKey(e) === selectedKey) ?? null,
@@ -344,15 +390,14 @@ export function RacePicker({
     });
   }
 
-  // Build ChoiceList options
-  const options: ChoiceOption<string>[] = filtered.map((e) => {
+  /** Build a ChoiceOption for any single RaceEntry. Used by both standalone cards and subrace group items. */
+  function buildOption(e: RaceEntry): ChoiceOption<string> {
     const key = entryKey(e);
     const asis = parseAsis(e.data.ability);
     const asiSummary = formatAsisSummary(asis);
     const speedStr = formatSpeed(e.data.speed);
     const sizeStr = formatSize(e.data.size);
 
-    // Tag pills: subrace-required indicator, ASI summary, size, speed
     const pills: ChoiceOption<string>['pills'] = [];
     if (!e.isSubrace && requiresSubrace({ slug: e.slug, source: e.source })) {
       pills.push({ tone: 'amber', label: 'requiere sublinaje' });
@@ -414,7 +459,19 @@ export function RacePicker({
         />
       ),
     };
-  });
+  }
+
+  function handleSelect(key: string | null) {
+    if (key !== selectedKey) {
+      setChosenAsis({});
+      setChosenLangs([]);
+      setChosenSkills([]);
+      setChosenFeatSlug(null);
+      setChosenCantrip(null);
+    }
+    setSelectedKey(key);
+    setError(null);
+  }
 
   return (
     <div className="space-y-4">
@@ -427,26 +484,48 @@ export function RacePicker({
         className="w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
       />
 
-      {filtered.length === 0 ? (
+      {partitioned.length === 0 ? (
         <div className="rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-mute">
           Sin resultados.
         </div>
       ) : (
-        <ChoiceList
-          options={options}
-          selectedKey={selectedKey}
-          onSelect={(key) => {
-            if (key !== selectedKey) {
-              setChosenAsis({});
-              setChosenLangs([]);
-              setChosenSkills([]);
-              setChosenFeatSlug(null);
-              setChosenCantrip(null);
+        <div className="space-y-2">
+          {partitioned.map((item) => {
+            if (item.kind === 'group') {
+              const { parent, subraces, autoExpand } = item;
+              // Auto-expand when the current selection is inside this group
+              const selectionInGroup = subraces.some((s) => entryKey(s) === selectedKey);
+              const subraceOptions = subraces.map((s) => buildOption(s));
+              return (
+                <SubraceGroup
+                  key={entryKey(parent)}
+                  parentName={parent.name}
+                  parentSlug={parent.slug}
+                  subraces={subraceOptions}
+                  selectedSubraceKey={selectedKey}
+                  defaultOpen={selectionInGroup || autoExpand}
+                  onSelect={handleSelect}
+                />
+              );
+            } else {
+              // Standalone: direct ChoiceCard
+              const opt = buildOption(item.entry);
+              const isSelected = opt.key === selectedKey;
+              return (
+                <ChoiceCard
+                  key={opt.key}
+                  id={opt.key}
+                  title={opt.title}
+                  subtitle={opt.subtitle}
+                  pills={opt.pills}
+                  selected={isSelected}
+                  onClick={() => handleSelect(isSelected ? null : opt.key)}
+                  detail={opt.detail}
+                />
+              );
             }
-            setSelectedKey(key);
-            setError(null);
-          }}
-        />
+          })}
+        </div>
       )}
 
       <WizardFooterNav
