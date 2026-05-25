@@ -26,6 +26,8 @@ import {
   SPELLCASTING_ABILITY,
   validateClassSpells,
   computeSpellLimits,
+  computeSpellSlots,
+  consumeSpellSlot,
   type AppliedClassSpells,
   type SpellLimitsView,
 } from '@dungeon-hub/domain/character/spellcasting';
@@ -118,6 +120,14 @@ const UpdateBody = z.object({
 const AwardXpBody = z.object({
   /** Delta signado. Negativo permite correcciones / penalty del DM. */
   award: z.number().int(),
+});
+
+// SP-05: consume a spell slot.
+const ConsumeSlotBody = z.object({
+  level: z.number().int().min(1).max(9),
+  slotType: z.enum(['regular', 'pact']),
+  /** Defaults to 1. Hardcoded to max 1 per MVP (PHB p.201). */
+  count: z.number().int().min(1).max(1).optional(),
 });
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
@@ -534,6 +544,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         raceSkillChoices: data['raceSkillChoices'] as never,
         // Batch 6: racial cantrip pick (High Elf). Read-path tolerance — may be absent.
         raceCantrip: data['raceCantrip'] as never,
+        // SP-05: slot usage tracking. Read-path tolerance — absent for pre-SP-05 characters.
+        spellSlotsUsed: data['spellSlotsUsed'] as never,
+        warlockSlotsUsed: data['warlockSlotsUsed'] as never,
       },
       raceData,
       itemWeights,
@@ -2174,6 +2187,66 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         newHp,
         itemsRecharged: rechargeResult.recharged,
       },
+    };
+  });
+
+  // ---- POST /characters/:id/spell-slots/use --------------------------------
+  // Consume one spell slot of the given level and type (SP-05).
+  // PHB p.201 — "you expend a spell slot to cast a spell of that level or higher."
+  // Mirrors the /rest/short pattern: auth → 404 → 403 → domain → persist → 200.
+  app.post('/characters/:id/spell-slots/use', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = ConsumeSlotBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
+
+    // Compute max slots from class composition.
+    const slotResult = computeSpellSlots(classes);
+
+    // Current usage (read-path tolerance: absent for pre-SP-05 characters).
+    const currentSlotsUsed = (charData['spellSlotsUsed'] as number[] | undefined) ?? [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const currentPactUsed = (charData['warlockSlotsUsed'] as number | undefined) ?? 0;
+
+    const consumeResult = consumeSpellSlot({
+      slotsMax: slotResult.slots,
+      slotsUsed: currentSlotsUsed,
+      pactMagic: slotResult.pactMagic,
+      pactSlotsUsed: currentPactUsed,
+      level: body.level,
+      slotType: body.slotType,
+      ...(body.count !== undefined ? { count: body.count } : {}),
+    });
+
+    if (!consumeResult.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: consumeResult.issues });
+    }
+
+    // Persist updated counts — only touch the changed field per slotType.
+    const nextData: Record<string, unknown> = { ...charData };
+    if (body.slotType === 'pact') {
+      nextData['warlockSlotsUsed'] = consumeResult.pactSlotsUsed;
+    } else {
+      nextData['spellSlotsUsed'] = [...consumeResult.slotsUsed];
+    }
+
+    await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+
+    return {
+      spellSlotsUsed: nextData['spellSlotsUsed'] ?? currentSlotsUsed,
+      warlockSlotsUsed: nextData['warlockSlotsUsed'] ?? currentPactUsed,
     };
   });
 

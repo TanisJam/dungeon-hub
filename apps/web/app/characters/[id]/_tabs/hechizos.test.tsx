@@ -80,6 +80,8 @@ function makeSheet(spellsByClass: ClassSpellSummary[]): CharacterSheet {
     spellSlots: {
       slots: [2, 0, 0, 0, 0, 0, 0, 0, 0],
       pactMagic: null,
+      slotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      pactSlotsUsed: 0,
     },
     spellsByClass,
   };

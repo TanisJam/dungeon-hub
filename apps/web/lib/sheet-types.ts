@@ -78,6 +78,16 @@ export interface SpellcastingView {
 export interface SpellSlotsView {
   slots: readonly [number, number, number, number, number, number, number, number, number];
   pactMagic: { slotLevel: number; slotCount: number } | null;
+  /**
+   * Slots used per level (SP-05). Always present, defaults to [0×9].
+   * exactOptionalPropertyTypes: never optional.
+   */
+  slotsUsed: readonly [number, number, number, number, number, number, number, number, number];
+  /**
+   * Pact slots used (SP-05). Always present, defaults to 0.
+   * exactOptionalPropertyTypes: never optional.
+   */
+  pactSlotsUsed: number;
 }
 
 /**
