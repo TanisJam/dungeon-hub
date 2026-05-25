@@ -13,6 +13,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
   let wizardL4AsiCharId: string;
   let clericCharId: string;
   let sorcCharId: string;
+  let warlockCharId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -39,6 +40,48 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
     // SP01-S2: Wizard L4 with base INT 15, +2 INT ASI at L4 → INT 17 (mod +3).
     // Post-ASI prep limit = 3 + 4 = 7. PHB p.114.
     wizardL4AsiCharId = await setupWizardL4WithIntAsi();
+
+    // SP-07: Warlock L3 (Fiend patron) for REQ-SP07-WARLOCK-PUT-SPELLS tests.
+    // L3: cantrips_known=2, spells_known=4; pact slots L2×2. PHB p.107.
+    // Use PATCH to set character data directly (avoids brittle level-up chain).
+    {
+      const c = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/characters',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { campaignId, name: 'Warlock SP07' },
+        })
+        .then((r) => r.json());
+      warlockCharId = c.id;
+
+      await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/characters/${warlockCharId}`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          data: {
+            classes: [
+              {
+                slug: 'warlock',
+                source: 'PHB',
+                level: 3,
+                hitDie: 'd8',
+                subclass: { slug: 'warlock--fiend', source: 'PHB' },
+                savingThrows: ['wis', 'cha'],
+                armorProficiencies: ['light'],
+                weaponProficiencies: ['simple'],
+                toolProficiencies: [],
+                skillChoices: ['arcana', 'deception'],
+              },
+            ],
+            baseStats: { str: 8, dex: 12, con: 13, int: 10, wis: 14, cha: 15 },
+            spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            warlockSlotsUsed: 0,
+          },
+        },
+      });
+    }
 
     async function setupChar(name: string, classSlug: string, scoreOverrides: Record<string, number>): Promise<string> {
       const baseScores = { str: 8, dex: 14, con: 13, int: 12, wis: 10, cha: 15 };
@@ -495,6 +538,61 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().issues[0].code).toBe('NO_WIZARD_CLASS');
+  });
+
+  // SP-07: REQ-SP07-WARLOCK-PUT-SPELLS — Warlock known spell selection ------
+
+  it('SP-07 REQ-SP07-WARLOCK-PUT-SPELLS: Warlock L3 PUT happy path → 200 + DB persisted (PHB p.107)', async () => {
+    // PHB p.107: Warlock L3 cantrips_known=2, spells_known=4; pact caster (no prepared)
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${warlockCharId}/classes/warlock/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        cantrips: [
+          { slug: 'eldritch-blast', source: 'PHB' },
+          { slug: 'mage-hand', source: 'PHB' },
+        ],
+        known: [
+          { slug: 'hex', source: 'PHB' },
+          { slug: 'armor-of-agathys', source: 'PHB' },
+          { slug: 'hellish-rebuke', source: 'PHB' },
+          { slug: 'witch-bolt', source: 'PHB' },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // Warlock picks are stored under data.spells.warlock
+    expect(body.character.data.spells.warlock.cantrips).toHaveLength(2);
+    expect(body.character.data.spells.warlock.known).toHaveLength(4);
+  });
+
+  it('SP-07 REQ-SP07-WARLOCK-PUT-INVALID: Warlock L1 with 3 cantrips (limit=2) → 400 VALIDATION_FAILED (PHB p.107)', async () => {
+    // PHB p.107: Warlock L3 cantrips_known=2; submitting 3 must fail
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${warlockCharId}/classes/warlock/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        cantrips: [
+          { slug: 'eldritch-blast', source: 'PHB' },
+          { slug: 'mage-hand', source: 'PHB' },
+          { slug: 'prestidigitation', source: 'PHB' }, // 3rd cantrip — over limit
+        ],
+        known: [
+          { slug: 'hex', source: 'PHB' },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.issues).toBeDefined();
+    expect(
+      body.issues.find((i: { code: string }) => i.code === 'CANTRIPS_KNOWN_EXCEEDED'),
+    ).toBeDefined();
   });
 
   // SP01-S2 (REQ-SP01-PREP-LIMIT): PUT /spells MUST use post-ASI prep limit.

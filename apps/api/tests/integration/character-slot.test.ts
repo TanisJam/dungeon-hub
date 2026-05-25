@@ -119,6 +119,20 @@ describe('POST /characters/:id/spell-slots/use', () => {
     await closeTestApp();
   });
 
+  // SP-07: REQ-SP07-SLOTS-USE-401 — unauthenticated request must return 401 ----
+
+  it('SP-07 REQ-SP07-SLOTS-USE-401: POST /spell-slots/use without Bearer token → 401 UNAUTHORIZED', async () => {
+    // No auth header — server must reject with 401 per API conventions (CLAUDE.md §6)
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${wizardCharId}/spell-slots/use`,
+      // No authorization header
+      payload: { level: 1, slotType: 'regular' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
   it('200 happy path regular: Wizard L3 consumes L1 slot → spellSlotsUsed[0] = 1', async () => {
     const app = await getTestApp();
 
