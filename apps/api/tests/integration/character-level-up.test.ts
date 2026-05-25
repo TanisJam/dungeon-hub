@@ -5,7 +5,9 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 /**
  * POST /characters/:id/classes/:classSlug/level-up
  *
- * Cubre: XP gate, HP delta, subclass unlock, ASI/feat (4/8/12/16/19),
+ * Cubre: XP gate, HP delta, subclass unlock,
+ * ASI/feat (per-class cadence: Fighter 4/6/8/12/14/16/19 — PHB p.72,
+ * Rogue 4/8/10/12/16/19 — PHB p.96, others 4/8/12/16/19 — PHB standard),
  * Wizard free spells, owner-only auth.
  */
 describe('POST /characters/:id/classes/:classSlug/level-up', () => {
@@ -349,5 +351,118 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
       payload: { hpMethod: 'average' },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it('B-RED-1: Fighter L5 → L6 sin ASI → 400 ASI_OR_FEAT_REQUIRED (PHB p.72)', async () => {
+    // PHB p.72 — Fighter gains ASI at level 6 (not standard cadence).
+    // Hardcoded set [4,8,12,16,19] misses level 6, so current code returns 200 here
+    // (it silently skips the ASI gate). After fix this must be 400.
+    // CL01-S1 from spec #663.
+    const app = await getTestApp();
+    const charId = await setupChar({ name: 'Fighter ASI L6', classSlug: 'fighter' });
+
+    // Award XP for level 6 (PHB p.15: 14,000 XP)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/xp`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { award: 14_000 },
+    });
+
+    // Level up L1→L2
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average' },
+    });
+    // L2→L3 (Fighter subclass unlock = L3, pick Champion)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average', subclass: { slug: 'fighter--champion', source: 'PHB' } },
+    });
+    // L3→L4 (ASI level — required)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        hpMethod: 'average',
+        asi: { choices: [{ ability: 'str', bonus: 1 }, { ability: 'con', bonus: 1 }] },
+      },
+    });
+    // L4→L5 (no ASI)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average' },
+    });
+
+    // L5→L6 sin ASI → must be 400 (Fighter ASI at L6, PHB p.72)
+    const noChoice = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { hpMethod: 'average' },
+    });
+    expect(noChoice.statusCode).toBe(400);
+    expect(noChoice.json().issues[0].code).toBe('ASI_OR_FEAT_REQUIRED');
+    expect(noChoice.json().issues[0].level).toBe(6);
+  });
+
+  it('B-RED-2: Rogue L9 → L10 sin ASI → 400 ASI_OR_FEAT_REQUIRED (PHB p.96)', async () => {
+    // PHB p.96 — Rogue gains ASI at level 10 (not in standard cadence).
+    // Hardcoded set [4,8,12,16,19] misses level 10. After fix this must be 400.
+    // CL01-S3 from spec #663.
+    const app = await getTestApp();
+    // Rogue requires 4 skill choices (PHB p.96)
+    const charId = await setupChar({
+      name: 'Rogue ASI L10',
+      classSlug: 'rogue',
+      skills: ['athletics', 'acrobatics', 'deception', 'perception'],
+    });
+
+    // Award XP for level 10 (PHB p.15: 64,000 XP)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/xp`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { award: 64_000 },
+    });
+
+    // Helper to level up with optional payload extras
+    const levelUp = (extra: Record<string, unknown> = {}): Promise<unknown> =>
+      app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${charId}/classes/rogue/level-up`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { hpMethod: 'average', ...extra },
+      });
+
+    // L1→L2 (no ASI, no subclass yet — Rogue unlock = L3)
+    await levelUp();
+    // L2→L3 (subclass unlock — pick Thief)
+    await levelUp({ subclass: { slug: 'rogue--thief', source: 'PHB' } });
+    // L3→L4 (ASI)
+    await levelUp({ asi: { choices: [{ ability: 'dex', bonus: 1 }, { ability: 'con', bonus: 1 }] } });
+    // L4→L5
+    await levelUp();
+    // L5→L6
+    await levelUp();
+    // L6→L7
+    await levelUp();
+    // L7→L8 (ASI)
+    await levelUp({ asi: { choices: [{ ability: 'dex', bonus: 1 }, { ability: 'str', bonus: 1 }] } });
+    // L8→L9
+    await levelUp();
+
+    // L9→L10 sin ASI → must be 400 (Rogue ASI at L10, PHB p.96)
+    const noChoice = await levelUp();
+    expect((noChoice as Awaited<ReturnType<typeof app.inject>>).statusCode).toBe(400);
+    expect((noChoice as Awaited<ReturnType<typeof app.inject>>).json().issues[0].code).toBe('ASI_OR_FEAT_REQUIRED');
+    expect((noChoice as Awaited<ReturnType<typeof app.inject>>).json().issues[0].level).toBe(10);
   });
 });

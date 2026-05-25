@@ -12,7 +12,7 @@ import {
 } from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
-import { computeSubclassUnlockLevel } from '@dungeon-hub/domain/character/class';
+import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import {
   addItemToInventory,
@@ -2314,8 +2314,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         newSubclass = { slug: subclassData.slug, source: subclassData.source };
       }
 
-      // ASI levels (4/8/12/16/19) — requiere asi o feat.
-      const ASI_LEVELS = new Set([4, 8, 12, 16, 19]);
+      // ASI levels — derived per-class from classFeatures[] (domain SoT, PHB §3).
+      // Fighter (PHB p.72): 4/6/8/12/14/16/19. Rogue (PHB p.96): 4/8/10/12/16/19.
+      // All other PHB classes: 4/8/12/16/19 (standard cadence, fallback default).
+      const ASI_LEVELS = new Set(deriveAsiLevels(classData.classFeatures));
       const isAsiLevel = ASI_LEVELS.has(newClassLevel);
       let asiToApply: AppliedAsi[] = [];
       let featToApply: AppliedFeat | null = null;
