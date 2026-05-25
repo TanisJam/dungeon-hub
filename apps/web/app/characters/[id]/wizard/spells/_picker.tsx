@@ -1,17 +1,15 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { Pill } from '@/components/ui/pill';
-import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 import { decodeSchool } from '@/lib/spells/school-decode';
-import { saveSpells } from './actions';
 import { SpellBadges } from '@/app/_components/spells/badges';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type SpellRef = { slug: string; source: string };
+export type SpellRef = { slug: string; source: string };
 
-type AvailableSpell = {
+export type AvailableSpell = {
   slug: string;
   source: string;
   name: string;
@@ -23,7 +21,7 @@ type AvailableSpell = {
   componentsMCost: number | null;
 };
 
-type SpellLimitsView = {
+export type SpellLimitsView = {
   cantripsKnown: number;
   spellsKnown: number | null;
   spellsPrepared: number | null;
@@ -32,20 +30,20 @@ type SpellLimitsView = {
   ability: 'int' | 'wis' | 'cha' | null;
 };
 
-type InitialSpells = {
+export type AppliedClassSpells = {
   cantrips: SpellRef[];
   known: SpellRef[];
   prepared: SpellRef[];
 };
 
 export type SpellsPickerProps = {
-  characterId: string;
   classSlug: string;
   classSource: string;
   limits: SpellLimitsView;
   availableSpells: AvailableSpell[];
   subclassGrantedSlugs: string[];
-  initialSpells: InitialSpells;
+  value: AppliedClassSpells;
+  onChange: (next: AppliedClassSpells) => void;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -112,24 +110,98 @@ function buildHeaderSummary(limits: SpellLimitsView, mode: CasterMode): string {
   return `Elegí ${parts.join(' y ')}.`;
 }
 
+// ── Exported validation helper ─────────────────────────────────────────────
+
+/**
+ * Validates current spell picks against the limits.
+ * Returns null when valid, or a user-readable error string when invalid.
+ * Used by parent wrappers (SinglePickerView, MulticlassSpellsView) to gate "Siguiente".
+ */
+export function validateSpellsPick(
+  limits: SpellLimitsView,
+  subclassGrantedSlugs: string[],
+  value: AppliedClassSpells,
+): string | null {
+  const mode = deriveCasterMode(limits);
+  const subclassGrantedSet = new Set(subclassGrantedSlugs);
+
+  // Build key sets
+  const refToK = (r: SpellRef) => spellKey(r.slug, r.source);
+  const cantripKeys = new Set(value.cantrips.map(refToK));
+  const knownKeys = new Set(value.known.map(refToK));
+  const preparedKeys = new Set(value.prepared.map(refToK));
+
+  // Compute subclass-granted sets (locked keys)
+  const subclassGrantedCantripKeys = new Set<string>();
+  const subclassGrantedLeveledKeys = new Set<string>();
+  // We don't have availableSpells here, so approximate: any cantrip ref in value.cantrips whose slug is in subclassGrantedSet
+  for (const r of value.cantrips) {
+    if (subclassGrantedSet.has(r.slug)) subclassGrantedCantripKeys.add(refToK(r));
+  }
+  for (const r of [...value.known, ...value.prepared]) {
+    if (subclassGrantedSet.has(r.slug)) subclassGrantedLeveledKeys.add(refToK(r));
+  }
+
+  const freeCantripCount = [...cantripKeys].filter((k) => !subclassGrantedCantripKeys.has(k)).length;
+  const freeCantripLimit = (limits.cantripsKnown ?? 0) - subclassGrantedCantripKeys.size;
+
+  if (freeCantripLimit > 0 && freeCantripCount !== freeCantripLimit) {
+    return `Necesitás elegir ${freeCantripLimit} cantrip${freeCantripLimit !== 1 ? 's' : ''}.`;
+  }
+
+  if (mode === 'known') {
+    const freeLimit = (limits.spellsKnown ?? 0) - subclassGrantedLeveledKeys.size;
+    const freeLeveledCount = [...knownKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
+    if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
+      return `Necesitás elegir ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
+    }
+  } else if (mode === 'prep') {
+    const freeLimit = (limits.spellsPrepared ?? 0) - subclassGrantedLeveledKeys.size;
+    const freeLeveledCount = [...preparedKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
+    if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
+      return `Necesitás preparar ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
+    }
+  } else if (mode === 'wizard') {
+    const freeKnownCount = [...knownKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
+    const minFreeKnown = (limits.wizardSpellbookSize ?? 0) - subclassGrantedLeveledKeys.size;
+    if (minFreeKnown > 0 && freeKnownCount < minFreeKnown) {
+      return `Necesitás conocer al menos ${minFreeKnown} hechizo${minFreeKnown !== 1 ? 's' : ''} en tu libro.`;
+    }
+    if (limits.spellsPrepared !== null) {
+      const freePreparedCount = [...preparedKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
+      const freePreparedLimit = limits.spellsPrepared - subclassGrantedLeveledKeys.size;
+      if (freePreparedLimit > 0 && freePreparedCount !== freePreparedLimit) {
+        return `Necesitás preparar exactamente ${freePreparedLimit} hechizo${freePreparedLimit !== 1 ? 's' : ''}.`;
+      }
+    }
+    for (const k of preparedKeys) {
+      if (!knownKeys.has(k)) {
+        return 'Tenés hechizos preparados que no están en tu libro. Revisá la selección.';
+      }
+    }
+  }
+
+  return null;
+}
+
 // ── Main Component ──────────────────────────────────────────────────────────
 
 export function SpellsPicker({
-  characterId,
   classSlug,
   limits,
   availableSpells,
   subclassGrantedSlugs,
-  initialSpells,
+  value,
+  onChange,
 }: SpellsPickerProps) {
   const casterMode = useMemo(() => deriveCasterMode(limits), [limits]);
 
   // Subclass-granted keys (slug-only comparison; source not in the slugs array)
   const subclassGrantedSet = useMemo(() => new Set(subclassGrantedSlugs), [subclassGrantedSlugs]);
 
-  // Build initial key sets from saved refs + subclass grants
+  // Build initial key sets from value refs + subclass grants
   const [cantripKeys, setCantripKeys] = useState<Set<string>>(() => {
-    const s = new Set(initialSpells.cantrips.map(refToKey));
+    const s = new Set(value.cantrips.map(refToKey));
     // Subclass-granted cantrips: find from availableSpells and seed in
     for (const spell of availableSpells) {
       if (spell.level === 0 && subclassGrantedSet.has(spell.slug)) {
@@ -140,7 +212,7 @@ export function SpellsPicker({
   });
 
   const [knownKeys, setKnownKeys] = useState<Set<string>>(() => {
-    const s = new Set(initialSpells.known.map(refToKey));
+    const s = new Set(value.known.map(refToKey));
     if (casterMode === 'wizard') {
       for (const spell of availableSpells) {
         if (spell.level > 0 && subclassGrantedSet.has(spell.slug)) {
@@ -152,7 +224,7 @@ export function SpellsPicker({
   });
 
   const [preparedKeys, setPreparedKeys] = useState<Set<string>>(() => {
-    const s = new Set(initialSpells.prepared.map(refToKey));
+    const s = new Set(value.prepared.map(refToKey));
     // Prep casters: subclass spells seed into preparedKeys
     for (const spell of availableSpells) {
       if (spell.level > 0 && subclassGrantedSet.has(spell.slug)) {
@@ -161,9 +233,6 @@ export function SpellsPicker({
     }
     return s;
   });
-
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   // ── Filter chip state (D-01: client-side, D-04: AND semantics) ───────────
   const [filterRitual, setFilterRitual] = useState(false);
@@ -259,22 +328,54 @@ export function SpellsPicker({
   const freeKnownLimit = (limits.wizardSpellbookSize ?? 0) - subclassGrantedLeveledKeys.size;
   const freePreparedLimit = (limits.spellsPrepared ?? 0) - subclassGrantedLeveledKeys.size;
 
+  // ── Helpers to emit upward after local state change ──────────────────────
+
+  function emitChange(
+    nextCantrips: Set<string>,
+    nextKnown: Set<string>,
+    nextPrepared: Set<string>,
+  ) {
+    const cantrips = Array.from(nextCantrips).map(parseKey);
+    let known: SpellRef[] = [];
+    let prepared: SpellRef[] = [];
+
+    if (casterMode === 'known') {
+      known = Array.from(nextKnown).map(parseKey);
+    } else if (casterMode === 'prep') {
+      prepared = Array.from(nextPrepared).map(parseKey);
+    } else {
+      // wizard
+      known = Array.from(nextKnown).map(parseKey);
+      prepared = Array.from(nextPrepared).map(parseKey);
+    }
+
+    onChange({ cantrips, known, prepared });
+  }
+
   // ── Toggle handlers ───────────────────────────────────────────────────────
 
   function toggleCantrip(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked
     if (checked && freeCantripCount >= freeCantripLimit) return; // cap
-    setCantripKeys((prev) => toggleSet(prev, key, checked));
-    setError(null);
+    setCantripKeys((prev) => {
+      const next = toggleSet(prev, key, checked);
+      emitChange(next, knownKeys, preparedKeys);
+      return next;
+    });
   }
 
   function toggleLeveled(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked
     if (checked && freeLeveledCount >= freeLeveledLimit) return; // cap
-    setActiveLeveledKeys((prev) => toggleSet(prev, key, checked));
-    setError(null);
+    setActiveLeveledKeys((prev) => {
+      const next = toggleSet(prev, key, checked);
+      const nextKnown = casterMode === 'known' ? next : knownKeys;
+      const nextPrepared = casterMode === 'prep' ? next : preparedKeys;
+      emitChange(cantripKeys, nextKnown, nextPrepared);
+      return next;
+    });
   }
 
   // ── Wizard-specific toggle handlers (D.2) ────────────────────────────────
@@ -282,12 +383,19 @@ export function SpellsPicker({
   function toggleKnown(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked — skip
-    setKnownKeys((prev) => toggleSet(prev, key, checked));
-    // Auto-link: unchecking Known → remove from Prepared (prepared ⊆ known)
-    if (!checked) {
-      setPreparedKeys((prev) => toggleSet(prev, key, false));
-    }
-    setError(null);
+    setCantripKeys((prevCantrips) => {
+      setKnownKeys((prev) => {
+        const nextKnown = toggleSet(prev, key, checked);
+        setPreparedKeys((prevPrep) => {
+          // Auto-link: unchecking Known → remove from Prepared
+          const nextPrepared = checked ? prevPrep : toggleSet(prevPrep, key, false);
+          emitChange(prevCantrips, nextKnown, nextPrepared);
+          return nextPrepared;
+        });
+        return nextKnown;
+      });
+      return prevCantrips;
+    });
   }
 
   function togglePrepared(key: string, checked: boolean) {
@@ -295,88 +403,10 @@ export function SpellsPicker({
     if (subclassGrantedSet.has(slug)) return; // locked — skip
     // Invariant: prepared ⊆ known. Can't prepare a spell not in the spellbook.
     if (checked && !knownKeys.has(key)) return;
-    setPreparedKeys((prev) => toggleSet(prev, key, checked));
-    setError(null);
-  }
-
-  // ── Validation ────────────────────────────────────────────────────────────
-
-  function validatePicker(): string | null {
-    // Cantrips: free picks must equal free cantrip limit
-    if (freeCantripLimit > 0 && freeCantripCount !== freeCantripLimit) {
-      return `Necesitás elegir ${freeCantripLimit} cantrip${freeCantripLimit !== 1 ? 's' : ''}.`;
-    }
-
-    if (casterMode === 'known') {
-      const freeLimit = (limits.spellsKnown ?? 0) - subclassGrantedLeveledKeys.size;
-      if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
-        return `Necesitás elegir ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
-      }
-    } else if (casterMode === 'prep') {
-      const freeLimit = (limits.spellsPrepared ?? 0) - subclassGrantedLeveledKeys.size;
-      if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
-        return `Necesitás preparar ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
-      }
-    } else if (casterMode === 'wizard') {
-      // D.4 — Full Wizard validation
-      // Free known picks: total known minus locked subclass grants
-      const freeKnownCount = [...knownKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
-      const minFreeKnown = (limits.wizardSpellbookSize ?? 0) - subclassGrantedLeveledKeys.size;
-      if (minFreeKnown > 0 && freeKnownCount < minFreeKnown) {
-        return `Necesitás conocer al menos ${minFreeKnown} hechizo${minFreeKnown !== 1 ? 's' : ''} en tu libro.`;
-      }
-
-      // Prepared: exact match to spellsPrepared limit
-      if (limits.spellsPrepared !== null) {
-        const freePreparedCount = [...preparedKeys].filter(
-          (k) => !subclassGrantedLeveledKeys.has(k),
-        ).length;
-        const freePreparedLimit = limits.spellsPrepared - subclassGrantedLeveledKeys.size;
-        if (freePreparedLimit > 0 && freePreparedCount !== freePreparedLimit) {
-          return `Necesitás preparar exactamente ${freePreparedLimit} hechizo${freePreparedLimit !== 1 ? 's' : ''}.`;
-        }
-      }
-
-      // Defensive invariant: prepared ⊆ known (should always hold via auto-link)
-      for (const k of preparedKeys) {
-        if (!knownKeys.has(k)) {
-          return 'Tenés hechizos preparados que no están en tu libro. Revisá la selección.';
-        }
-      }
-    }
-
-    return null;
-  }
-
-  // ── Submit ────────────────────────────────────────────────────────────────
-
-  function handleSubmit() {
-    const validationError = validatePicker();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    setError(null);
-
-    const cantrips = Array.from(cantripKeys).map(parseKey);
-    let known: SpellRef[] = [];
-    let prepared: SpellRef[] = [];
-
-    if (casterMode === 'known') {
-      known = Array.from(knownKeys).map(parseKey);
-      prepared = [];
-    } else if (casterMode === 'prep') {
-      known = [];
-      prepared = Array.from(preparedKeys).map(parseKey);
-    } else {
-      // wizard — Phase D will differentiate; for now treat same as known
-      known = Array.from(knownKeys).map(parseKey);
-      prepared = Array.from(preparedKeys).map(parseKey);
-    }
-
-    startTransition(async () => {
-      const res = await saveSpells({ characterId, classSlug, cantrips, known, prepared });
-      if (res?.error) setError(res.error);
+    setPreparedKeys((prev) => {
+      const next = toggleSet(prev, key, checked);
+      emitChange(cantripKeys, knownKeys, next);
+      return next;
     });
   }
 
@@ -590,12 +620,6 @@ export function SpellsPicker({
         <EmptyGroup label={`Nivel 1`} />
       )}
 
-      <WizardFooterNav
-        backHref={`/characters/${characterId}/wizard/background`}
-        onNext={handleSubmit}
-        pending={pending}
-        error={error}
-      />
     </div>
   );
 }

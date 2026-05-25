@@ -26,10 +26,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/characters/test-id/wizard/spells',
 }));
 
-vi.mock('./actions', () => ({
-  saveSpells: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { SpellsPickerProps, SpellsPicker } from './_picker';
 
 const makeLimits = (overrides = {}) => ({
@@ -65,13 +61,13 @@ const makeSpell = (overrides: Partial<{
 });
 
 const defaultProps: SpellsPickerProps = {
-  characterId: 'char-1',
   classSlug: 'cleric',
   classSource: 'PHB',
   limits: makeLimits(),
   availableSpells: [],
   subclassGrantedSlugs: [],
-  initialSpells: { cantrips: [], known: [], prepared: [] },
+  value: { cantrips: [], known: [], prepared: [] },
+  onChange: vi.fn(),
 };
 
 describe('SpellsPicker — school decode (REQ-SP02-WEB-SCHOOL-DECODE)', () => {
@@ -215,6 +211,7 @@ const filterProps: SpellsPickerProps = {
   ...defaultProps,
   limits: makeLimits({ cantripsKnown: 0, spellsPrepared: 3, maxSpellLevel: 1 }),
   availableSpells: filterFixtureSpells,
+  onChange: vi.fn(),
 };
 
 describe('SpellsPicker — filter chips (REQ-SP03-FILTER-RITUAL, SP03-S1)', () => {
@@ -270,7 +267,7 @@ describe('SpellsPicker — filter chips (REQ-SP03-FILTER-RITUAL, SP03-S1)', () =
     const mm = filterFixtureSpells.find((s) => s.slug === 'magic-missile')!;
     const propsWithSelected: SpellsPickerProps = {
       ...filterProps,
-      initialSpells: {
+      value: {
         cantrips: [],
         known: [],
         prepared: [
@@ -278,6 +275,7 @@ describe('SpellsPicker — filter chips (REQ-SP03-FILTER-RITUAL, SP03-S1)', () =
           { slug: mm.slug, source: mm.source },
         ],
       },
+      onChange: vi.fn(),
     };
     render(<SpellsPicker {...propsWithSelected} />);
     // Counter shows 2/3 before filter
@@ -307,6 +305,7 @@ const collapseProps: SpellsPickerProps = {
   ...defaultProps,
   limits: makeLimits({ cantripsKnown: 0, spellsPrepared: 3, maxSpellLevel: 3 }),
   availableSpells: collapseFixtureSpells,
+  onChange: vi.fn(),
 };
 
 describe('SpellsPicker — collapse default (REQ-SP03-COLLAPSE-DEFAULT, SP03-S5)', () => {

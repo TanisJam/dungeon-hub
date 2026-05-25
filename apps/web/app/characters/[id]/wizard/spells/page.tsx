@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 import { NoPicksPanel } from './_no-picks-panel';
-import { SpellsPicker } from './_picker';
+import { SinglePickerView } from './_single-picker-view';
 import { RaceCantripCard } from './_race-cantrip-card';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -90,6 +90,8 @@ export default async function SpellsStepPage({ params }: Props) {
 
   const primaryClass = character.data?.classes?.[0];
   if (!primaryClass) redirect(`/characters/${id}/wizard/class`);
+
+  // C1: placeholder; C2 will fan out over all caster classes
 
   const raceCantripRef = character.data?.raceCantrip ?? null;
 
@@ -187,14 +189,15 @@ export default async function SpellsStepPage({ params }: Props) {
             level={primaryClass.level}
           />
         ) : (
-          <SpellsPicker
+          <SinglePickerView
             characterId={id}
             classSlug={primaryClass.slug}
             classSource={primaryClass.source}
             limits={limits}
             availableSpells={options.availableSpells}
             subclassGrantedSlugs={options.subclassGrantedSlugs}
-            initialSpells={initialSpells}
+            backHref={`/characters/${id}/wizard/background`}
+            initialPicks={initialSpells}
           />
         )}
       </div>

@@ -5,8 +5,6 @@ import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { formatValidationIssues } from '@/lib/issue-messages';
 
-export type SpellsState = { error: string | null };
-
 type SpellRef = { slug: string; source: string };
 
 type SpellPayload = {
@@ -17,14 +15,16 @@ type SpellPayload = {
   prepared: SpellRef[];
 };
 
-export async function saveSpells(payload: SpellPayload): Promise<SpellsState> {
+export type SaveSpellsResult = { ok: true } | { ok: false; error: string };
+
+export async function saveSpellsForClass(payload: SpellPayload): Promise<SaveSpellsResult> {
   const { characterId, classSlug, cantrips, known, prepared } = payload;
 
   const supabase = await createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) return { error: 'Not authenticated.' };
+  if (!session) return { ok: false, error: 'Not authenticated.' };
 
   try {
     await api.put(
@@ -42,22 +42,20 @@ export async function saveSpells(payload: SpellPayload): Promise<SpellsState> {
           }
         | null;
       if (body?.issues?.length) {
-        return { error: formatValidationIssues(body.issues) };
+        return { ok: false, error: formatValidationIssues(body.issues) };
       }
-      return { error: body?.message ?? body?.error ?? `API ${err.status}` };
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 
+  return { ok: true };
+}
+
+export async function proceedToReview(characterId: string): Promise<never> {
   redirect(`/characters/${characterId}/wizard/review`);
 }
 
-export async function skipSpells(characterId: string): Promise<SpellsState> {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return { error: 'Not authenticated.' };
-
+export async function skipSpells(characterId: string): Promise<never> {
   redirect(`/characters/${characterId}/wizard/review`);
 }
