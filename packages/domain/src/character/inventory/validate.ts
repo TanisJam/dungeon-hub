@@ -519,27 +519,59 @@ export function consumeInventoryItem(args: {
 }
 
 /**
- * Recarga charges en items cuyo compendio define `recharge === 'dawn'`. Se
- * invoca tras un long rest. Items sin charges o con otro timing (turn/action/
- * frases custom) no se tocan.
+ * Trigger type for item recharge on rest.
+ *
+ * PHB p.141: magic items regain charges at dawn, at the end of a short rest,
+ * or at the end of a long rest.
+ *
+ * - `'short'`  → recharges items with `recharge === 'short'`
+ * - `'long'`   → recharges items with `recharge === 'long'` OR `recharge === 'dawn'`
+ *               (R-04 DOC deferral: dawn items are long-rest-equivalent until the
+ *               campaign clock is implemented — parent roadmap rules-audit-rest D-03)
+ * - `'dawn'`   → recharges only items with `recharge === 'dawn'`
+ */
+export type RechargeTrigger = 'short' | 'long' | 'dawn';
+
+/**
+ * Recarga charges en items cuyo compendio coincide con el trigger de descanso.
+ * PHB p.141. Items sin charges o cuyo recharge no coincide con el trigger no
+ * se tocan.
  *
  * Devuelve el inventario nuevo + lista de instanceIds recargados.
+ *
+ * @param trigger - El tipo de descanso que dispara la recarga.
+ *   Defaults to `'long'` for backward-compatibility with existing call sites.
  */
 export function rechargeInventoryItems(args: {
   inventory: InventoryItem[];
   weights: ReadonlyArray<ItemCompendiumLite>;
-  /** 'long' (default) = recarga items con recharge='dawn'. */
-  trigger?: 'long';
+  /** PHB p.141 — which rest triggers this recharge. Default: 'long'. */
+  trigger?: RechargeTrigger;
 }): { inventory: InventoryItem[]; recharged: Array<{ instanceId: string; to: number }> } {
-  const { inventory, weights } = args;
+  const { inventory, weights, trigger = 'long' } = args;
   const lookup = new Map<string, ItemCompendiumLite>();
   for (const w of weights) lookup.set(`${w.slug}|${w.source}`, w);
+
+  /** Returns true if a given recharge value should fire for this trigger. */
+  function matchesTrigger(recharge: string | null | undefined): boolean {
+    if (!recharge) return false;
+    switch (trigger) {
+      case 'short':
+        return recharge === 'short';
+      case 'long':
+        // R-04 DOC deferral: 'dawn' items are treated as long-rest-equivalent
+        // until the campaign clock is implemented. PHB p.141.
+        return recharge === 'long' || recharge === 'dawn';
+      case 'dawn':
+        return recharge === 'dawn';
+    }
+  }
 
   const recharged: Array<{ instanceId: string; to: number }> = [];
   const nextInventory = inventory.map((it) => {
     const lite = lookup.get(`${it.itemSlug}|${it.itemSource}`);
     if (!lite || lite.charges == null) return it;
-    if (lite.recharge !== 'dawn') return it;
+    if (!matchesTrigger(lite.recharge)) return it;
     if (it.charges === lite.charges) return it;
     recharged.push({ instanceId: it.instanceId, to: lite.charges });
     return { ...it, charges: lite.charges };

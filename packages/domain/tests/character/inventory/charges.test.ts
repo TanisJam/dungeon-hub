@@ -514,4 +514,190 @@ describe('rechargeInventoryItems', () => {
     expect(res.recharged).toHaveLength(0);
     expect(res.inventory[0]!.charges).toBe(1);
   });
+
+  // ---- Trigger taxonomy (REST-02) ----
+
+  // REQ-R02-RECHARGE-TRIGGER-SHORT
+  it('trigger:short — recarga solo items con recharge=short (PHB p.141)', () => {
+    // PHB p.141: "others at the end of a short or long rest"
+    const shortItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      slug: 'ring-of-short-recharge',
+      source: 'TEST',
+      recharge: 'short',
+      charges: 3,
+    };
+    const add = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: shortItem,
+      input: { charges: 1 },
+      weights: [shortItem],
+      ctx: martialCtx,
+    });
+    if (!add.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add.inventory,
+      weights: [shortItem],
+      trigger: 'short',
+    });
+    expect(res.recharged).toHaveLength(1);
+    expect(res.recharged[0]!.to).toBe(3);
+    expect(res.inventory[0]!.charges).toBe(3);
+  });
+
+  // REQ-R02-RECHARGE-TRIGGER-SHORT — non-short item untouched
+  it('trigger:short — no toca items con recharge=dawn', () => {
+    const dawnItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      recharge: 'dawn',
+    };
+    const add = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: dawnItem,
+      input: { charges: 1 },
+      weights: [dawnItem],
+      ctx: martialCtx,
+    });
+    if (!add.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add.inventory,
+      weights: [dawnItem],
+      trigger: 'short',
+    });
+    expect(res.recharged).toHaveLength(0);
+    expect(res.inventory[0]!.charges).toBe(1);
+  });
+
+  // REQ-R02-RECHARGE-TRIGGER-LONG — recharges 'long' items
+  it('trigger:long — recarga items con recharge=long (PHB p.141)', () => {
+    // PHB p.141: "at the end of a long rest"
+    const longItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      slug: 'ring-of-long-recharge',
+      source: 'TEST',
+      recharge: 'long',
+      charges: 5,
+    };
+    const add = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: longItem,
+      input: { charges: 0 },
+      weights: [longItem],
+      ctx: martialCtx,
+    });
+    if (!add.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add.inventory,
+      weights: [longItem],
+      trigger: 'long',
+    });
+    expect(res.recharged).toHaveLength(1);
+    expect(res.recharged[0]!.to).toBe(5);
+    expect(res.inventory[0]!.charges).toBe(5);
+  });
+
+  // REQ-R02-RECHARGE-TRIGGER-LONG — dawn items also recharged on long rest
+  it('trigger:long — sigue recargando items con recharge=dawn (R-04 DOC deferral)', () => {
+    // R-04 DOC deferral: dawn items are treated as long-rest-equivalent until
+    // campaign clock is implemented. trigger='long' MUST include dawn items
+    // to avoid regressing existing behavior.
+    const dawnItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      recharge: 'dawn',
+      charges: 10,
+    };
+    const add = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: dawnItem,
+      input: { charges: 2 },
+      weights: [dawnItem],
+      ctx: martialCtx,
+    });
+    if (!add.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add.inventory,
+      weights: [dawnItem],
+      trigger: 'long',
+    });
+    expect(res.recharged).toHaveLength(1);
+    expect(res.recharged[0]!.to).toBe(10);
+    expect(res.inventory[0]!.charges).toBe(10);
+  });
+
+  // REQ-R02-RECHARGE-TRIGGER-LONG — short items NOT recharged on long rest
+  it('trigger:long — no toca items con recharge=short', () => {
+    // REQ-R02-RECHARGE-NO-EFFECT: short items are not recharged on long rest
+    const shortItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      slug: 'ring-of-short-recharge',
+      source: 'TEST',
+      recharge: 'short',
+      charges: 3,
+    };
+    const add = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: shortItem,
+      input: { charges: 0 },
+      weights: [shortItem],
+      ctx: martialCtx,
+    });
+    if (!add.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add.inventory,
+      weights: [shortItem],
+      trigger: 'long',
+    });
+    expect(res.recharged).toHaveLength(0);
+    expect(res.inventory[0]!.charges).toBe(0);
+  });
+
+  // REQ-R02-RECHARGE-TRIGGER-DAWN
+  it('trigger:dawn — recarga solo items con recharge=dawn, no toca recharge=long', () => {
+    const dawnItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      recharge: 'dawn',
+      charges: 7,
+    };
+    const longItem: ItemCompendiumLite = {
+      ...wandOfMagicMissiles,
+      slug: 'ring-of-long-recharge',
+      source: 'TEST',
+      recharge: 'long',
+      charges: 5,
+    };
+    const add1 = addItemToInventory({
+      inventory: freshInventory(),
+      itemData: dawnItem,
+      input: { charges: 0 },
+      weights: [dawnItem],
+      ctx: martialCtx,
+    });
+    if (!add1.ok) throw new Error('setup');
+
+    const add2 = addItemToInventory({
+      inventory: add1.inventory,
+      itemData: longItem,
+      input: { charges: 0 },
+      weights: [longItem],
+      ctx: martialCtx,
+    });
+    if (!add2.ok) throw new Error('setup');
+
+    const res = rechargeInventoryItems({
+      inventory: add2.inventory,
+      weights: [dawnItem, longItem],
+      trigger: 'dawn',
+    });
+    // Only dawn item recharged
+    expect(res.recharged).toHaveLength(1);
+    const dawnInst = res.inventory.find((it) => it.itemSlug === 'wand-of-magic-missiles');
+    const longInst = res.inventory.find((it) => it.itemSlug === 'ring-of-long-recharge');
+    expect(dawnInst!.charges).toBe(7);
+    expect(longInst!.charges).toBe(0);
+  });
 });
