@@ -66,6 +66,8 @@ function deriveChosenAsis(
     parentAbility: parent?.data.ability,
     selectedAbility: selected.data.ability,
     selectedIsSubrace: selected.isSubrace,
+    selectedSlug: selected.slug,
+    selectedSource: selected.source,
   });
 
   const buckets: Array<{ slots: typeof raceSlots; source: 'race' | 'subrace' }> = [

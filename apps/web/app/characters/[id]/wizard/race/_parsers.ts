@@ -2,6 +2,8 @@
 // embeds/race.ts — devolvemos data estructurada en vez de strings para Discord.
 // TODO si esto crece, extraer a un package compartido packages/5etools-render.
 
+import { subraceReplacesParentAbility } from '@dungeon-hub/domain/character/race';
+
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 export const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
@@ -136,11 +138,19 @@ export function mpmmSyntheticSlots(): AsiSlot[] {
  * Si parent y selected no tienen ability data (raza estilo MPMM/2024), devuelve
  * los slots sintéticos +2/+1 en el bucket 'race'. Esto matchea la lógica del
  * validator del API (`raceIsEmpty && !subraceHasChoose`).
+ *
+ * REPLACE semantics: cuando el subrace está en SUBRACES_REPLACING_PARENT_ABILITY
+ * (Variant Human, PHB p.31 sidebar), el ASI del subrace REEMPLAZA al del parent
+ * en lugar de apilar. Sin este check, Variant Human daría +1 a todo (race) + +1×2
+ * (subrace) en lugar de solo +1×2.
  */
 export function effectiveAsiSlots(input: {
   parentAbility: RaceData['ability'];
   selectedAbility: RaceData['ability'];
   selectedIsSubrace: boolean;
+  /** slug+source del subrace seleccionado (cuando selectedIsSubrace=true). */
+  selectedSlug?: string;
+  selectedSource?: string;
 }): { raceSlots: AsiSlot[]; subraceSlots: AsiSlot[] } {
   const parentSlots = parseAsis(input.parentAbility);
   const selectedSlots = parseAsis(input.selectedAbility);
@@ -150,6 +160,17 @@ export function effectiveAsiSlots(input: {
   }
 
   if (input.selectedIsSubrace) {
+    const replaces =
+      input.selectedSlug !== undefined &&
+      input.selectedSource !== undefined &&
+      subraceReplacesParentAbility({
+        slug: input.selectedSlug,
+        source: input.selectedSource,
+      });
+    if (replaces) {
+      // PHB-RAW: subrace ASI REPLACES parent ASI (Variant Human, PHB p.31).
+      return { raceSlots: [], subraceSlots: selectedSlots };
+    }
     return { raceSlots: parentSlots, subraceSlots: selectedSlots };
   }
   return { raceSlots: selectedSlots, subraceSlots: [] };

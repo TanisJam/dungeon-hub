@@ -1618,3 +1618,98 @@ describe('W-F4: clicking a source chip switches the active variant', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// W-G: Variant Human REPLACES parent ASI (PHB p.31 sidebar)
+//
+// When Variant Human is selected as a subrace of Human PHB, the Variant's
+// +1×2 choose REPLACES the base Human's +1-to-all — they do NOT stack.
+// Per PHB p.31: "all of which replace the human's Ability Score Increase trait."
+// Domain constant: SUBRACES_REPLACING_PARENT_ABILITY contains 'variant|PHB'.
+// ---------------------------------------------------------------------------
+
+describe('W-G: Variant Human REPLACES parent ASI (PHB p.31 sidebar)', () => {
+  it('saveRace receives ONLY the 2 chosen +1s — base Human +1-to-all is NOT applied', async () => {
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+    vi.mocked(saveRace).mockResolvedValue({ error: null });
+
+    // Variant Human ASI shape: [{choose:{from:[6 abilities], count:2, amount:1}}].
+    // The choose slot is the only slot in selected.ability → effectiveAsiSlots
+    // routes it to subraceSlots, raceSlots stays empty due to REPLACE flag.
+    // Storage key for subrace choose:0 → 'subrace:0'.
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[HUMAN_BASE, VARIANT_HUMAN_SUBRACE_PEER]}
+        allFeats={SAMPLE_FEATS}
+        initialSelection={{
+          raceSlug: 'human',
+          raceSource: 'PHB',
+          subraceSlug: 'variant',
+          subraceSource: 'PHB',
+        }}
+        initialChosenAsis={{ 'subrace:0': ['str', 'dex'] }}
+        initialSkillChoices={['perception']}
+        initialFeatSlug="actor"
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    await vi.waitFor(() => {
+      expect(saveRace).toHaveBeenCalled();
+    });
+
+    // Pull the applied ASIs payload (4th positional argument).
+    const call = vi.mocked(saveRace).mock.calls[0]!;
+    const appliedAsis = call[3] as Array<{ ability: AbilityKey; bonus: number; source: 'race' | 'subrace' }>;
+
+    // PHB-RAW: exactly 2 ASIs (the +1×2 from Variant), each tagged source='subrace'.
+    expect(appliedAsis).toHaveLength(2);
+    expect(appliedAsis.every((a) => a.source === 'subrace')).toBe(true);
+    expect(appliedAsis.every((a) => a.bonus === 1)).toBe(true);
+    expect(appliedAsis.map((a) => a.ability).sort()).toEqual(['dex', 'str']);
+
+    // NO race-level +1s leaked through (would be the bug we're fixing).
+    expect(appliedAsis.filter((a) => a.source === 'race')).toEqual([]);
+  });
+
+  it('Hill Dwarf (NOT a REPLACE subrace) still stacks parent +2 CON + subrace +1 WIS', async () => {
+    // Sanity check: only Variant Human is in SUBRACES_REPLACING_PARENT_ABILITY.
+    // Hill Dwarf must keep stacking semantics per PHB p.20.
+    const { saveRace } = await import('./actions');
+    vi.mocked(saveRace).mockClear();
+    vi.mocked(saveRace).mockResolvedValue({ error: null });
+
+    render(
+      <RacePicker
+        characterId="char-1"
+        entries={[DWARF_BASE, HILL_DWARF_SUBRACE]}
+        initialSelection={{
+          raceSlug: 'dwarf',
+          raceSource: 'PHB',
+          subraceSlug: 'dwarf--hill',
+          subraceSource: 'PHB',
+        }}
+      />,
+    );
+
+    const siguiente = screen.getByRole('button', { name: /siguiente/i });
+    fireEvent.click(siguiente);
+
+    await vi.waitFor(() => {
+      expect(saveRace).toHaveBeenCalled();
+    });
+
+    const call = vi.mocked(saveRace).mock.calls[0]!;
+    const appliedAsis = call[3] as Array<{ ability: AbilityKey; bonus: number; source: 'race' | 'subrace' }>;
+
+    // Dwarf +2 CON (race) + Hill Dwarf +1 WIS (subrace) — STACKS.
+    const raceAsi = appliedAsis.find((a) => a.source === 'race');
+    const subraceAsi = appliedAsis.find((a) => a.source === 'subrace');
+    expect(raceAsi).toEqual({ ability: 'con', bonus: 2, source: 'race' });
+    expect(subraceAsi).toEqual({ ability: 'wis', bonus: 1, source: 'subrace' });
+  });
+});

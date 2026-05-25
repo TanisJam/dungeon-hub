@@ -445,6 +445,8 @@ export function RacePicker({
       parentAbility: parent?.data.ability,
       selectedAbility: selected.data.ability,
       selectedIsSubrace: selected.isSubrace,
+      selectedSlug: selected.slug,
+      selectedSource: selected.source,
     });
 
     const appliedAsis: Array<{ ability: AbilityKey; bonus: number; source: 'race' | 'subrace' }> = [];
@@ -963,6 +965,8 @@ function AsiSection({
     parentAbility: parent?.data.ability,
     selectedAbility: entry.data.ability,
     selectedIsSubrace: entry.isSubrace,
+    selectedSlug: entry.slug,
+    selectedSource: entry.source,
   });
 
   const parentAbilityEmpty = parent && !(parent.data.ability && parent.data.ability.length > 0);
