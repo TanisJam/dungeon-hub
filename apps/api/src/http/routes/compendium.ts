@@ -17,19 +17,61 @@ import {
   compendiumLanguages,
   compendiumActions,
 } from '../../infra/db/schema.js';
-import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
+import { loadCampaign, loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { profileFilterConditions } from '../../use-cases/compendium/profile-filter.js';
 
-const CampaignQuery = z.object({ campaign: z.string().uuid() });
 const PaginationQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   q: z.string().min(1).optional(), // búsqueda por nombre
 });
 
-async function resolveProfile(request: { query: unknown }, reply: { code: (n: number) => { send: (body: unknown) => unknown } }) {
-  const { campaign } = CampaignQuery.parse(request.query);
-  const loaded = await loadCampaign(campaign);
+// Compendium endpoints scope results by `RulesProfile`. The caller MUST provide
+// EXACTLY ONE of `?campaign=<uuid>` or `?world=<uuid>` — both or neither yield 400.
+// Both code paths resolve to the same RulesProfile (campaign joins to world).
+const ScopeQuery = z.object({
+  campaign: z.string().uuid().optional(),
+  world: z.string().uuid().optional(),
+});
+
+async function resolveProfile(
+  request: { query: unknown },
+  reply: {
+    code: (n: number) => { send: (body: unknown) => unknown };
+  },
+) {
+  const parsed = ScopeQuery.safeParse(request.query);
+  if (!parsed.success) {
+    reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+    return null;
+  }
+  const { campaign, world } = parsed.data;
+  if ((campaign && world) || (!campaign && !world)) {
+    reply.code(400).send({
+      error: 'VALIDATION_FAILED',
+      issues: [
+        {
+          code: 'SCOPE_PARAM_REQUIRED',
+          message: 'Provide exactly one of ?campaign=<uuid> or ?world=<uuid>.',
+        },
+      ],
+    });
+    return null;
+  }
+
+  if (world) {
+    const loaded = await loadWorldById(world);
+    if (!loaded) {
+      reply.code(404).send({ error: 'WORLD_NOT_FOUND' });
+      return null;
+    }
+    // Return a shape compatible with `LoadedCampaign` consumers — only
+    // `rulesProfile` is read downstream.
+    return { rulesProfile: loaded.rulesProfile };
+  }
+
+  // campaign branch (campaign is defined here by the XOR check above)
+  const loaded = await loadCampaign(campaign!);
   if (!loaded) {
     reply.code(404).send({ error: 'CAMPAIGN_NOT_FOUND' });
     return null;
