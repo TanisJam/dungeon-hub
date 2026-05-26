@@ -38,6 +38,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await page.fill('input[name="name"]', charName);
       await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
+      await expect(page.locator('text=Atributos').first()).toBeVisible({ timeout: 5_000 });
 
       // Standard array — tap all 6 tiles once each. Matches the existing
       // working pattern from wizard.auth.spec.ts. The toBeEnabled wait is REQUIRED:
@@ -54,6 +55,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       });
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
+      await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
     // -----------------------------------------------------------------------
@@ -69,6 +71,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
 
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
+      await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
     });
 
     // -----------------------------------------------------------------------
@@ -85,6 +88,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await page.getByRole('button', { name: 'Survival', exact: true }).first().click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
+      await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
     });
 
     // -----------------------------------------------------------------------
@@ -102,6 +106,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await page.getByRole('button', { name: 'Halfling', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+      await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });
 
     // -----------------------------------------------------------------------
@@ -110,6 +115,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
     await test.step('spells step: non-caster panel → siguiente', async () => {
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
+      await expect(page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
     });
 
     // -----------------------------------------------------------------------

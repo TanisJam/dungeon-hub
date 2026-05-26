@@ -76,6 +76,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await page.fill('input[name="name"]', charName);
       await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
+      await expect(page.locator('text=Atributos').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('atributos: estándar → guardar y seguir', async () => {
@@ -92,6 +93,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       });
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
+      await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('linaje: Human PHB → guardar y seguir', async () => {
@@ -110,6 +112,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
+      await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('clase: Wizard PHB → guardar y seguir', async () => {
@@ -124,6 +127,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await page.getByRole('button', { name: 'History', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
+      await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('trasfondo: Acolyte PHB → guardar y seguir', async () => {
@@ -140,6 +144,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+      await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('hechizos: Wizard → two-column picker visible', async () => {
@@ -214,6 +219,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
     await test.step('hechizos: Siguiente → land on /review', async () => {
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
+      await expect(page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('revisión: card Hechizos visible con contenido', async () => {

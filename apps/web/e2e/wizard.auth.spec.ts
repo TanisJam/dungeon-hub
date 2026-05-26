@@ -24,6 +24,10 @@ test.describe('character builder wizard', () => {
       await page.fill('input[name="name"]', charName);
       await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
+      // Render assertion: step heading must be visible. Catches Server Component
+      // throws that would otherwise leave the URL intact while Next.js shows an
+      // error boundary. See REQ-CWR-WIZARD-RENDER (engram #798).
+      await expect(page.locator('text=Atributos').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('atributos: estándar (tile-based) → guardar y seguir', async () => {
@@ -41,6 +45,7 @@ test.describe('character builder wizard', () => {
       await expect(page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 3000 });
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
+      await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('linaje: Human PHB (MPMM-style) → guardar y seguir', async () => {
@@ -64,6 +69,7 @@ test.describe('character builder wizard', () => {
       await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
+      await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('clase: Fighter PHB + skills acrobatics/survival → guardar y seguir', async () => {
@@ -78,6 +84,7 @@ test.describe('character builder wizard', () => {
       await page.getByRole('button', { name: 'Survival', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
+      await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('trasfondo: Soldier PHB + dice-set → guardar y seguir', async () => {
@@ -91,6 +98,7 @@ test.describe('character builder wizard', () => {
       await page.getByRole('button', { name: 'Dice Set', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+      await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('hechizos: Fighter es non-caster → panel "no picks needed" → siguiente', async () => {
@@ -103,6 +111,7 @@ test.describe('character builder wizard', () => {
       // Click the Siguiente button in the NoPicksPanel footer
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
+      await expect(page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
     });
 
     await test.step('revisión: verificar contenido (incluye card Hechizos) + publicar', async () => {
