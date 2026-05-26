@@ -13,6 +13,7 @@ import { campaigns, worlds } from '../../infra/db/schema.js';
 export interface LoadedWorld {
   id: string;
   name: string;
+  slug: string;
   ownerUserId: string;
   rulesProfile: RulesProfile;
 }
@@ -22,6 +23,7 @@ export async function loadWorldById(worldId: string): Promise<LoadedWorld | null
     .select({
       id: worlds.id,
       name: worlds.name,
+      slug: worlds.slug,
       ownerUserId: worlds.ownerUserId,
       rulesProfile: worlds.rulesProfile,
     })
@@ -42,6 +44,7 @@ export async function loadWorldById(worldId: string): Promise<LoadedWorld | null
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug,
     ownerUserId: row.ownerUserId,
     rulesProfile: parsed.data,
   };

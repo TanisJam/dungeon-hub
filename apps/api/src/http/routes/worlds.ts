@@ -9,10 +9,13 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { worlds, worldMembers } from '../../infra/db/schema.js';
+import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 
 const ListWorldsQuery = z.object({
   mine: z.coerce.number().int().optional(),
 });
+
+const WorldIdParams = z.object({ id: z.string().uuid() });
 
 export const worldsRoute: FastifyPluginAsync = async (app) => {
   // ---- GET /worlds ----------------------------------------------------------
@@ -40,5 +43,39 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
       .innerJoin(worldMembers, and(eq(worldMembers.worldId, worlds.id), eq(worldMembers.userId, userId)));
 
     return reply.send({ worlds: rows });
+  });
+
+  // ---- GET /worlds/:id ------------------------------------------------------
+  // Returns the world payload (including rulesProfile) for any authenticated
+  // worldMember. Used by the character wizard to scope compendium queries and
+  // surface statGeneration on the stats step.
+  app.get('/worlds/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = WorldIdParams.safeParse(request.params);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: parsed.error.issues,
+      });
+    }
+    const { id } = parsed.data;
+    const userId = request.user!.sub;
+
+    const world = await loadWorldById(id);
+    if (!world) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const membership = await db
+      .select({ role: worldMembers.role })
+      .from(worldMembers)
+      .where(and(eq(worldMembers.worldId, id), eq(worldMembers.userId, userId)))
+      .limit(1);
+    if (membership.length === 0) return reply.code(403).send({ error: 'FORBIDDEN' });
+
+    return reply.send({
+      id: world.id,
+      name: world.name,
+      slug: world.slug,
+      ownerUserId: world.ownerUserId,
+      rulesProfile: world.rulesProfile,
+    });
   });
 };
