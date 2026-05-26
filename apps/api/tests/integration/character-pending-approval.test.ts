@@ -62,7 +62,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
     expect(res.json().status).toBe('pending_approval');
   });
 
-  it('D.3 — PATCH active → pending_approval returns 422', async () => {
+  it('D.3 — PATCH active → pending_approval returns 409 CHARACTER_LOCKED (was 422 ILLEGAL_TRANSITION pre-#834)', async () => {
     const app = await getTestApp();
 
     // Create draft then promote to active
@@ -89,11 +89,17 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
       payload: { status: 'pending_approval' },
     });
 
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error).toBe('ILLEGAL_TRANSITION');
+    // After SDD character-approval-flow (#834), PATCH on locked statuses
+    // (active/retired/dead) returns 409 CHARACTER_LOCKED before the old
+    // ILLEGAL_TRANSITION 422 check fires. Same intent (transition blocked),
+    // more accurate code: the gate is "this character is locked", not
+    // "this transition is illegal". Pre-existing D.3 behavior is now
+    // strictly subsumed by REQ-CAF-LOCK-WIZARD-EDITS.
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('CHARACTER_LOCKED');
   });
 
-  it('D.3 — PATCH retired → pending_approval returns 422', async () => {
+  it('D.3 — PATCH retired → pending_approval returns 409 CHARACTER_LOCKED (was 422 ILLEGAL_TRANSITION pre-#834)', async () => {
     const app = await getTestApp();
 
     const created = await app
@@ -119,11 +125,17 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
       payload: { status: 'pending_approval' },
     });
 
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error).toBe('ILLEGAL_TRANSITION');
+    // After SDD character-approval-flow (#834), PATCH on locked statuses
+    // (active/retired/dead) returns 409 CHARACTER_LOCKED before the old
+    // ILLEGAL_TRANSITION 422 check fires. Same intent (transition blocked),
+    // more accurate code: the gate is "this character is locked", not
+    // "this transition is illegal". Pre-existing D.3 behavior is now
+    // strictly subsumed by REQ-CAF-LOCK-WIZARD-EDITS.
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('CHARACTER_LOCKED');
   });
 
-  it('D.3 — PATCH dead → pending_approval returns 422', async () => {
+  it('D.3 — PATCH dead → pending_approval returns 409 CHARACTER_LOCKED (was 422 ILLEGAL_TRANSITION pre-#834)', async () => {
     const app = await getTestApp();
 
     const created = await app
@@ -149,8 +161,14 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
       payload: { status: 'pending_approval' },
     });
 
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error).toBe('ILLEGAL_TRANSITION');
+    // After SDD character-approval-flow (#834), PATCH on locked statuses
+    // (active/retired/dead) returns 409 CHARACTER_LOCKED before the old
+    // ILLEGAL_TRANSITION 422 check fires. Same intent (transition blocked),
+    // more accurate code: the gate is "this character is locked", not
+    // "this transition is illegal". Pre-existing D.3 behavior is now
+    // strictly subsumed by REQ-CAF-LOCK-WIZARD-EDITS.
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('CHARACTER_LOCKED');
   });
 });
 

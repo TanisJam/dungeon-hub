@@ -196,4 +196,117 @@ describe('POST /characters/:id/{approve,reject}', () => {
       expect(res.json().issues[0].code).toBe('FORBIDDEN_FOR_ACTOR');
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // REQ-CAF-LOCK-WIZARD-EDITS + REQ-CAF-PLAY-TIME-UNLOCKED
+  // ---------------------------------------------------------------------------
+  describe('edit lock on wizard-shape endpoints when status=active', () => {
+    it('PATCH /:id on active → 409 CHARACTER_LOCKED', async () => {
+      const app = await getTestApp();
+      await setStatus('active');
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { name: 'Renamed While Locked' },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'CHARACTER_LOCKED', status: 'active' });
+    });
+
+    it('PUT /:id/stats on active → 409 CHARACTER_LOCKED', async () => {
+      const app = await getTestApp();
+      await setStatus('active');
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/stats`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          method: 'standard-array',
+          scores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+        },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('CHARACTER_LOCKED');
+    });
+
+    it('PATCH /:id on draft → 200 (lock OFF for draft)', async () => {
+      const app = await getTestApp();
+      await setStatus('draft');
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/characters/${charId}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { name: 'Renamed While Draft' },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
+  describe('play-time endpoints remain unlocked on active', () => {
+    it('POST /:id/hp delta works on active', async () => {
+      const app = await getTestApp();
+      await setStatus('active');
+      const { db } = await import('../../src/infra/db/client.js');
+      const { characters } = await import('../../src/infra/db/schema.js');
+      const [row] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, charId))
+        .limit(1);
+      const data = (row?.data as Record<string, unknown>) ?? {};
+      await db
+        .update(characters)
+        .set({
+          data: { ...data, hp: { current: 10, max: 10, temp: 0 } },
+          updatedAt: new Date(),
+        })
+        .where(eq(characters.id, charId));
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${charId}/hp`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { delta: -3 },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('POST /:id/rest/long works on active (no cooldown)', async () => {
+      const app = await getTestApp();
+      const { db } = await import('../../src/infra/db/client.js');
+      const { characters } = await import('../../src/infra/db/schema.js');
+      await setStatus('active');
+      // Clear REST-03 cooldown + seed valid HP.
+      const stale = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+      const [row] = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.id, charId))
+        .limit(1);
+      const data = (row?.data as Record<string, unknown>) ?? {};
+      await db
+        .update(characters)
+        .set({
+          data: {
+            ...data,
+            hp: { current: 5, max: 10, temp: 0 },
+            lastLongRestAt: stale,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(characters.id, charId));
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${charId}/rest/long`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {},
+      });
+      expect(res.statusCode).toBe(200);
+    });
+  });
 });

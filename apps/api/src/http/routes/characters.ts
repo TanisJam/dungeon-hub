@@ -83,6 +83,7 @@ import {
 } from '@dungeon-hub/domain/character/class-resources';
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
+import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
 
 const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
 
@@ -623,7 +624,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -801,7 +807,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -843,7 +854,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -1004,7 +1020,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -1094,7 +1115,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -1178,7 +1204,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -1254,7 +1285,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const access = await getCharacterAccess(character, userId);
-    if (access !== 'owner') {
+    const writable = assertWritableForEdit(access, character.status);
+    if (!writable.ok) {
+      const issue = writable.issues[0]!;
+      if (issue.code === 'CHARACTER_LOCKED') {
+        return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
@@ -2667,7 +2703,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
       const access = await getCharacterAccess(character, userId);
-      if (access !== 'owner') {
+      const writable = assertWritableForEdit(access, character.status);
+      if (!writable.ok) {
+        const issue = writable.issues[0]!;
+        if (issue.code === 'CHARACTER_LOCKED') {
+          return reply.code(409).send({ error: 'CHARACTER_LOCKED', status: issue.status });
+        }
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
       }
 
