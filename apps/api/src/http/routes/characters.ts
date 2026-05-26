@@ -81,6 +81,8 @@ import {
   classResourceBySlug,
   resetClassResourcesForRest,
 } from '@dungeon-hub/domain/character/class-resources';
+import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
+import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 
 const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
 
@@ -642,6 +644,83 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const [updated] = await db
       .update(characters)
       .set(updates)
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
+  });
+
+  // ---- POST /characters/:id/approve ---------------------------------------
+  // DM (gm worldMember) approves a pending character → status 'active'.
+  // Closes REQ-CAF-APPROVE-ENDPOINT from sdd/character-approval-flow/spec (#833).
+  app.post('/characters/:id/approve', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const actor = await resolveActorRole(character, userId);
+    if (actor === null) {
+      return reply.code(403).send({ error: 'FORBIDDEN' });
+    }
+
+    const transition = validateCharacterTransition(character.status, 'active', actor);
+    if (!transition.ok) {
+      const issue = transition.issues[0]!;
+      if (issue.code === 'FORBIDDEN_FOR_ACTOR') {
+        return reply.code(403).send({ error: 'FORBIDDEN', issues: transition.issues });
+      }
+      return reply.code(409).send({ error: 'ILLEGAL_TRANSITION', issues: transition.issues });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const nextData = {
+      ...charData,
+      approvedBy: userId,
+      approvedAt: new Date().toISOString(),
+    };
+    const [updated] = await db
+      .update(characters)
+      .set({ status: 'active', data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id))
+      .returning();
+
+    return updated;
+  });
+
+  // ---- POST /characters/:id/reject ----------------------------------------
+  // Moves the character back to 'draft'. Paths:
+  //   - pending_approval → draft (owner self-cancel OR gm reject)
+  //   - active → draft (gm revert for re-edit workflow)
+  // Clears the approvedBy/approvedAt audit fields.
+  // Closes REQ-CAF-REJECT-ENDPOINT from spec #833.
+  app.post('/characters/:id/reject', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const actor = await resolveActorRole(character, userId);
+    if (actor === null) {
+      return reply.code(403).send({ error: 'FORBIDDEN' });
+    }
+
+    const transition = validateCharacterTransition(character.status, 'draft', actor);
+    if (!transition.ok) {
+      const issue = transition.issues[0]!;
+      if (issue.code === 'FORBIDDEN_FOR_ACTOR') {
+        return reply.code(403).send({ error: 'FORBIDDEN', issues: transition.issues });
+      }
+      return reply.code(409).send({ error: 'ILLEGAL_TRANSITION', issues: transition.issues });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const nextData = { ...charData, approvedBy: null, approvedAt: null };
+    const [updated] = await db
+      .update(characters)
+      .set({ status: 'draft', data: nextData, updatedAt: new Date() })
       .where(eq(characters.id, id))
       .returning();
 
