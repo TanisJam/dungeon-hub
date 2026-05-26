@@ -538,6 +538,58 @@ describe('POST /characters/:id/level-up (play-time)', () => {
     expect(spellSlots.slots[0]).toBeGreaterThanOrEqual(4); // L1 slots ≥ 4 for caster level 4
   });
 
+  // ---- Feat validation (negative) -----------------------------------------
+
+  /**
+   * FEAT-NEG-1: Fighter L3 → L4 with asiFeat.kind='feat' and a nonexistent slug.
+   *
+   * NOTE: The play-time handler (POST /characters/:id/level-up) delegates ALL
+   * validation to the domain's validateLevelUp(), which only validates
+   * asiFeat.kind='asi'. When kind='feat', the domain checks that asiFeat is
+   * truthy (satisfying LEVELUP_ASIFEAT_REQUIRED) but does NOT perform a feat
+   * slug lookup. As a result, this request currently returns 200 and the feat
+   * is silently NOT applied (mutations.featPushed is undefined).
+   *
+   * This test documents the ACTUAL behavior as a regression anchor.
+   * The expected behavior (400 FEAT_NOT_FOUND) requires the handler to call
+   * loadFeatData when asiFeat.kind='feat', which is a known gap.
+   */
+  it('FEAT-NEG-1: Fighter L3→L4 with asiFeat.kind=feat nonexistent slug → 200 (feat silently ignored — gap documented)', async () => {
+    const app = await getTestApp();
+    const charId = await setupActiveChar({
+      app,
+      name: 'Feat Not Found Fighter',
+      classSlug: 'fighter',
+      classLevel: 3,
+      subclass: { slug: 'fighter--champion', source: 'PHB' },
+    });
+    await grantXp(app, charId, 2700);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        kind: 'same-class',
+        class: { slug: 'fighter', source: 'PHB' },
+        hp: { method: 'average' },
+        asiFeat: { kind: 'feat', slug: 'nonexistent-feat', source: 'PHB' },
+      },
+    });
+
+    // GAP: play-time handler does not call loadFeatData for asiFeat.kind='feat'.
+    // The domain ignores the feat slug and returns ok=true. The feat is NOT
+    // persisted (mutations.featPushed is undefined). Ideally this should be 400
+    // FEAT_NOT_FOUND, but fixing that requires adding feat validation in the
+    // handler or domain before this test can assert the intended behavior.
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.summary.toClassLevel).toBe(4);
+    // feat is NOT applied — data.feats should be empty/unchanged.
+    const feats = (body.character.data.feats as Array<unknown> | undefined) ?? [];
+    expect(feats).toHaveLength(0);
+  });
+
   // ---- Level cap ----------------------------------------------------------
 
   it('CAP-1: total level 14 → 400 LEVELUP_TOTAL_LEVEL_CAP_EXCEEDED', async () => {
