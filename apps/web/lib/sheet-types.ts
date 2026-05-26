@@ -134,6 +134,31 @@ export interface ClassSpellSummary {
   spells: { cantrips: SpellSheetRef[]; leveled: SpellSheetRef[] };
 }
 
+/**
+ * Sheet-level non-blocking warning codes. Single channel for AC + future helpers.
+ * Mirrors domain `ArmorClassWarningCode`. Per inventory-foundation design D7.
+ */
+export type SheetWarningCode = 'INSUFFICIENT_STRENGTH_FOR_ARMOR' | 'STEALTH_DISADVANTAGE';
+
+export type EncumbranceStatus = 'ok' | 'encumbered' | 'heavily-encumbered' | 'over';
+
+/**
+ * Encumbrance evaluation surfaced by the sheet (PHB p.176 variant thresholds).
+ * Mirrors domain `EncumbranceView`.
+ */
+export interface EncumbranceView {
+  weight: number;
+  /** Hard ceiling (STR × 15). Above → 'over'. */
+  max: number;
+  status: EncumbranceStatus;
+  thresholds: {
+    encumbered: number; // STR × 5
+    heavily: number;    // STR × 10
+    max: number;        // STR × 15
+  };
+  speedPenalty: number;
+}
+
 export interface CharacterSheet {
   identity: {
     name: string;
@@ -193,6 +218,18 @@ export interface CharacterSheet {
    * Empty array for non-casters.
    */
   spellsByClass: ClassSpellSummary[];
+  /**
+   * Sheet-level non-blocking warnings (e.g. AC STR-min). Defaults to []
+   * for legacy reads. Inventory-foundation D7 — single channel.
+   * Optional on the web type for read-path tolerance (CLAUDE.md §11):
+   * pre-inventory-foundation sheet fixtures may not have this field.
+   */
+  warnings?: SheetWarningCode[];
+  /**
+   * Encumbrance view (PHB p.176). Optional on the web type for read-path
+   * tolerance — older sheet fixtures predate this field.
+   */
+  encumbrance?: EncumbranceView;
 }
 
 export interface InventoryItem {
