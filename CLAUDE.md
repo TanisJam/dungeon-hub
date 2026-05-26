@@ -68,7 +68,7 @@ pnpm workspace (Node ≥22, pnpm 10.7), ESM everywhere (`"type": "module"` in ev
 apps/
   web/   — Next.js 15 (App Router) + React 19 + Tailwind 4 (CSS-first) + Supabase SSR. Port 3001.
   api/   — Fastify 5 + Drizzle ORM + Supabase Auth (JWT). Postgres backend. Port 4000.
-  bot/   — Discord.js 14. No test infra.
+  bot/   — Discord.js 14. Vitest 2.x unit tests; no E2E (manual smoke against live Discord).
 
 packages/
   domain/              — Pure business logic. Zod schemas. SINGLE source of truth for rules.
