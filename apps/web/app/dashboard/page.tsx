@@ -28,6 +28,7 @@ type CampaignRow = {
   id: string;
   name: string;
   gmUserId: string;
+  worldId: string;
   memberRole: 'gm' | 'player';
 };
 

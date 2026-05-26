@@ -17,6 +17,10 @@ import { NotasTab } from './_tabs/notas';
 import { RecursosTab } from './_tabs/recursos';
 import { DeleteCharacterButton } from './_delete-button';
 import { RestActions } from './_rest-actions';
+import { ApprovalActions } from './_components/approval-actions';
+
+type WorldCallerRole = 'gm' | 'player' | null;
+type WorldDetailLite = { callerRole: WorldCallerRole };
 
 const VALID_TABS = ['resumen', 'habilidades', 'hechizos', 'recursos', 'inventario', 'notas'] as const;
 
@@ -84,6 +88,20 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
     redirect(`/characters/${id}/wizard/stats`);
   }
 
+  // Fetch world detail for callerRole — needed to gate DM approval actions.
+  // Best-effort: on failure we hide the actions but don't break the sheet.
+  // SDD dm-session-panel — REQ-CAU-APPROVE-BUTTON / REQ-CAU-REJECT-BUTTON / REQ-CAU-REVERT-BUTTON.
+  let callerRole: WorldCallerRole = null;
+  try {
+    const world = await api.get<WorldDetailLite>(
+      `/worlds/${character.worldId}`,
+      session.access_token,
+    );
+    callerRole = world.callerRole;
+  } catch {
+    callerRole = null;
+  }
+
   const classSummary = buildClassSummary(data);
   const statusBanner = getStatusBanner(character.status);
   const isActive = character.status === 'active';
@@ -133,6 +151,12 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         />
 
         <RestActions charId={id} />
+
+        <ApprovalActions
+          characterId={id}
+          callerRole={callerRole}
+          status={character.status}
+        />
 
         <SheetTabs activeTab={tab} characterId={id} />
 

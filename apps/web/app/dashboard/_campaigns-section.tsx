@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Pill, SectionHead, Card } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 
@@ -5,6 +6,7 @@ type CampaignRow = {
   id: string;
   name: string;
   gmUserId: string;
+  worldId: string;
   memberRole: 'gm' | 'player' | string;
 };
 
@@ -55,12 +57,30 @@ function CampaignCard({
   const roleTone: PillTone = ROLE_TONES[role] ?? 'stone';
   const roleLabel = ROLE_LABELS[role] ?? role;
 
+  // REQ-DWL-MASTER-CLICKABLE (spec #857) — GM rows wrap the "DM" pill in a
+  // Link to /worlds/[id] so the DM can drop into the world session panel.
+  // Player rows keep the inert pill (no link target — they reach their own
+  // characters via the Characters section).
+  const pillNode = (
+    <Pill tone={roleTone} size="sm">{roleLabel}</Pill>
+  );
+
   return (
     <li>
       <Card variant="surface" className="px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <p className="truncate font-semibold text-ink">{campaign.name}</p>
-          <Pill tone={roleTone} size="sm">{roleLabel}</Pill>
+          {isGm ? (
+            <Link
+              href={`/worlds/${campaign.worldId}`}
+              aria-label={`Abrir panel de maestro de ${campaign.name}`}
+              className="inline-flex min-h-[44px] items-center transition-opacity hover:opacity-80"
+            >
+              {pillNode}
+            </Link>
+          ) : (
+            pillNode
+          )}
         </div>
       </Card>
     </li>

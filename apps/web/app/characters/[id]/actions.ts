@@ -333,6 +333,78 @@ export async function removeInventoryItem(
   return { ok: true };
 }
 
+// ── DM approval actions (SDD dm-session-panel — REQ-CAU-*) ───────────────────
+
+export type ApprovalActionState = { ok: false; error: string } | { ok: true };
+
+/**
+ * GM approves a pending character. Flips status `pending_approval → active`.
+ * SDD dm-session-panel — REQ-CAU-APPROVE-BUTTON (spec #857).
+ *
+ * Maps to existing POST /characters/:id/approve. Revalidates both the
+ * character sheet and the world landing so the row disappears from the
+ * Pendientes tab on next visit.
+ */
+export async function approveCharacter(
+  characterId: string,
+): Promise<ApprovalActionState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(`/characters/${characterId}/approve`, {}, session.access_token);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  revalidatePath(`/worlds/[id]`, 'page');
+  return { ok: true };
+}
+
+/**
+ * GM rejects a character. Used for both:
+ *   - REQ-CAU-REJECT-BUTTON: pending → draft (player must re-submit)
+ *   - REQ-CAU-REVERT-BUTTON: active → draft (GM revert path)
+ *
+ * Maps to existing POST /characters/:id/reject. The api endpoint accepts both
+ * source statuses (pending_approval and active) per character-approval-flow.
+ */
+export async function rejectCharacter(
+  characterId: string,
+): Promise<ApprovalActionState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(`/characters/${characterId}/reject`, {}, session.access_token);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  revalidatePath(`/worlds/[id]`, 'page');
+  return { ok: true };
+}
+
 // ── Existing actions ──────────────────────────────────────────────────────────
 
 export async function deleteCharacter(characterId: string): Promise<DeleteState> {
