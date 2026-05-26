@@ -397,3 +397,64 @@ describe('validateLevelUp — new-class branch', () => {
     }
   });
 });
+
+describe('validateLevelUp — feat at ASI level (REQ-CLU-FEAT-VALID)', () => {
+  // FEAT-VAL-1: asiFeat.kind='feat' with featData provided → mutations.featPushed is set
+  // PHB p.72 — Fighter L4 is an ASI level; when feat is chosen, the feat is recorded.
+  it('FEAT-VAL-1: Fighter L3→L4 with asiFeat.kind=feat and featData provided → mutations.featPushed set', () => {
+    const featData = {
+      slug: 'alert',
+      source: 'PHB',
+      name: 'Alert',
+      prerequisite: null,
+      ability: null,
+    };
+    const result = validateLevelUp({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      character: { ...FIGHTER_L3_ACTIVE, xp: XP_2700, status: 'active' },
+      body: {
+        kind: 'same-class',
+        class: { slug: 'fighter', source: 'PHB' },
+        hp: { method: 'average' },
+        asiFeat: { kind: 'feat', slug: 'alert', source: 'PHB' },
+      },
+      classData: FIGHTER_DATA,
+      featData,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.mutations.featPushed).toBeDefined();
+      if (result.mutations.featPushed) {
+        expect(result.mutations.featPushed.slug).toBe('alert');
+        expect(result.mutations.featPushed.source).toBe('PHB');
+        expect(result.mutations.featPushed.asisApplied).toEqual([]);
+      }
+    }
+  });
+
+  // FEAT-VAL-2: asiFeat.kind='feat' but no featData → FEAT_NOT_FOUND issue
+  // This fires when the route did not find the feat in the compendium before calling validateLevelUp.
+  it('FEAT-VAL-2: Fighter L3→L4 with asiFeat.kind=feat but no featData → FEAT_NOT_FOUND', () => {
+    const result = validateLevelUp({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      character: { ...FIGHTER_L3_ACTIVE, xp: XP_2700, status: 'active' },
+      body: {
+        kind: 'same-class',
+        class: { slug: 'fighter', source: 'PHB' },
+        hp: { method: 'average' },
+        asiFeat: { kind: 'feat', slug: 'nonexistent-feat', source: 'PHB' },
+      },
+      classData: FIGHTER_DATA,
+      // featData intentionally omitted → domain must return FEAT_NOT_FOUND
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const issue = result.issues.find((i) => i.code === 'FEAT_NOT_FOUND');
+      expect(issue).toBeDefined();
+      if (issue?.code === 'FEAT_NOT_FOUND') {
+        expect(issue.feat.slug).toBe('nonexistent-feat');
+        expect(issue.feat.source).toBe('PHB');
+      }
+    }
+  });
+});

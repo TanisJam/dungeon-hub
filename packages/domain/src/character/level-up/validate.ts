@@ -1,7 +1,7 @@
 import type { RulesProfile } from '../../rules-profile/types.js';
 import type { ClassCompendiumData, SubclassCompendiumData, AppliedClass } from '../class/types.js';
 import type { AppliedAsi } from '../race/types.js';
-import type { AppliedFeat } from '../feat/types.js';
+import type { AppliedFeat, FeatCompendiumData } from '../feat/types.js';
 import type { CharacterSnapshot } from '../sheet/types.js';
 import type { MulticlassValidationIssue } from '../multiclass/types.js';
 import { canReachLevel } from './xp-table.js';
@@ -53,6 +53,7 @@ export type LevelUpIssue =
   | { code: 'SUBCLASS_REQUIRED_AT_LEVEL'; classSlug: string; targetLevel: number; unlockLevel: number }
   | { code: 'LEVELUP_ASIFEAT_REQUIRED'; classSlug: string; targetLevel: number }
   | { code: 'ASI_DELTA_INVALID'; reason: string }
+  | { code: 'FEAT_NOT_FOUND'; feat: { slug: string; source: string } }
   | MulticlassValidationIssue;
 
 export interface LevelUpMutations {
@@ -90,6 +91,12 @@ export interface LevelUpInput {
   subclassData?: SubclassCompendiumData | null;
   /** Server-rolled value for HP if body.hp.method === 'roll'. Never trust client-provided rolls. */
   serverRoll?: number | null;
+  /**
+   * Feat compendium data — required when body.asiFeat?.kind === 'feat'.
+   * If asiFeat.kind='feat' and this is absent, returns FEAT_NOT_FOUND.
+   * The route handler is responsible for loading this via loadFeatData before calling validateLevelUp.
+   */
+  featData?: FeatCompendiumData | null;
 }
 
 const LEVEL_CAP = 14;
@@ -166,7 +173,7 @@ function validateSameClassBranch(
   targetTotal: number,
   issues: LevelUpIssue[],
 ): LevelUpResult {
-  const { rulesProfile, character, body, classData, subclassData, serverRoll } = input;
+  const { rulesProfile, character, body, classData, subclassData, serverRoll, featData } = input;
   if (body.kind !== 'same-class') return { ok: false, issues };
 
   // ---- 4a) Must own the class ----------------------------------------------
@@ -209,6 +216,7 @@ function validateSameClassBranch(
 
   // ---- 4d) Validate ASI delta if provided ---------------------------------
   let asiPushed: AppliedAsi | undefined;
+  let featPushed: AppliedFeat | undefined;
 
   if (body.asiFeat?.kind === 'asi') {
     const effectiveScores = computeEffectiveScores(
@@ -234,6 +242,25 @@ function validateSameClassBranch(
         source: 'levelup',
       };
     }
+  }
+
+  // ---- 4e) Validate feat if provided (REQ-CLU-FEAT-VALID) -----------------
+  // When asiFeat.kind='feat', the route must supply featData after calling loadFeatData.
+  // If featData is absent, the feat slug was not found in the compendium → FEAT_NOT_FOUND.
+  if (body.asiFeat?.kind === 'feat') {
+    if (!featData) {
+      issues.push({ code: 'FEAT_NOT_FOUND', feat: { slug: body.asiFeat.slug, source: body.asiFeat.source } });
+      return { ok: false, issues };
+    }
+    // Build the minimal AppliedFeat from the compendium data.
+    // Feat ASI choices (ability grants) are handled by the route/wizard layer;
+    // at this point we record the feat with empty asisApplied (no ASI granted by the feat itself
+    // is resolved here — the caller handles any asiChoice before persisting).
+    featPushed = {
+      slug: featData.slug,
+      source: featData.source,
+      asisApplied: [],
+    };
   }
 
   // ---- 5) HP delta ---------------------------------------------------------
@@ -273,6 +300,7 @@ function validateSameClassBranch(
   };
 
   if (asiPushed !== undefined) mutations.asiPushed = asiPushed;
+  if (featPushed !== undefined) mutations.featPushed = featPushed;
 
   if (hpResult.rollUsed !== null) {
     mutations.hpRollEntry = {

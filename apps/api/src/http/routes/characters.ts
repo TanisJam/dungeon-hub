@@ -1544,6 +1544,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // ---- Load feat data if asiFeat.kind='feat' (REQ-CLU-FEAT-VALID) ----------
+    // Trust boundary: the route resolves feat existence before passing to domain.
+    let resolvedFeatData: import('@dungeon-hub/domain/character/feat').FeatCompendiumData | null = null;
+    if (body.kind === 'same-class' && body.asiFeat?.kind === 'feat') {
+      resolvedFeatData = await loadFeatData({ slug: body.asiFeat.slug, source: body.asiFeat.source });
+      if (!resolvedFeatData) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'FEAT_NOT_FOUND', feat: { slug: body.asiFeat.slug, source: body.asiFeat.source } }],
+        });
+      }
+    }
+
     // ---- Server-side HP roll -----------------------------------------------
     // Trust boundary: if method='roll', server rolls and ignores any client roll.
     // REQ-CLU-HP-DELTA-ATOMIC.
@@ -1581,6 +1594,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     };
     if (subclassData !== undefined) levelUpInput.subclassData = subclassData;
     if (serverRoll !== null) levelUpInput.serverRoll = serverRoll;
+    if (resolvedFeatData !== null) levelUpInput.featData = resolvedFeatData;
 
     const levelUpResult = validateLevelUp(levelUpInput);
 
@@ -1633,20 +1647,24 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // ---- Session event (outside transaction — non-critical) ----------------
     // REQ-CLU-EVENT-EMISSION.
+    const sessionPayload: Record<string, unknown> = {
+      characterId: id,
+      classSlug: summary.classSlug,
+      fromClassLevel: summary.fromClassLevel,
+      toClassLevel: summary.toClassLevel,
+      totalLevelAfter: summary.totalLevelAfter,
+      hpDelta: summary.hpDelta,
+      rollUsed: summary.rollUsed,
+      asiFeatApplied: summary.asiFeatApplied,
+    };
+    if (mutations.featPushed) {
+      sessionPayload['featApplied'] = { slug: mutations.featPushed.slug, source: mutations.featPushed.source };
+    }
     await recordSessionEventForCharacter({
       characterId: id,
       actorUserId: userId,
       eventType: 'level_up',
-      payload: {
-        characterId: id,
-        classSlug: summary.classSlug,
-        fromClassLevel: summary.fromClassLevel,
-        toClassLevel: summary.toClassLevel,
-        totalLevelAfter: summary.totalLevelAfter,
-        hpDelta: summary.hpDelta,
-        rollUsed: summary.rollUsed,
-        asiFeatApplied: summary.asiFeatApplied,
-      },
+      payload: sessionPayload,
     });
 
     return { character: updated, summary };
