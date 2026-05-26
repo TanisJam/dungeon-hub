@@ -56,6 +56,7 @@ import {
 } from '../../use-cases/characters/load-character.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
+import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
 import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import {
@@ -742,6 +743,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+    const worldRefData = await loadWorldRefData(character.worldId);
+    if (!worldRefData) return reply.code(500).send({ error: 'WORLD_REF_DATA_MISSING' });
 
     const { race, subrace } = await loadRaceAndSubrace({
       raceSlug: body.race.slug,
@@ -818,6 +821,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       raceData: race,
       ...(subrace !== null ? { subraceData: subrace } : {}),
       rulesProfile: campaign.rulesProfile,
+      worldRefData,
       ...(body.appliedAsis !== undefined ? { appliedAsis: body.appliedAsis } : {}),
       ...(body.languageChoices !== undefined ? { languageChoices: body.languageChoices } : {}),
       ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),

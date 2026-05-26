@@ -57,6 +57,11 @@ describe('GET /worlds/:id', () => {
     expect(body.rulesProfile).toBeTypeOf('object');
     expect(body.rulesProfile.sources).toBeTypeOf('object');
     expect(body.rulesProfile.statGeneration).toBeTypeOf('object');
+    // refData (added by SDD domain-reference-data-runtime-source) — arrays at API boundary.
+    expect(body.refData).toBeTypeOf('object');
+    expect(Array.isArray(body.refData.languagePool.standard)).toBe(true);
+    expect(Array.isArray(body.refData.subraceRequiredSet)).toBe(true);
+    expect(body.refData.subraceRequiredSet).toContain('dwarf|PHB');
   });
 
   it('player-role worldMember gets 200', async () => {

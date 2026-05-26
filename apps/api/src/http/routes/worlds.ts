@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { worlds, worldMembers } from '../../infra/db/schema.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
+import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
 
 const ListWorldsQuery = z.object({
   mine: z.coerce.number().int().optional(),
@@ -70,12 +71,24 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
       .limit(1);
     if (membership.length === 0) return reply.code(403).send({ error: 'FORBIDDEN' });
 
+    const refData = await loadWorldRefData(id);
+    // Sets aren't JSON-serializable — flatten to arrays at the API boundary.
+    const refDataPayload =
+      refData == null
+        ? null
+        : {
+            languagePool: refData.languagePool,
+            subraceRequiredSet: Array.from(refData.subraceRequiredSet),
+            subraceReplacingAbilitySet: Array.from(refData.subraceReplacingAbilitySet),
+          };
+
     return reply.send({
       id: world.id,
       name: world.name,
       slug: world.slug,
       ownerUserId: world.ownerUserId,
       rulesProfile: world.rulesProfile,
+      refData: refDataPayload,
     });
   });
 };

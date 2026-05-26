@@ -17,6 +17,11 @@ const DisabledEntitiesSchema = z.object({
   items: z.array(z.string()).default([]),
   feats: z.array(z.string()).default([]),
   optionalFeatures: z.array(z.string()).default([]),
+  /**
+   * Added by SDD `domain-reference-data-runtime-source` (#807). Existing stored
+   * profiles default to [] via Zod schema parse — no DB migration required.
+   */
+  languages: z.array(z.string()).default([]),
 });
 
 const VariantRulesSchema = z.object({

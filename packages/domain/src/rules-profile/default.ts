@@ -32,6 +32,7 @@ export const DEFAULT_RULES_PROFILE: RulesProfile = {
     items: [],
     feats: [],
     optionalFeatures: [],
+    languages: [],
   },
   variantRules: {
     multiclassing: true,
