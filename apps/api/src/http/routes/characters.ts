@@ -41,7 +41,9 @@ import {
   hitDieFaces,
   hitDieHpGain,
   rollHitDie,
+  chooseHitDiceRecovery,
   type HpMethod,
+  type HitDieFace,
 } from '@dungeon-hub/domain/character/level-up';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
@@ -240,7 +242,20 @@ const ShortRestBody = z.object({
   rolls: z.record(z.string().regex(/^d\d+$/), z.array(z.number().int().min(1))).optional(),
 });
 
-const LongRestBody = z.object({});
+const LongRestBody = z.object({
+  /**
+   * R-04 (REST-04 / #826): player-driven hit-dice recovery distribution.
+   * When omitted, the route falls back to the existing greedy "most-spent
+   * first" heuristic. When present, validated by `chooseHitDiceRecovery`
+   * (PHB p.186 — "the player chooses").
+   */
+  hitDiceRecoveryChoice: z
+    .record(z.enum(['d6', 'd8', 'd10', 'd12']), z.number().int().nonnegative())
+    .optional(),
+});
+
+/** REST-03 (#826): 24h server-clock cooldown on long rests per PHB p.186. */
+const LONG_REST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const HpDeltaBody = z.object({
   /** Delta signado. Negativo daña (consume temp HP primero), positivo cura. */
@@ -2107,7 +2122,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
   // reset death saves, -1 exhaustion, reset warlock slots.
   app.post('/characters/:id/rest/long', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
-    LongRestBody.parse(request.body ?? {});
+    const longRestBody = LongRestBody.parse(request.body ?? {});
     const userId = request.user!.sub;
 
     const character = await loadCharacter(id);
@@ -2128,6 +2143,28 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const eligibility = validateLongRestEligibility(currentHp);
     if (!eligibility.ok) {
       return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: eligibility.issues });
+    }
+
+    // REST-03 (#826): 24h cooldown gate. PHB p.186 — "A character must finish a
+    // long rest at least once every 24 hours". Server-clock approximation per
+    // proposal #738 D-03. Gate runs BEFORE any state mutation so a reject
+    // preserves class-resource state (REQ-RC-COOLDOWN-GATE scenario).
+    const lastLongRestAt = charData['lastLongRestAt'] as string | undefined;
+    if (lastLongRestAt) {
+      const elapsedMs = Date.now() - new Date(lastLongRestAt).getTime();
+      if (elapsedMs < LONG_REST_COOLDOWN_MS) {
+        const remainingMs = LONG_REST_COOLDOWN_MS - elapsedMs;
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [
+            {
+              code: 'LONG_REST_TOO_SOON',
+              expected: new Date(Date.now() + remainingMs).toISOString(),
+              got: new Date().toISOString(),
+            },
+          ],
+        });
+      }
     }
 
     const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
@@ -2163,9 +2200,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       max = Math.max(1, m);
     }
 
-    // Hit dice: recuperás floor(totalLevel/2) mín 1, distribuidos en el die
-    // que más usaste. RAW: el player elige, pero para MVP recargamos hacia
-    // los dice con más spent count (siempre que respete el total).
+    // Hit dice: PHB p.186 — recuperás floor(totalLevel/2) mín 1. RAW: el
+    // player elige cuáles recuperar. REST-04 (#826) permite enviar
+    // `hitDiceRecoveryChoice` para distribuir explícitamente; cuando ausente,
+    // fallback al greedy "más gastados primero".
     const totalLevel = classes.reduce((acc, c) => acc + c.level, 0);
     const totalsFromClasses = hitDiceTotalsByDie(classes);
     const existingHitDice = (charData['hitDice'] as Record<string, { total: number; available: number }> | undefined);
@@ -2175,18 +2213,41 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
 
     const recoverCount = hitDiceRecoveredOnLongRest(totalLevel);
-    let remaining = recoverCount;
-    // Distribuir: primero a los más gastados.
-    const dice = Object.entries(hitDice).sort((a, b) => {
-      const spentA = a[1].total - a[1].available;
-      const spentB = b[1].total - b[1].available;
-      return spentB - spentA;
-    });
-    for (const [die, state] of dice) {
-      if (remaining === 0) break;
-      const canRecover = Math.min(remaining, state.total - state.available);
-      hitDice[die] = { ...state, available: state.available + canRecover };
-      remaining -= canRecover;
+
+    if (longRestBody.hitDiceRecoveryChoice && Object.keys(longRestBody.hitDiceRecoveryChoice).length > 0) {
+      // REST-04: player-driven distribution. Validate via domain helper.
+      const spentByFace: Partial<Record<HitDieFace, number>> = {};
+      for (const [face, state] of Object.entries(hitDice) as Array<[HitDieFace, typeof hitDice[string]]>) {
+        spentByFace[face] = state.total - state.available;
+      }
+      const choiceResult = chooseHitDiceRecovery(
+        spentByFace,
+        recoverCount,
+        longRestBody.hitDiceRecoveryChoice,
+      );
+      if (!choiceResult.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: choiceResult.issues });
+      }
+      for (const [face, n] of Object.entries(choiceResult.distribution)) {
+        const state = hitDice[face];
+        if (state && typeof n === 'number') {
+          hitDice[face] = { ...state, available: state.available + n };
+        }
+      }
+    } else {
+      // Greedy fallback (pre-REST-04 behavior): primero a los más gastados.
+      let remaining = recoverCount;
+      const dice = Object.entries(hitDice).sort((a, b) => {
+        const spentA = a[1].total - a[1].available;
+        const spentB = b[1].total - b[1].available;
+        return spentB - spentA;
+      });
+      for (const [die, state] of dice) {
+        if (remaining === 0) break;
+        const canRecover = Math.min(remaining, state.total - state.available);
+        hitDice[die] = { ...state, available: state.available + canRecover };
+        remaining -= canRecover;
+      }
     }
 
     // Death saves reset.
@@ -2226,6 +2287,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       warlockSlotsUsed: 0,
       // R-07: clear all class resources on long rest (PHB p.186).
       classResourcesUsed: resetClassResourcesForRest(currentResourcesUsedLong, classes, 'long'),
+      // REST-03 (#826): persist server-clock timestamp for 24h cooldown gate.
+      lastLongRestAt: new Date().toISOString(),
     };
 
     const [updated] = await db

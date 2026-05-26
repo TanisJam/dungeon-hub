@@ -603,7 +603,14 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
       method: 'PATCH',
       url: `/api/v1/characters/${charId}`,
       headers: { authorization: `Bearer ${player.accessToken}` },
-      payload: { data: { ...charPre.data, hp: { current: 5, max: 10, temp: 0 } } },
+      payload: {
+        data: {
+          ...charPre.data,
+          hp: { current: 5, max: 10, temp: 0 },
+          // REST-03 (#826): clear cooldown so this REST-02 fixture test can rest.
+          lastLongRestAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     });
 
     const res = await app.inject({
@@ -653,7 +660,14 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
       method: 'PATCH',
       url: `/api/v1/characters/${charId}`,
       headers: { authorization: `Bearer ${player.accessToken}` },
-      payload: { data: { ...charPre.data, hp: { current: 5, max: 10, temp: 0 } } },
+      payload: {
+        data: {
+          ...charPre.data,
+          hp: { current: 5, max: 10, temp: 0 },
+          // REST-03 (#826): clear cooldown so this REST-02 fixture test can rest.
+          lastLongRestAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        },
+      },
     });
 
     const res = await app.inject({
@@ -728,5 +742,229 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.shortRest.itemsRecharged).toHaveLength(0);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// REST-03 + REST-04 (#826) — long-rest 24h cooldown + hit-dice player choice
+//
+// State-isolated suite: uses its own character so it doesn't collide with
+// the pre-existing REST-01 / REST-02 tests above (which assume no cooldown
+// has been written yet for their shared character).
+// ---------------------------------------------------------------------------
+describe('POST /characters/:id/rest/long — REST-03 + REST-04 (#826)', () => {
+  let owner: TestUser;
+  let cooldownCharId: string;
+
+  // Helper: seed a `lastLongRestAt` > 24h ago and an optional `hitDice` map so
+  // each test starts from a clean window without depending on prior tests.
+  async function seedRestedState(args: {
+    hitDice?: Record<string, { total: number; available: number }>;
+    hpCurrent?: number;
+  }) {
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const stale = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const [row] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, cooldownCharId))
+      .limit(1);
+    const data = (row?.data as Record<string, unknown>) ?? {};
+    const nextData: Record<string, unknown> = { ...data, lastLongRestAt: stale };
+    if (args.hitDice) nextData['hitDice'] = args.hitDice;
+    if (args.hpCurrent !== undefined) {
+      const hp = (data['hp'] as { max?: number } | undefined) ?? {};
+      nextData['hp'] = { ...hp, current: args.hpCurrent };
+    }
+    await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, cooldownCharId));
+  }
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    owner = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { name: 'Cooldown Test Campaign' },
+      })
+      .then((r) => r.json());
+    const worldId = campaign.worldId;
+
+    // Fighter L3 via PATCH to avoid the full wizard chain.
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { worldId, name: 'Cooldown Fighter L3' },
+      })
+      .then((r) => r.json());
+    cooldownCharId = c.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${cooldownCharId}`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'fighter',
+              source: 'PHB',
+              level: 3,
+              hitDie: 'd10',
+              subclass: { slug: 'fighter--champion', source: 'PHB' },
+              savingThrows: ['str', 'con'],
+              armorProficiencies: ['heavy'],
+              weaponProficiencies: ['simple', 'martial'],
+              toolProficiencies: [],
+              skillChoices: ['athletics', 'perception'],
+            },
+          ],
+          baseStats: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+          hp: { current: 25, max: 25, temp: 0 },
+          hitDice: { d10: { total: 3, available: 3 } },
+        },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (owner) await deleteTestUser(owner.id);
+  });
+
+  it('R03-S1: first long rest writes lastLongRestAt timestamp', async () => {
+    const app = await getTestApp();
+    await seedRestedState({ hpCurrent: 25 });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const [row] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, cooldownCharId))
+      .limit(1);
+    const data = row?.data as { lastLongRestAt?: string };
+    expect(typeof data.lastLongRestAt).toBe('string');
+    const ageMs = Date.now() - new Date(data.lastLongRestAt!).getTime();
+    expect(ageMs).toBeLessThan(60_000); // written within the last minute
+  });
+
+  it('R03-S2: second long rest within 24h → 400 LONG_REST_TOO_SOON', async () => {
+    const app = await getTestApp();
+    // Prior test left lastLongRestAt ≈ now; the retry must be rejected.
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].code).toBe('LONG_REST_TOO_SOON');
+  });
+
+  it('R03-S3: cooldown reject does NOT mutate hp (idempotent on reject)', async () => {
+    const app = await getTestApp();
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+
+    // Damage HP so we can detect mutation after a cooldown-rejected long rest.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/hp`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { delta: -5 },
+    });
+    const [before] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, cooldownCharId))
+      .limit(1);
+    const hpBefore = (before?.data as { hp?: { current?: number } }).hp?.current;
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+
+    const [after] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, cooldownCharId))
+      .limit(1);
+    const hpAfter = (after?.data as { hp?: { current?: number } }).hp?.current;
+    expect(hpAfter).toBe(hpBefore);
+  });
+
+  it('R03-S4: lastLongRestAt > 24h ago → next long rest accepted', async () => {
+    const app = await getTestApp();
+    await seedRestedState({ hpCurrent: 25 });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('R04-S1: explicit choice respects per-face distribution (Fighter L3 → only 1 d10 recovered)', async () => {
+    const app = await getTestApp();
+    await seedRestedState({
+      hpCurrent: 25,
+      hitDice: { d10: { total: 3, available: 1 } }, // 2 spent, allowance floor(3/2)=1
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceRecoveryChoice: { d10: 1 } },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const [after] = await db
+      .select()
+      .from(characters)
+      .where(eq(characters.id, cooldownCharId))
+      .limit(1);
+    const hd = (after?.data as { hitDice?: Record<string, { available: number }> }).hitDice;
+    expect(hd?.d10?.available).toBe(2); // 1 + 1 recovered
+  });
+
+  it('R04-S2: invalid choice over-spent → 400 HIT_DICE_CHOICE_OVER_SPENT', async () => {
+    const app = await getTestApp();
+    await seedRestedState({
+      hpCurrent: 25,
+      hitDice: { d10: { total: 3, available: 3 } }, // 0 spent
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${cooldownCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceRecoveryChoice: { d10: 1 } }, // can't recover what isn't spent
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].code).toBe('HIT_DICE_CHOICE_OVER_SPENT');
   });
 });

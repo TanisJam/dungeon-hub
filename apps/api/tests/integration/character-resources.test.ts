@@ -16,6 +16,27 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
   let monkCharId: string;
   let fighterCharId: string;
 
+  // REST-03 (#826) introduces a 24h cooldown on long rests. Tests that long-rest
+  // sequentially on the same character must clear the cooldown first.
+  async function clearLongRestCooldown(id: string): Promise<void> {
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(characters).where(eq(characters.id, id)).limit(1);
+    if (!row) return;
+    const data = (row.data as Record<string, unknown>) ?? {};
+    await db
+      .update(characters)
+      .set({
+        data: {
+          ...data,
+          lastLongRestAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id));
+  }
+
   beforeAll(async () => {
     const app = await getTestApp();
     owner = await createTestUser();
@@ -219,6 +240,8 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
 
   it('GET /sheet exposes classResources view with used counter round-trip', async () => {
     const app = await getTestApp();
+    // Clear REST-03 cooldown (#826) so the long rest below can succeed.
+    await clearLongRestCooldown(monkCharId);
     // Reset to a known state, then consume exactly 2 ki and read back.
     await app.inject({
       method: 'POST',
@@ -263,6 +286,8 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
 
   it('long rest resets all class resources to 0', async () => {
     const app = await getTestApp();
+    // Clear REST-03 cooldown (#826) so the long rest below can succeed.
+    await clearLongRestCooldown(monkCharId);
     // Use ki + second-wind to set non-zero state.
     await app.inject({
       method: 'POST',
