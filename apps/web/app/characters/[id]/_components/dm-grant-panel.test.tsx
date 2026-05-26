@@ -5,10 +5,12 @@
  *   REQ-CDG-DM-PANEL-VISIBILITY: only gm sees trigger button
  *   REQ-CDG-DM-PANEL-INTERACTION: tab switching, modal open/close
  *   REQ-CDG-XP-FORM: submit pending state, success → close, error → stays open
+ *   REQ-CDG-GOLD-FORM: 5 coin inputs → grantGold with non-zero coins only
+ *   REQ-CDG-ITEM-FORM: debounced typeahead → grantItem
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 
 vi.mock('../actions', () => ({
   grantXp: vi.fn().mockResolvedValue({ ok: true }),
@@ -155,6 +157,86 @@ describe('DmGrantPanel — XP tab submit', () => {
     });
     // Modal stays open
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('DmGrantPanel — Oro tab submit', () => {
+  it('submit with gp=50 → calls grantGold with { gp: 50 } only, modal closes', async () => {
+    const { grantGold } = await import('../actions');
+    vi.mocked(grantGold).mockResolvedValue({ ok: true });
+
+    render(<DmGrantPanel {...PROPS} callerRole="gm" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Oro' }));
+    });
+
+    const gpInput = screen.getByLabelText(/Oro \(gp\)/i);
+    await act(async () => {
+      fireEvent.change(gpInput, { target: { value: '50' } });
+    });
+    await act(async () => {
+      fireEvent.submit(gpInput.closest('form')!);
+    });
+
+    await vi.waitFor(() => {
+      expect(grantGold).toHaveBeenCalledWith('char-1', { gp: 50 });
+    });
+    // Modal closes on success
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+});
+
+describe('DmGrantPanel — Ítem tab submit', () => {
+  it('pick item from typeahead → calls grantItem with slug+source+qty=1, modal closes', async () => {
+    const { grantItem, searchCompendiumItems } = await import('../actions');
+    vi.mocked(searchCompendiumItems).mockResolvedValue([
+      { slug: 'longsword', source: 'PHB', name: 'Longsword', type: 'weapon', weight: 3 },
+    ]);
+    vi.mocked(grantItem).mockResolvedValue({ ok: true });
+
+    render(<DmGrantPanel {...PROPS} callerRole="gm" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Ítem' }));
+    });
+
+    const searchInput = screen.getByRole('searchbox');
+    await act(async () => {
+      fireEvent.change(searchInput, { target: { value: 'long' } });
+    });
+
+    // Wait for debounce (200ms) + search result render
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: /Longsword/i })).toBeTruthy();
+      },
+      { timeout: 1000 },
+    );
+
+    // Pick the item
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Longsword/i }));
+    });
+
+    // Submit
+    await act(async () => {
+      fireEvent.submit(searchInput.closest('form')!);
+    });
+
+    await vi.waitFor(() => {
+      expect(grantItem).toHaveBeenCalledWith('char-1', { slug: 'longsword', source: 'PHB' }, 1);
+    });
+    // Modal closes on success
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
 });
 
