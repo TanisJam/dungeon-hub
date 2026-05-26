@@ -42,8 +42,10 @@ import {
   hitDieHpGain,
   rollHitDie,
   chooseHitDiceRecovery,
+  validateLevelUp,
   type HpMethod,
   type HitDieFace,
+  type LevelUpBody as DomainLevelUpBody,
 } from '@dungeon-hub/domain/character/level-up';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
@@ -203,6 +205,8 @@ const AddMulticlassBody = z.object({
     .nullable()
     .optional(),
   skillChoices: z.array(z.string().min(1)).optional(),
+  /** CL-07: Bard multiclass requires 1 musical instrument (PHB p.164). */
+  toolChoices: z.array(z.string().min(1)).optional(),
 });
 
 const SetBackgroundBody = z.object({
@@ -314,6 +318,48 @@ const ClassSpellsBody = z.object({
   known: z.array(SpellRefSchema).optional(),
   prepared: z.array(SpellRefSchema).optional(),
 });
+
+// ---- Play-time level-up schemas (POST /characters/:id/level-up) -------------
+// These are distinct from the wizard-time LevelUpBody above.
+// Play-time: active characters, owner-only, no assertWritableForEdit.
+// REQ-CLU-PLAY-TIME-AUTH, REQ-CLU-BODY-DISCRIMINATOR.
+
+const PlayTimeHpInput = z.discriminatedUnion('method', [
+  z.object({ method: z.literal('average') }),
+  z.object({ method: z.literal('roll') }),
+]);
+
+const PlayTimeAsiFeatInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('asi'), deltas: z.record(z.string(), z.number().int()) }),
+  z.object({ kind: z.literal('feat'), slug: z.string().min(1), source: z.string().min(1) }),
+]);
+
+const PlayTimeClassRef = z.object({ slug: z.string().min(1), source: z.string().min(1) });
+
+const PlayTimeSameClassBody = z.object({
+  kind: z.literal('same-class'),
+  class: PlayTimeClassRef,
+  subclass: PlayTimeClassRef.nullable().optional(),
+  hp: PlayTimeHpInput,
+  asiFeat: PlayTimeAsiFeatInput.optional(),
+  classFeaturePicks: z.unknown().optional(),
+  spellPicks: z.unknown().optional(),
+});
+
+const PlayTimeNewClassBody = z.object({
+  kind: z.literal('new-class'),
+  class: PlayTimeClassRef,
+  subclass: PlayTimeClassRef.nullable().optional(),
+  skillChoices: z.array(z.string().min(1)).optional(),
+  toolChoices: z.array(z.string().min(1)).optional(),
+  hp: PlayTimeHpInput,
+  spellPicks: z.unknown().optional(),
+});
+
+const PlayTimeLevelUpBody = z.discriminatedUnion('kind', [
+  PlayTimeSameClassBody,
+  PlayTimeNewClassBody,
+]);
 
 const ClassSpellsParams = z.object({
   id: z.string().uuid(),
@@ -1421,6 +1467,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       newClassData: classData,
       ...(subclassData !== undefined ? { newSubclassData: subclassData } : {}),
       ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
+      // CL-07: pass toolChoices for Bard multiclass instrument selection (PHB p.164).
+      ...(body.toolChoices !== undefined ? { toolChoices: body.toolChoices } : {}),
     });
 
     if (!result.ok) {
@@ -1445,6 +1493,163 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .returning();
 
     return reply.code(201).send(updated);
+  });
+
+  // ---- POST /characters/:id/level-up ----------------------------------------
+  // Play-time endpoint: sube un nivel al personaje (same-class o new-class/multiclass).
+  // PLAY-TIME: do NOT use assertWritableForEdit per REQ-CLU-PLAY-TIME-AUTH.
+  // Auth: owner-only via getCharacterAccess === 'owner'. Allowed on status='active'.
+  // Atomic: db.transaction wrapping all mutations.
+  // REQ-CLU-PLAY-TIME-AUTH, REQ-CLU-BODY-DISCRIMINATOR, REQ-CLU-PERSIST-ATOMIC.
+  app.post('/characters/:id/level-up', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = PlayTimeLevelUpBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    // ---- Auth: owner-only (NOT assertWritableForEdit — play-time pattern) ---
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'NOT_OWNER' }],
+      });
+    }
+
+    // ---- Status gate: only active characters can level up ------------------
+    if (character.status !== 'active') {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'LEVELUP_STATUS_INVALID', status: character.status, allowed: ['active'] }],
+      });
+    }
+
+    const campaign = await loadWorldById(character.worldId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    // ---- Load class data ---------------------------------------------------
+    const { classData, subclassData } = await loadClassAndSubclass({
+      classSlug: body.class.slug,
+      classSource: body.class.source,
+      subclassSlug: body.subclass?.slug ?? null,
+      subclassSource: body.subclass?.source ?? null,
+    });
+
+    if (!classData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'CLASS_NOT_FOUND', class: body.class }],
+      });
+    }
+
+    // ---- Server-side HP roll -----------------------------------------------
+    // Trust boundary: if method='roll', server rolls and ignores any client roll.
+    // REQ-CLU-HP-DELTA-ATOMIC.
+    let serverRoll: number | null = null;
+    if (body.hp.method === 'roll') {
+      serverRoll = rollHitDie(classData.hd ? `d${classData.hd.faces}` : 'd8');
+    }
+
+    // ---- Snapshot for domain validator -------------------------------------
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+
+    // Map Zod-inferred body to domain LevelUpBody shape
+    const domainBody = body as DomainLevelUpBody;
+
+    // Build snapshot with exactOptionalPropertyTypes compliance (no undefined for optional fields)
+    const charBaseStats = charData['baseStats'] as AbilityScores | undefined;
+    const charAsis = charData['asisApplied'] as AppliedAsi[] | undefined;
+    const charClasses = charData['classes'] as AppliedClass[] | undefined;
+    const charLevelUpAsis = charData['levelUpAsis'] as AppliedAsi[] | undefined;
+    const charFeats = charData['feats'] as AppliedFeat[] | undefined;
+
+    type LevelUpCharSnapshot = Parameters<typeof validateLevelUp>[0]['character'];
+    const charSnapshot: LevelUpCharSnapshot = { name: character.name, xp: character.xp, status: character.status };
+    if (charBaseStats !== undefined) charSnapshot.baseStats = charBaseStats;
+    if (charAsis !== undefined) charSnapshot.asisApplied = charAsis;
+    if (charClasses !== undefined) charSnapshot.classes = charClasses;
+    if (charLevelUpAsis !== undefined) charSnapshot.levelUpAsis = charLevelUpAsis;
+    if (charFeats !== undefined) charSnapshot.feats = charFeats;
+
+    const levelUpInput: Parameters<typeof validateLevelUp>[0] = {
+      rulesProfile: campaign.rulesProfile,
+      character: charSnapshot,
+      body: domainBody,
+      classData,
+    };
+    if (subclassData !== undefined) levelUpInput.subclassData = subclassData;
+    if (serverRoll !== null) levelUpInput.serverRoll = serverRoll;
+
+    const levelUpResult = validateLevelUp(levelUpInput);
+
+    if (!levelUpResult.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: levelUpResult.issues });
+    }
+
+    const { mutations, summary } = levelUpResult;
+
+    // ---- Persist atomic (db.transaction) -----------------------------------
+    // REQ-CLU-PERSIST-ATOMIC.
+    const allAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+    const existingFeats = (charData['feats'] as AppliedFeat[] | undefined) ?? [];
+    const existingHpRolls = (charData['levelUpHpRolls'] as Array<{ classSlug: string; level: number; roll: number }> | undefined) ?? [];
+    const inventoryNow = (character.inventory as InventoryItem[] | null) ?? [];
+
+    const nextAsis = mutations.asiPushed
+      ? [...allAsis, mutations.asiPushed]
+      : allAsis;
+
+    const nextFeats = mutations.featPushed
+      ? [...existingFeats, mutations.featPushed]
+      : existingFeats;
+
+    const nextHpRolls = mutations.hpRollEntry
+      ? [...existingHpRolls, mutations.hpRollEntry]
+      : existingHpRolls;
+
+    // Wizard new-class gets spellbook if not already present.
+    const inventoryAfter =
+      body.kind === 'new-class' && mutations.classesNext.some((c) => c.slug === 'wizard')
+        ? ensureWizardSpellbook(inventoryNow)
+        : inventoryNow;
+
+    const nextData: Record<string, unknown> = {
+      ...charData,
+      classes: mutations.classesNext,
+      levelUpAsis: nextAsis,
+      feats: nextFeats,
+      levelUpHpRolls: nextHpRolls,
+    };
+
+    const [updated] = await db.transaction(async (tx) => {
+      return tx
+        .update(characters)
+        .set({ data: nextData, inventory: inventoryAfter, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+    });
+
+    // ---- Session event (outside transaction — non-critical) ----------------
+    // REQ-CLU-EVENT-EMISSION.
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'level_up',
+      payload: {
+        characterId: id,
+        classSlug: summary.classSlug,
+        fromClassLevel: summary.fromClassLevel,
+        toClassLevel: summary.toClassLevel,
+        totalLevelAfter: summary.totalLevelAfter,
+        hpDelta: summary.hpDelta,
+        rollUsed: summary.rollUsed,
+        asiFeatApplied: summary.asiFeatApplied,
+      },
+    });
+
+    return { character: updated, summary };
   });
 
   // ---- POST /characters/:id/feats -----------------------------------------
