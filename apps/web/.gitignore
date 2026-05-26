@@ -10,3 +10,4 @@ out
 /test-results
 /playwright/.cache
 e2e/.auth/
+e2e/.screenshots/
