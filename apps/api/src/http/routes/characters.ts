@@ -134,6 +134,26 @@ const AwardXpBody = z.object({
   award: z.number().int(),
 });
 
+// ---- DM grant schemas -------------------------------------------------------
+
+const GrantGoldBody = z
+  .object({
+    cp: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+    sp: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+    ep: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+    gp: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+    pp: z.number().int().min(-1_000_000).max(1_000_000).optional(),
+  })
+  .refine(
+    (b) => (['cp', 'sp', 'ep', 'gp', 'pp'] as const).some((k) => b[k] !== undefined && b[k] !== 0),
+    { message: 'Al menos una moneda con delta != 0 es requerida' },
+  );
+
+const GrantItemBody = z.object({
+  item: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  quantity: z.number().int().min(1).max(999).optional(),
+});
+
 // SP-05: consume a spell slot.
 const ConsumeSlotBody = z.object({
   level: z.number().int().min(1).max(9),
@@ -777,6 +797,160 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     return { character: updated, xp: next, award: body.award };
   });
+
+  // ---- POST /characters/:id/grant/gold ------------------------------------
+  // DM-only: otorga (o resta) monedas a cualquier personaje del mundo.
+  // Requiere rol gm en el mundo del personaje. Owner del personaje NO puede usar esto.
+  app.post(
+    '/characters/:id/grant/gold',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const body = GrantGoldBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'WORLD_GM_REQUIRED', worldId: character.worldId, userId }],
+        });
+      }
+
+      const data = (character.data as Record<string, unknown> | null) ?? {};
+      const current = (data['currency'] as Record<string, number> | undefined) ?? {
+        cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+      };
+
+      const next: Record<string, number> = { ...current };
+      const issues: Array<{
+        code: string;
+        coin: string;
+        current: number;
+        delta: number;
+        result: number;
+      }> = [];
+      const deltas: Record<string, number> = {};
+
+      for (const coin of ['cp', 'sp', 'ep', 'gp', 'pp'] as const) {
+        const delta = body[coin];
+        if (delta === undefined) continue;
+        deltas[coin] = delta;
+        const result = (current[coin] ?? 0) + delta;
+        if (result < 0) {
+          issues.push({ code: 'INSUFFICIENT_FUNDS', coin, current: current[coin] ?? 0, delta, result });
+        }
+        next[coin] = result;
+      }
+
+      if (issues.length > 0) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues });
+      }
+
+      const [updated] = await db
+        .update(characters)
+        .set({ data: { ...data, currency: next }, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      await recordSessionEventForCharacter({
+        characterId: id,
+        actorUserId: userId,
+        eventType: 'gold_grant',
+        payload: { characterId: id, deltas, before: current, after: next },
+      });
+
+      return { character: updated, currency: next };
+    },
+  );
+
+  // ---- POST /characters/:id/grant/item ------------------------------------
+  // DM-only: agrega un ítem al inventario de cualquier personaje del mundo.
+  // Usa ctx mínimo (strScore=10, sin proficiencias) ya que el DM puede otorgar
+  // cualquier ítem sin restricción de proficiencia.
+  app.post(
+    '/characters/:id/grant/item',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const body = GrantItemBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'WORLD_GM_REQUIRED', worldId: character.worldId, userId }],
+        });
+      }
+
+      const itemData = await loadItemData({ slug: body.item.slug, source: body.item.source });
+      if (!itemData) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'ITEM_NOT_FOUND', item: body.item }],
+        });
+      }
+
+      const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+
+      const allRefs = [
+        ...existingInventory.map((it) => ({ slug: it.itemSlug, source: it.itemSource })),
+        { slug: itemData.slug, source: itemData.source },
+      ];
+      const weights = await loadItemDataMany(allRefs);
+
+      // Minimal ctx: DM grants bypass proficiency warnings
+      const ctx = { strScore: 10, armorProficiencies: [] as string[], weaponProficiencies: [] as string[] };
+
+      const result = addItemToInventory({
+        inventory: existingInventory,
+        itemData,
+        input: {
+          quantity: body.quantity ?? 1,
+          state: 'carried',
+          attuned: false,
+        },
+        weights,
+        ctx,
+      });
+
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      const [updated] = await db
+        .update(characters)
+        .set({ inventory: result.inventory, updatedAt: new Date() })
+        .where(eq(characters.id, id))
+        .returning();
+
+      await recordSessionEventForCharacter({
+        characterId: id,
+        actorUserId: userId,
+        eventType: 'item_grant',
+        payload: {
+          characterId: id,
+          instanceId: result.addedInstanceId,
+          itemSlug: itemData.slug,
+          itemSource: itemData.source,
+          quantity: body.quantity ?? 1,
+        },
+      });
+
+      return reply.code(201).send({
+        character: updated,
+        addedInstanceId: result.addedInstanceId,
+        warnings: result.warnings,
+      });
+    },
+  );
 
   // ---- DELETE /characters/:id ----------------------------------------------
   app.delete('/characters/:id', { preHandler: app.authenticate }, async (request, reply) => {
