@@ -28,11 +28,12 @@ type Tab = 'xp' | 'gold' | 'item';
 
 interface DmGrantPanelProps {
   characterId: string;
+  characterName: string;
   callerRole: CallerRole;
   worldId: string;
 }
 
-export function DmGrantPanel({ characterId, callerRole, worldId }: DmGrantPanelProps) {
+export function DmGrantPanel({ characterId, characterName, callerRole, worldId }: DmGrantPanelProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('xp');
 
@@ -62,6 +63,7 @@ export function DmGrantPanel({ characterId, callerRole, worldId }: DmGrantPanelP
       {open && (
         <DmGrantModal
           characterId={characterId}
+          characterName={characterName}
           worldId={worldId}
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -78,6 +80,7 @@ export function DmGrantPanel({ characterId, callerRole, worldId }: DmGrantPanelP
 
 interface DmGrantModalProps {
   characterId: string;
+  characterName: string;
   worldId: string;
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
@@ -86,6 +89,7 @@ interface DmGrantModalProps {
 
 function DmGrantModal({
   characterId,
+  characterName,
   worldId,
   activeTab,
   onTabChange,
@@ -107,60 +111,73 @@ function DmGrantModal({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dm-grant-panel-title"
-      className="fixed inset-0 z-50 flex flex-col bg-paper"
+      className="fixed inset-0 z-50 flex md:items-center md:justify-center md:bg-ink/40 md:p-4"
+      onMouseDown={(e) => {
+        // Backdrop click closes on desktop. Mobile is fullscreen so no backdrop area.
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-3">
-        <h2
-          id="dm-grant-panel-title"
-          className="flex-1 text-sm font-bold text-ink"
-        >
-          Otorgar recompensa
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar"
-          className="flex h-11 w-11 items-center justify-center rounded-md text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Tabs ABOVE form — thumb reach at 375px */}
-      <div className="flex border-b border-line" role="tablist">
-        {(['xp', 'gold', 'item'] as const).map((tab) => (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dm-grant-panel-title"
+        className="flex h-full w-full flex-col bg-paper md:h-auto md:max-h-[85vh] md:w-full md:max-w-md md:rounded-xl md:shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-3 md:rounded-t-xl">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute">
+              Otorgar a
+            </p>
+            <h2
+              id="dm-grant-panel-title"
+              className="truncate text-sm font-bold text-ink"
+            >
+              {characterName}
+            </h2>
+          </div>
           <button
-            key={tab}
             type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            onClick={() => onTabChange(tab)}
-            className={`min-h-[44px] flex-1 px-2 py-3 text-sm font-semibold transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-primary text-primary-deep'
-                : 'text-ink-mute hover:text-ink'
-            }`}
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors"
           >
-            {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : 'Ítem'}
+            ✕
           </button>
-        ))}
-      </div>
+        </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {activeTab === 'xp' && (
-          <XpTab characterId={characterId} onClose={onClose} />
-        )}
-        {activeTab === 'gold' && (
-          <GoldTab characterId={characterId} onClose={onClose} />
-        )}
-        {activeTab === 'item' && (
-          <ItemTab characterId={characterId} worldId={worldId} onClose={onClose} />
-        )}
+        {/* Tabs ABOVE form — thumb reach at 375px */}
+        <div className="flex border-b border-line" role="tablist">
+          {(['xp', 'gold', 'item'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => onTabChange(tab)}
+              className={`min-h-[44px] flex-1 px-2 py-3 text-sm font-semibold transition-colors ${
+                activeTab === tab
+                  ? 'border-b-2 border-primary text-primary-deep'
+                  : 'text-ink-mute hover:text-ink'
+              }`}
+            >
+              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : 'Ítem'}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {activeTab === 'xp' && (
+            <XpTab characterId={characterId} onClose={onClose} />
+          )}
+          {activeTab === 'gold' && (
+            <GoldTab characterId={characterId} onClose={onClose} />
+          )}
+          {activeTab === 'item' && (
+            <ItemTab characterId={characterId} worldId={worldId} onClose={onClose} />
+          )}
+        </div>
       </div>
     </div>
   );

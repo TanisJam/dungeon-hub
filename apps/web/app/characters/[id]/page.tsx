@@ -161,6 +161,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
 
         <DmGrantPanel
           characterId={id}
+          characterName={identity.name}
           callerRole={callerRole}
           worldId={character.worldId}
         />

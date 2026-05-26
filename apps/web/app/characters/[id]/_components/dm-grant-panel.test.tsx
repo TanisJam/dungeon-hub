@@ -23,6 +23,7 @@ import { DmGrantPanel } from './dm-grant-panel';
 
 const PROPS = {
   characterId: 'char-1',
+  characterName: 'Aragorn',
   worldId: 'world-1',
 };
 
@@ -64,6 +65,18 @@ describe('DmGrantPanel — REQ-CDG-DM-PANEL-INTERACTION', () => {
     // XP tab selected
     const xpTab = screen.getByRole('tab', { name: 'XP' });
     expect(xpTab.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('modal header shows the character name (which PC receives the grant)', async () => {
+    render(<DmGrantPanel {...PROPS} callerRole="gm" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
+    });
+    // The dialog is labelled by the heading, and the heading IS the character name.
+    const dialog = screen.getByRole('dialog');
+    const titleId = dialog.getAttribute('aria-labelledby');
+    expect(titleId).toBe('dm-grant-panel-title');
+    expect(document.getElementById(titleId!)?.textContent).toBe('Aragorn');
   });
 
   it('click "Oro" tab → switches to gold form', async () => {
