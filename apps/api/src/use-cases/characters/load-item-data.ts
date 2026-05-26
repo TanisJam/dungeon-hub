@@ -105,6 +105,31 @@ export function extractArmorStrengthMin(data: unknown): number | undefined {
 }
 
 /**
+ * Extrae `costCp` del JSONB 5etools al shape lite del dominio.
+ *
+ * 5etools encodea el costo en `data.value` como número en copper pieces (CP).
+ * Por ejemplo, longsword = 1500 (15 gp × 100 cp/gp). Cuando el campo está
+ * ausente o no es numérico → null (magic items, homebrew, etc.).
+ *
+ * Design decision sdd/inventory-d4-d6/design #890: read-time projection, NO
+ * columna `cost_cp` en el schema. El shop SDD agregará la columna cuando sea
+ * necesario persistir datos de costo personalizado.
+ *
+ * Gotcha R5 (proposal #888): `data.value` puede ser string en algunos items
+ * de homebrew — siempre parseamos con Number().
+ */
+export function extractCostCp(data: unknown): number | null {
+  if (data == null || typeof data !== 'object') return null;
+  const raw = (data as Record<string, unknown>)['value'];
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) return raw;
+  if (typeof raw === 'string' && raw.length > 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+/**
  * Extrae `containerCapacity` del JSONB 5etools al shape lite del dominio.
  *
  * El shape original tiene:
@@ -194,6 +219,10 @@ function projectItemRow(row: {
   if (stealth !== undefined) lite.stealth = stealth;
   const armorStrengthMin = extractArmorStrengthMin(row.data);
   if (armorStrengthMin !== undefined) lite.armorStrengthMin = armorStrengthMin;
+
+  // Cost projection (REQ-CIP-COST-PROJECTION, sdd/inventory-d4-d6 #889).
+  // Always set — null when absent/non-numeric. Consumer must handle null.
+  lite.costCp = extractCostCp(row.data);
 
   return lite;
 }

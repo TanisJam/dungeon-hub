@@ -759,7 +759,10 @@ describe('inventory — POST / DELETE', () => {
     });
     expect(sheetRes.statusCode).toBe(200);
     const sheet = sheetRes.json().sheet;
-    expect(sheet.encumbrance.weight).toBe(130);
+    // PHB p.143: 50 gp = 50 coins = 1 lb of coin weight (sdd/inventory-d4-d6).
+    // 2× plate armor = 130 lb + 1 lb coins = 131 lb total.
+    expect(sheet.encumbrance.weight).toBe(131);
+    expect(sheet.encumbrance.coinWeight).toBe(1);
     expect(sheet.encumbrance.max).toBe(120);
     expect(sheet.encumbrance.status).toBe('over');
     expect(sheet.attunement).toEqual({ used: 1, max: 3 });

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
@@ -19,6 +19,7 @@ import {
   consumeInventoryItem,
   rechargeInventoryItems,
   removeItemFromInventory,
+  transferItemBetweenCharacters,
   updateInventoryItem,
   type InventoryItem,
 } from '@dungeon-hub/domain/character/inventory';
@@ -52,7 +53,7 @@ import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { characters, compendiumSpells, worldMembers } from '../../infra/db/schema.js';
+import { characters, compendiumSpells, sessionEvents, sessionParticipants, sessions, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
   getCharacterAccess,
@@ -70,7 +71,7 @@ import {
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
 import { buildFeatContext } from '../../use-cases/characters/build-feat-context.js';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
-import { recordSessionEventForCharacter } from '../../use-cases/sessions/events.js';
+import { recordSessionEventForCharacter, routeTransferEvent } from '../../use-cases/sessions/events.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
 import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
 import { loadFeatureProgression } from '../../use-cases/characters/load-feature-progression.js';
@@ -154,6 +155,19 @@ const GrantGoldBody = z
 const GrantItemBody = z.object({
   item: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
   quantity: z.number().int().min(1).max(999).optional(),
+});
+
+// ---- Transfer + recent-grants schemas (sdd/inventory-d4-d6 #889) ------------
+
+const TransferItemBody = z.object({
+  toCharacterId: z.string().uuid(),
+  instanceId: z.string().uuid(),
+  /** Quantity to transfer. When omitted, moves the full stack. */
+  quantity: z.number().int().min(1).max(999).optional(),
+});
+
+const RecentGrantsQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 // SP-05: consume a spell slot.
@@ -995,6 +1009,162 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         addedInstanceId: result.addedInstanceId,
         warnings: result.warnings,
       });
+    },
+  );
+
+  // ---- GET /characters/:id/recent-grants ------------------------------------
+  // Read-only: últimos N eventos de tipo item_grant / gold_grant / xp_award
+  // para el personaje. Requiere ser owner O worldGm del mundo del personaje.
+  // REQ-CRG-ENDPOINT + REQ-CRG-FILTERING (sdd/inventory-d4-d6 spec #889).
+  app.get(
+    '/characters/:id/recent-grants',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const { limit } = RecentGrantsQuery.parse(request.query);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Auth: owner OR worldGm (NOT assertWritableForEdit — read-only).
+      const isOwner = character.userId === userId;
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!isOwner && !gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'NOT_OWNER_OR_GM', characterId: id, userId }],
+        });
+      }
+
+      // Query: session_events JOINed via session_participants WHERE character is a participant.
+      // Filter to the three grant event types; order DESC by occurredAt.
+      const GRANT_TYPES = ['item_grant', 'gold_grant', 'xp_award'] as const;
+
+      const rows = await db
+        .select({
+          id: sessionEvents.id,
+          sessionId: sessionEvents.sessionId,
+          occurredAt: sessionEvents.occurredAt,
+          actorUserId: sessionEvents.actorUserId,
+          eventType: sessionEvents.eventType,
+          payload: sessionEvents.payload,
+        })
+        .from(sessionEvents)
+        .innerJoin(sessions, eq(sessions.id, sessionEvents.sessionId))
+        .innerJoin(sessionParticipants, eq(sessionParticipants.sessionId, sessions.id))
+        .where(
+          and(
+            eq(sessionParticipants.characterId, id),
+            isNull(sessionParticipants.leftAt),
+            inArray(sessionEvents.eventType, [...GRANT_TYPES]),
+          ),
+        )
+        .orderBy(desc(sessionEvents.occurredAt))
+        .limit(limit);
+
+      // App-code safety filter: only events whose payload.characterId matches.
+      const events = rows.filter((e) => {
+        const p = e.payload as Record<string, unknown> | null;
+        return p?.['characterId'] === id;
+      });
+
+      return { events };
+    },
+  );
+
+  // ---- POST /characters/:id/transfer-item -----------------------------------
+  // DM-only: mueve un ítem del inventario de fromChar al inventario de toChar.
+  // Ambos chars deben estar en el mismo mundo. Transacción atómica.
+  // REQ-CIT-ENDPOINT + REQ-CIT-ATOMIC-TRANSACTION (sdd/inventory-d4-d6 spec #889).
+  app.post(
+    '/characters/:id/transfer-item',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const body = TransferItemBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      // Load fromChar
+      const fromChar = await loadCharacter(id);
+      if (!fromChar) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Auth: DM only (REQ-CIT-ENDPOINT).
+      const gmCheck = await assertWorldGm(fromChar.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'WORLD_GM_REQUIRED', worldId: fromChar.worldId, userId }],
+        });
+      }
+
+      // Load toChar
+      const toChar = await loadCharacter(body.toCharacterId);
+      if (!toChar) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // REQ-CIT-SAME-WORLD: must be in same world.
+      if (toChar.worldId !== fromChar.worldId) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{
+            code: 'CHARACTER_NOT_IN_WORLD',
+            fromWorldId: fromChar.worldId,
+            toWorldId: toChar.worldId,
+            expectedWorldId: fromChar.worldId,
+          }],
+        });
+      }
+
+      const fromInventory = (fromChar.inventory as InventoryItem[] | null) ?? [];
+      const toInventory = (toChar.inventory as InventoryItem[] | null) ?? [];
+
+      // Pure domain validation (REQ-CIT-INSTANCE-OWNED + REQ-CIT-QUANTITY-VALID).
+      const transferResult = transferItemBetweenCharacters({
+        fromInventory,
+        toInventory,
+        instanceId: body.instanceId,
+        ...(body.quantity !== undefined && { quantity: body.quantity }),
+      });
+
+      if (!transferResult.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: transferResult.issues });
+      }
+
+      // Atomic DB transaction (REQ-CIT-ATOMIC-TRANSACTION).
+      await db.transaction(async (tx) => {
+        await tx
+          .update(characters)
+          .set({ inventory: transferResult.fromInventoryNext, updatedAt: new Date() })
+          .where(eq(characters.id, id));
+
+        await tx
+          .update(characters)
+          .set({ inventory: transferResult.toInventoryNext, updatedAt: new Date() })
+          .where(eq(characters.id, body.toCharacterId));
+      });
+
+      // Emit single inventory_transfer event (REQ-CIT-SINGLE-EVENT).
+      // Outside transaction — non-critical (best-effort).
+      await routeTransferEvent({
+        fromCharacterId: id,
+        toCharacterId: body.toCharacterId,
+        actorUserId: userId,
+        payload: {
+          fromCharacterId: id,
+          toCharacterId: body.toCharacterId,
+          instanceId: transferResult.transferred.instanceId,
+          ...(transferResult.transferred.newInstanceId && {
+            newInstanceId: transferResult.transferred.newInstanceId,
+          }),
+          quantity: transferResult.transferred.quantity,
+          itemSlug: transferResult.transferred.itemSlug,
+          itemSource: transferResult.transferred.itemSource,
+        },
+      });
+
+      return {
+        transferred: transferResult.transferred,
+      };
     },
   );
 

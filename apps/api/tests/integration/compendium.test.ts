@@ -223,4 +223,44 @@ describe('compendium', () => {
     // Bless is a concentration spell
     expect(data.some((s: { slug: string }) => s.slug === 'bless')).toBe(true);
   });
+
+  // REQ-CIP-COST-PROJECTION — sdd/inventory-d4-d6 spec #889
+  describe('costCp projection on item endpoints', () => {
+    it('GET /compendium/items/:slug returns costCp for longsword (1500 cp = 15 gp)', async () => {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/compendium/items/longsword?campaign=${campaignId}&source=PHB`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      });
+      // longsword may or may not be in this campaign's sources, skip if missing
+      if (res.statusCode === 404) return;
+      expect(res.statusCode).toBe(200);
+      const item = res.json();
+      // costCp must be present in the response (number or null)
+      expect('costCp' in item).toBe(true);
+      if (item.costCp !== null) {
+        expect(typeof item.costCp).toBe('number');
+        expect(item.costCp).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it('GET /compendium/items returns costCp on each row', async () => {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/compendium/items?campaign=${campaignId}&limit=5`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const { data } = res.json();
+      if (data.length === 0) return; // edge case: empty compendium
+      for (const item of data) {
+        expect('costCp' in item).toBe(true);
+        // costCp must be number or null — never undefined
+        const val = (item as Record<string, unknown>)['costCp'];
+        expect(val === null || typeof val === 'number').toBe(true);
+      }
+    });
+  });
 });

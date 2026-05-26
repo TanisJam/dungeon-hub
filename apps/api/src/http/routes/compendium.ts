@@ -19,6 +19,7 @@ import {
 } from '../../infra/db/schema.js';
 import { loadCampaign, loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { profileFilterConditions } from '../../use-cases/compendium/profile-filter.js';
+import { extractCostCp } from '../../use-cases/characters/load-item-data.js';
 
 const PaginationQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -470,6 +471,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           name: compendiumItems.name,
           type: compendiumItems.type,
           weight: compendiumItems.weight,
+          data: compendiumItems.data,
         })
         .from(compendiumItems)
         .where(conds)
@@ -482,7 +484,12 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
         .offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(compendiumItems).where(conds),
     ]);
-    return { data: rows, total: totalRow[0]?.count ?? 0, limit, offset };
+    // REQ-CIP-COST-PROJECTION: project costCp from data.value, omit raw data from response.
+    const data = rows.map(({ data: rowData, ...rest }) => ({
+      ...rest,
+      costCp: extractCostCp(rowData),
+    }));
+    return { data, total: totalRow[0]?.count ?? 0, limit, offset };
   });
 
   app.get('/compendium/items/:slug', { preHandler: app.authenticate }, async (request, reply) => {
@@ -504,7 +511,9 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
-    return rows[0];
+    // REQ-CIP-COST-PROJECTION: project costCp from data.value.
+    const row = rows[0]!;
+    return { ...row, costCp: extractCostCp(row.data) };
   });
 
   // ---- FEATS ---------------------------------------------------------------

@@ -235,6 +235,54 @@ export async function recordSessionEventForWorld(args: {
 }
 
 /**
+ * Routes an `inventory_transfer` event to the best available session.
+ *
+ * Decision sdd/inventory-d4-d6/design #890:
+ *   1. Try shared active session (intersection of fromChar's + toChar's active sessions).
+ *   2. Else use fromChar's active session (if any).
+ *   3. Else no-op (no event row — state still persisted by caller).
+ *
+ * Best-effort: like `recordSessionEventForCharacter`, errors are silenced.
+ */
+export async function routeTransferEvent(args: {
+  fromCharacterId: string;
+  toCharacterId: string;
+  payload: Record<string, unknown>;
+  actorUserId: string;
+}): Promise<void> {
+  try {
+    const { findCharacterActiveSession } = await import('./load-session.js');
+
+    const [fromSession, toSession] = await Promise.all([
+      findCharacterActiveSession(args.fromCharacterId),
+      findCharacterActiveSession(args.toCharacterId),
+    ]);
+
+    // Prefer shared active session (only if both are in the SAME session).
+    let targetSessionId: string | null = null;
+    if (fromSession?.status === 'active' && toSession?.status === 'active' &&
+        fromSession.sessionId === toSession.sessionId) {
+      targetSessionId = fromSession.sessionId;
+    } else if (fromSession?.status === 'active') {
+      targetSessionId = fromSession.sessionId;
+    }
+
+    if (!targetSessionId) return; // no active session — no-op
+
+    await recordSessionEvent({
+      sessionId: targetSessionId,
+      actorUserId: args.actorUserId,
+      eventType: 'inventory_transfer',
+      payload: args.payload,
+      visibility: 'public',
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[session-events] transfer event routing failed:', err);
+  }
+}
+
+/**
  * Cuenta events de una sesión. Útil para frontend / debugging.
  */
 export async function countSessionEvents(sessionId: string): Promise<number> {
