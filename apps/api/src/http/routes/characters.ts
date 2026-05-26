@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { validateStats } from '@dungeon-hub/domain/character/stats';
 import { validateRaceSelection } from '@dungeon-hub/domain/character/race';
 import { validateClassSelection } from '@dungeon-hub/domain/character/class';
@@ -1056,7 +1056,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .where(
           and(
             eq(sessionParticipants.characterId, id),
-            isNull(sessionParticipants.leftAt),
+            // NOTE: intentionally NO leftAt filter — grants from past sessions
+            // (where the char later left) must still appear in history (REQ-CRG-FILTERING).
             inArray(sessionEvents.eventType, [...GRANT_TYPES]),
           ),
         )

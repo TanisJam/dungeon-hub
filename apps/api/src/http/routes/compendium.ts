@@ -511,9 +511,9 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
       .limit(1);
 
     if (rows.length === 0) return reply.code(404).send({ error: 'NOT_FOUND' });
-    // REQ-CIP-COST-PROJECTION: project costCp from data.value.
-    const row = rows[0]!;
-    return { ...row, costCp: extractCostCp(row.data) };
+    // REQ-CIP-COST-PROJECTION: project costCp from data.value; strip raw data JSONB.
+    const { data: rawData, ...rest } = rows[0]!;
+    return { ...rest, costCp: extractCostCp(rawData) };
   });
 
   // ---- FEATS ---------------------------------------------------------------
