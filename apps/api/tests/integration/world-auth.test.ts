@@ -8,50 +8,19 @@
  *
  * REQs covered: REQ-WF-API-CAMPAIGN-AUTH, REQ-WF-API-SESSION-AUTH, REQ-WF-API-CHARACTER-XP-AUTH
  */
-import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
-import { DEFAULT_RULES_PROFILE } from '@dungeon-hub/domain/rules-profile';
+import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
 
 // ---------------------------------------------------------------------------
-// Local helpers — createWorldWithGm will be a proper helper in C7. For now,
-// we inline the DB inserts directly here.
+// Local helper — adds an additional world member (not in createWorldWithGm).
 // ---------------------------------------------------------------------------
-
-async function createWorldWithGm(
-  userId: string,
-  opts?: { name?: string },
-): Promise<{ worldId: string }> {
-  const { db } = await import('../../src/infra/db/client.js');
-  const { worlds, worldMembers } = await import('../../src/infra/db/schema.js');
-  const name = opts?.name ?? `Test World ${randomUUID().slice(0, 8)}`;
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + randomUUID().slice(0, 8);
-  const [world] = await db
-    .insert(worlds)
-    .values({
-      name,
-      slug,
-      ownerUserId: userId,
-      rulesProfile: DEFAULT_RULES_PROFILE,
-    })
-    .returning({ id: worlds.id });
-  if (!world) throw new Error('Failed to create world');
-  await db.insert(worldMembers).values({ worldId: world.id, userId, role: 'gm' });
-  return { worldId: world.id };
-}
 
 async function addWorldMember(worldId: string, userId: string, role: 'gm' | 'player') {
   const { db } = await import('../../src/infra/db/client.js');
   const { worldMembers } = await import('../../src/infra/db/schema.js');
   await db.insert(worldMembers).values({ worldId, userId, role });
-}
-
-async function deleteWorldsForUser(userId: string) {
-  const { db } = await import('../../src/infra/db/client.js');
-  const { worlds } = await import('../../src/infra/db/schema.js');
-  const { eq } = await import('drizzle-orm');
-  await db.delete(worlds).where(eq(worlds.ownerUserId, userId));
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +99,7 @@ describe('world-auth — world-level GM gates', () => {
   });
 
   afterAll(async () => {
-    await deleteWorldsForUser(dmA.id);
+    // deleteTestUser now handles world cleanup (worlds.owner_user_id ON DELETE RESTRICT).
     if (dmA) await deleteTestUser(dmA.id);
     if (gmB) await deleteTestUser(gmB.id);
     if (player) await deleteTestUser(player.id);

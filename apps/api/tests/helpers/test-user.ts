@@ -61,13 +61,23 @@ export async function createTestUser(): Promise<TestUser> {
  * Borra el user de auth.users via admin API. Los campaign_members y characters
  * se borran en cascada por FK. Las campaigns que ese user es GM se borran
  * explícitamente abajo (FK gm_user_id NO tiene cascade).
+ *
+ * Worlds where this user is owner_user_id must also be deleted before the auth
+ * user is removed because worlds.owner_user_id has ON DELETE RESTRICT.
+ * Deleting a world cascades automatically to: worldMembers, campaigns (world_id FK
+ * ON DELETE CASCADE), sessions, characters, factions, hexes, etc.
  */
 export async function deleteTestUser(userId: string): Promise<void> {
-  // Borrar campaigns donde es GM (FK no cascadea)
-  // Lo hacemos via SQL directo porque no tenemos endpoint para esto.
   const { db } = await import('../../src/infra/db/client.js');
-  const { campaigns } = await import('../../src/infra/db/schema.js');
+  const { campaigns, worlds } = await import('../../src/infra/db/schema.js');
   const { eq } = await import('drizzle-orm');
+
+  // Borrar worlds donde es owner (FK ON DELETE RESTRICT — debe ir antes de borrar auth user).
+  // Cascade: worldMembers, campaigns (via world_id FK), sessions, characters, etc.
+  await db.delete(worlds).where(eq(worlds.ownerUserId, userId));
+
+  // Borrar campaigns donde es GM pero cuyo world pertenece a otro user
+  // (gm_user_id FK no tiene cascade; puede no existir si el world ya fue borrado).
   await db.delete(campaigns).where(eq(campaigns.gmUserId, userId));
 
   // Borrar user de auth (cascadea a public.users)

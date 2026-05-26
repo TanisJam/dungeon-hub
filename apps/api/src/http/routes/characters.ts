@@ -367,7 +367,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // Verify user is a member of the world (via worldMembers OR via a campaign in the world).
     // Direct world membership (worldMembers) is the primary path.
     // Campaign membership is also accepted for backward compat with existing flows where
-    // players join campaigns but world-level invite UI doesn't exist yet (C6).
+    // players join campaigns but world-level invite UI doesn't exist yet.
+    // TODO: remove OR shim after all tests create worldMembers directly (post-migration 0016 backfill).
     const worldMember = await db
       .select({ role: worldMembers.role })
       .from(worldMembers)
