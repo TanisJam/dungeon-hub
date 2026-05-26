@@ -35,11 +35,8 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
     worldId = lvlCampaign.worldId;
 
     // Hacemos al player miembro de la campaña.
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({
-      campaignId, userId: player.id, role: 'player',
-    });
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
   });
 
   afterAll(async () => {

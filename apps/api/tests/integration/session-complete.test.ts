@@ -37,12 +37,9 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
     campaignId = completeCampaign.id;
     worldId = completeCampaign.worldId;
 
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values([
-      { campaignId, userId: alice.id, role: 'player' },
-      { campaignId, userId: bob.id, role: 'player' },
-    ]);
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    await addCampaignAndWorldMember(campaignId, bob.id, 'player');
 
     aliceCharId = await makeChar(alice, 'Alice');
     bobCharId = await makeChar(bob, 'Bob');

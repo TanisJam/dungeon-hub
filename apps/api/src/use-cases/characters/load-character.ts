@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characters, campaignMembers, campaigns, worldMembers } from '../../infra/db/schema.js';
+import { characters, worldMembers } from '../../infra/db/schema.js';
 
 export interface LoadedCharacter {
   id: string;
@@ -49,30 +49,4 @@ export async function getCharacterAccess(
     .limit(1);
 
   return member.length > 0 ? 'world-member' : 'none';
-}
-
-/**
- * Verifica que el user sea miembro de la campaña (precondición para crear personaje ahí).
- * Devuelve la campaign si es miembro, null si no.
- *
- * NOTE: This function checks campaign-level membership (campaign_members table).
- * Character creation is a C5 concern (switching from campaignId → worldId).
- * Kept as-is for C5 migration.
- */
-export async function assertCampaignMembership(
-  campaignId: string,
-  userId: string,
-): Promise<{ id: string; name: string; gmUserId: string } | null> {
-  const rows = await db
-    .select({
-      id: campaigns.id,
-      name: campaigns.name,
-      gmUserId: campaigns.gmUserId,
-    })
-    .from(campaigns)
-    .innerJoin(campaignMembers, eq(campaignMembers.campaignId, campaigns.id))
-    .where(and(eq(campaigns.id, campaignId), eq(campaignMembers.userId, userId)))
-    .limit(1);
-
-  return rows[0] ?? null;
 }

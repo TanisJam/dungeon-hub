@@ -31,9 +31,8 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
         .then((r) => r.json())
     ).id;
 
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({ campaignId, userId: alice.id, role: 'player' });
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
 
     hexId = (
       await app

@@ -48,7 +48,7 @@ import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { campaigns, campaignMembers, characters, compendiumSpells, worldMembers } from '../../infra/db/schema.js';
+import { characters, compendiumSpells, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
   getCharacterAccess,
@@ -364,25 +364,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: 'NOT_FOUND' });
     }
 
-    // Verify user is a member of the world (via worldMembers OR via a campaign in the world).
-    // Direct world membership (worldMembers) is the primary path.
-    // Campaign membership is also accepted for backward compat with existing flows where
-    // players join campaigns but world-level invite UI doesn't exist yet.
-    // TODO: remove OR shim after all tests create worldMembers directly (post-migration 0016 backfill).
+    // Verify user is a world member (worldMembers is the single source of truth).
     const worldMember = await db
       .select({ role: worldMembers.role })
       .from(worldMembers)
       .where(and(eq(worldMembers.worldId, body.worldId), eq(worldMembers.userId, userId)))
       .limit(1);
-    const campaignMember = worldMember.length === 0
-      ? await db
-          .select({ campaignId: campaignMembers.campaignId })
-          .from(campaignMembers)
-          .innerJoin(campaigns, eq(campaigns.id, campaignMembers.campaignId))
-          .where(and(eq(campaigns.worldId, body.worldId), eq(campaignMembers.userId, userId)))
-          .limit(1)
-      : [];
-    if (worldMember.length === 0 && campaignMember.length === 0) {
+    if (worldMember.length === 0) {
       return reply.code(403).send({ error: 'NOT_WORLD_MEMBER', worldId: body.worldId });
     }
 

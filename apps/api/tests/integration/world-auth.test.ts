@@ -12,16 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
-
-// ---------------------------------------------------------------------------
-// Local helper — adds an additional world member (not in createWorldWithGm).
-// ---------------------------------------------------------------------------
-
-async function addWorldMember(worldId: string, userId: string, role: 'gm' | 'player') {
-  const { db } = await import('../../src/infra/db/client.js');
-  const { worldMembers } = await import('../../src/infra/db/schema.js');
-  await db.insert(worldMembers).values({ worldId, userId, role });
-}
+import {
+  addCampaignAndWorldMember,
+  addWorldMember,
+} from '../helpers/add-world-member.js';
 
 // ---------------------------------------------------------------------------
 // Test setup
@@ -61,7 +55,7 @@ describe('world-auth — world-level GM gates', () => {
 
     // 3. Create campaign under the world (using direct DB insert since POST /campaigns auto-creates world)
     const { db } = await import('../../src/infra/db/client.js');
-    const { campaigns, campaignMembers } = await import('../../src/infra/db/schema.js');
+    const { campaigns } = await import('../../src/infra/db/schema.js');
     const [campaign] = await db
       .insert(campaigns)
       .values({ name: 'Auth Test Campaign', gmUserId: dmA.id, worldId })
@@ -70,11 +64,11 @@ describe('world-auth — world-level GM gates', () => {
     campaignId = campaign.id;
 
     // Add dmA + gmB + player as campaign members
-    await db.insert(campaignMembers).values([
-      { campaignId, userId: dmA.id, role: 'gm' },
-      { campaignId, userId: gmB.id, role: 'gm' },
-      { campaignId, userId: player.id, role: 'player' },
-    ]);
+    // (worldMembers already inserted above for gmB + player; dmA is owner via createWorldWithGm.
+    //  addCampaignAndWorldMember is idempotent on the worldMembers side.)
+    await addCampaignAndWorldMember(campaignId, dmA.id, 'gm');
+    await addCampaignAndWorldMember(campaignId, gmB.id, 'gm');
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
 
     // 4. Create a session (owned by dmA)
     const sessionRes = await app.inject({

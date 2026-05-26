@@ -32,14 +32,9 @@ describe('POST /characters/:id/xp', () => {
     campaignId = campaign.id;
     worldId = campaign.worldId; // C5: POST /campaigns now returns worldId
 
-    // El player se une a la campaña. Endpoint join: si no existe, lo agregamos via SQL.
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({
-      campaignId,
-      userId: player.id,
-      role: 'player',
-    });
+    // El player se une a la campaña.
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
 
     // El player crea su personaje.
     const character = await app

@@ -33,9 +33,8 @@ describe('POST /characters/:id/rest', () => {
     worldId = restCampaign.worldId; // C5: POST /campaigns now returns worldId
 
     // Player se une a la campaña ANTES de crear personaje (requisito de POST /characters).
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({ campaignId, userId: player.id, role: 'player' });
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
 
     // Fighter L3, CON 13 (mod +1). HP base: 10 + 1 + 2×(6+1) = 25.
     const c = await app
@@ -379,9 +378,8 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
     const campaignId = restCampaign02.id;
     const restWorldId = restCampaign02.worldId; // C5
 
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({ campaignId, userId: player.id, role: 'player' });
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
 
     // Fighter L1, CON 10 (mod 0). Simple character for rest tests.
     const c = await app

@@ -43,12 +43,9 @@ describe('sessions — Slice 1', () => {
     worldId = sessionsCampaign.worldId;
 
     // Alice y Bob se unen como players.
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values([
-      { campaignId, userId: alice.id, role: 'player' },
-      { campaignId, userId: bob.id, role: 'player' },
-    ]);
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    await addCampaignAndWorldMember(campaignId, bob.id, 'player');
 
     aliceCharId = (
       await app
@@ -481,9 +478,8 @@ describe('sessions — Slice 1', () => {
 
       // Necesitamos un segundo char ajeno para llenar. Creamos uno nuevo.
       const charlie = await createTestUser();
-      const { db } = await import('../../src/infra/db/client.js');
-      const { campaignMembers } = await import('../../src/infra/db/schema.js');
-      await db.insert(campaignMembers).values({ campaignId, userId: charlie.id, role: 'player' });
+      const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+      await addCampaignAndWorldMember(campaignId, charlie.id, 'player');
       const charlieCharId = (
         await app
           .inject({

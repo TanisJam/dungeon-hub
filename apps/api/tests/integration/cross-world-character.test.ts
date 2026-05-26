@@ -91,9 +91,8 @@ describe('cross-world character rejection — REQ-WF-API-CROSS-WORLD-SESSION', (
 
     // 3. Create campaign K1 directly in W1
     const { db } = await import('../../src/infra/db/client.js');
-    const { campaigns, campaignMembers, characters } = await import(
-      '../../src/infra/db/schema.js'
-    );
+    const { campaigns, characters } = await import('../../src/infra/db/schema.js');
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
 
     const [campaign] = await db
       .insert(campaigns)
@@ -103,10 +102,8 @@ describe('cross-world character rejection — REQ-WF-API-CROSS-WORLD-SESSION', (
     k1Id = campaign.id;
 
     // Add dm as campaign GM and alice as player in K1
-    await db.insert(campaignMembers).values([
-      { campaignId: k1Id, userId: dm.id, role: 'gm' },
-      { campaignId: k1Id, userId: alice.id, role: 'player' },
-    ]);
+    await addCampaignAndWorldMember(k1Id, dm.id, 'gm');
+    await addCampaignAndWorldMember(k1Id, alice.id, 'player');
 
     // 4. Create session S1 under K1 (owned by dm)
     const sessionRes = await app.inject({

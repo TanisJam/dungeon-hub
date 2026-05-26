@@ -31,9 +31,8 @@ describe('sessions — Slice 3 (auto-logging)', () => {
     campaignId = autoLogCampaign.id;
     worldId = autoLogCampaign.worldId;
 
-    const { db } = await import('../../src/infra/db/client.js');
-    const { campaignMembers } = await import('../../src/infra/db/schema.js');
-    await db.insert(campaignMembers).values({ campaignId, userId: alice.id, role: 'player' });
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
   });
 
   afterAll(async () => {
