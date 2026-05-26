@@ -18,4 +18,8 @@ export {
   hitDiceTotalsByDie,
   hitDiceTotalCount,
   hitDiceRecoveredOnLongRest,
+  chooseHitDiceRecovery,
+  type HitDieFace,
+  type ChooseHitDiceRecoveryIssue,
+  type ChooseHitDiceRecoveryResult,
 } from './hit-dice.js';

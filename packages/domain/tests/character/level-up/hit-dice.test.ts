@@ -3,6 +3,7 @@ import {
   hitDiceTotalsByDie,
   hitDiceTotalCount,
   hitDiceRecoveredOnLongRest,
+  chooseHitDiceRecovery,
 } from '../../../src/character/level-up/hit-dice.js';
 import type { AppliedClass } from '../../../src/character/class/types.js';
 
@@ -43,5 +44,53 @@ describe('hitDiceRecoveredOnLongRest', () => {
     [20, 10],
   ])('level %i recupera %i hit dice', (level, recovered) => {
     expect(hitDiceRecoveredOnLongRest(level)).toBe(recovered);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chooseHitDiceRecovery — REQ-RC-CHOICE-RESPECTED + REQ-RC-CHOICE-INVALID
+// (sdd/rest-closeout/spec engram #824). PHB p.186.
+// ---------------------------------------------------------------------------
+describe('chooseHitDiceRecovery — happy path', () => {
+  it('C1: valid single-face choice → ok with distribution', () => {
+    const r = chooseHitDiceRecovery({ d6: 2 }, 2, { d6: 1 });
+    expect(r).toEqual({ ok: true, distribution: { d6: 1 } });
+  });
+
+  it('C2: empty choice → ok with empty distribution (caller falls back to greedy)', () => {
+    const r = chooseHitDiceRecovery({ d6: 2 }, 2, {});
+    expect(r).toEqual({ ok: true, distribution: {} });
+  });
+
+  it('C3-TRIANGULATE: multiclass partial-face choice', () => {
+    // spent d6:1, d10:2; allowance 2; player picks d10 twice
+    const r = chooseHitDiceRecovery({ d6: 1, d10: 2 }, 2, { d10: 2 });
+    expect(r).toEqual({ ok: true, distribution: { d10: 2 } });
+  });
+});
+
+describe('chooseHitDiceRecovery — invalid choice', () => {
+  it('C4: over-spent → HIT_DICE_CHOICE_OVER_SPENT', () => {
+    const r = chooseHitDiceRecovery({ d6: 1 }, 5, { d6: 2 });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues).toContainEqual({
+      code: 'HIT_DICE_CHOICE_OVER_SPENT',
+      face: 'd6',
+      requested: 2,
+      available: 1,
+    });
+  });
+
+  it('C5: over-allowance → HIT_DICE_CHOICE_OVER_ALLOWANCE', () => {
+    // spent d6:2, d10:2; allowance 1; player asks for 2 total
+    const r = chooseHitDiceRecovery({ d6: 2, d10: 2 }, 1, { d6: 1, d10: 1 });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.issues).toContainEqual({
+      code: 'HIT_DICE_CHOICE_OVER_ALLOWANCE',
+      requested: 2,
+      allowance: 1,
+    });
   });
 });
