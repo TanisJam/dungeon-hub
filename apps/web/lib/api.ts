@@ -48,3 +48,18 @@ export const api = {
   delete: <T>(path: string, accessToken?: string) =>
     request<T>(path, { method: 'DELETE', accessToken }),
 };
+
+// ---------------------------------------------------------------------------
+// Server-side helpers (call these from Server Components / Server Actions)
+// ---------------------------------------------------------------------------
+
+export type WorldRow = { id: string; name: string; slug: string };
+
+/**
+ * Returns the worlds where the authenticated user has a worldMembers row.
+ * Calls GET /worlds?mine=1. Must be called server-side with a valid access token.
+ */
+export async function getMyWorlds(accessToken: string): Promise<WorldRow[]> {
+  const res = await request<{ worlds: WorldRow[] }>('/worlds?mine=1', { accessToken });
+  return res.worlds;
+}

@@ -4,34 +4,42 @@ import { useActionState } from 'react';
 import { createCharacter, type CreateState } from './actions';
 import { Button } from '@/components/ui';
 
-type Campaign = { id: string; name: string };
+type World = { id: string; name: string; slug: string };
 const INITIAL: CreateState = { error: null };
 
-export function NewCharacterForm({ campaigns }: { campaigns: Campaign[] }) {
+export function NewCharacterForm({ worlds }: { worlds: World[] }) {
   const [state, action, pending] = useActionState(createCharacter, INITIAL);
+
+  // If exactly 1 world, pre-select it so the user doesn't have to interact.
+  const defaultWorldId = worlds.length === 1 ? worlds[0]!.id : '';
 
   return (
     <form action={action} className="space-y-5">
       <div>
-        <label htmlFor="campaignId" className="block text-sm font-semibold text-ink-soft">
-          Campaña
+        <label htmlFor="worldId" className="block text-sm font-semibold text-ink-soft">
+          Mundo
         </label>
         <select
-          id="campaignId"
-          name="campaignId"
+          id="worldId"
+          name="worldId"
           required
-          defaultValue=""
+          defaultValue={defaultWorldId}
           className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none transition-colors"
         >
-          <option value="" disabled>
-            Elegí una campaña…
-          </option>
-          {campaigns.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
+          {worlds.length > 1 && (
+            <option value="" disabled>
+              Elegí un mundo…
+            </option>
+          )}
+          {worlds.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
             </option>
           ))}
         </select>
+        {worlds.length === 1 && (
+          <p className="mt-1 text-xs text-ink-mute">Único mundo disponible — seleccionado automáticamente.</p>
+        )}
       </div>
 
       <div>

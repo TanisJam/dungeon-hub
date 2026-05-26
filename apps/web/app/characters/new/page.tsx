@@ -1,22 +1,17 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { api } from '@/lib/api';
+import { getMyWorlds } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
 import { Card } from '@/components/ui';
 import { NewCharacterForm } from './_form';
-
-type CampaignRow = { id: string; name: string };
 
 export default async function NewCharacterPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/');
   const { data: { session } } = await supabase.auth.getSession();
-  const { data: campaigns } = await api.get<{ data: CampaignRow[] }>(
-    '/campaigns',
-    session!.access_token,
-  );
+  const worlds = await getMyWorlds(session!.access_token);
 
   const exitLink = (
     <Link
@@ -35,18 +30,18 @@ export default async function NewCharacterPage() {
       constructorHref="/characters/new"
     >
       <p className="text-sm text-ink-mute">
-        Elegí una campaña y un nombre. Después configuramos atributos, linaje, clase y trasfondo.
+        Elegí un mundo y un nombre. Después configuramos atributos, linaje, clase y trasfondo.
       </p>
 
       <div className="mt-8">
-        {campaigns.length === 0 ? (
+        {worlds.length === 0 ? (
           <Card variant="surface" className="px-4 py-8 text-center">
             <p className="text-sm text-ink-mute">
-              Todavía no sos miembro de ninguna campaña. Pedile a un DM que te agregue.
+              No tenés worlds asignados. Pedile al DM que te invite.
             </p>
           </Card>
         ) : (
-          <NewCharacterForm campaigns={campaigns} />
+          <NewCharacterForm worlds={worlds} />
         )}
       </div>
     </AppShell>
