@@ -1235,3 +1235,48 @@ describe('validateRaceSelection — Batch 6 RACE_CANTRIP_REQUIRED / RACE_CANTRIP
     expect(hasCantrip).toBeFalsy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// REQ-DRD-VALIDATOR-CONTRACT (engram #806)
+// Validator must consume the injected worldRefData instead of hardcoded
+// `RACES_REQUIRING_SUBRACE` / `SUBRACES_REPLACING_PARENT_ABILITY`.
+// ---------------------------------------------------------------------------
+describe('validateRaceSelection — injected worldRefData (DI contract)', () => {
+  it('REQ-DRD-CONTRACT-1: empty subraceRequiredSet → PHB Dwarf without subrace is OK', () => {
+    // PHB Dwarf is in the HARDCODED RACES_REQUIRING_SUBRACE set. If the
+    // validator reads the injected pool, an empty set means Dwarf no longer
+    // requires a subrace and the validator should pass.
+    const res = validateRaceSelection({
+      raceData: PHB_DWARF,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      worldRefData: {
+        languagePool: { standard: [], exotic: [] },
+        subraceRequiredSet: new Set(),
+        subraceReplacingAbilitySet: new Set(),
+      },
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('REQ-DRD-CONTRACT-2: non-default subraceRequiredSet → custom race triggers RACE_SUBRACE_REQUIRED', () => {
+    // PHB Half-Elf is NOT in the hardcoded set. Injecting a custom set that
+    // INCLUDES it must trigger RACE_SUBRACE_REQUIRED.
+    const res = validateRaceSelection({
+      raceData: PHB_HALF_ELF,
+      subraceData: null,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      worldRefData: {
+        languagePool: { standard: [], exotic: [] },
+        subraceRequiredSet: new Set(['half-elf|PHB']),
+        subraceReplacingAbilitySet: new Set(),
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'RACE_SUBRACE_REQUIRED',
+      race: { slug: 'half-elf', source: 'PHB' },
+    });
+  });
+});

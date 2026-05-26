@@ -1,7 +1,7 @@
 import { ABILITY_KEYS, type AbilityKey } from '../stats/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
-import { RACES_REQUIRING_SUBRACE } from './subrace-required.js';
-import { subraceReplacesParentAbility } from './subraces-replacing-parent-ability.js';
+import { phbDefaultPools } from '../../world/phb-defaults.js';
+import type { WorldRefData } from '../../world/ref-data.js';
 import type {
   AbilityBlock,
   AppliedAsi,
@@ -192,6 +192,15 @@ interface ValidateRaceInput {
   raceData: RaceCompendiumData;
   subraceData?: SubraceCompendiumData | null;
   rulesProfile: RulesProfile;
+  /**
+   * Resolved reference-data pools for the world. When omitted, `phbDefaultPools()`
+   * is used — keeps PHB-only callers and existing tests working without
+   * threading the pool everywhere. New callers (api routes loading worlds
+   * from DB) SHOULD pass the resolved data so homebrew/disabledEntities apply.
+   *
+   * Closes engram #513 via SDD `domain-reference-data-runtime-source` (#807).
+   */
+  worldRefData?: WorldRefData;
   appliedAsis?: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>;
   /** Idiomas elegidos por el jugador (para satisfacer slots `any*` de raza + subrace). */
   languageChoices?: string[];
@@ -267,6 +276,7 @@ function validateLanguageChoices(input: {
 export function validateRaceSelection(input: ValidateRaceInput): RaceValidationResult {
   const issues: RaceValidationIssue[] = [];
   const { raceData, subraceData, rulesProfile } = input;
+  const worldRefData = input.worldRefData ?? phbDefaultPools();
 
   // ---- 1) Source + disabled gating ---------------------------------------
   if (rulesProfile.sources[raceData.source] !== true) {
@@ -307,7 +317,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   // Some races (Dwarf/Elf/Gnome/Halfling per PHB) cannot be selected without
   // a subrace — the subrace carries half the mechanical identity (ASI,
   // proficiencies, traits). Hard block; see decision #528.
-  if (!subraceData && RACES_REQUIRING_SUBRACE.has(entityKey(raceData.slug, raceData.source))) {
+  if (!subraceData && worldRefData.subraceRequiredSet.has(entityKey(raceData.slug, raceData.source))) {
     issues.push({
       code: 'RACE_SUBRACE_REQUIRED',
       race: { slug: raceData.slug, source: raceData.source },
@@ -333,7 +343,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   // we drop the parent's blocks so the validator only expects the subrace ASIs.
   const subraceReplacesParent =
     subraceData != null &&
-    subraceReplacesParentAbility({ slug: subraceData.slug, source: subraceData.source });
+    worldRefData.subraceReplacingAbilitySet.has(entityKey(subraceData.slug, subraceData.source));
   const raceBlocks = subraceReplacesParent
     ? []
     : (raceData.ability ?? []).map(processAbilityBlock);
