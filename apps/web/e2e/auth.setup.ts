@@ -54,13 +54,21 @@ setup('ensure test user + sign in + save state', async ({ page }) => {
   }
   const accessToken = signIn.session.access_token;
 
-  // 3. Asegurar que existe una "E2E Test Campaign" — necesaria para crear chars.
-  const campaignsRes = await fetch(`${API_URL}/api/v1/campaigns`, {
+  // 3. Asegurar que existe la fixture de worlds-foundation:
+  //    - 'E2E Test Campaign (World)' — world para el picker del wizard (creado
+  //      automáticamente cuando se crea 'E2E Test Campaign' via POST /campaigns).
+  //    - 'E2E Test Campaign' — campaign bajo ese world (para sesiones, etc.).
+  //
+  //    Chequeo de idempotencia: GET /worlds?mine=1. Si el world ya existe el
+  //    /campaigns ya fue creado; no se vuelve a crear.
+  const worldsRes = await fetch(`${API_URL}/api/v1/worlds?mine=1`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const campaignsJson = (await campaignsRes.json()) as { data: Array<{ name: string }> };
-  const hasE2eCampaign = campaignsJson.data?.some((c) => c.name === 'E2E Test Campaign');
-  if (!hasE2eCampaign) {
+  const worldsJson = (await worldsRes.json()) as { worlds: Array<{ name: string }> };
+  const hasE2eWorld = worldsJson.worlds?.some((w) => w.name === 'E2E Test Campaign (World)');
+  if (!hasE2eWorld) {
+    // POST /campaigns crea el world 'E2E Test Campaign (World)' + campaign
+    // 'E2E Test Campaign' atómicamente, y agrega al user como gm worldMember.
     const createRes = await fetch(`${API_URL}/api/v1/campaigns`, {
       method: 'POST',
       headers: {

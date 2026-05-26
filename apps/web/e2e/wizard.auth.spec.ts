@@ -19,8 +19,8 @@ test.describe('character builder wizard', () => {
       await expect(page).toHaveURL(/\/characters\/new$/);
     });
 
-    await test.step('submit name + campaign → land on stats step', async () => {
-      await page.selectOption('select[name="campaignId"]', { label: 'E2E Test Campaign' });
+    await test.step('submit name + world → land on stats step', async () => {
+      await page.selectOption('select[name="worldId"]', { label: 'E2E Test Campaign (World)' });
       await page.fill('input[name="name"]', charName);
       await page.getByRole('button', { name: /crear personaje/i }).click();
       await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });

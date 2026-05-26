@@ -26,7 +26,7 @@ async function createCharacterAndReachBackground(page: Page, charName: string) {
   await page.locator('a[href="/characters/new"]').first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
 
-  await page.selectOption('select[name="campaignId"]', { label: 'E2E Test Campaign' });
+  await page.selectOption('select[name="worldId"]', { label: 'E2E Test Campaign (World)' });
   await page.fill('input[name="name"]', charName);
   await page.getByRole('button', { name: /crear personaje/i }).click();
   await expect(page).toHaveURL(/\/wizard\/stats$/, { timeout: 10_000 });
