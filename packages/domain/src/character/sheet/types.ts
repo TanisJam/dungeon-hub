@@ -98,6 +98,13 @@ export interface CharacterSnapshot {
   exhaustion?: number;
   /** Picks de class features (TCE OCF, fighting styles, invocations, maneuvers) por classSlug. */
   classFeatures?: Record<string, Record<string, Array<{ slug: string; source: string }>>>;
+  /**
+   * Limited-use class resources consumed (R-07). Keyed by class-prefixed slug
+   * (`fighter:second-wind`, `monk:ki-points`). Max + recovery trigger derived
+   * from the registry — only the `used` counter persists.
+   * Origin: SDD `rules-audit-class-features` (#815).
+   */
+  classResourcesUsed?: Record<string, number>;
   /** Selección persistida de spells por clase. */
   spells?: Record<string, { cantrips: Array<{ slug: string; source: string }>; known: Array<{ slug: string; source: string }>; prepared: Array<{ slug: string; source: string }> }>;
   /** Idiomas elegidos por el jugador para slots `any*` del linaje (raza + subrace). */
@@ -361,4 +368,10 @@ export interface CharacterSheet {
   exhaustion: ExhaustionView;
   /** Picks de class features mostrados por classSlug + featureType. */
   classFeatures: Record<string, Record<string, Array<{ slug: string; source: string }>>>;
+  /**
+   * Per-class limited-use resources (R-07). Empty when no canonical resources
+   * apply at the character's classes/levels. See `ClassResource` type.
+   * Origin: SDD `rules-audit-class-features` (#815).
+   */
+  classResources: Record<string, import('../class-resources/types.js').ClassResource>;
 }

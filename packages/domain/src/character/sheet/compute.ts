@@ -33,6 +33,7 @@ import {
   SPELLCASTING_ABILITY,
 } from '../spellcasting/index.js';
 import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
+import { deriveClassResources } from '../class-resources/derive.js';
 
 /**
  * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
@@ -551,6 +552,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
       return { level, effects: exhaustionEffectsFor(level) };
     })(),
     classFeatures: character.classFeatures ?? {},
+    classResources: deriveClassResources(classes, character.classResourcesUsed ?? {}),
     spellSlots: ((): SpellSlotsView => {
       const r = computeSpellSlots(classes);
       // SP-05: thread persisted usage counts from CharacterSnapshot.

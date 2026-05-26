@@ -1381,3 +1381,66 @@ describe('SCEN-RT-08 + SCEN-RT-12: CharacterSheet.racialTraits pass-through + ba
     expect(sheet.racialTraits).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// REQ-RAC-SHAPE (engram #814) — classResources view on the sheet.
+// ---------------------------------------------------------------------------
+import type { AppliedClass } from '../../../src/character/class/types.js';
+
+const FIGHTER_L1_CLASS: AppliedClass = {
+  slug: 'fighter',
+  source: 'PHB',
+  level: 1,
+  subclass: null,
+  hitDie: 'd10',
+  savingThrows: ['str', 'con'],
+  armorProficiencies: [],
+  weaponProficiencies: [],
+  toolProficiencies: [],
+  skillChoices: [],
+};
+const MONK_L5_CLASS: AppliedClass = {
+  slug: 'monk',
+  source: 'PHB',
+  level: 5,
+  subclass: null,
+  hitDie: 'd8',
+  savingThrows: ['str', 'dex'],
+  armorProficiencies: [],
+  weaponProficiencies: [],
+  toolProficiencies: [],
+  skillChoices: [],
+};
+
+describe('computeCharacterSheet — classResources view (REQ-RAC-SHAPE)', () => {
+  it('L1 Fighter → sheet.classResources["fighter:second-wind"] has max 1 / used 0', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Test Fighter', classes: [FIGHTER_L1_CLASS] },
+    });
+    const sw = sheet.classResources['fighter:second-wind'];
+    expect(sw).toBeDefined();
+    expect(sw?.max).toBe(1);
+    expect(sw?.used).toBe(0);
+    expect(sw?.recoveryTrigger).toBe('short');
+  });
+
+  it('L5 Wizard → sheet.classResources is empty (no canonical resources)', () => {
+    const sheet = computeCharacterSheet({
+      character: { name: 'Test Wizard', classes: [] },
+    });
+    expect(sheet.classResources).toEqual({});
+  });
+
+  it('L5 Monk with persisted classResourcesUsed: { "monk:ki-points": 3 } → used 3', () => {
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Test Monk',
+        classes: [MONK_L5_CLASS],
+        classResourcesUsed: { 'monk:ki-points': 3 },
+      },
+    });
+    const ki = sheet.classResources['monk:ki-points'];
+    expect(ki?.max).toBe(5);
+    expect(ki?.used).toBe(3);
+  });
+});
