@@ -24,7 +24,8 @@
     "./entities": "./src/entities/index.ts",
     "./constraints": "./src/constraints/index.ts",
     "./calculations": "./src/calculations/index.ts",
-    "./use-cases": "./src/use-cases/index.ts"
+    "./use-cases": "./src/use-cases/index.ts",
+    "./world": "./src/world/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
