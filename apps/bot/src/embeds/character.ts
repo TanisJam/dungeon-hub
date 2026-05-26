@@ -10,9 +10,44 @@ export interface CharacterRow {
   updatedAt: string;
 }
 
+// Currency denomination keys (matches domain CURRENCY_KEYS)
+export type CurrencyKey = 'cp' | 'sp' | 'ep' | 'gp' | 'pp';
+export type Currency = Record<CurrencyKey, number>;
+
+export interface EncumbranceView {
+  weight: number;
+  max: number;
+  status: 'ok' | 'encumbered' | 'heavily-encumbered' | 'over';
+  thresholds: { encumbered: number; heavily: number; max: number };
+  speedPenalty: number;
+  coinWeight: number;
+}
+
+export interface InventoryItem {
+  instanceId: string;
+  itemSlug: string;
+  itemSource: string;
+  quantity: number;
+  state: 'equipped' | 'carried' | 'stowed';
+  attuned: boolean;
+  customName: string | null;
+  notes: string;
+  equipHand?: 'main' | 'off' | 'both' | null;
+  charges?: number | null;
+  containerId?: string | null;
+}
+
+export interface RecentGrant {
+  id: string;
+  eventType: 'item_grant' | 'gold_grant' | 'xp_award';
+  occurredAt: string;
+  payload: Record<string, unknown>;
+}
+
 export interface CharacterSheetResponse {
-  character: { id: string; userId: string; campaignId: string; status: string; xp: number };
+  character: { id: string; userId: string; worldId: string; status: string; xp: number };
   sheet: CharacterSheet;
+  inventory: InventoryItem[];
 }
 
 interface CharacterSheet {
@@ -21,6 +56,7 @@ interface CharacterSheet {
     totalLevel: number;
     classes: Array<{
       slug: string;
+      source: string;
       level: number;
       hitDie: string;
       subclass: { slug: string; source: string } | null;
@@ -37,13 +73,31 @@ interface CharacterSheet {
   initiative: number;
   armorClass: { value: number; formula: string };
   hitPoints: { max: number; formula: string };
+  hitDice: Record<string, number>;
   speed: { walk: number; fly?: number; swim?: number; climb?: number };
   size: string;
+  carryingCapacity: number;
+  proficiencies: { armor: string[]; weapons: string[]; tools: string[]; languages: string[] };
+  feats: Array<{ slug: string; source: string }>;
+  breathWeapon: null | { damageType: string; area: string; saveDC: number; damageDice: string };
+  darkvision: null | { feet: number; isSuperior: boolean };
+  racialSpells: unknown[];
+  racialTraits: unknown[];
+  spellcasting: unknown[];
+  currency: Currency;
+  encumbrance: EncumbranceView;
+  attunement: { used: number; max: number };
   spellSlots: {
-    slots: readonly number[];
+    slots: readonly [number, number, number, number, number, number, number, number, number];
     pactMagic: { slotLevel: number; slotCount: number } | null;
+    slotsUsed: readonly [number, number, number, number, number, number, number, number, number];
+    pactSlotsUsed: number;
   };
+  spellsByClass: unknown[];
   exhaustion: { level: number; effects: string[] };
+  classFeatures: Record<string, unknown>;
+  classResources: Record<string, unknown>;
+  warnings: string[];
 }
 
 /** El current HP vive en character.data.hp, no en el sheet. Hace falta el detail. */
@@ -227,9 +281,11 @@ export function buildLongRestEmbed(res: LongRestResponse): EmbedBuilder {
 
 export function buildCharacterSheetEmbed(
   detail: CharacterDetail,
-  sheet: CharacterSheet,
+  sheetRes: CharacterSheetResponse,
+  recentGrants?: ReadonlyArray<RecentGrant>,
 ): EmbedBuilder {
   const id = detail.id;
+  const sheet = sheetRes.sheet;
   const identity = sheet.identity;
 
   const classLine = identity.classes

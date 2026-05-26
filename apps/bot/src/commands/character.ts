@@ -208,7 +208,7 @@ async function runShow(interaction: ChatInputCommandInteraction): Promise<void> 
     ]);
 
     await interaction.editReply({
-      embeds: [buildCharacterSheetEmbed(detail, sheetRes.sheet)],
+      embeds: [buildCharacterSheetEmbed(detail, sheetRes)],
     });
   } catch (err) {
     if (err instanceof LinkRequiredError) return replyLinkRequired(interaction);

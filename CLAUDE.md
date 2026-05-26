@@ -116,7 +116,7 @@ domain (pure)  ←  use-cases  ←  HTTP routes (api) / Server Actions + Server 
 | Validation | Zod | all request/action bodies, no exceptions |
 | Tests | Vitest 2.x + @testing-library/react 16 | per-package |
 | E2E | Playwright 1.49 | `apps/web/e2e/`, stack must be up |
-| Bot | Discord.js 14 | `apps/bot`, no tests |
+| Bot | Discord.js 14 | `apps/bot`. Vitest 2.x. No E2E (manual smoke against live Discord). |
 
 ---
 
