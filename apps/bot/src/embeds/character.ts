@@ -169,6 +169,41 @@ function formatModifier(mod: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
+/** Returns "hace X minutos|horas|días" or "ahora" for a past ISO date string. */
+export function relativeTime(date: string): string {
+  const diffMs = Date.now() - new Date(date).getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'ahora';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `hace ${diffMin} minuto${diffMin === 1 ? '' : 's'}`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `hace ${diffHrs} hora${diffHrs === 1 ? '' : 's'}`;
+  const diffDays = Math.floor(diffHrs / 24);
+  return `hace ${diffDays} día${diffDays === 1 ? '' : 's'}`;
+}
+
+/** Maps a grant event to a human-readable Spanish label. */
+export function humanLabel(event: RecentGrant): string {
+  const p = event.payload;
+  switch (event.eventType) {
+    case 'gold_grant': {
+      const amount = typeof p['amount'] === 'number' ? p['amount'] : '?';
+      const denom = typeof p['denomination'] === 'string' ? p['denomination'] : 'gp';
+      return `Recibiste ${amount} ${denom} del DM`;
+    }
+    case 'item_grant': {
+      const name = typeof p['itemName'] === 'string' ? p['itemName']
+        : typeof p['itemSlug'] === 'string' ? p['itemSlug']
+        : 'un ítem';
+      return `Recibiste "${name}" del DM`;
+    }
+    case 'xp_award': {
+      const amount = typeof p['amount'] === 'number' ? p['amount'] : '?';
+      return `Ganaste ${amount} XP`;
+    }
+  }
+}
+
 export function buildCharactersListEmbed(chars: CharacterRow[]): EmbedBuilder {
   const embed = new EmbedBuilder().setTitle('Tus characters').setColor(0x2c3e50);
   if (chars.length === 0) {
@@ -341,14 +376,6 @@ export function buildCharacterSheetEmbed(
     .join(' · ');
   embed.addFields({ name: 'Saves', value: saves });
 
-  // ---- Skills proficient ----
-  const profSkills = sheet.skills
-    .filter((s) => s.proficient || s.expertise)
-    .map((s) => `${s.expertise ? '★' : '●'} ${s.name} ${formatModifier(s.modifier)}`);
-  if (profSkills.length > 0) {
-    embed.addFields({ name: 'Skills (proficient)', value: profSkills.join(' · ') });
-  }
-
   // ---- Speed + size ----
   const speedParts: string[] = [`${sheet.speed.walk} ft`];
   if (sheet.speed.fly) speedParts.push(`fly ${sheet.speed.fly}`);
@@ -360,21 +387,71 @@ export function buildCharacterSheetEmbed(
     { name: 'PB', value: formatModifier(sheet.proficiencyBonus), inline: true },
   );
 
-  // ---- Spell slots (si tiene) ----
+  // ---- Spell slots (available = max - used, hide when all zero) ----
   const slotsLine = sheet.spellSlots.slots
-    .map((count, i) => (count > 0 ? `L${i + 1}: ${count}` : null))
+    .map((maxCount, i) => {
+      if (maxCount <= 0) return null;
+      const used = sheet.spellSlots.slotsUsed[i] ?? 0;
+      const available = Math.max(0, maxCount - used);
+      return `L${i + 1} ${available}/${maxCount}`;
+    })
     .filter(Boolean)
     .join(' · ');
   if (slotsLine) {
-    embed.addFields({ name: 'Spell Slots (max)', value: slotsLine });
+    embed.addFields({ name: '🔮 Spell Slots', value: slotsLine });
   }
   if (sheet.spellSlots.pactMagic) {
     const pm = sheet.spellSlots.pactMagic;
+    const pactUsed = sheet.spellSlots.pactSlotsUsed;
+    const pactAvailable = Math.max(0, pm.slotCount - pactUsed);
     embed.addFields({
       name: 'Pact Magic',
-      value: `${pm.slotCount} slots de L${pm.slotLevel}`,
+      value: `${pactAvailable}/${pm.slotCount} slots L${pm.slotLevel}`,
       inline: true,
     });
+  }
+
+  // ---- Currency (hide when all zero) ----
+  const currency = sheet.currency;
+  const currencyParts: string[] = [];
+  if (currency.pp > 0) currencyParts.push(`${currency.pp} pp`);
+  if (currency.gp > 0) currencyParts.push(`${currency.gp} gp`);
+  if (currency.ep > 0) currencyParts.push(`${currency.ep} ep`);
+  if (currency.sp > 0) currencyParts.push(`${currency.sp} sp`);
+  if (currency.cp > 0) currencyParts.push(`${currency.cp} cp`);
+  if (currencyParts.length > 0) {
+    embed.addFields({ name: '💰 Monedas', value: currencyParts.join(' · ') });
+  }
+
+  // ---- Inventory summary (equipped items + encumbrance status) ----
+  const inventory = sheetRes.inventory;
+  const equipped = inventory.filter((it) => it.state === 'equipped');
+  if (equipped.length > 0 || sheet.encumbrance.status !== 'ok') {
+    const CAP = 5;
+    const displayItems = equipped.slice(0, CAP).map((it) => it.customName ?? it.itemSlug);
+    let invLine = displayItems.join(', ');
+    if (equipped.length > CAP) invLine += ` _(+${equipped.length - CAP} más)_`;
+    const encStatus = sheet.encumbrance.status;
+    const encLabel = encStatus === 'ok' ? null
+      : encStatus === 'encumbered' ? '⚠️ Encumbered'
+      : encStatus === 'heavily-encumbered' ? '🔴 Heavily Encumbered'
+      : '🚫 Overloaded';
+    const invValue = [invLine, encLabel].filter(Boolean).join(' — ');
+    const totalItems = inventory.length;
+    embed.addFields({
+      name: `🎒 Inventario (${totalItems} ítems, ${equipped.length} equipados)`,
+      value: invValue || `${totalItems} ítems en total`,
+    });
+  }
+
+  // ---- Top skills: proficient, sorted by modifier desc, cap 6 ----
+  const topSkills = [...sheet.skills]
+    .filter((s) => s.proficient || s.expertise)
+    .sort((a, b) => b.modifier - a.modifier)
+    .slice(0, 6)
+    .map((s) => `${s.expertise ? '★' : '●'} ${s.name} ${formatModifier(s.modifier)}`);
+  if (topSkills.length > 0) {
+    embed.addFields({ name: '🎯 Top Skills', value: topSkills.join(' · ') });
   }
 
   // ---- Exhaustion (si activo) ----
@@ -383,6 +460,14 @@ export function buildCharacterSheetEmbed(
       name: '⚠️ Exhaustion',
       value: `Level ${sheet.exhaustion.level} — ${sheet.exhaustion.effects.join(', ')}`,
     });
+  }
+
+  // ---- Recent grants (best-effort — shown when provided) ----
+  if (recentGrants && recentGrants.length > 0) {
+    const grantLines = recentGrants
+      .slice(0, 3)
+      .map((g) => `• ${humanLabel(g)} _(${relativeTime(g.occurredAt)})_`);
+    embed.addFields({ name: '🎁 Últimas recompensas', value: grantLines.join('\n') });
   }
 
   embed.setFooter({ text: `character ${shortId(id)} · PP ${sheet.passivePerception}` });

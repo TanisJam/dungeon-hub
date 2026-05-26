@@ -19,6 +19,7 @@ import {
   type HpDeltaResponse,
   type LongRestResponse,
   type ShortRestResponse,
+  type RecentGrant,
 } from '../embeds/character.js';
 
 const REST_TYPES = [
@@ -199,16 +200,23 @@ async function runShow(interaction: ChatInputCommandInteraction): Promise<void> 
 
     // El sheet endpoint trae el cómputo derivado; el detail trae los raw
     // (incluye current HP que el sheet no tiene). Las traemos en paralelo.
-    const [detail, sheetRes] = await Promise.all([
+    const [detail, sheetRes, grantsRes] = await Promise.all([
       api.getAs<CharacterDetail>(interaction.user.id, `/api/v1/characters/${characterId}`),
       api.getAs<CharacterSheetResponse>(
         interaction.user.id,
         `/api/v1/characters/${characterId}/sheet`,
       ),
+      api
+        .getAs<{ events: RecentGrant[] }>(
+          interaction.user.id,
+          `/api/v1/characters/${characterId}/recent-grants`,
+          { limit: 3 },
+        )
+        .catch(() => ({ events: [] as RecentGrant[] })),
     ]);
 
     await interaction.editReply({
-      embeds: [buildCharacterSheetEmbed(detail, sheetRes)],
+      embeds: [buildCharacterSheetEmbed(detail, sheetRes, grantsRes.events)],
     });
   } catch (err) {
     if (err instanceof LinkRequiredError) return replyLinkRequired(interaction);
