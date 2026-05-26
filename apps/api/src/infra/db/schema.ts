@@ -11,6 +11,7 @@ import {
   primaryKey,
   uniqueIndex,
   index,
+  check,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -114,6 +115,7 @@ export const worldMembers = pgTable(
   (t) => [
     primaryKey({ columns: [t.worldId, t.userId] }),
     index('idx_world_members_user').on(t.userId),
+    check('world_members_role_check', sql`role IN ('gm', 'player')`),
   ],
 );
 
