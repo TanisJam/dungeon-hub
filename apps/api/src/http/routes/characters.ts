@@ -75,6 +75,10 @@ import {
   validateClassFeaturePicks,
   type FeaturePicks,
 } from '@dungeon-hub/domain/character/class-features';
+import {
+  classResourceBySlug,
+  resetClassResourcesForRest,
+} from '@dungeon-hub/domain/character/class-resources';
 
 const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
 
@@ -134,6 +138,11 @@ const ConsumeSlotBody = z.object({
 });
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
+
+const ResourceMutationBody = z.object({
+  slug: z.string().min(1),
+  amount: z.number().int().positive().optional(),
+});
 const ListQuery = z.object({
   campaign: z.string().uuid().optional(),
   status: z
@@ -2032,11 +2041,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const newCurrent = Math.min(existingHp.max, existingHp.current + hpRecovered);
     const newHp = { current: newCurrent, max: existingHp.max, temp: existingHp.temp ?? 0 };
 
+    const currentResourcesUsed =
+      (charData['classResourcesUsed'] as Record<string, number> | undefined) ?? {};
     const nextData = {
       ...charData,
       hp: newHp,
       hitDice,
       warlockSlotsUsed: 0,
+      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsed, classes, 'short'),
     };
 
     // Inventory recharge — PHB p.141: items with recharge='short' regain charges
@@ -2198,6 +2210,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       trigger: 'long',
     });
 
+    const currentResourcesUsedLong =
+      (charData['classResourcesUsed'] as Record<string, number> | undefined) ?? {};
     const nextData = {
       ...charData,
       hp: newHp,
@@ -2207,6 +2221,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       // Spell slots y pact magic full → trackeamos uso a 0.
       spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
       warlockSlotsUsed: 0,
+      // R-07: clear all class resources on long rest (PHB p.186).
+      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsedLong, classes, 'long'),
     };
 
     const [updated] = await db
@@ -2299,6 +2315,102 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       spellSlotsUsed: nextData['spellSlotsUsed'] ?? currentSlotsUsed,
       warlockSlotsUsed: nextData['warlockSlotsUsed'] ?? currentPactUsed,
     };
+  });
+
+  // ---- POST /characters/:id/resources/use ---------------------------------
+  // Consume `amount` (default 1) of a class resource. Closes REQ-RAC-CONSUME
+  // from sdd/rules-audit-class-features/spec (#814).
+  app.post('/characters/:id/resources/use', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = ResourceMutationBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const def = classResourceBySlug(body.slug);
+    if (!def) {
+      return reply
+        .code(400)
+        .send({ error: 'VALIDATION_FAILED', issues: [{ code: 'RESOURCE_NOT_FOUND', slug: body.slug }] });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
+    const owningClass = classes.find((c) => c.slug === def.classSlug);
+    const max = owningClass != null ? def.maxFor(owningClass.level) : null;
+    if (max == null) {
+      return reply
+        .code(400)
+        .send({ error: 'VALIDATION_FAILED', issues: [{ code: 'RESOURCE_NOT_FOUND', slug: body.slug }] });
+    }
+
+    const current =
+      (charData['classResourcesUsed'] as Record<string, number> | undefined) ?? {};
+    const usedBefore = current[body.slug] ?? 0;
+    const amount = body.amount ?? 1;
+    if (usedBefore + amount > max) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'RESOURCE_OVER_LIMIT', slug: body.slug, used: usedBefore, max, requested: amount }],
+      });
+    }
+
+    const nextUsed: Record<string, number> = { ...current, [body.slug]: usedBefore + amount };
+    const nextData = { ...charData, classResourcesUsed: nextUsed };
+
+    await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+
+    return { classResourcesUsed: nextUsed };
+  });
+
+  // ---- POST /characters/:id/resources/restore -----------------------------
+  // Decrement `used` by `amount` (default 1) for a class resource; floors at 0.
+  // Separate from /use so the verbs stay clean ("Usar" vs "Restaurar").
+  app.post('/characters/:id/resources/restore', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = ResourceMutationBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const def = classResourceBySlug(body.slug);
+    if (!def) {
+      return reply
+        .code(400)
+        .send({ error: 'VALIDATION_FAILED', issues: [{ code: 'RESOURCE_NOT_FOUND', slug: body.slug }] });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const current =
+      (charData['classResourcesUsed'] as Record<string, number> | undefined) ?? {};
+    const usedBefore = current[body.slug] ?? 0;
+    const amount = body.amount ?? 1;
+    const nextUsedValue = Math.max(0, usedBefore - amount);
+
+    const nextUsed: Record<string, number> = { ...current, [body.slug]: nextUsedValue };
+    const nextData = { ...charData, classResourcesUsed: nextUsed };
+
+    await db
+      .update(characters)
+      .set({ data: nextData, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+
+    return { classResourcesUsed: nextUsed };
   });
 
   // ---- POST /characters/:id/hp ---------------------------------------------
