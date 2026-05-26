@@ -13,22 +13,23 @@ describe('sessions — Slice 3 (auto-logging)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
     dm = await createTestUser();
     alice = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'AutoLog Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const autoLogCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'AutoLog Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = autoLogCampaign.id;
+    worldId = autoLogCampaign.worldId;
 
     const { db } = await import('../../src/infra/db/client.js');
     const { campaignMembers } = await import('../../src/infra/db/schema.js');
@@ -53,7 +54,7 @@ describe('sessions — Slice 3 (auto-logging)', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId, name: `Alice ${opts.title}` },
+          payload: { worldId, name: `Alice ${opts.title}` },
         })
         .then((r) => r.json())
     ).id;
@@ -275,7 +276,7 @@ describe('sessions — Slice 3 (auto-logging)', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId, name: 'Free char' },
+          payload: { worldId, name: 'Free char' },
         })
         .then((r) => r.json())
     ).id;

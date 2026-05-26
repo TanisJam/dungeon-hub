@@ -11,6 +11,7 @@ describe('sessions — Slice 2 (events)', () => {
   let bob: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
   let aliceCharId: string;
   let bobCharId: string;
 
@@ -21,16 +22,16 @@ describe('sessions — Slice 2 (events)', () => {
     bob = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Events Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const eventsCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Events Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = eventsCampaign.id;
+    worldId = eventsCampaign.worldId;
 
     const { db } = await import('../../src/infra/db/client.js');
     const { campaignMembers } = await import('../../src/infra/db/schema.js');
@@ -45,7 +46,7 @@ describe('sessions — Slice 2 (events)', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId, name: 'Alice Char' },
+          payload: { worldId, name: 'Alice Char' },
         })
         .then((r) => r.json())
     ).id;
@@ -55,7 +56,7 @@ describe('sessions — Slice 2 (events)', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${bob.accessToken}` },
-          payload: { campaignId, name: 'Bob Char' },
+          payload: { worldId, name: 'Bob Char' },
         })
         .then((r) => r.json())
     ).id;
@@ -351,7 +352,7 @@ describe('sessions — Slice 2 (events)', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId, name: `Alice Tmp ${Math.random()}` },
+          payload: { worldId, name: `Alice Tmp ${Math.random()}` },
         })
         .then((r) => r.json())
     ).id;

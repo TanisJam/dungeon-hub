@@ -31,7 +31,7 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Aldric Vane' },
+        payload: { worldId: campaign.worldId, name: 'Aldric Vane' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -216,7 +216,7 @@ describe('GET /characters/:id/sheet — SCEN-RT-09: racialTraits for Dwarf + Hil
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Thordak Ironforge' },
+        payload: { worldId: campaign.worldId, name: 'Thordak Ironforge' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -394,7 +394,7 @@ describe('GET /characters/:id/sheet — SP-04: spellsByClass.spells enrichment',
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Cleric of Light' },
+        payload: { worldId: campaign.worldId, name: 'Cleric of Light' },
       })
       .then((r) => r.json());
     clericCharId = clericChar.id;
@@ -441,7 +441,7 @@ describe('GET /characters/:id/sheet — SP-04: spellsByClass.spells enrichment',
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Wizard No Spells' },
+        payload: { worldId: campaign.worldId, name: 'Wizard No Spells' },
       })
       .then((r) => r.json());
     emptyCharId = emptyChar.id;

@@ -29,7 +29,7 @@ describe('POST /characters/:id/feats', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Feat Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Feat Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;

@@ -17,7 +17,7 @@ type Me = {
 
 type CharacterRow = {
   id: string;
-  campaignId: string;
+  worldId: string;
   name: string;
   status: 'active' | 'inactive' | 'dead' | string;
   xp: number;

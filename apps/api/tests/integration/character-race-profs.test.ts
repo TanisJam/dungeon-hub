@@ -18,6 +18,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5)', () => {
   let user: TestUser;
   let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -32,6 +33,7 @@ describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5
       })
       .then((r) => r.json());
     campaignId = campaign.id;
+    worldId = campaign.worldId;
   });
 
   afterAll(async () => {
@@ -57,7 +59,7 @@ describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: `Test ${opts.race.slug}` },
+        payload: { worldId, name: `Test ${opts.race.slug}` },
       })
       .then((r) => r.json());
     const characterId = character.id as string;

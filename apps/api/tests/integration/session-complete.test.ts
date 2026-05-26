@@ -15,6 +15,7 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
   let bob: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
   let aliceCharId: string;
   let bobCharId: string;
 
@@ -25,16 +26,16 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
     bob = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Complete Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const completeCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Complete Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = completeCampaign.id;
+    worldId = completeCampaign.worldId;
 
     const { db } = await import('../../src/infra/db/client.js');
     const { campaignMembers } = await import('../../src/infra/db/schema.js');
@@ -62,7 +63,7 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: `${name} ${Math.random()}` },
+        payload: { worldId, name: `${name} ${Math.random()}` },
       })
       .then((r) => r.json());
     await app.inject({

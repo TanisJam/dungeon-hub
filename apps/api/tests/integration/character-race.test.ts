@@ -35,7 +35,7 @@ describe('PUT /characters/:id/race', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Race Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Race Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -236,7 +236,7 @@ describe('PUT /characters/:id/race', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: newCamp.id, name: 'No VGM Char' },
+        payload: { worldId: newCamp.worldId, name: 'No VGM Char' },
       })
       .then((r) => r.json());
 
@@ -289,7 +289,7 @@ describe('RACE_SUBRACE_REQUIRED — gate + read-path tolerance', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Subrace Required Char' },
+        payload: { worldId: campaign.worldId, name: 'Subrace Required Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -397,7 +397,7 @@ describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => 
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Variant Human Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Variant Human Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -758,7 +758,7 @@ describe('Dragonborn ancestry — PHB Batch 3 (race-dragonborn-ancestry)', () =>
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Qyara Virixis' },
+        payload: { worldId: campaign.worldId, name: 'Qyara Virixis' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -951,7 +951,7 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Darkvision Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Darkvision Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -1178,7 +1178,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Racial Spells Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Racial Spells Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;

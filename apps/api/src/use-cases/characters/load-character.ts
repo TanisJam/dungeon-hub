@@ -5,10 +5,7 @@ import { characters, campaignMembers, campaigns, worldMembers } from '../../infr
 export interface LoadedCharacter {
   id: string;
   userId: string;
-  /** worldId replaces campaignId post-C2. campaignId kept for read-path tolerance (C5). */
   worldId: string;
-  /** @deprecated campaignId removed from schema in C2. Kept in interface for C5 migration. */
-  campaignId?: string;
   name: string;
   status: 'draft' | 'active' | 'retired' | 'dead' | 'pending_approval';
   data: unknown;

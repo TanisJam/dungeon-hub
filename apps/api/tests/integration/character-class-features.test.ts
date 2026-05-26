@@ -11,22 +11,23 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('PUT /characters/:id/classes/:classSlug/features', () => {
   let user: TestUser;
   let campaignId: string;
+  let worldId: string;
   let fighterCharId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
     user = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { name: 'Class Features Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const cftCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Class Features Test' },
+      })
+      .then((r) => r.json());
+    campaignId = cftCampaign.id;
+    worldId = cftCampaign.worldId;
 
     // Fighter L1 — gana 1 Fighting Style (FS:F).
     const c = await app
@@ -34,7 +35,7 @@ describe('PUT /characters/:id/classes/:classSlug/features', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Fighter Test' },
+        payload: { worldId, name: 'Fighter Test' },
       })
       .then((r) => r.json());
     fighterCharId = c.id;

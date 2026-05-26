@@ -15,6 +15,7 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
   let player: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -22,16 +23,16 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
     player = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Level Up Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const lvlCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Level Up Test' },
+      })
+      .then((r) => r.json());
+    campaignId = lvlCampaign.id;
+    worldId = lvlCampaign.worldId;
 
     // Hacemos al player miembro de la campaña.
     const { db } = await import('../../src/infra/db/client.js');
@@ -62,7 +63,7 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${player.accessToken}` },
-        payload: { campaignId, name: args.name },
+        payload: { worldId, name: args.name },
       })
       .then((r) => r.json());
 

@@ -16,6 +16,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
   let alice: TestUser;
   let bob: TestUser;
   let aliceCampaignId: string;
+  let aliceWorldId: string;
   let aliceCharId: string;
 
   beforeAll(async () => {
@@ -23,16 +24,16 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
     alice = await createTestUser();
     bob = await createTestUser();
 
-    aliceCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { name: 'Consume Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const consumeCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { name: 'Consume Campaign' },
+      })
+      .then((r) => r.json());
+    aliceCampaignId = consumeCampaign.id;
+    aliceWorldId = consumeCampaign.worldId;
 
     aliceCharId = (
       await app
@@ -40,7 +41,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Wandwielder' },
+          payload: { worldId: aliceWorldId, name: 'Wandwielder' },
         })
         .then((r) => r.json())
     ).id;
@@ -261,7 +262,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Rester' },
+          payload: { worldId: aliceWorldId, name: 'Rester' },
         })
         .then((r) => r.json());
       await app.inject({
@@ -318,7 +319,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Sword Only' },
+          payload: { worldId: aliceWorldId, name: 'Sword Only' },
         })
         .then((r) => r.json());
       await app.inject({
@@ -367,7 +368,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Archer' },
+          payload: { worldId: aliceWorldId, name: 'Archer' },
         })
         .then((r) => r.json());
 
@@ -403,7 +404,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Split Archer' },
+          payload: { worldId: aliceWorldId, name: 'Split Archer' },
         })
         .then((r) => r.json());
 
@@ -433,7 +434,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Shooter' },
+          payload: { worldId: aliceWorldId, name: 'Shooter' },
         })
         .then((r) => r.json());
 

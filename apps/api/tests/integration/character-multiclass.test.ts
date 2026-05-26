@@ -26,7 +26,7 @@ describe('POST /characters/:id/classes (multiclass)', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'MC Test' },
+        payload: { worldId: campaign.worldId, name: 'MC Test' },
       })
       .then((r) => r.json());
     characterId = character.id;

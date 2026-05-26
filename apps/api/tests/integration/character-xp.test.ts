@@ -11,6 +11,7 @@ describe('POST /characters/:id/xp', () => {
   let player: TestUser; // dueño del personaje, member de la campaña
   let outsider: TestUser; // user sin relación con la campaña
   let campaignId: string;
+  let worldId: string;
   let characterId: string;
 
   beforeAll(async () => {
@@ -29,6 +30,7 @@ describe('POST /characters/:id/xp', () => {
       })
       .then((r) => r.json());
     campaignId = campaign.id;
+    worldId = campaign.worldId; // C5: POST /campaigns now returns worldId
 
     // El player se une a la campaña. Endpoint join: si no existe, lo agregamos via SQL.
     const { db } = await import('../../src/infra/db/client.js');
@@ -45,7 +47,7 @@ describe('POST /characters/:id/xp', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${player.accessToken}` },
-        payload: { campaignId, name: 'XP Test Char' },
+        payload: { worldId, name: 'XP Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;

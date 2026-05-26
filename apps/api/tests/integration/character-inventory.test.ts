@@ -18,9 +18,11 @@ describe('inventory — POST / DELETE', () => {
   let mallory: TestUser; // owner wizard
   let bob: TestUser; // outsider
   let aliceCampaignId: string;
+  let aliceWorldId: string;
   let aliceCharId: string;
   let malloryCharId: string;
   let malloryCampaignId: string;
+  let malloryWorldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -29,16 +31,16 @@ describe('inventory — POST / DELETE', () => {
     bob = await createTestUser();
 
     // Alice: Fighter, STR 15 → carry max 225.
-    aliceCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { name: 'Alice Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const aliceCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { name: 'Alice Campaign' },
+      })
+      .then((r) => r.json());
+    aliceCampaignId = aliceCampaign.id;
+    aliceWorldId = aliceCampaign.worldId;
 
     aliceCharId = (
       await app
@@ -46,7 +48,7 @@ describe('inventory — POST / DELETE', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Aldric the Fighter' },
+          payload: { worldId: aliceWorldId, name: 'Aldric the Fighter' },
         })
         .then((r) => r.json())
     ).id;
@@ -73,16 +75,16 @@ describe('inventory — POST / DELETE', () => {
     });
 
     // Mallory: Wizard, STR 8 → carry max 120.
-    malloryCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${mallory.accessToken}` },
-          payload: { name: 'Mallory Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const malloryCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${mallory.accessToken}` },
+        payload: { name: 'Mallory Campaign' },
+      })
+      .then((r) => r.json());
+    malloryCampaignId = malloryCampaign.id;
+    malloryWorldId = malloryCampaign.worldId;
 
     malloryCharId = (
       await app
@@ -90,7 +92,7 @@ describe('inventory — POST / DELETE', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${mallory.accessToken}` },
-          payload: { campaignId: malloryCampaignId, name: 'Mallory the Wizard' },
+          payload: { worldId: malloryWorldId, name: 'Mallory the Wizard' },
         })
         .then((r) => r.json())
     ).id;
@@ -186,7 +188,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Attune Test' },
+        payload: { worldId: aliceWorldId, name: 'Attune Test' },
       })
       .then((r) => r.json());
 
@@ -240,7 +242,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${mallory.accessToken}` },
-        payload: { campaignId: malloryCampaignId, name: 'Heavy Lifter' },
+        payload: { worldId: malloryWorldId, name: 'Heavy Lifter' },
       })
       .then((r) => r.json());
 
@@ -300,7 +302,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Delete Inventory Test' },
+        payload: { worldId: aliceWorldId, name: 'Delete Inventory Test' },
       })
       .then((r) => r.json());
 
@@ -346,7 +348,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'PATCH Equip' },
+        payload: { worldId: aliceWorldId, name: 'PATCH Equip' },
       })
       .then((r) => r.json());
 
@@ -402,7 +404,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${mallory.accessToken}` },
-        payload: { campaignId: malloryCampaignId, name: 'PATCH Equip Warning' },
+        payload: { worldId: malloryWorldId, name: 'PATCH Equip Warning' },
       })
       .then((r) => r.json());
 
@@ -459,7 +461,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'PATCH Attune Cap' },
+        payload: { worldId: aliceWorldId, name: 'PATCH Attune Cap' },
       })
       .then((r) => r.json());
 
@@ -508,7 +510,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'PATCH Untune' },
+        payload: { worldId: aliceWorldId, name: 'PATCH Untune' },
       })
       .then((r) => r.json());
 
@@ -572,7 +574,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Plate Hoarder' },
+        payload: { worldId: aliceWorldId, name: 'Plate Hoarder' },
       })
       .then((r) => r.json());
 
@@ -603,7 +605,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Greatsword Test' },
+        payload: { worldId: aliceWorldId, name: 'Greatsword Test' },
       })
       .then((r) => r.json());
 
@@ -628,7 +630,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Greatsword Both' },
+        payload: { worldId: aliceWorldId, name: 'Greatsword Both' },
       })
       .then((r) => r.json());
 
@@ -654,7 +656,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Money Bags' },
+        payload: { worldId: aliceWorldId, name: 'Money Bags' },
       })
       .then((r) => r.json());
 
@@ -687,7 +689,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Poor Soul' },
+        payload: { worldId: aliceWorldId, name: 'Poor Soul' },
       })
       .then((r) => r.json());
 
@@ -712,7 +714,7 @@ describe('inventory — POST / DELETE', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${mallory.accessToken}` },
-        payload: { campaignId: malloryCampaignId, name: 'Sheet Integration' },
+        payload: { worldId: malloryWorldId, name: 'Sheet Integration' },
       })
       .then((r) => r.json());
 

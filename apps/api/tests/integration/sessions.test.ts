@@ -16,7 +16,9 @@ describe('sessions — Slice 1', () => {
   let bob: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
   let otherCampaignId: string;
+  let otherWorldId: string;
   let aliceCharId: string;
   let bobCharId: string;
   /** Char de alice en OTRA campaña → no joineable a sesiones de campaignId. */
@@ -29,16 +31,16 @@ describe('sessions — Slice 1', () => {
     bob = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Sessions Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const sessionsCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Sessions Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = sessionsCampaign.id;
+    worldId = sessionsCampaign.worldId;
 
     // Alice y Bob se unen como players.
     const { db } = await import('../../src/infra/db/client.js');
@@ -54,7 +56,7 @@ describe('sessions — Slice 1', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId, name: 'Alice Char' },
+          payload: { worldId, name: 'Alice Char' },
         })
         .then((r) => r.json())
     ).id;
@@ -65,29 +67,29 @@ describe('sessions — Slice 1', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${bob.accessToken}` },
-          payload: { campaignId, name: 'Bob Char' },
+          payload: { worldId, name: 'Bob Char' },
         })
         .then((r) => r.json())
     ).id;
 
     // Otra campaña, char de alice ahí.
-    otherCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { name: 'Other Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const otherCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { name: 'Other Campaign' },
+      })
+      .then((r) => r.json());
+    otherCampaignId = otherCampaign.id;
+    otherWorldId = otherCampaign.worldId;
     aliceOtherCampaignCharId = (
       await app
         .inject({
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: otherCampaignId, name: 'Alice Other' },
+          payload: { worldId: otherWorldId, name: 'Alice Other' },
         })
         .then((r) => r.json())
     ).id;
@@ -488,7 +490,7 @@ describe('sessions — Slice 1', () => {
             method: 'POST',
             url: '/api/v1/characters',
             headers: { authorization: `Bearer ${charlie.accessToken}` },
-            payload: { campaignId, name: 'Charlie' },
+            payload: { worldId, name: 'Charlie' },
           })
           .then((r) => r.json())
       ).id;

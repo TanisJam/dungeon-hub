@@ -10,6 +10,7 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
   let user: TestUser;
   let otherUser: TestUser;
   let campaignId: string;
+  let worldId: string;
   let fighterCharId: string;
   let wizardCharId: string;
   let wizardL4AsiCharId: string;
@@ -22,16 +23,16 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
     user = await createTestUser();
     otherUser = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { name: 'Spells Options Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const spellsOptsCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Spells Options Test' },
+      })
+      .then((r) => r.json());
+    campaignId = spellsOptsCampaign.id;
+    worldId = spellsOptsCampaign.worldId; // C5
 
     fighterCharId = await setupChar('Fighter PHB', 'fighter', {}, null, ['athletics', 'perception']);
     wizardCharId = await setupChar('Wizard PHB', 'wizard', { int: 15 }, null, [
@@ -100,7 +101,7 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { campaignId, name },
+          payload: { worldId, name },
         })
         .then((r) => r.json());
 
@@ -143,7 +144,7 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { campaignId, name: 'Wizard L4 ASI' },
+          payload: { worldId, name: 'Wizard L4 ASI' },
         })
         .then((r) => r.json());
 

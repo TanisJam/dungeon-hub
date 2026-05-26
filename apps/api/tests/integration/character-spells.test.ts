@@ -9,6 +9,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('PUT /characters/:id/classes/:classSlug/spells', () => {
   let user: TestUser;
   let campaignId: string;
+  let worldId: string;
   let wizardCharId: string;
   let wizardL4AsiCharId: string;
   let clericCharId: string;
@@ -19,16 +20,16 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
     const app = await getTestApp();
     user = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { name: 'Spells Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const spellsCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Spells Test' },
+      })
+      .then((r) => r.json());
+    campaignId = spellsCampaign.id;
+    worldId = spellsCampaign.worldId; // C5
 
     // Wizard L1 con INT 15 (mod 2) → prep limit = 3.
     wizardCharId = await setupChar('Wizardo', 'wizard', { int: 15 });
@@ -50,7 +51,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { campaignId, name: 'Warlock SP07' },
+          payload: { worldId, name: 'Warlock SP07' },
         })
         .then((r) => r.json());
       warlockCharId = c.id;
@@ -99,7 +100,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { campaignId, name },
+          payload: { worldId, name },
         })
         .then((r) => r.json());
 
@@ -153,7 +154,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${user.accessToken}` },
-          payload: { campaignId, name: 'Wizard L4 ASI Spells' },
+          payload: { worldId, name: 'Wizard L4 ASI Spells' },
         })
         .then((r) => r.json());
 
@@ -481,7 +482,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Poor Wiz' },
+        payload: { worldId, name: 'Poor Wiz' },
       })
       .then((r) => r.json());
 

@@ -9,7 +9,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('POST /characters/:id/spell-slots/use', () => {
   let player: TestUser;
   let outsider: TestUser;
-  let campaignId: string;
+  let worldId: string;
   let wizardCharId: string;
   let warlockCharId: string;
 
@@ -19,16 +19,15 @@ describe('POST /characters/:id/spell-slots/use', () => {
     outsider = await createTestUser();
 
     // DM = player for simplicity (campaign owner).
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${player.accessToken}` },
-          payload: { name: 'Slot Test Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const slotCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { name: 'Slot Test Campaign' },
+      })
+      .then((r) => r.json());
+    worldId = slotCampaign.worldId;
 
     // --- Wizard L3: slots L1=4, L2=2 (PHB p.113).
     // Use PATCH to directly set class data — avoids brittle level-up chain in test setup.
@@ -38,7 +37,7 @@ describe('POST /characters/:id/spell-slots/use', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${player.accessToken}` },
-          payload: { campaignId, name: 'Ariane Wizard' },
+          payload: { worldId, name: 'Ariane Wizard' },
         })
         .then((r) => r.json());
       wizardCharId = c.id;
@@ -79,7 +78,7 @@ describe('POST /characters/:id/spell-slots/use', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${player.accessToken}` },
-          payload: { campaignId, name: 'Elias Warlock' },
+          payload: { worldId, name: 'Elias Warlock' },
         })
         .then((r) => r.json());
       warlockCharId = c.id;

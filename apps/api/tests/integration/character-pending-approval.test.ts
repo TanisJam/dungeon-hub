@@ -14,6 +14,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
   let alice: TestUser;
   let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -28,6 +29,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
       })
       .then((r) => r.json());
     campaignId = campaign.id;
+    worldId = campaign.worldId;
   });
 
   afterAll(async () => {
@@ -43,7 +45,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Draft To Pending' },
+        payload: { worldId, name: 'Draft To Pending' },
       })
       .then((r) => r.json());
 
@@ -69,7 +71,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Active Char' },
+        payload: { worldId, name: 'Active Char' },
       })
       .then((r) => r.json());
 
@@ -99,7 +101,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Retired Char' },
+        payload: { worldId, name: 'Retired Char' },
       })
       .then((r) => r.json());
 
@@ -129,7 +131,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Dead Char' },
+        payload: { worldId, name: 'Dead Char' },
       })
       .then((r) => r.json());
 
@@ -158,6 +160,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
 describe('D.2 — GET /characters status filter', () => {
   let alice: TestUser;
   let campaignId: string;
+  let worldId: string;
   let draftId: string;
   let activeId: string;
   let pendingId: string;
@@ -175,6 +178,7 @@ describe('D.2 — GET /characters status filter', () => {
       })
       .then((r) => r.json());
     campaignId = campaign.id;
+    worldId = campaign.worldId;
 
     // Create a draft character
     draftId = await app
@@ -182,7 +186,7 @@ describe('D.2 — GET /characters status filter', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Draft One' },
+        payload: { worldId, name: 'Draft One' },
       })
       .then((r) => r.json().id);
 
@@ -192,7 +196,7 @@ describe('D.2 — GET /characters status filter', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Active One' },
+        payload: { worldId, name: 'Active One' },
       })
       .then((r) => r.json());
     activeId = activeChar.id;
@@ -210,7 +214,7 @@ describe('D.2 — GET /characters status filter', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId, name: 'Pending One' },
+        payload: { worldId, name: 'Pending One' },
       })
       .then((r) => r.json());
     pendingId = pendingChar.id;
@@ -306,7 +310,7 @@ describe('D.4 — GET /characters/:id/sheet includes currentHp and inventory', (
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'HP Sheet Test' },
+        payload: { worldId: campaign.worldId, name: 'HP Sheet Test' },
       })
       .then((r) => r.json());
     characterId = character.id;

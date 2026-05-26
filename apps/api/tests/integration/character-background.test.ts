@@ -27,7 +27,7 @@ describe('PUT /characters/:id/background', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'BG Test Char' },
+        payload: { worldId: campaign.worldId, name: 'BG Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -241,7 +241,7 @@ describe('PUT /characters/:id/background — Tool choose-block (7 backgrounds)',
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Tool Choose Char' },
+        payload: { worldId: campaign.worldId, name: 'Tool Choose Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
@@ -378,7 +378,7 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Custom BG Bare Char' },
+        payload: { worldId: campaign.worldId, name: 'Custom BG Bare Char' },
       })
       .then((r) => r.json());
     characterId = bare.id;
@@ -389,7 +389,7 @@ describe('PUT /characters/:id/background — Custom Background skill picker', ()
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Custom BG Class Char' },
+        payload: { worldId: campaign.worldId, name: 'Custom BG Class Char' },
       })
       .then((r) => r.json());
     charWithClassId = withClass.id;
@@ -580,7 +580,7 @@ describe('PUT /characters/:id/background — Custom Background customization', (
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Custom BG Customization Char' },
+        payload: { worldId: campaign.worldId, name: 'Custom BG Customization Char' },
       })
       .then((r) => r.json());
     characterId = character.id;

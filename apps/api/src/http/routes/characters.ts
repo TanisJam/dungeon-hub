@@ -48,15 +48,14 @@ import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { characters, compendiumSpells } from '../../infra/db/schema.js';
+import { campaigns, campaignMembers, characters, compendiumSpells, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
-  assertCampaignMembership,
   getCharacterAccess,
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
-import { loadCampaign, loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
+import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import {
@@ -108,7 +107,7 @@ function ensureWizardSpellbook(inventory: InventoryItem[]): InventoryItem[] {
 const CharacterStatus = z.enum(['draft', 'active', 'retired', 'dead', 'pending_approval']);
 
 const CreateBody = z.object({
-  campaignId: z.string().uuid(),
+  worldId: z.string().uuid(),
   name: z.string().min(1).max(120),
   /** data libre por ahora — el constraint engine de Fase 1.4 le va a dar shape. */
   data: z.record(z.string(), z.unknown()).default({}),
@@ -353,32 +352,44 @@ const SetRaceBody = z.object({
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
   // ---- POST /characters ----------------------------------------------------
-  // Post-C2: characters belong to worlds, not campaigns. The body still accepts
-  // `campaignId` for backward compat (C5 will switch to `worldId`).
-  // The campaign's worldId is resolved here and stored on the character.
+  // C5: characters are created directly under a world (worldId required).
+  // campaignId is no longer accepted — the character's world scope is set at creation.
   app.post('/characters', { preHandler: app.authenticate }, async (request, reply) => {
     const body = CreateBody.parse(request.body);
     const userId = request.user!.sub;
 
-    // Verify user is a member of the campaign.
-    const campaign = await assertCampaignMembership(body.campaignId, userId);
-    if (!campaign) {
-      return reply
-        .code(403)
-        .send({ error: 'NOT_CAMPAIGN_MEMBER', campaignId: body.campaignId });
+    // Verify the world exists.
+    const world = await loadWorldById(body.worldId);
+    if (!world) {
+      return reply.code(404).send({ error: 'NOT_FOUND' });
     }
 
-    // Load the campaign to get its worldId (rulesProfile lives on world post-C2).
-    const loadedCampaign = await loadCampaign(body.campaignId);
-    if (!loadedCampaign) {
-      return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+    // Verify user is a member of the world (via worldMembers OR via a campaign in the world).
+    // Direct world membership (worldMembers) is the primary path.
+    // Campaign membership is also accepted for backward compat with existing flows where
+    // players join campaigns but world-level invite UI doesn't exist yet (C6).
+    const worldMember = await db
+      .select({ role: worldMembers.role })
+      .from(worldMembers)
+      .where(and(eq(worldMembers.worldId, body.worldId), eq(worldMembers.userId, userId)))
+      .limit(1);
+    const campaignMember = worldMember.length === 0
+      ? await db
+          .select({ campaignId: campaignMembers.campaignId })
+          .from(campaignMembers)
+          .innerJoin(campaigns, eq(campaigns.id, campaignMembers.campaignId))
+          .where(and(eq(campaigns.worldId, body.worldId), eq(campaignMembers.userId, userId)))
+          .limit(1)
+      : [];
+    if (worldMember.length === 0 && campaignMember.length === 0) {
+      return reply.code(403).send({ error: 'NOT_WORLD_MEMBER', worldId: body.worldId });
     }
 
     const [created] = await db
       .insert(characters)
       .values({
         userId,
-        worldId: loadedCampaign.worldId,
+        worldId: body.worldId,
         name: body.name,
         data: body.data,
         // status default 'draft', inventory default '[]', xp default 0 (schema)

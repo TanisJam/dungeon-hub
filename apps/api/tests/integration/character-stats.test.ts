@@ -30,7 +30,7 @@ describe('PUT /characters/:id/stats', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId, name: 'Stats Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Stats Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;

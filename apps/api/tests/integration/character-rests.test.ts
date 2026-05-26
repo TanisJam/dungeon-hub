@@ -12,6 +12,7 @@ describe('POST /characters/:id/rest', () => {
   let player: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
   let charId: string;
 
   beforeAll(async () => {
@@ -20,16 +21,16 @@ describe('POST /characters/:id/rest', () => {
     player = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Rest Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const restCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Rest Test' },
+      })
+      .then((r) => r.json());
+    campaignId = restCampaign.id;
+    worldId = restCampaign.worldId; // C5: POST /campaigns now returns worldId
 
     // Player se une a la campaña ANTES de crear personaje (requisito de POST /characters).
     const { db } = await import('../../src/infra/db/client.js');
@@ -42,7 +43,7 @@ describe('POST /characters/:id/rest', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${player.accessToken}` },
-        payload: { campaignId, name: 'Tank' },
+        payload: { worldId, name: 'Tank' },
       })
       .then((r) => r.json());
     charId = c.id;
@@ -367,16 +368,16 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
     dm = await createTestUser();
     player = await createTestUser();
 
-    const campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'REST-02 Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const restCampaign02 = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'REST-02 Test' },
+      })
+      .then((r) => r.json());
+    const campaignId = restCampaign02.id;
+    const restWorldId = restCampaign02.worldId; // C5
 
     const { db } = await import('../../src/infra/db/client.js');
     const { campaignMembers } = await import('../../src/infra/db/schema.js');
@@ -388,7 +389,7 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${player.accessToken}` },
-        payload: { campaignId, name: 'RestTestChar' },
+        payload: { worldId: restWorldId, name: 'RestTestChar' },
       })
       .then((r) => r.json());
     charId = c.id;

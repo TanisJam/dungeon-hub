@@ -17,6 +17,7 @@ describe('world events — Slice 2', () => {
   let alice: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -24,16 +25,16 @@ describe('world events — Slice 2', () => {
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'World Events Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const weCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'World Events Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = weCampaign.id;
+    worldId = weCampaign.worldId;
 
     const { db } = await import('../../src/infra/db/client.js');
     const { campaignMembers } = await import('../../src/infra/db/schema.js');
@@ -222,7 +223,7 @@ describe('world events — Slice 2', () => {
             method: 'POST',
             url: '/api/v1/characters',
             headers: { authorization: `Bearer ${alice.accessToken}` },
-            payload: { campaignId, name: `wc ${Math.random()}` },
+            payload: { worldId, name: `wc ${Math.random()}` },
           })
           .then((r) => r.json())
       ).id;
@@ -302,7 +303,7 @@ describe('world events — Slice 2', () => {
             method: 'POST',
             url: '/api/v1/characters',
             headers: { authorization: `Bearer ${alice.accessToken}` },
-            payload: { campaignId, name: `disp ${Math.random()}` },
+            payload: { worldId, name: `disp ${Math.random()}` },
           })
           .then((r) => r.json())
       ).id;

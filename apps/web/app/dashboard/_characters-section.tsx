@@ -4,7 +4,7 @@ import type { PillTone } from '@/components/ui';
 
 type CharacterRow = {
   id: string;
-  campaignId: string;
+  worldId: string;
   name: string;
   status: string;
   xp: number;

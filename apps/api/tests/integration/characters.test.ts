@@ -6,6 +6,8 @@ describe('characters CRUD', () => {
   let alice: TestUser; // owner
   let bob: TestUser; // outsider (no es miembro de la campaign de alice)
   let aliceCampaignId: string;
+  /** worldId resolved from alice's campaign (C5: POST /characters now requires worldId). */
+  let aliceWorldId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -19,6 +21,14 @@ describe('characters CRUD', () => {
       payload: { name: "Alice's Campaign" },
     });
     aliceCampaignId = res.json().id;
+
+    // C5: Resolve worldId from alice's campaign (POST /campaigns auto-creates a world).
+    const campaignRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/campaigns/${aliceCampaignId}`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    aliceWorldId = campaignRes.json().worldId;
   });
 
   afterAll(async () => {
@@ -40,7 +50,7 @@ describe('characters CRUD', () => {
       url: '/api/v1/characters',
       headers: { authorization: `Bearer ${alice.accessToken}` },
       payload: {
-        campaignId: aliceCampaignId,
+        worldId: aliceWorldId,
         name: 'Aldric Vane',
         data: { notes: 'WIP' },
       },
@@ -52,23 +62,22 @@ describe('characters CRUD', () => {
     expect(c.status).toBe('draft');
     expect(c.xp).toBe(0);
     expect(c.userId).toBe(alice.id);
-    // Post-C2: characters belong to worlds, not campaigns.
-    // worldId is set from the campaign's world; campaignId no longer returned.
-    expect(c.worldId).toMatch(/^[0-9a-f-]{36}$/);
+    // C5: worldId returned directly; campaignId is gone.
+    expect(c.worldId).toBe(aliceWorldId);
     expect(c.data).toEqual({ notes: 'WIP' });
   });
 
-  it('rechaza crear personaje en una campaña a la que no pertenecés', async () => {
+  it('rechaza crear personaje en un world al que no pertenecés', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/characters',
       headers: { authorization: `Bearer ${bob.accessToken}` },
-      payload: { campaignId: aliceCampaignId, name: 'Intruder' },
+      payload: { worldId: aliceWorldId, name: 'Intruder' },
     });
 
     expect(res.statusCode).toBe(403);
-    expect(res.json().error).toBe('NOT_CAMPAIGN_MEMBER');
+    expect(res.json().error).toBe('NOT_WORLD_MEMBER');
   });
 
   it('lista solo mis personajes', async () => {
@@ -80,7 +89,7 @@ describe('characters CRUD', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name },
+        payload: { worldId: aliceWorldId, name },
       });
     }
 
@@ -110,7 +119,7 @@ describe('characters CRUD', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Edit Test' },
+        payload: { worldId: aliceWorldId, name: 'Edit Test' },
       })
       .then((r) => r.json());
 
@@ -145,7 +154,7 @@ describe('characters CRUD', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Delete Test' },
+        payload: { worldId: aliceWorldId, name: 'Delete Test' },
       })
       .then((r) => r.json());
 
@@ -174,6 +183,62 @@ describe('characters CRUD', () => {
     expect(after.statusCode).toBe(404);
   });
 
+  // REQ-WF-API-CHARACTER-PAYLOAD: POST accepts worldId directly; campaignId rejected.
+  it('POST /characters with worldId creates character in world', async () => {
+    const app = await getTestApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/characters',
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { worldId: aliceWorldId, name: 'World-Direct Char' },
+    });
+    expect(res.statusCode).toBe(201);
+    const c = res.json();
+    expect(c.worldId).toBe(aliceWorldId);
+    expect('campaignId' in c).toBe(false);
+  });
+
+  it('POST /characters with only campaignId (no worldId) → error', async () => {
+    const app = await getTestApp();
+    // After C5, worldId is required. Sending only campaignId (no worldId) fails validation.
+    // Zod throws ZodError (worldId required) → Fastify returns 500 (no global ZodError handler yet).
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/characters',
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { campaignId: aliceCampaignId, name: 'Legacy Char' },
+    });
+    // worldId is required; missing → error (500 because no global Zod error handler)
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+  });
+
+  // REQ-WF-API-CHARACTER-PAYLOAD: GET response includes worldId, no campaignId key.
+  it('GET /characters/:id payload — worldId present, campaignId absent', async () => {
+    const app = await getTestApp();
+
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { worldId: aliceWorldId, name: 'Payload Test Char' },
+      })
+      .then((r) => r.json());
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${created.id}`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // worldId must be present and be a valid UUID
+    expect(body.worldId).toMatch(/^[0-9a-f-]{36}$/);
+    // campaignId must NOT appear in the response at all
+    expect('campaignId' in body).toBe(false);
+  });
+
   it('sheet endpoint devuelve la ficha calculada para un draft vacío', async () => {
     const app = await getTestApp();
 
@@ -182,7 +247,7 @@ describe('characters CRUD', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name: 'Sheet Test' },
+        payload: { worldId: aliceWorldId, name: 'Sheet Test' },
       })
       .then((r) => r.json());
 

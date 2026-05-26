@@ -15,22 +15,23 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('inventory containers — POST/PATCH/DELETE con containerId', () => {
   let alice: TestUser;
   let aliceCampaignId: string;
+  let aliceWorldId: string;
   let aliceCharId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
     alice = await createTestUser();
 
-    aliceCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { name: 'Container Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const containerCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { name: 'Container Campaign' },
+      })
+      .then((r) => r.json());
+    aliceCampaignId = containerCampaign.id;
+    aliceWorldId = containerCampaign.worldId;
 
     aliceCharId = (
       await app
@@ -38,7 +39,7 @@ describe('inventory containers — POST/PATCH/DELETE con containerId', () => {
           method: 'POST',
           url: '/api/v1/characters',
           headers: { authorization: `Bearer ${alice.accessToken}` },
-          payload: { campaignId: aliceCampaignId, name: 'Packrat' },
+          payload: { worldId: aliceWorldId, name: 'Packrat' },
         })
         .then((r) => r.json())
     ).id;
@@ -77,7 +78,7 @@ describe('inventory containers — POST/PATCH/DELETE con containerId', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${alice.accessToken}` },
-        payload: { campaignId: aliceCampaignId, name },
+        payload: { worldId: aliceWorldId, name },
       })
       .then((r) => r.json());
     await app.inject({

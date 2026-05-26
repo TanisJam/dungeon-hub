@@ -24,7 +24,7 @@ describe('PUT /characters/:id/class', () => {
         method: 'POST',
         url: '/api/v1/characters',
         headers: { authorization: `Bearer ${user.accessToken}` },
-        payload: { campaignId: campaign.id, name: 'Class Test Char' },
+        payload: { worldId: campaign.worldId, name: 'Class Test Char' },
       })
       .then((r) => r.json());
     characterId = character.id;
