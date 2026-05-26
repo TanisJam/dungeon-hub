@@ -19,7 +19,6 @@ import {
   type RaceInnateSpellLite,
 } from './_parsers';
 import { saveRace } from './actions';
-import { RACES_REQUIRING_SUBRACE, requiresSubrace } from '@dungeon-hub/domain/character/race';
 import { poolFor, titleCase } from '../background/_options';
 import { ChoiceCard } from '@/components/wizard/choice-card';
 import type { ChoiceOption } from '@/components/wizard/choice-list';
@@ -85,6 +84,23 @@ function normalizeForMerge(name: string): string {
  * Source priority for variant ordering inside a merged card. PHB is canonical; supplements
  * fall back to alphabetical. Used to decide which variant is shown first in the chip selector.
  */
+/**
+ * Defaults for the worldRefData-injected sets when the caller doesn't pass them
+ * (e.g. older test setups). Replicates the PHB constants this component used to
+ * import from `@dungeon-hub/domain/character/race` before SDD #807.
+ */
+const DEFAULT_SUBRACE_REQUIRED_SET: ReadonlySet<string> = new Set([
+  'dwarf|PHB',
+  'elf|PHB',
+  'gnome|PHB',
+  'halfling|PHB',
+  'dragonborn|PHB',
+]);
+
+const DEFAULT_SUBRACE_REPLACING_ABILITY_SET: ReadonlySet<string> = new Set([
+  'human--variant|PHB',
+]);
+
 const SOURCE_PRIORITY: Record<string, number> = {
   PHB: 0, DMG: 1, MTF: 2, MPMM: 3, SCAG: 4, TCE: 5, XGE: 6, EGW: 7,
 };
@@ -121,6 +137,8 @@ export function RacePicker({
   initialSkillChoices = [],
   initialFeatSlug = null,
   initialRaceCantrip = null,
+  subraceRequiredSet = DEFAULT_SUBRACE_REQUIRED_SET,
+  subraceReplacingAbilitySet = DEFAULT_SUBRACE_REPLACING_ABILITY_SET,
 }: {
   characterId: string;
   entries: RaceEntry[];
@@ -134,6 +152,10 @@ export function RacePicker({
   initialFeatSlug?: string | null;
   /** Pre-selected wizard cantrip for High Elf re-edit flow. Decision #606. */
   initialRaceCantrip?: { slug: string; source: string } | null;
+  /** From `worldRefData.subraceRequiredSet`. Defaults to PHB-only when omitted. */
+  subraceRequiredSet?: ReadonlySet<string>;
+  /** From `worldRefData.subraceReplacingAbilitySet`. Defaults to PHB-only when omitted. */
+  subraceReplacingAbilitySet?: ReadonlySet<string>;
 }) {
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(() => {
@@ -176,8 +198,8 @@ export function RacePicker({
    * unanchored. Grouping all sub-raced races visually + making the PHB-base race selectable
    * via the header card preserves PHB-RAW semantics without losing the variants' affordance.
    */
-  // RACES_REQUIRING_SUBRACE is a stable module-level constant — no memo needed.
-  const requiredSubraceParents = RACES_REQUIRING_SUBRACE;
+  // Prop-supplied set — stable identity per render of the parent Server Component.
+  const requiredSubraceParents = subraceRequiredSet;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -430,7 +452,7 @@ export function RacePicker({
     // Preflight: base race that requires a subrace. Domain is still source of
     // truth (the API will reject too), but we surface the error inline before
     // the round-trip so the user gets a fast signal.
-    if (!selected.isSubrace && requiresSubrace({ slug: selected.slug, source: selected.source })) {
+    if (!selected.isSubrace && subraceRequiredSet.has(`${selected.slug}|${selected.source}`)) {
       setError('Elegí un sublinaje para esta raza.');
       return;
     }
@@ -447,6 +469,7 @@ export function RacePicker({
       selectedIsSubrace: selected.isSubrace,
       selectedSlug: selected.slug,
       selectedSource: selected.source,
+      subraceReplacingAbilitySet,
     });
 
     const appliedAsis: Array<{ ability: AbilityKey; bonus: number; source: 'race' | 'subrace' }> = [];
@@ -637,7 +660,7 @@ export function RacePicker({
     const sizeStr = formatSize(e.data.size);
 
     const pills: ChoiceOption<string>['pills'] = [];
-    if (!e.isSubrace && requiresSubrace({ slug: e.slug, source: e.source })) {
+    if (!e.isSubrace && subraceRequiredSet.has(`${e.slug}|${e.source}`)) {
       pills.push({ tone: 'amber', label: 'requiere sublinaje' });
     }
     if (asiSummary && asiSummary !== '—') {
@@ -669,6 +692,8 @@ export function RacePicker({
           parent={parentEntry}
           allFeats={allFeats}
           allWizardCantrips={allWizardCantrips}
+          subraceRequiredSet={subraceRequiredSet}
+          subraceReplacingAbilitySet={subraceReplacingAbilitySet}
           chosenAsis={chosenAsis}
           setChosenAsis={(next) => {
             setChosenAsis(next);
@@ -814,6 +839,8 @@ function RaceDetailPanel({
   setChosenFeatSlug,
   chosenCantrip,
   setChosenCantrip,
+  subraceRequiredSet,
+  subraceReplacingAbilitySet,
 }: {
   entry: RaceEntry;
   parent: RaceEntry | null;
@@ -829,6 +856,8 @@ function RaceDetailPanel({
   setChosenFeatSlug: (next: string | null) => void;
   chosenCantrip: { slug: string; source: string } | null;
   setChosenCantrip: (next: { slug: string; source: string } | null) => void;
+  subraceRequiredSet: ReadonlySet<string>;
+  subraceReplacingAbilitySet: ReadonlySet<string>;
 }) {
   const traits = useMemo(() => {
     const own = extractTraits(entry.data.entries);
@@ -872,7 +901,7 @@ function RaceDetailPanel({
 
   return (
     <div className="space-y-3">
-      {!entry.isSubrace && requiresSubrace({ slug: entry.slug, source: entry.source }) && (
+      {!entry.isSubrace && subraceRequiredSet.has(`${entry.slug}|${entry.source}`) && (
         <p className="rounded-md border border-accent-soft bg-paper px-2.5 py-1.5 text-xs text-accent-deep">
           Esta raza requiere un sublinaje. Elegí uno de los sublinajes listados.
         </p>
@@ -887,6 +916,7 @@ function RaceDetailPanel({
         entry={entry}
         chosen={chosenAsis}
         setChosen={setChosenAsis}
+        subraceReplacingAbilitySet={subraceReplacingAbilitySet}
       />
 
       {(fixedLangs.length > 0 || hasLangChoices) && (
@@ -955,11 +985,13 @@ function AsiSection({
   entry,
   chosen,
   setChosen,
+  subraceReplacingAbilitySet,
 }: {
   parent: RaceEntry | null;
   entry: RaceEntry;
   chosen: Record<string, AbilityKey[]>;
   setChosen: (next: Record<string, AbilityKey[]>) => void;
+  subraceReplacingAbilitySet: ReadonlySet<string>;
 }) {
   const { raceSlots, subraceSlots } = effectiveAsiSlots({
     parentAbility: parent?.data.ability,
@@ -967,6 +999,7 @@ function AsiSection({
     selectedIsSubrace: entry.isSubrace,
     selectedSlug: entry.slug,
     selectedSource: entry.source,
+    subraceReplacingAbilitySet,
   });
 
   const parentAbilityEmpty = parent && !(parent.data.ability && parent.data.ability.length > 0);

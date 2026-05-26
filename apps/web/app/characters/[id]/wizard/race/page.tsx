@@ -60,6 +60,7 @@ function deriveChosenAsis(
   asisApplied: Array<{ ability: string; bonus: number; source: 'race' | 'subrace' }>,
   parent: RaceEntry | null,
   selected: RaceEntry,
+  subraceReplacingAbilitySet: ReadonlySet<string>,
 ): Record<string, AbilityKey[]> {
   const out: Record<string, AbilityKey[]> = {};
   const { raceSlots, subraceSlots } = effectiveAsiSlots({
@@ -68,6 +69,7 @@ function deriveChosenAsis(
     selectedIsSubrace: selected.isSubrace,
     selectedSlug: selected.slug,
     selectedSource: selected.source,
+    subraceReplacingAbilitySet,
   });
 
   const buckets: Array<{ slots: typeof raceSlots; source: 'race' | 'subrace' }> = [
@@ -108,6 +110,23 @@ export default async function RaceStepPage({ params }: Props) {
   const token = session.access_token;
 
   const character = await api.get<Character>(`/characters/${id}`, token);
+
+  // Resolve world reference data (subrace registries + language pool) for the
+  // current world. The API flattens Sets to arrays at the boundary; we rebuild
+  // them here so RacePicker can do O(1) `.has()` lookups.
+  const world = await api.get<{
+    refData: {
+      languagePool: { standard: string[]; exotic: string[] };
+      subraceRequiredSet: string[];
+      subraceReplacingAbilitySet: string[];
+    } | null;
+  }>(`/worlds/${character.worldId}`, token);
+  const subraceRequiredSet: ReadonlySet<string> = new Set(
+    world.refData?.subraceRequiredSet ?? [],
+  );
+  const subraceReplacingAbilitySet: ReadonlySet<string> = new Set(
+    world.refData?.subraceReplacingAbilitySet ?? [],
+  );
 
   const [{ data: list }, { data: featList }, { data: spellList }] = await Promise.all([
     api.get<{ data: RaceRow[] }>(
@@ -179,7 +198,12 @@ export default async function RaceStepPage({ params }: Props) {
       : null;
 
     if (selected && character.data.asisApplied) {
-      initialChosenAsis = deriveChosenAsis(character.data.asisApplied, parent, selected);
+      initialChosenAsis = deriveChosenAsis(
+        character.data.asisApplied,
+        parent,
+        selected,
+        subraceReplacingAbilitySet,
+      );
     }
   }
 
@@ -204,6 +228,8 @@ export default async function RaceStepPage({ params }: Props) {
           initialSkillChoices={character.data?.raceSkillChoices ?? []}
           initialFeatSlug={character.data?.raceFeatSlug ?? null}
           initialRaceCantrip={character.data?.raceCantrip ?? null}
+          subraceRequiredSet={subraceRequiredSet}
+          subraceReplacingAbilitySet={subraceReplacingAbilitySet}
         />
       </div>
     </section>

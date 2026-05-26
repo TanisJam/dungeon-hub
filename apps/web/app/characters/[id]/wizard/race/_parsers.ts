@@ -2,7 +2,6 @@
 // embeds/race.ts — devolvemos data estructurada en vez de strings para Discord.
 // TODO si esto crece, extraer a un package compartido packages/5etools-render.
 
-import { subraceReplacesParentAbility } from '@dungeon-hub/domain/character/race';
 
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 export const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -151,6 +150,13 @@ export function effectiveAsiSlots(input: {
   /** slug+source del subrace seleccionado (cuando selectedIsSubrace=true). */
   selectedSlug?: string;
   selectedSource?: string;
+  /**
+   * `worldRefData.subraceReplacingAbilitySet` from the world's resolved
+   * reference data. Replaces the domain-level `subraceReplacesParentAbility`
+   * helper after SDD #807. Optional for backwards compat — defaults to the
+   * PHB-only set (Variant Human).
+   */
+  subraceReplacingAbilitySet?: ReadonlySet<string>;
 }): { raceSlots: AsiSlot[]; subraceSlots: AsiSlot[] } {
   const parentSlots = parseAsis(input.parentAbility);
   const selectedSlots = parseAsis(input.selectedAbility);
@@ -160,13 +166,12 @@ export function effectiveAsiSlots(input: {
   }
 
   if (input.selectedIsSubrace) {
+    const replacingSet =
+      input.subraceReplacingAbilitySet ?? new Set(['human--variant|PHB']);
     const replaces =
       input.selectedSlug !== undefined &&
       input.selectedSource !== undefined &&
-      subraceReplacesParentAbility({
-        slug: input.selectedSlug,
-        source: input.selectedSource,
-      });
+      replacingSet.has(`${input.selectedSlug}|${input.selectedSource}`);
     if (replaces) {
       // PHB-RAW: subrace ASI REPLACES parent ASI (Variant Human, PHB p.31).
       return { raceSlots: [], subraceSlots: selectedSlots };
