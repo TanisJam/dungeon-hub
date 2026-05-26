@@ -226,6 +226,10 @@ When a 5etools data shape is **new to this codebase** (e.g. `_copy`, `_versions`
 - **`_versions` pattern**: two variants — SIMPLE (15+ races, e.g. Aasimar MPMM) and ABSTRACT+IMPL (Dragonborn XPHB, FTD Chromatic/Gem/Metallic). XPHB and FTD are excluded sources in this project; PHB Dragonborn does NOT use `_versions` and instead encodes ancestry as `resist: [{choose:{from:[...]}}]` + narrative table. See [engram #558].
 - **Excluded sources** (today): XPHB, FTD. If a feature scope expands to include them, that's a separate decision documented per SDD.
 
+**See also**:
+- `docs/manuals/dsl.md` — normative description of what each compendium entity looks like after import, plus the patches the importer applies (Dragonborn ancestries, additional spells normalizer, subclass grants, etc.).
+- `docs/manuals/conflict-resolution.md` — how `rules_profile.sources` + `disabledEntities` resolve cross-manual overlaps per-world, with worked examples.
+
 ---
 
 ## 11. Common Pitfalls (Lessons Learned)
@@ -249,4 +253,5 @@ If you trip on any of these, save a `discovery` to engram and link from your SDD
 - **Project context (this file)**: this `CLAUDE.md`.
 - **User-global agent rules**: `~/.claude/CLAUDE.md` (applies to all projects).
 - **E2E setup**: `apps/web/e2e/README.md` (pre-requisites, env vars, commands).
+- **Manual system**: `docs/manuals/dsl.md` (DSL reference) + `docs/manuals/conflict-resolution.md` (per-world overrides).
 - **Roadmaps**: `audit/rules-audit-*/proposal` topics in engram (one per audited domain).
