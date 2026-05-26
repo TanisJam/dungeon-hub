@@ -16,3 +16,10 @@ export {
   type ProficiencyCheck,
 } from './proficiency.js';
 export { checkEquipSlots } from './equip-slots.js';
+export { coinWeight, type CoinCurrency } from './coin-weight.js';
+export {
+  transferItemBetweenCharacters,
+  type TransferInput,
+  type TransferIssue,
+  type TransferResult,
+} from './transfer.js';

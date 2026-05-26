@@ -5,7 +5,7 @@
  * - Attunement máx 3 ítems con `attuned: true` (PHB p.138, hard rule).
  * - Carga > STR × 15 → warning, no bloquea.
  * - Equipar arma/armadura sin proficiency → warning, no bloquea.
- * - Currency separado en `data.currency` (no en este módulo).
+ * - Currency separado en `data.currency` (no en este módulo). Ver `coinWeight` para peso de monedas (PHB p.143).
  */
 
 export const ITEM_STATES = ['equipped', 'carried', 'stowed'] as const;
@@ -88,6 +88,13 @@ export interface ItemCompendiumLite {
    * the armor has no STR requirement. Maps from 5etools `strength` field.
    */
   armorStrengthMin?: number;
+  /**
+   * Costo del ítem en copper pieces (CP), extraído de `data.value` en 5etools.
+   * null cuando el campo está ausente o no es numérico (magic items, homebrew, etc.).
+   * Read-time projection — NO hay columna `cost_cp` en el schema; se extrae en `projectItemRow`.
+   * Design decision sdd/inventory-d4-d6/design #890 — `extractCostCp` en load-item-data.ts.
+   */
+  costCp?: number | null;
   /**
    * Si el ítem es un container, define su capacidad y si "cancela" el peso
    * del contenido (Bag of Holding, Heward's Handy Haversack, etc.). null si

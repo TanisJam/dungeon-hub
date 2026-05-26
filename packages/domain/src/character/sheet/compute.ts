@@ -21,6 +21,7 @@ import type { RaceInnateSpell } from '../race/types.js';
 import {
   buildWeightLookup,
   carryingCapacity,
+  coinWeight,
   evaluateEncumbrance,
   totalWeight,
   ATTUNEMENT_MAX,
@@ -494,14 +495,19 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   const racialTraits = raceData?.racialTraits ?? [];
 
   // ---- Encumbrance (con o sin variant) ----------------------------------
-  const totalCarryWeight = totalWeight(
+  // PHB p.143: coins also contribute weight (50 coins = 1 lb, all denominations equal).
+  // Design decision sdd/inventory-d4-d6/design #890: aggregate at call site, keep evaluateEncumbrance pure.
+  const itemWeight = totalWeight(
     character.inventory ?? [],
     buildWeightLookup(input.itemWeights ?? []),
   );
+  const coinWeightLb = coinWeight(character.currency ?? null);
+  const totalCarryWeight = itemWeight + coinWeightLb;
   const encumbranceView: EncumbranceView = evaluateEncumbrance(
     totalCarryWeight,
     effective.str,
     input.encumbranceVariant === true,
+    coinWeightLb,
   );
 
   // ---- Speed final: aplicar penalty de encumbrance, después exhaustion ---

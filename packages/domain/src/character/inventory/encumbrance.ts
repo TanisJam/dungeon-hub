@@ -119,6 +119,12 @@ export interface EncumbranceView {
   };
   /** Penalty de velocidad por encumbrance variant. 0 si ok o si variant OFF. */
   speedPenalty: number;
+  /**
+   * Peso aportado por las monedas del personaje (PHB p.143: 50 monedas = 1 lb).
+   * Siempre >= 0. Se incluye en `weight`. Exponemos por separado para que
+   * la UI pueda mostrar el sub-hint "Monedas: X lb".
+   */
+  coinWeight: number;
 }
 
 /**
@@ -132,26 +138,43 @@ export interface EncumbranceView {
  *   - peso > STR×5  → 'encumbered', speed -10.
  *   - else → 'ok'.
  */
+/**
+ * Evalúa encumbrance contra peso total.
+ *
+ * - Sin variant (default): solo importa el máximo STR×15. Status: 'ok' o 'over'.
+ * - Con variant (PHB p.176):
+ *   - peso > STR×15 → 'over' (no podés cargar más)
+ *   - peso > STR×10 → 'heavily-encumbered', speed -20, disadvantage en STR/DEX/CON
+ *     ability checks, attack rolls y saves.
+ *   - peso > STR×5  → 'encumbered', speed -10.
+ *   - else → 'ok'.
+ *
+ * `coinWeightLb` es el peso de las monedas (ya incluido en `weight`). Se propaga
+ * tal cual al resultado para que el caller (compute.ts) pueda exponerlo en la UI.
+ * PHB p.143: 50 coins = 1 lb.
+ */
 export function evaluateEncumbrance(
   weight: number,
   strScore: number,
   variant = false,
+  coinWeightLb = 0,
 ): EncumbranceView {
   const max = Math.max(0, strScore) * 15;
   const encumbered = Math.max(0, strScore) * 5;
   const heavily = Math.max(0, strScore) * 10;
   const thresholds = { encumbered, heavily, max };
+  const coinWeight = coinWeightLb;
 
   if (weight > max) {
-    return { weight, max, status: 'over', thresholds, speedPenalty: variant ? 20 : 0 };
+    return { weight, max, status: 'over', thresholds, speedPenalty: variant ? 20 : 0, coinWeight };
   }
   if (variant) {
     if (weight > heavily) {
-      return { weight, max, status: 'heavily-encumbered', thresholds, speedPenalty: 20 };
+      return { weight, max, status: 'heavily-encumbered', thresholds, speedPenalty: 20, coinWeight };
     }
     if (weight > encumbered) {
-      return { weight, max, status: 'encumbered', thresholds, speedPenalty: 10 };
+      return { weight, max, status: 'encumbered', thresholds, speedPenalty: 10, coinWeight };
     }
   }
-  return { weight, max, status: 'ok', thresholds, speedPenalty: 0 };
+  return { weight, max, status: 'ok', thresholds, speedPenalty: 0, coinWeight };
 }

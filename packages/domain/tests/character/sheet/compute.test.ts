@@ -420,6 +420,30 @@ describe('sheet: inventory views (1.6c)', () => {
     expect(sheet.speed.walk).toBe(10);
   });
 
+  // ---- Coin weight (PHB p.143: 50 coins = 1 lb, all denominations equal) ---
+  it('encumbrance.weight includes coin weight: 100 gp → 2 lb', () => {
+    // PHB p.143: 50 coins = 1 lb. 100 gp = 100 coins = 2 lb.
+    const sheet = computeCharacterSheet({
+      character: {
+        name: 'Rich Wizard',
+        baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        inventory: [],
+        currency: { cp: 0, sp: 0, ep: 0, gp: 100, pp: 0 },
+      },
+    });
+    expect(sheet.encumbrance.weight).toBe(2);
+    expect(sheet.encumbrance.coinWeight).toBe(2);
+  });
+
+  it('encumbrance.coinWeight = 0 when character has no coins (regression)', () => {
+    // Existing behavior preserved: zero coins → zero coin contribution.
+    const sheet = computeCharacterSheet({
+      character: { name: 'Broke Rogue' },
+    });
+    expect(sheet.encumbrance.weight).toBe(0);
+    expect(sheet.encumbrance.coinWeight).toBe(0);
+  });
+
   // ---- Exhaustion (PHB p.291) -----------------------------------------
   it('exhaustion 0: sin efectos, speed/HP intactos', () => {
     const sheet = computeCharacterSheet({
