@@ -243,4 +243,37 @@ export const authRoute: FastifyPluginAsync = async (app) => {
       discord_username: tok.discordUsername,
     };
   });
+
+  // ---- POST /auth/link/revoke ---------------------------------------------
+  // Desvincula la cuenta de Discord del user autenticado. Idempotente: si el
+  // user no está vinculado, devuelve 200 con previousDiscordId=null.
+  //
+  // El bot llama esto vía X-Acting-As-Discord-Id (postAs) — el backend resuelve
+  // el user por discordId y limpia el campo. Después de revoke, ese mismo
+  // discord_id NO resolverá más al user (impersonation futura → DISCORD_USER_NOT_LINKED).
+  //
+  // El user puede después correr /link de nuevo desde Discord y vincular otra
+  // cuenta del backend.
+  app.post('/auth/link/revoke', { preHandler: app.authenticate }, async (request) => {
+    const userId = request.user!.sub;
+
+    const rows = await db
+      .select({ discordId: users.discordId, discordUsername: users.discordUsername })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const previous = rows[0] ?? null;
+
+    await db
+      .update(users)
+      .set({ discordId: null, discordUsername: null })
+      .where(eq(users.id, userId));
+
+    return {
+      ok: true,
+      previousDiscordId: previous?.discordId ?? null,
+      previousDiscordUsername: previous?.discordUsername ?? null,
+    };
+  });
 };
