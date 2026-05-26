@@ -2,9 +2,11 @@ import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import {
   campaignMembers,
+  campaigns,
   characters,
   sessionParticipants,
   sessions,
+  worldMembers,
 } from '../../infra/db/schema.js';
 
 export type SessionStatus = 'scheduled' | 'active' | 'paused' | 'completed' | 'cancelled';
@@ -35,23 +37,53 @@ export async function loadSession(id: string): Promise<LoadedSession | null> {
   return (rows[0] as LoadedSession | undefined) ?? null;
 }
 
+/**
+ * Resolves the worldId for a session by loading its campaign.
+ * Returns null if the campaign no longer exists.
+ */
+export async function loadSessionWorldId(session: LoadedSession): Promise<string | null> {
+  const rows = await db
+    .select({ worldId: campaigns.worldId })
+    .from(campaigns)
+    .where(eq(campaigns.id, session.campaignId))
+    .limit(1);
+  return rows[0]?.worldId ?? null;
+}
+
 export type SessionAccess = 'gm' | 'participant' | 'campaign-member' | 'none';
 
 /**
  * Devuelve el nivel de acceso del user sobre la sesión:
- * - 'gm':              el GM que creó la sesión (full read/write).
+ * - 'gm':              el GM que creó la sesión, o cualquier world GM del world de la campaña.
  * - 'participant':     un jugador que joineó un char (read + leave; write limitado).
  * - 'campaign-member': miembro de la campaña pero no participante (read public-only).
  * - 'none':            sin acceso → 403.
  *
- * Para sesiones, "gm" es el `gm_user_id` de la sesión, NO el GM de la campaña
- * (aunque típicamente coinciden — el GM crea sus propias sesiones).
+ * Post-C3: 'gm' is returned for any worldMember with role='gm' of the world
+ * that owns the session's campaign. This allows multi-DM sessions.
  */
 export async function getSessionAccess(
   session: LoadedSession,
   userId: string,
 ): Promise<SessionAccess> {
+  // Check if session creator
   if (session.gmUserId === userId) return 'gm';
+
+  // Check world-level GM membership
+  const campaignRow = await db
+    .select({ worldId: campaigns.worldId })
+    .from(campaigns)
+    .where(eq(campaigns.id, session.campaignId))
+    .limit(1);
+  const worldId = campaignRow[0]?.worldId;
+  if (worldId) {
+    const gmRow = await db
+      .select({ role: worldMembers.role })
+      .from(worldMembers)
+      .where(and(eq(worldMembers.worldId, worldId), eq(worldMembers.userId, userId)))
+      .limit(1);
+    if (gmRow.length > 0 && gmRow[0]!.role === 'gm') return 'gm';
+  }
 
   // ¿Es participant activo?
   const partRows = await db
@@ -132,22 +164,25 @@ export async function findCharacterActiveSession(
 
 /**
  * Helper para validar que un character existe Y pertenece al user que lo
- * quiere joinear/leavear, EN la campaña de la sesión.
+ * quiere joinear/leavear, EN el world de la sesión.
+ *
+ * Post-C2: characters no longer have campaign_id; they belong to a world.
+ * The session's worldId is resolved via its campaign (campaign.worldId).
  */
 export async function loadCharacterForSession(
   characterId: string,
   userId: string,
-  campaignId: string,
+  sessionWorldId: string,
 ): Promise<{ id: string; userId: string } | null> {
   const rows = await db
-    .select({ id: characters.id, userId: characters.userId, campaignId: characters.campaignId })
+    .select({ id: characters.id, userId: characters.userId, worldId: characters.worldId })
     .from(characters)
     .where(eq(characters.id, characterId))
     .limit(1);
   const c = rows[0];
   if (!c) return null;
   if (c.userId !== userId) return null;
-  if (c.campaignId !== campaignId) return null;
+  if (c.worldId !== sessionWorldId) return null;
   return { id: c.id, userId: c.userId };
 }
 

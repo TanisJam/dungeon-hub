@@ -1,13 +1,16 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characters, campaignMembers, campaigns } from '../../infra/db/schema.js';
+import { characters, campaignMembers, campaigns, worldMembers } from '../../infra/db/schema.js';
 
 export interface LoadedCharacter {
   id: string;
   userId: string;
-  campaignId: string;
+  /** worldId replaces campaignId post-C2. campaignId kept for read-path tolerance (C5). */
+  worldId: string;
+  /** @deprecated campaignId removed from schema in C2. Kept in interface for C5 migration. */
+  campaignId?: string;
   name: string;
-  status: 'draft' | 'active' | 'retired' | 'dead';
+  status: 'draft' | 'active' | 'retired' | 'dead' | 'pending_approval';
   data: unknown;
   inventory: unknown;
   xp: number;
@@ -20,13 +23,16 @@ export async function loadCharacter(id: string): Promise<LoadedCharacter | null>
   return (rows[0] as LoadedCharacter | undefined) ?? null;
 }
 
-export type CharacterAccess = 'owner' | 'campaign-member' | 'none';
+export type CharacterAccess = 'owner' | 'world-member' | 'none';
 
 /**
  * Devuelve el nivel de acceso del user sobre el personaje:
- * - 'owner':           el user dueño → full access (read/write/delete).
- * - 'campaign-member': el user pertenece a la campaña del personaje → read-only.
- * - 'none':            sin acceso → 403.
+ * - 'owner':        el user dueño → full access (read/write/delete).
+ * - 'world-member': el user pertenece al world del personaje → read-only.
+ * - 'none':         sin acceso → 403.
+ *
+ * Post-C2: access is scoped to world membership, not campaign membership.
+ * Characters belong to worlds (campaign_id dropped in migration 0015).
  */
 export async function getCharacterAccess(
   character: LoadedCharacter,
@@ -35,22 +41,26 @@ export async function getCharacterAccess(
   if (character.userId === userId) return 'owner';
 
   const member = await db
-    .select({ role: campaignMembers.role })
-    .from(campaignMembers)
+    .select({ role: worldMembers.role })
+    .from(worldMembers)
     .where(
       and(
-        eq(campaignMembers.campaignId, character.campaignId),
-        eq(campaignMembers.userId, userId),
+        eq(worldMembers.worldId, character.worldId),
+        eq(worldMembers.userId, userId),
       ),
     )
     .limit(1);
 
-  return member.length > 0 ? 'campaign-member' : 'none';
+  return member.length > 0 ? 'world-member' : 'none';
 }
 
 /**
  * Verifica que el user sea miembro de la campaña (precondición para crear personaje ahí).
  * Devuelve la campaign si es miembro, null si no.
+ *
+ * NOTE: This function checks campaign-level membership (campaign_members table).
+ * Character creation is a C5 concern (switching from campaignId → worldId).
+ * Kept as-is for C5 migration.
  */
 export async function assertCampaignMembership(
   campaignId: string,

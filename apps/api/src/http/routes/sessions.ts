@@ -21,10 +21,12 @@ import {
   listSessionParticipants,
   loadCharacterForSession,
   loadSession,
+  loadSessionWorldId,
   sanitizeSessionForRole,
   type SessionStatus,
 } from '../../use-cases/sessions/load-session.js';
 import { applyTransition, type StateAction } from '../../use-cases/sessions/state-machine.js';
+import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 import {
   canAppendEvent,
   filterEventsByAccess,
@@ -241,8 +243,15 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
 
     const session = await loadSession(id);
     if (!session) return reply.code(404).send({ error: 'NOT_FOUND' });
-    if (session.gmUserId !== userId) {
-      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el GM puede editar' });
+
+    const sessionWorldId = await loadSessionWorldId(session);
+    if (!sessionWorldId) return reply.code(500).send({ error: 'WORLD_MISSING' });
+    const gmCheck = await assertWorldGm(sessionWorldId, userId);
+    if (!gmCheck.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: sessionWorldId, userId }],
+      });
     }
 
     // Editar una sesión completed o cancelled queda permitido solo para summary y dmNotes.
@@ -302,8 +311,15 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
 
     const session = await loadSession(id);
     if (!session) return reply.code(404).send({ error: 'NOT_FOUND' });
-    if (session.gmUserId !== userId) {
-      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el GM ejecuta transiciones' });
+
+    const transWorldId = await loadSessionWorldId(session);
+    if (!transWorldId) return reply.code(500).send({ error: 'WORLD_MISSING' });
+    const transGmCheck = await assertWorldGm(transWorldId, userId);
+    if (!transGmCheck.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: transWorldId, userId }],
+      });
     }
 
     const result = applyTransition(session.status, action);
@@ -363,7 +379,10 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const character = await loadCharacterForSession(body.characterId, userId, session.campaignId);
+    const joinWorldId = await loadSessionWorldId(session);
+    const character = joinWorldId
+      ? await loadCharacterForSession(body.characterId, userId, joinWorldId)
+      : null;
     if (!character) {
       return reply.code(400).send({
         error: 'VALIDATION_FAILED',
@@ -594,8 +613,15 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
 
     const session = await loadSession(id);
     if (!session) return reply.code(404).send({ error: 'NOT_FOUND' });
-    if (session.gmUserId !== userId) {
-      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el GM puede completar' });
+
+    const completeWorldId = await loadSessionWorldId(session);
+    if (!completeWorldId) return reply.code(500).send({ error: 'WORLD_MISSING' });
+    const completeGmCheck = await assertWorldGm(completeWorldId, userId);
+    if (!completeGmCheck.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: completeWorldId, userId }],
+      });
     }
 
     const transition = applyTransition(session.status as SessionStatus, 'complete');

@@ -55,7 +55,8 @@ import {
   getCharacterAccess,
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
-import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
+import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
+import { loadCampaign, loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadRaceAndSubrace, loadRaceSheetData } from '../../use-cases/characters/load-race-data.js';
 import { loadClassAndSubclass } from '../../use-cases/characters/load-class-data.js';
 import {
@@ -352,11 +353,14 @@ const SetRaceBody = z.object({
 
 export const charactersRoute: FastifyPluginAsync = async (app) => {
   // ---- POST /characters ----------------------------------------------------
+  // Post-C2: characters belong to worlds, not campaigns. The body still accepts
+  // `campaignId` for backward compat (C5 will switch to `worldId`).
+  // The campaign's worldId is resolved here and stored on the character.
   app.post('/characters', { preHandler: app.authenticate }, async (request, reply) => {
     const body = CreateBody.parse(request.body);
     const userId = request.user!.sub;
 
-    // El user tiene que ser miembro de la campaña.
+    // Verify user is a member of the campaign.
     const campaign = await assertCampaignMembership(body.campaignId, userId);
     if (!campaign) {
       return reply
@@ -364,11 +368,17 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .send({ error: 'NOT_CAMPAIGN_MEMBER', campaignId: body.campaignId });
     }
 
+    // Load the campaign to get its worldId (rulesProfile lives on world post-C2).
+    const loadedCampaign = await loadCampaign(body.campaignId);
+    if (!loadedCampaign) {
+      return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+    }
+
     const [created] = await db
       .insert(characters)
       .values({
         userId,
-        campaignId: body.campaignId,
+        worldId: loadedCampaign.worldId,
         name: body.name,
         data: body.data,
         // status default 'draft', inventory default '[]', xp default 0 (schema)
@@ -386,7 +396,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const { campaign, status: statusFilter } = ListQuery.parse(request.query);
 
     const conditions = [eq(characters.userId, userId)];
-    if (campaign) conditions.push(eq(characters.campaignId, campaign));
+    // Post-C2: characters belong to worlds, not campaigns. The `campaign` query param
+    // is kept for API compat but now filters by worldId (C5 will rename the param).
+    if (campaign) conditions.push(eq(characters.worldId, campaign));
     if (statusFilter && statusFilter.length > 0) {
       conditions.push(inArray(characters.status, statusFilter));
     }
@@ -396,7 +408,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const rows = await db
       .select({
         id: characters.id,
-        campaignId: characters.campaignId,
+        worldId: characters.worldId,
         name: characters.name,
         status: characters.status,
         xp: characters.xp,
@@ -449,7 +461,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const access = await getCharacterAccess(character, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const data = (character.data as Record<string, unknown> | null) ?? {};
@@ -563,7 +575,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const currentHp = hpData?.current ?? null;
 
     return {
-      character: { id: character.id, userId: character.userId, campaignId: character.campaignId, status: character.status, xp: character.xp },
+      character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
       currentHp,
       inventory,
@@ -620,13 +632,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const character = await loadCharacter(id);
     if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const campaign = await loadCampaign(character.campaignId);
-    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
-
-    if (campaign.gmUserId !== userId) {
-      return reply
-        .code(403)
-        .send({ error: 'FORBIDDEN', message: 'Solo el DM de la campaña puede otorgar XP' });
+    // Auth: world-level GM check (post-C3: replaced campaign.gmUserId === userId)
+    const xpGmCheck = await assertWorldGm(character.worldId, userId);
+    if (!xpGmCheck.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: character.worldId, userId }],
+      });
     }
 
     const next = character.xp + body.award;
@@ -686,7 +698,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) {
       return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
     }
@@ -728,7 +740,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const { race, subrace } = await loadRaceAndSubrace({
@@ -886,7 +898,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const { classData, subclassData } = await loadClassAndSubclass({
@@ -976,7 +988,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const backgroundData = await loadBackgroundData({
@@ -1060,7 +1072,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const { classData, subclassData } = await loadClassAndSubclass({
@@ -1136,7 +1148,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const featData = await loadFeatData({ slug: body.feat.slug, source: body.feat.source });
@@ -1570,7 +1582,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
     }
 
-    const campaign = await loadCampaign(character.campaignId);
+    const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
@@ -1697,7 +1709,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede acceder' });
       }
 
-      const campaign = await loadCampaign(character.campaignId);
+      const campaign = await loadWorldById(character.worldId);
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
@@ -1826,7 +1838,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
       }
 
-      const campaign = await loadCampaign(character.campaignId);
+      const campaign = await loadWorldById(character.worldId);
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
@@ -2398,7 +2410,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
       }
 
-      const campaign = await loadCampaign(character.campaignId);
+      const campaign = await loadWorldById(character.worldId);
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};
@@ -2728,7 +2740,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
       }
 
-      const campaign = await loadCampaign(character.campaignId);
+      const campaign = await loadWorldById(character.worldId);
       if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
 
       const charData = (character.data as Record<string, unknown> | null) ?? {};

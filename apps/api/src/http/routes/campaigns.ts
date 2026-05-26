@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { DEFAULT_RULES_PROFILE, RulesProfileSchema } from '@dungeon-hub/domain/rules-profile';
 import { db } from '../../infra/db/client.js';
-import { campaigns, campaignMembers, users } from '../../infra/db/schema.js';
+import { campaigns, campaignMembers, users, worlds, worldMembers } from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
+import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 
 const CreateCampaignBody = z.object({
   name: z.string().min(1).max(120),
@@ -14,6 +16,10 @@ const CreateCampaignBody = z.object({
 
 const UpdateCampaignBody = z.object({
   name: z.string().min(1).max(120).optional(),
+  /**
+   * Post-C2: rulesProfile is stored on the world, not the campaign.
+   * Accepting it here for backward compat — updates the associated world.
+   */
   rulesProfile: RulesProfileSchema.optional(),
 });
 
@@ -21,6 +27,8 @@ const ParamsWithId = z.object({ id: z.string().uuid() });
 
 export const campaignsRoute: FastifyPluginAsync = async (app) => {
   // ---- POST /campaigns -----------------------------------------------------
+  // Crea un world + campaign atómicamente. El creator se convierte en GM del world.
+  // El rulesProfile se almacena en el world (no en la campaña post-C2).
   app.post('/campaigns', { preHandler: app.authenticate }, async (request, reply) => {
     const body = CreateCampaignBody.parse(request.body);
     const userId = request.user!.sub;
@@ -37,12 +45,32 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
 
     const profile = body.rulesProfile ?? DEFAULT_RULES_PROFILE;
 
+    // Slug derivado del nombre + UUID suffix para unicidad
+    const slugBase = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const slug = slugBase + '-' + randomUUID().slice(0, 8);
+
+    // Create world first (rules_profile lives on world post-C2)
+    const [createdWorld] = await db
+      .insert(worlds)
+      .values({
+        name: body.name + ' (World)',
+        slug,
+        ownerUserId: userId,
+        rulesProfile: profile,
+      })
+      .returning();
+
+    if (!createdWorld) {
+      return reply.code(500).send({ error: 'CREATE_FAILED' });
+    }
+
+    // Create campaign under the world
     const [created] = await db
       .insert(campaigns)
       .values({
         name: body.name,
         gmUserId: userId,
-        rulesProfile: profile,
+        worldId: createdWorld.id,
       })
       .returning();
 
@@ -50,7 +78,14 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
       return reply.code(500).send({ error: 'CREATE_FAILED' });
     }
 
-    // El GM se une como miembro automáticamente
+    // GM se une al world como gm worldMember
+    await db.insert(worldMembers).values({
+      worldId: createdWorld.id,
+      userId,
+      role: 'gm',
+    });
+
+    // El GM se une a la campaign como miembro automáticamente
     await db.insert(campaignMembers).values({
       campaignId: created.id,
       userId,
@@ -61,7 +96,8 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
       id: created.id,
       name: created.name,
       gmUserId: created.gmUserId,
-      rulesProfile: created.rulesProfile,
+      worldId: created.worldId,
+      rulesProfile: profile,
       createdAt: created.createdAt,
     });
   });
@@ -76,6 +112,7 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
         id: campaigns.id,
         name: campaigns.name,
         gmUserId: campaigns.gmUserId,
+        worldId: campaigns.worldId,
         createdAt: campaigns.createdAt,
         memberRole: campaignMembers.role,
       })
@@ -105,7 +142,7 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
   });
 
   // ---- PATCH /campaigns/:id ------------------------------------------------
-  // Solo el GM puede editar (en particular, el Rules Profile).
+  // Cualquier GM del world (worldMembers.role='gm') puede editar la campaña.
   app.patch('/campaigns/:id', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
     const body = UpdateCampaignBody.parse(request.body);
@@ -113,13 +150,17 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
 
     const campaign = await loadCampaign(id);
     if (!campaign) return reply.code(404).send({ error: 'NOT_FOUND' });
-    if (campaign.gmUserId !== userId) {
-      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el GM puede editar' });
+
+    const check = await assertWorldGm(campaign.worldId, userId);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: campaign.worldId, userId }],
+      });
     }
 
     const updates: Partial<typeof campaigns.$inferInsert> = { updatedAt: new Date() };
     if (body.name !== undefined) updates.name = body.name;
-    if (body.rulesProfile !== undefined) updates.rulesProfile = body.rulesProfile;
 
     const [updated] = await db
       .update(campaigns)
@@ -127,6 +168,14 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
       .where(eq(campaigns.id, id))
       .returning();
 
-    return updated;
+    // Post-C2: rulesProfile lives on the world. Update world if rulesProfile was provided.
+    if (body.rulesProfile !== undefined) {
+      await db
+        .update(worlds)
+        .set({ rulesProfile: body.rulesProfile, updatedAt: new Date() })
+        .where(eq(worlds.id, campaign.worldId));
+    }
+
+    return { ...updated, rulesProfile: body.rulesProfile ?? campaign.rulesProfile };
   });
 };

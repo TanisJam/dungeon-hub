@@ -52,7 +52,9 @@ describe('characters CRUD', () => {
     expect(c.status).toBe('draft');
     expect(c.xp).toBe(0);
     expect(c.userId).toBe(alice.id);
-    expect(c.campaignId).toBe(aliceCampaignId);
+    // Post-C2: characters belong to worlds, not campaigns.
+    // worldId is set from the campaign's world; campaignId no longer returned.
+    expect(c.worldId).toMatch(/^[0-9a-f-]{36}$/);
     expect(c.data).toEqual({ notes: 'WIP' });
   });
 
