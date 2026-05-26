@@ -4,11 +4,15 @@
 -- Existing campaign_members (players) were NOT backfilled into world_members.
 -- This was a known gap (engram #782) deferred from C5 (commit 862e6a9).
 --
--- This migration closes the gap: every campaign_member whose user_id is not yet
--- a worldMember of the campaign's world is inserted as role='player'.
+-- This migration closes the gap for historical data: every campaign_member
+-- whose user_id is not yet a worldMember of the campaign's world is inserted
+-- as role='player'.
 --
--- After this runs the OR shim in POST /characters is removed and replaced
--- with a single assertWorldMembership(worldId, userId) use-case call.
+-- The OR shim in POST /characters is NOT removed here. Integration tests still
+-- create campaign_members directly (bypassing any invite flow), so any new
+-- post-migration campaign_member rows can still be orphaned w.r.t. world_members.
+-- Resolving that requires designing the campaign-invite flow to write both
+-- tables atomically — deferred to the character-approval-flow SDD (roadmap §6.7).
 --
 -- This migration is pure DML — no schema changes. The snapshot is identical to 0015.
 
