@@ -39,7 +39,7 @@ const BANNER_COLOR: Record<Exclude<EncumbranceStatus, 'ok'>, string> = {
 };
 
 export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
-  const { weight, max, status, thresholds } = encumbrance;
+  const { weight, max, status, thresholds, coinWeight } = encumbrance;
   // % fill capped at 100. We render against the absolute ceiling STR×15.
   const pct = max > 0 ? Math.min(100, Math.round((weight / max) * 100)) : 0;
 
@@ -49,9 +49,17 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
         <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
           Carga
         </p>
-        <p className="text-xs font-semibold text-ink-soft tabular-nums">
-          {weight} / {max} lb
-        </p>
+        <div className="text-right">
+          <p className="text-xs font-semibold text-ink-soft tabular-nums">
+            {weight} / {max} lb
+          </p>
+          {/* REQ-ID-ENCUMBRANCE-COIN-LABEL: show coin weight hint when > 0. */}
+          {coinWeight != null && coinWeight > 0 && (
+            <p className="text-[10px] text-ink-mute tabular-nums">
+              Monedas: {coinWeight} lb
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Capacity track with threshold ticks */}

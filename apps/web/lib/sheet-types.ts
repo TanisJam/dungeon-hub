@@ -157,7 +157,16 @@ export interface EncumbranceView {
     max: number;        // STR × 15
   };
   speedPenalty: number;
+  /**
+   * Weight contributed by coins (PHB p.143: 50 coins = 1 lb).
+   * Included in `weight`. Exposed separately for the "Monedas: X lb" sub-hint.
+   * Optional for read-path tolerance (pre-sdd/inventory-d4-d6 sheet responses).
+   */
+  coinWeight?: number;
 }
+
+export type CurrencyKey = 'cp' | 'sp' | 'ep' | 'gp' | 'pp';
+export type Currency = Record<CurrencyKey, number>;
 
 export interface CharacterSheet {
   identity: {
@@ -230,6 +239,11 @@ export interface CharacterSheet {
    * tolerance — older sheet fixtures predate this field.
    */
   encumbrance?: EncumbranceView;
+  /**
+   * Character's currency totals (cp/sp/ep/gp/pp).
+   * Optional on the web type for read-path tolerance.
+   */
+  currency?: Currency;
 }
 
 export interface InventoryItem {

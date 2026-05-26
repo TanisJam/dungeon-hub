@@ -13,6 +13,7 @@
  */
 import type {
   CharacterSheet,
+  Currency,
   InventoryItem,
   SheetWarningCode,
 } from '@/lib/sheet-types';
@@ -37,6 +38,39 @@ const BUCKETS: ReadonlyArray<{ key: Bucket; label: string }> = [
   { key: 'stowed', label: 'Guardados' },
 ];
 
+/**
+ * Currency block — REQ-ID-CURRENCY-BLOCK (sdd/inventory-d4-d6 spec #889).
+ * 5-column compact grid for 375px. Each cell: count + denomination label.
+ * Tap targets ≥44px (min-h-[44px]).
+ */
+function CurrencyBlock({ currency }: { currency: Currency }) {
+  const COINS: Array<{ key: keyof Currency; label: string; color: string }> = [
+    { key: 'cp', label: 'MC', color: 'text-amber-700' },
+    { key: 'sp', label: 'MP', color: 'text-slate-500' },
+    { key: 'ep', label: 'ME', color: 'text-teal-600' },
+    { key: 'gp', label: 'MO', color: 'text-yellow-600' },
+    { key: 'pp', label: 'PP', color: 'text-violet-600' },
+  ];
+
+  return (
+    <div className="grid grid-cols-5 gap-1" aria-label="Monedas">
+      {COINS.map(({ key, label, color }) => (
+        <div
+          key={key}
+          className="flex min-h-[44px] flex-col items-center justify-center rounded-md bg-paper-soft px-1 py-2"
+        >
+          <p className={`text-sm font-bold tabular-nums ${color}`}>
+            {currency[key] ?? 0}
+          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-mute">
+            {label}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function InventarioTab({
   characterId,
   worldId,
@@ -58,6 +92,14 @@ export function InventarioTab({
   return (
     <div className="space-y-4">
       <Picker characterId={characterId} worldId={worldId} />
+
+      {/* REQ-ID-CURRENCY-BLOCK: currency block always rendered (0 = no coins). */}
+      <Card variant="surface" className="p-4">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          Monedas
+        </p>
+        <CurrencyBlock currency={sheet.currency ?? { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 }} />
+      </Card>
 
       {sheet.encumbrance && (
         <Card variant="surface" className="p-4">

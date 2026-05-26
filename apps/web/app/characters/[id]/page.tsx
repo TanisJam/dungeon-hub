@@ -20,6 +20,7 @@ import { RestActions } from './_rest-actions';
 import { ApprovalActions } from './_components/approval-actions';
 import { DmGrantPanel } from './_components/dm-grant-panel';
 import { LevelUpEntryPoint } from './_components/level-up-entry-point';
+import { RecentGrants } from './_components/recent-grants';
 
 type WorldCallerRole = 'gm' | 'player' | null;
 type WorldDetailLite = { callerRole: WorldCallerRole };
@@ -173,6 +174,13 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           totalLevel={totalLevel}
           xp={xpCurrent}
           callerRole={callerRole}
+        />
+
+        {/* REQ-CRG-WIDGET: Recent grants for owner + DM (sdd/inventory-d4-d6). */}
+        <RecentGrants
+          characterId={id}
+          callerRole={callerRole}
+          accessToken={session.access_token}
         />
 
         <SheetTabs activeTab={tab} characterId={id} />
