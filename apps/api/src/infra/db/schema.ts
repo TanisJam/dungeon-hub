@@ -64,7 +64,62 @@ export const discordLinkTokens = pgTable('discord_link_tokens', {
 });
 
 // ---------------------------------------------------------------------------
-// campaigns — Rules Profile vive acá (JSONB)
+// worlds — top-level ownership entity.
+//
+// A world groups campaigns + characters under a shared authority axis.
+// `rules_profile` (formerly on campaigns) lives here — one rules set per world.
+// `owner_user_id` is the world creator; actual authority is via worldMembers.
+// ON DELETE RESTRICT: deleting a user requires explicit world cleanup first.
+// ---------------------------------------------------------------------------
+export const worlds = pgTable(
+  'worlds',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    rulesProfile: jsonb('rules_profile').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_worlds_slug').on(t.slug),
+    index('idx_worlds_owner').on(t.ownerUserId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// world_members — many-to-many: users ↔ worlds with role.
+//
+// role: 'gm' = world-level GM authority; 'player' = member.
+// PK (world_id, user_id) — one membership per user per world.
+// ON DELETE CASCADE on both FKs: removing a user removes their memberships;
+// removing a world removes its entire membership graph.
+// Index on (user_id) for "my worlds" dashboard query.
+// ---------------------------------------------------------------------------
+export const worldMembers = pgTable(
+  'world_members',
+  {
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['gm', 'player'] }).notNull(),
+    invitedAt: timestamp('invited_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.worldId, t.userId] }),
+    index('idx_world_members_user').on(t.userId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// campaigns — world_id added; rules_profile DROPPED (moved to worlds).
+// gm_user_id RETAINED — session-runner identity (locked decision #774).
 // ---------------------------------------------------------------------------
 export const campaigns = pgTable('campaigns', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
@@ -72,7 +127,9 @@ export const campaigns = pgTable('campaigns', {
   gmUserId: uuid('gm_user_id')
     .notNull()
     .references(() => users.id),
-  rulesProfile: jsonb('rules_profile').notNull(),
+  worldId: uuid('world_id')
+    .notNull()
+    .references(() => worlds.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -96,7 +153,10 @@ export const campaignMembers = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// characters — snapshot completo en data JSONB; inventory aparte para queries
+// characters — snapshot completo en data JSONB; inventory aparte para queries.
+//
+// campaign_id DROPPED (locked decision #774); world_id added.
+// Characters belong to a world, not directly to a campaign.
 // ---------------------------------------------------------------------------
 export const characters = pgTable(
   'characters',
@@ -105,9 +165,9 @@ export const characters = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    campaignId: uuid('campaign_id')
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     status: text('status', { enum: ['draft', 'active', 'retired', 'dead', 'pending_approval'] })
       .notNull()
@@ -120,7 +180,7 @@ export const characters = pgTable(
   },
   (table) => [
     index('idx_characters_user').on(table.userId),
-    index('idx_characters_campaign').on(table.campaignId),
+    index('idx_characters_world').on(table.worldId),
   ],
 );
 
