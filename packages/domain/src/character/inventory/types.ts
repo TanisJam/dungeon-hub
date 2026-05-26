@@ -73,6 +73,22 @@ export interface ItemCompendiumLite {
    */
   recharge?: 'dawn' | 'dusk' | 'short' | 'long' | string | null;
   /**
+   * Base armor class for body armor (5etools `ac`). PHB p.144 — Armor table.
+   * Examples: leather=11, chain shirt=13, plate=18. Undefined for non-armor.
+   */
+  ac?: number;
+  /**
+   * True when wearing this armor imposes disadvantage on Stealth checks
+   * (PHB p.144). Reflects 5etools `stealth` flag. Undefined for non-armor.
+   */
+  stealth?: boolean;
+  /**
+   * Minimum STR score required to avoid the heavy-armor speed penalty
+   * (PHB p.144 — e.g. plate=15, splint=15, chain mail=13). Undefined when
+   * the armor has no STR requirement. Maps from 5etools `strength` field.
+   */
+  armorStrengthMin?: number;
+  /**
    * Si el ítem es un container, define su capacidad y si "cancela" el peso
    * del contenido (Bag of Holding, Heward's Handy Haversack, etc.). null si
    * no es un container.
