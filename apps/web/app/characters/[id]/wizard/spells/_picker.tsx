@@ -358,24 +358,20 @@ export function SpellsPicker({
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked
     if (checked && freeCantripCount >= freeCantripLimit) return; // cap
-    setCantripKeys((prev) => {
-      const next = toggleSet(prev, key, checked);
-      emitChange(next, knownKeys, preparedKeys);
-      return next;
-    });
+    const next = toggleSet(cantripKeys, key, checked);
+    setCantripKeys(next);
+    emitChange(next, knownKeys, preparedKeys);
   }
 
   function toggleLeveled(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked
     if (checked && freeLeveledCount >= freeLeveledLimit) return; // cap
-    setActiveLeveledKeys((prev) => {
-      const next = toggleSet(prev, key, checked);
-      const nextKnown = casterMode === 'known' ? next : knownKeys;
-      const nextPrepared = casterMode === 'prep' ? next : preparedKeys;
-      emitChange(cantripKeys, nextKnown, nextPrepared);
-      return next;
-    });
+    const next = toggleSet(activeLeveledKeys, key, checked);
+    setActiveLeveledKeys(next);
+    const nextKnown = casterMode === 'known' ? next : knownKeys;
+    const nextPrepared = casterMode === 'prep' ? next : preparedKeys;
+    emitChange(cantripKeys, nextKnown, nextPrepared);
   }
 
   // ── Wizard-specific toggle handlers (D.2) ────────────────────────────────
@@ -383,19 +379,12 @@ export function SpellsPicker({
   function toggleKnown(key: string, checked: boolean) {
     const slug = parseKey(key).slug;
     if (subclassGrantedSet.has(slug)) return; // locked — skip
-    setCantripKeys((prevCantrips) => {
-      setKnownKeys((prev) => {
-        const nextKnown = toggleSet(prev, key, checked);
-        setPreparedKeys((prevPrep) => {
-          // Auto-link: unchecking Known → remove from Prepared
-          const nextPrepared = checked ? prevPrep : toggleSet(prevPrep, key, false);
-          emitChange(prevCantrips, nextKnown, nextPrepared);
-          return nextPrepared;
-        });
-        return nextKnown;
-      });
-      return prevCantrips;
-    });
+    const nextKnown = toggleSet(knownKeys, key, checked);
+    // Auto-link: unchecking Known → remove from Prepared.
+    const nextPrepared = checked ? preparedKeys : toggleSet(preparedKeys, key, false);
+    setKnownKeys(nextKnown);
+    setPreparedKeys(nextPrepared);
+    emitChange(cantripKeys, nextKnown, nextPrepared);
   }
 
   function togglePrepared(key: string, checked: boolean) {
@@ -403,11 +392,9 @@ export function SpellsPicker({
     if (subclassGrantedSet.has(slug)) return; // locked — skip
     // Invariant: prepared ⊆ known. Can't prepare a spell not in the spellbook.
     if (checked && !knownKeys.has(key)) return;
-    setPreparedKeys((prev) => {
-      const next = toggleSet(prev, key, checked);
-      emitChange(cantripKeys, knownKeys, next);
-      return next;
-    });
+    const next = toggleSet(preparedKeys, key, checked);
+    setPreparedKeys(next);
+    emitChange(cantripKeys, knownKeys, next);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
