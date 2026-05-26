@@ -217,25 +217,35 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
     expect(reloaded.data.classResourcesUsed['monk:ki-points']).toBe(0);
   });
 
-  it('GET /sheet exposes classResources view (web tab consumes this)', async () => {
+  it('GET /sheet exposes classResources view with used counter round-trip', async () => {
     const app = await getTestApp();
-    // Read the sheet — state may have changed from prior tests but the
-    // structure + max should be stable for an L5 Monk.
+    // Reset to a known state, then consume exactly 2 ki and read back.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${monkCharId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    const useRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${monkCharId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'monk:ki-points', amount: 2 },
+    });
+    expect(useRes.statusCode).toBe(200);
+
     const sheetRes = await app.inject({
       method: 'GET',
       url: `/api/v1/characters/${monkCharId}/sheet`,
       headers: { authorization: `Bearer ${owner.accessToken}` },
     });
     expect(sheetRes.statusCode).toBe(200);
-    const body = sheetRes.json();
-    const ki = body.sheet.classResources['monk:ki-points'];
+    const ki = sheetRes.json().sheet.classResources['monk:ki-points'];
     expect(ki).toBeDefined();
     expect(ki.max).toBe(5);
+    expect(ki.used).toBe(2);
     expect(ki.recoveryTrigger).toBe('short');
     expect(ki.classSlug).toBe('monk');
-    expect(typeof ki.used).toBe('number');
-    expect(ki.used).toBeGreaterThanOrEqual(0);
-    expect(ki.used).toBeLessThanOrEqual(5);
   });
 
   it('GET /sheet for L1 Fighter exposes Second Wind only', async () => {

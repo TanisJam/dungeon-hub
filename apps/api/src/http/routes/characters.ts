@@ -571,6 +571,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         // SP-05: slot usage tracking. Read-path tolerance — absent for pre-SP-05 characters.
         spellSlotsUsed: data['spellSlotsUsed'] as never,
         warlockSlotsUsed: data['warlockSlotsUsed'] as never,
+        // R-07: class-resource usage counters (#819). Read-path tolerance — absent
+        // on pre-SDD characters; deriveClassResources defaults to {} when undefined.
+        classResourcesUsed: data['classResourcesUsed'] as never,
       },
       raceData,
       itemWeights,
