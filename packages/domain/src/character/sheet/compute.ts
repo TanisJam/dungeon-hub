@@ -34,6 +34,7 @@ import {
 } from '../spellcasting/index.js';
 import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
 import { deriveClassResources } from '../class-resources/derive.js';
+import { computeArmorClass, type ArmorClassWarningCode } from './armor-class.js';
 
 /**
  * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
@@ -311,30 +312,29 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
   const pb = proficiencyBonus(totalLevel);
 
   // ---- AC ---------------------------------------------------------------
+  // Delegated to the pure helper `computeArmorClass` (REQ-CSD-AC-DELEGATION).
+  // PHB p.144 (Armor) + p.149 (Shield). All branching logic lives in the helper;
+  // here we only assemble the lookup, call it, and capture warnings.
   const dexMod = abilityModifier(effective.dex);
   const conMod = abilityModifier(effective.con);
-  const wisMod = abilityModifier(effective.wis);
-
-  // Default unarmored AC = 10 + DEX. Si tiene Monk o Barbarian (clase principal level 1+),
-  // usamos Unarmored Defense.
-  let acValue = 10 + dexMod;
-  let acFormula = `10 + DEX(${dexMod})`;
-  const hasBarb = classes.some((c) => c.slug === 'barbarian');
-  const hasMonk = classes.some((c) => c.slug === 'monk');
-  if (hasBarb) {
-    const v = 10 + dexMod + conMod;
-    if (v > acValue) {
-      acValue = v;
-      acFormula = `10 + DEX(${dexMod}) + CON(${conMod})  [Barbarian Unarmored Defense]`;
-    }
+  const itemLitesById: Record<string, ItemCompendiumLite> = {};
+  for (const lite of input.itemWeights ?? []) {
+    itemLitesById[`${lite.slug}|${lite.source}`] = lite;
   }
-  if (hasMonk) {
-    const v = 10 + dexMod + wisMod;
-    if (v > acValue) {
-      acValue = v;
-      acFormula = `10 + DEX(${dexMod}) + WIS(${wisMod})  [Monk Unarmored Defense]`;
-    }
-  }
+  const acResult = computeArmorClass({
+    inventory: character.inventory ?? [],
+    itemLites: itemLitesById,
+    classes: classes.map((c) => ({ classSlug: c.slug, level: c.level })),
+    abilities: {
+      str: effective.str,
+      dex: effective.dex,
+      con: effective.con,
+      wis: effective.wis,
+    },
+  });
+  const acValue = acResult.ac;
+  const acFormula = acResult.formula;
+  const acWarnings: ArmorClassWarningCode[] = acResult.warnings;
 
   // ---- HP ---------------------------------------------------------------
   // L1 de la primera clase: max(hit die) + CON mod.
@@ -553,6 +553,7 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     })(),
     classFeatures: character.classFeatures ?? {},
     classResources: deriveClassResources(classes, character.classResourcesUsed ?? {}),
+    warnings: acWarnings,
     spellSlots: ((): SpellSlotsView => {
       const r = computeSpellSlots(classes);
       // SP-05: thread persisted usage counts from CharacterSnapshot.

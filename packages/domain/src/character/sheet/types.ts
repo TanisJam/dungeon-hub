@@ -5,6 +5,7 @@ import type { AppliedBackground } from '../background/types.js';
 import type { AppliedAsi, BreathWeaponData, BreathWeaponShape, BreathWeaponSavingThrow, RaceInnateSpell, RaceInnateSpellFrequency } from '../race/types.js';
 import type { InventoryItem } from '../inventory/types.js';
 import type { EncumbranceView } from '../inventory/encumbrance.js';
+import type { ArmorClassWarningCode } from './armor-class.js';
 
 /**
  * A descriptive racial trait surfaced on the sheet's "Rasgos raciales" card.
@@ -374,4 +375,11 @@ export interface CharacterSheet {
    * Origin: SDD `rules-audit-class-features` (#815).
    */
   classResources: Record<string, import('../class-resources/types.js').ClassResource>;
+  /**
+   * Sheet-level non-blocking warnings surfaced for the UI banner. Single channel
+   * per design `inventory-foundation` D7. Today only emitted by the AC helper
+   * (PHB p.144 STR-min on heavy armor); future helpers can append here.
+   * Defaults to [] for legacy reads — no migration required.
+   */
+  warnings: ArmorClassWarningCode[];
 }
