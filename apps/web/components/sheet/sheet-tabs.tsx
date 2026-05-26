@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export type SheetTab = 'resumen' | 'habilidades' | 'hechizos' | 'inventario' | 'notas';
+export type SheetTab = 'resumen' | 'habilidades' | 'hechizos' | 'recursos' | 'inventario' | 'notas';
 
 interface SheetTabsProps {
   activeTab: SheetTab;
@@ -11,6 +11,7 @@ const TABS: { slug: SheetTab; label: string }[] = [
   { slug: 'resumen', label: 'Resumen' },
   { slug: 'habilidades', label: 'Habilidades' },
   { slug: 'hechizos', label: 'Hechizos' },
+  { slug: 'recursos', label: 'Recursos' },
   { slug: 'inventario', label: 'Inventario' },
   { slug: 'notas', label: 'Notas' },
 ];

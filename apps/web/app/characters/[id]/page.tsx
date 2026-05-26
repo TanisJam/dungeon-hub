@@ -14,10 +14,11 @@ import { HabilidadesTab } from './_tabs/habilidades';
 import { HechizosTab } from './_tabs/hechizos';
 import { InventarioTab } from './_tabs/inventario';
 import { NotasTab } from './_tabs/notas';
+import { RecursosTab } from './_tabs/recursos';
 import { DeleteCharacterButton } from './_delete-button';
 import { RestActions } from './_rest-actions';
 
-const VALID_TABS = ['resumen', 'habilidades', 'hechizos', 'inventario', 'notas'] as const;
+const VALID_TABS = ['resumen', 'habilidades', 'hechizos', 'recursos', 'inventario', 'notas'] as const;
 
 function isValidTab(tab: string | undefined): tab is SheetTab {
   return VALID_TABS.includes(tab as SheetTab);
@@ -139,6 +140,9 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           {tab === 'resumen' && <ResumenTab sheet={sheet} />}
           {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
           {tab === 'hechizos' && <HechizosTab sheet={sheet} charId={id} />}
+          {tab === 'recursos' && (
+            <RecursosTab characterId={id} classResources={sheet.classResources ?? {}} />
+          )}
           {tab === 'inventario' && <InventarioTab inventory={inventory} />}
           {tab === 'notas' && <NotasTab />}
         </div>

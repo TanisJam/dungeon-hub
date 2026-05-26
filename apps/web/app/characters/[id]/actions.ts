@@ -99,6 +99,75 @@ export async function shortRest(characterId: string): Promise<SlotActionState> {
   return { ok: true };
 }
 
+// ── R-07: Class-resource actions (Second Wind, Ki, etc.) ────────────────────
+
+export type ResourceActionState = { ok: false; error: string } | { ok: true };
+
+/**
+ * Consume 1 use of a class resource. Maps to POST /resources/use.
+ * On error returns the API error message for the calling Client Component.
+ */
+export async function useClassResource(
+  characterId: string,
+  slug: string,
+): Promise<ResourceActionState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(
+      `/characters/${characterId}/resources/use`,
+      { slug },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/** Restore 1 use of a class resource (floors at 0). Maps to POST /resources/restore. */
+export async function restoreClassResource(
+  characterId: string,
+  slug: string,
+): Promise<ResourceActionState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(
+      `/characters/${characterId}/resources/restore`,
+      { slug },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
 // ── Existing actions ──────────────────────────────────────────────────────────
 
 export async function deleteCharacter(characterId: string): Promise<DeleteState> {

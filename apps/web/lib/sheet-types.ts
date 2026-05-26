@@ -10,6 +10,18 @@
 export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
 /**
+ * Web-side mirror of domain ClassResource. R-07 — see
+ * `packages/domain/src/character/class-resources/types.ts`.
+ */
+export interface ClassResourceView {
+  slug: string;
+  classSlug: string;
+  used: number;
+  max: number;
+  recoveryTrigger: 'short' | 'long' | 'both';
+}
+
+/**
  * A descriptive racial trait surfaced on the sheet's "Rasgos raciales" card.
  * Mirrors domain RacialTrait. Populated by GET /characters/:id/sheet via
  * loadRaceSheetData + extractRacialTraits. Batch 8 — race-traits-on-sheet.
@@ -137,6 +149,13 @@ export interface CharacterSheet {
     subrace: { slug: string; source: string } | null;
     background: { slug: string; source: string } | null;
   };
+  /**
+   * Per-class limited-use resources (R-07). Empty when no canonical resources
+   * apply at the character's classes/levels. Origin: SDD
+   * `rules-audit-class-features` (#815). Optional on the web type for
+   * read-path tolerance — pre-SDD sheet fixtures in older tests do not carry it.
+   */
+  classResources?: Record<string, ClassResourceView>;
   proficiencyBonus: number;
   abilityScores: Record<AbilityKey, AbilityScoreView>;
   savingThrows: SavingThrowView[];
