@@ -51,6 +51,60 @@ function extractRecharge(data: unknown): string | null {
 }
 
 /**
+ * Extrae `ac` del JSONB 5etools al shape lite del dominio.
+ *
+ * PHB p.144 (Armor) + p.149 (Shield). En 5etools:
+ * - Body armor (LA/MA/HA): `ac` es el AC base (e.g. leather=11, chain shirt=13, plate=18).
+ * - Shield (type='S'): `ac` es el BONUS (e.g. shield=2). `computeArmorClass` lo
+ *   interpreta correctamente según `lite.type` — acá solo proyectamos el número.
+ *
+ * Items que no son armadura ni escudo no tienen `ac` → undefined.
+ *
+ * Exportado para unit testing.
+ */
+export function extractAc(data: unknown): number | undefined {
+  if (data == null || typeof data !== 'object') return undefined;
+  const ac = (data as Record<string, unknown>)['ac'];
+  if (typeof ac !== 'number' || !Number.isFinite(ac)) return undefined;
+  return ac;
+}
+
+/**
+ * Extrae `stealth` (disadvantage on Stealth checks; PHB p.144) del JSONB.
+ *
+ * 5etools encodea como `stealth: true` cuando aplica el penalty. Si el flag está
+ * ausente o no es boolean, devolvemos undefined.
+ *
+ * Exportado para unit testing.
+ */
+export function extractStealth(data: unknown): boolean | undefined {
+  if (data == null || typeof data !== 'object') return undefined;
+  const s = (data as Record<string, unknown>)['stealth'];
+  if (typeof s !== 'boolean') return undefined;
+  return s;
+}
+
+/**
+ * Extrae el STR mínimo (`strength`) requerido para evitar el penalty de velocidad
+ * en heavy armor (PHB p.144 — plate=15, splint=15, chain mail=13).
+ *
+ * NOTA 5etools: el campo viene como STRING (`"15"`), no number. Lo parseamos
+ * a número. Cualquier valor que no pueda parsearse → undefined.
+ *
+ * Exportado para unit testing.
+ */
+export function extractArmorStrengthMin(data: unknown): number | undefined {
+  if (data == null || typeof data !== 'object') return undefined;
+  const raw = (data as Record<string, unknown>)['strength'];
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string' && raw.length > 0) {
+    const n = Number(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+/**
  * Extrae `containerCapacity` del JSONB 5etools al shape lite del dominio.
  *
  * El shape original tiene:
@@ -103,7 +157,23 @@ export async function loadItemData(input: {
 
   const row = rows[0];
   if (!row) return null;
-  return {
+  return projectItemRow(row);
+}
+
+/**
+ * Proyecta una row de `compendium_items` al `ItemCompendiumLite`. Single source
+ * of truth para la conversión row JSONB → lite domain — compartido entre
+ * `loadItemData` (single) y `loadItemDataMany` (batch).
+ */
+function projectItemRow(row: {
+  slug: string;
+  source: string;
+  name: string;
+  type: string | null;
+  weight: string | null;
+  data: unknown;
+}): ItemCompendiumLite {
+  const lite: ItemCompendiumLite = {
     slug: row.slug,
     source: row.source,
     name: row.name,
@@ -114,6 +184,18 @@ export async function loadItemData(input: {
     recharge: extractRecharge(row.data),
     containerCapacity: extractContainerCapacity(row.data),
   };
+
+  // Armor fields (REQ-CIP-ARMOR-FIELDS + REQ-CIP-LEGACY-MISSING from spec #843).
+  // Only attach when present — exactOptionalPropertyTypes is on, so we MUST omit
+  // these keys (not set undefined) for non-armor items.
+  const ac = extractAc(row.data);
+  if (ac !== undefined) lite.ac = ac;
+  const stealth = extractStealth(row.data);
+  if (stealth !== undefined) lite.stealth = stealth;
+  const armorStrengthMin = extractArmorStrengthMin(row.data);
+  if (armorStrengthMin !== undefined) lite.armorStrengthMin = armorStrengthMin;
+
+  return lite;
 }
 
 /**
@@ -142,17 +224,7 @@ export async function loadItemDataMany(
   const out: ItemCompendiumLite[] = [];
   for (const row of rows) {
     if (!wanted.has(`${row.slug}|${row.source}`)) continue;
-    out.push({
-      slug: row.slug,
-      source: row.source,
-      name: row.name,
-      type: row.type ?? null,
-      weight: parseWeight(row.weight),
-      property: extractProperty(row.data),
-      charges: extractCharges(row.data),
-      recharge: extractRecharge(row.data),
-      containerCapacity: extractContainerCapacity(row.data),
-    });
+    out.push(projectItemRow(row));
   }
   return out;
 }

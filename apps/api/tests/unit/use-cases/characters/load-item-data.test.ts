@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { RECHARGE_5ETOOLS_MAP } from '../../../../src/use-cases/characters/load-item-data.js';
+import {
+  RECHARGE_5ETOOLS_MAP,
+  extractAc,
+  extractStealth,
+  extractArmorStrengthMin,
+} from '../../../../src/use-cases/characters/load-item-data.js';
 
 /**
  * Unit tests for RECHARGE_5ETOOLS_MAP / extractRecharge mapping logic.
@@ -34,5 +39,134 @@ describe('RECHARGE_5ETOOLS_MAP — 5etools → domain recharge mapping', () => {
   it('unknown value is NOT in the map (passes through unchanged via ?? r)', () => {
     // The map has no entry for 'midnight' — caller uses `?? r` fallback.
     expect(RECHARGE_5ETOOLS_MAP['midnight']).toBeUndefined();
+  });
+});
+
+/**
+ * Unit tests for the armor field extractors used by `loadItemData` /
+ * `loadItemDataMany`. These cover the JSONB → ItemCompendiumLite projection
+ * for armor data per REQ-CIP-ARMOR-FIELDS and REQ-CIP-LEGACY-MISSING (spec #843).
+ *
+ * PHB p.144 (Armor) shapes (verified against `data/5etools/data/items-base.json`):
+ * - Chain Shirt (PHB): `{ type: "MA", ac: 13 }` — no stealth, no strength.
+ * - Plate Armor (PHB): `{ type: "HA", ac: 18, strength: "15", stealth: true }`.
+ *   IMPORTANT: 5etools encodes `strength` as a STRING; we parse to number.
+ * - Shield (PHB): `{ type: "S", ac: 2 }` — `ac: 2` is the BONUS, not total AC.
+ *   The domain `computeArmorClass` interprets the value correctly per `lite.type`.
+ * - Rope (PHB): `{ type: "G" }` — no armor fields at all → projected lite has
+ *   `ac`/`stealth`/`armorStrengthMin` all undefined (legacy / non-armor tolerance).
+ */
+describe('extractAc — REQ-CIP-ARMOR-FIELDS', () => {
+  it('reads numeric ac from armor JSONB (e.g. chain shirt = 13)', () => {
+    expect(extractAc({ ac: 13 })).toBe(13);
+  });
+
+  it('reads shield bonus as ac (shield = 2; the value is the bonus, not total AC)', () => {
+    // PHB p.149 — Shield grants +2 AC. The domain `computeArmorClass` adds
+    // this to the body-armor or unarmored branch when type === 'S'.
+    expect(extractAc({ ac: 2, type: 'S' })).toBe(2);
+  });
+
+  it('returns undefined when ac is absent (non-armor item)', () => {
+    expect(extractAc({ name: 'Rope, Hempen', type: 'G' })).toBeUndefined();
+  });
+
+  it('returns undefined for null / non-object input (legacy tolerance)', () => {
+    expect(extractAc(null)).toBeUndefined();
+    expect(extractAc(undefined)).toBeUndefined();
+    expect(extractAc('not-an-object')).toBeUndefined();
+  });
+
+  it('returns undefined when ac is non-numeric (defensive)', () => {
+    expect(extractAc({ ac: 'thirteen' })).toBeUndefined();
+    expect(extractAc({ ac: Number.NaN })).toBeUndefined();
+  });
+});
+
+describe('extractStealth — REQ-CIP-ARMOR-FIELDS', () => {
+  it('reads true when armor imposes stealth disadvantage (e.g. plate)', () => {
+    // PHB p.144 — heavy armor without explicit DEX cap imposes stealth disadv.
+    expect(extractStealth({ ac: 18, stealth: true })).toBe(true);
+  });
+
+  it('reads false when explicitly set (defensive — some rows encode false)', () => {
+    expect(extractStealth({ ac: 13, stealth: false })).toBe(false);
+  });
+
+  it('returns undefined when stealth is absent (most items, non-armor)', () => {
+    expect(extractStealth({ ac: 11 })).toBeUndefined();
+    expect(extractStealth({ type: 'G' })).toBeUndefined();
+  });
+
+  it('returns undefined for null / non-object input', () => {
+    expect(extractStealth(null)).toBeUndefined();
+    expect(extractStealth(undefined)).toBeUndefined();
+  });
+});
+
+describe('extractArmorStrengthMin — REQ-CIP-ARMOR-FIELDS', () => {
+  it('parses string strength to number (5etools encodes as STRING: "15")', () => {
+    // PHB p.144 — Plate strength=15. 5etools ships this as `"strength": "15"`.
+    expect(extractArmorStrengthMin({ strength: '15' })).toBe(15);
+    expect(extractArmorStrengthMin({ strength: '13' })).toBe(13);
+  });
+
+  it('accepts numeric strength (defensive — homebrew or future data)', () => {
+    expect(extractArmorStrengthMin({ strength: 15 })).toBe(15);
+  });
+
+  it('returns undefined when strength is absent (non-heavy armor, non-armor)', () => {
+    expect(extractArmorStrengthMin({ ac: 13 })).toBeUndefined();
+    expect(extractArmorStrengthMin({ type: 'G' })).toBeUndefined();
+  });
+
+  it('returns undefined for empty string or unparseable value', () => {
+    expect(extractArmorStrengthMin({ strength: '' })).toBeUndefined();
+    expect(extractArmorStrengthMin({ strength: 'heavy' })).toBeUndefined();
+  });
+
+  it('returns undefined for null / non-object input', () => {
+    expect(extractArmorStrengthMin(null)).toBeUndefined();
+    expect(extractArmorStrengthMin(undefined)).toBeUndefined();
+  });
+});
+
+describe('armor extractors — combined fixtures (REQ-CIP-LEGACY-MISSING)', () => {
+  // Real-shape fixtures verified against data/5etools/data/items-base.json.
+
+  it('chain shirt: ac=13, stealth/armorStrengthMin undefined', () => {
+    const data = { name: 'Chain Shirt', source: 'PHB', type: 'MA', ac: 13, armor: true };
+    expect(extractAc(data)).toBe(13);
+    expect(extractStealth(data)).toBeUndefined();
+    expect(extractArmorStrengthMin(data)).toBeUndefined();
+  });
+
+  it('plate armor: ac=18, stealth=true, armorStrengthMin=15', () => {
+    const data = {
+      name: 'Plate Armor',
+      source: 'PHB',
+      type: 'HA',
+      ac: 18,
+      strength: '15',
+      armor: true,
+      stealth: true,
+    };
+    expect(extractAc(data)).toBe(18);
+    expect(extractStealth(data)).toBe(true);
+    expect(extractArmorStrengthMin(data)).toBe(15);
+  });
+
+  it('shield: ac=2 (bonus), no stealth, no armorStrengthMin', () => {
+    const data = { name: 'Shield', source: 'PHB', type: 'S', ac: 2 };
+    expect(extractAc(data)).toBe(2);
+    expect(extractStealth(data)).toBeUndefined();
+    expect(extractArmorStrengthMin(data)).toBeUndefined();
+  });
+
+  it('rope / non-armor: all three undefined', () => {
+    const data = { name: 'Rope, Hempen (50 feet)', source: 'PHB', type: 'G', weight: 10 };
+    expect(extractAc(data)).toBeUndefined();
+    expect(extractStealth(data)).toBeUndefined();
+    expect(extractArmorStrengthMin(data)).toBeUndefined();
   });
 });

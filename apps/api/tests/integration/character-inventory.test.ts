@@ -765,4 +765,181 @@ describe('inventory — POST / DELETE', () => {
     expect(sheet.attunement).toEqual({ used: 1, max: 3 });
     expect(sheet.currency).toEqual({ cp: 0, sp: 0, ep: 0, gp: 50, pp: 0 });
   });
+
+  // -- Armor / AC integration (inventory-foundation C3) -------------------
+  // REQ-AC-MEDIUM-ARMOR + REQ-CIP-ARMOR-FIELDS. PHB p.144.
+  // Chain Shirt = medium armor (ac 13), DEX capped at +2.
+  it('GET /sheet: STR 10 / DEX 14 + equipped chain shirt → AC 15', async () => {
+    const app = await getTestApp();
+
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { worldId: aliceWorldId, name: 'Chain Shirt Carrier' },
+      })
+      .then((r) => r.json());
+
+    // STR 10, DEX 14 (+2), rest filler. Fighter has medium armor prof.
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/stats`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        method: 'standard-array',
+        scores: { str: 10, dex: 14, con: 13, int: 12, wis: 8, cha: 15 },
+      },
+    });
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/class`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+
+    const addRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${c.id}/inventory`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { item: { slug: 'chain-shirt', source: 'PHB' }, state: 'equipped' },
+    });
+    expect(addRes.statusCode).toBe(201);
+
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${c.id}/sheet`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const sheet = sheetRes.json().sheet;
+    // Chain shirt 13 + min(DEX +2, 2) = 15.
+    expect(sheet.armorClass.value).toBe(15);
+    // No STR warning — chain shirt has no strength minimum.
+    expect(sheet.warnings ?? []).not.toContain('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+  });
+
+  // REQ-AC-HEAVY-ARMOR + REQ-AC-STR-WARNING + REQ-CIP-ARMOR-FIELDS. PHB p.144.
+  // Plate = heavy armor (ac 18, strength "15"). DEX ignored. STR 8 < 15 → warning.
+  it('GET /sheet: STR 8 + equipped plate → AC 18 + INSUFFICIENT_STRENGTH_FOR_ARMOR warning', async () => {
+    const app = await getTestApp();
+
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { worldId: aliceWorldId, name: 'Weak Plate Fighter' },
+      })
+      .then((r) => r.json());
+
+    // STR 8 (below plate's strength=15), DEX 14, Fighter (heavy armor prof).
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/stats`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        method: 'standard-array',
+        scores: { str: 8, dex: 14, con: 13, int: 12, wis: 10, cha: 15 },
+      },
+    });
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/class`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+
+    const addRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${c.id}/inventory`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { item: { slug: 'plate-armor', source: 'PHB' }, state: 'equipped' },
+    });
+    expect(addRes.statusCode).toBe(201);
+
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${c.id}/sheet`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const sheet = sheetRes.json().sheet;
+    // Plate AC 18, DEX ignored. STR warning is non-blocking — AC still computes.
+    expect(sheet.armorClass.value).toBe(18);
+    expect(sheet.warnings).toContain('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+  });
+
+  // REQ-AC-SHIELD + REQ-CIP-ARMOR-FIELDS. PHB p.144 + p.149.
+  // Chain shirt (13, medium, DEX cap +2) + Shield (+2) + DEX 14 → 13 + 2 + 2 = 17.
+  // NOTE: standard array is [15,14,13,12,10,8] — DEX 16 needs point-buy/rolled.
+  // DEX 14 already yields the +2 cap, so the assertion is the same.
+  it('GET /sheet: chain shirt + shield + DEX 14 → AC 17 (medium cap + shield bonus)', async () => {
+    const app = await getTestApp();
+
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { worldId: aliceWorldId, name: 'Sword and Board' },
+      })
+      .then((r) => r.json());
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/stats`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        method: 'standard-array',
+        scores: { str: 13, dex: 14, con: 12, int: 10, wis: 8, cha: 15 },
+      },
+    });
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${c.id}/class`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
+      },
+    });
+
+    const csRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${c.id}/inventory`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { item: { slug: 'chain-shirt', source: 'PHB' }, state: 'equipped' },
+    });
+    expect(csRes.statusCode).toBe(201);
+    const shRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${c.id}/inventory`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { item: { slug: 'shield', source: 'PHB' }, state: 'equipped' },
+    });
+    expect(shRes.statusCode).toBe(201);
+
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${c.id}/sheet`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const sheet = sheetRes.json().sheet;
+    // 13 (chain shirt) + min(DEX +2, 2) (medium cap) + 2 (shield) = 17.
+    expect(sheet.armorClass.value).toBe(17);
+  });
 });
