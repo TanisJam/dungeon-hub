@@ -405,6 +405,105 @@ export async function rejectCharacter(
   return { ok: true };
 }
 
+// ── DM grant actions (SDD dm-session-grants — REQ-CDG-*) ────────────────────
+
+export type GrantState = { ok: false; error: string } | { ok: true };
+
+/**
+ * DM grants XP to a character.
+ * Maps to POST /characters/:id/xp.
+ * REQ-CDG-XP-FORM (spec #867 — dm-session-grants).
+ */
+export async function grantXp(characterId: string, award: number): Promise<GrantState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(`/characters/${characterId}/xp`, { award }, session.access_token);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/**
+ * DM grants gold (coin deltas) to a character.
+ * Maps to POST /characters/:id/grant/gold.
+ * REQ-CDG-GOLD-FORM (spec #867 — dm-session-grants).
+ */
+export async function grantGold(
+  characterId: string,
+  deltas: Partial<Record<'cp' | 'sp' | 'ep' | 'gp' | 'pp', number>>,
+): Promise<GrantState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(`/characters/${characterId}/grant/gold`, deltas, session.access_token);
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/**
+ * DM grants an item to a character.
+ * Maps to POST /characters/:id/grant/item.
+ * REQ-CDG-ITEM-FORM (spec #867 — dm-session-grants).
+ */
+export async function grantItem(
+  characterId: string,
+  item: { slug: string; source: string },
+  quantity: number,
+): Promise<GrantState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(
+      `/characters/${characterId}/grant/item`,
+      { item, quantity },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
 // ── Existing actions ──────────────────────────────────────────────────────────
 
 export async function deleteCharacter(characterId: string): Promise<DeleteState> {

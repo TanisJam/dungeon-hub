@@ -18,6 +18,7 @@ import { RecursosTab } from './_tabs/recursos';
 import { DeleteCharacterButton } from './_delete-button';
 import { RestActions } from './_rest-actions';
 import { ApprovalActions } from './_components/approval-actions';
+import { DmGrantPanel } from './_components/dm-grant-panel';
 
 type WorldCallerRole = 'gm' | 'player' | null;
 type WorldDetailLite = { callerRole: WorldCallerRole };
@@ -156,6 +157,12 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           characterId={id}
           callerRole={callerRole}
           status={character.status}
+        />
+
+        <DmGrantPanel
+          characterId={id}
+          callerRole={callerRole}
+          worldId={character.worldId}
         />
 
         <SheetTabs activeTab={tab} characterId={id} />
