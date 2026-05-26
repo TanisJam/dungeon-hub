@@ -15,6 +15,7 @@ import * as world from './world.js';
 import * as lore from './lore.js';
 import * as wmap from './map.js';
 import * as link from './link.js';
+import * as unlink from './unlink.js';
 import * as whoami from './whoami.js';
 import * as character from './character.js';
 import * as monster from './monster.js';
@@ -48,6 +49,7 @@ export const commands: Record<string, Command> = {
   [lore.data.name]: lore,
   [wmap.data.name]: wmap,
   [link.data.name]: link,
+  [unlink.data.name]: unlink,
   [whoami.data.name]: whoami,
   [character.data.name]: character,
   [monster.data.name]: monster,
