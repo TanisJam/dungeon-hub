@@ -338,7 +338,16 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
 
   // ---- HP ---------------------------------------------------------------
   // L1 de la primera clase: max(hit die) + CON mod.
-  // L2+ de cualquier clase: avg(hit die) + CON mod.
+  // L2+ de cualquier clase: avg(hit die) + CON mod, OR stored roll from
+  // levelUpHpRolls when present (SDD multiclass-class-step).
+  //
+  // levelUpHpRolls: Array<{ classSlug, level, roll }> — keyed by (classSlug, level).
+  // Back-compat: absent/undefined → use average for all levels (pre-SDD characters).
+  const rollLookup = new Map<string, number>();
+  for (const entry of character.levelUpHpRolls ?? []) {
+    rollLookup.set(`${entry.classSlug}|${entry.level}`, entry.roll);
+  }
+
   let hpMax = 0;
   const hpParts: string[] = [];
   const hitDiceTotal: Record<string, number> = {};
@@ -349,16 +358,26 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     hitDiceTotal[c.hitDie] = (hitDiceTotal[c.hitDie] ?? 0) + c.level;
 
     if (isFirstClass) {
-      hpMax += dieFaces + conMod; // L1 full
-      if (c.level > 1) hpMax += (avg + conMod) * (c.level - 1);
+      hpMax += dieFaces + conMod; // L1 full (always max, never rolled)
+      // L2+ for the first class: per-level with roll substitution
+      for (let lv = 2; lv <= c.level; lv++) {
+        const storedRoll = rollLookup.get(`${c.slug}|${lv}`);
+        const delta = Math.max(1, (storedRoll ?? avg) + conMod);
+        hpMax += delta;
+      }
       hpParts.push(
         `${c.slug}(L${c.level}): ${dieFaces}+CON(${conMod})` +
-          (c.level > 1 ? ` + ${c.level - 1}×(${avg}+CON(${conMod}))` : ''),
+          (c.level > 1 ? ` + ${c.level - 1}×(avg/roll+CON(${conMod}))` : ''),
       );
       isFirstClass = false;
     } else {
-      hpMax += (avg + conMod) * c.level;
-      hpParts.push(`${c.slug}(L${c.level}): ${c.level}×(${avg}+CON(${conMod}))`);
+      // Multiclass levels: all per-level, no L1 max rule
+      for (let lv = 1; lv <= c.level; lv++) {
+        const storedRoll = rollLookup.get(`${c.slug}|${lv}`);
+        const delta = Math.max(1, (storedRoll ?? avg) + conMod);
+        hpMax += delta;
+      }
+      hpParts.push(`${c.slug}(L${c.level}): ${c.level}×(avg/roll+CON(${conMod}))`);
     }
   }
   const hpFormula = hpParts.join(' + ') || '0';

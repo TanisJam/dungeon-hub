@@ -27,6 +27,11 @@ interface ValidateMulticlassInput {
   newSubclassData?: SubclassCompendiumData | null;
   /** Skills elegidas en multiclass (solo Bard/Ranger/Rogue las otorgan). */
   skillChoices?: string[];
+  /**
+   * CL-07: Tool choices for multiclass (e.g. Bard requires 1 musical instrument).
+   * PHB p.164 — "One musical instrument of your choice".
+   */
+  toolChoices?: string[];
 }
 
 const DEFAULT_SUBCLASS_UNLOCK = 3;
@@ -220,6 +225,24 @@ export function validateMulticlassAddition(input: ValidateMulticlassInput): Mult
     }
   }
 
+  // ---- 7b) CL-07: Tool choices (e.g. Bard musical instrument) -------------
+  // PHB p.164: "One musical instrument of your choice" for Bard multiclass.
+  const toolChoiceSlots = mcProfs.toolChoices ?? [];
+  const toolChoicesProvided = input.toolChoices ?? [];
+  const expectedToolCount = toolChoiceSlots.reduce((sum, slot) => sum + slot.count, 0);
+
+  if (expectedToolCount > 0) {
+    if (toolChoicesProvided.length !== expectedToolCount) {
+      issues.push({
+        code: 'MULTICLASS_TOOL_REQUIRED',
+        classSlug: newClassData.slug,
+        expectedCount: expectedToolCount,
+        gotCount: toolChoicesProvided.length,
+        slots: toolChoiceSlots,
+      });
+    }
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
   // ---- 8) Construir AppliedClass con profs REDUCIDAS --------------------
@@ -235,7 +258,8 @@ export function validateMulticlassAddition(input: ValidateMulticlassInput): Mult
     savingThrows: [],
     armorProficiencies: [...mcProfs.armor],
     weaponProficiencies: [...mcProfs.weapons],
-    toolProficiencies: [...mcProfs.tools],
+    // CL-07: include collected tool choices alongside fixed tools.
+    toolProficiencies: [...mcProfs.tools, ...toolChoicesProvided],
     skillChoices,
   };
 

@@ -1444,3 +1444,65 @@ describe('computeCharacterSheet — classResources view (REQ-RAC-SHAPE)', () => 
     expect(ki?.used).toBe(3);
   });
 });
+
+// ---- T5: levelUpHpRolls substitution (SDD multiclass-class-step) ------------
+
+describe('computeCharacterSheet — levelUpHpRolls substitution', () => {
+  // Fighter L3, CON 14 → conMod +2
+  // Normal avg-based HP:
+  //   L1: 10 + 2 = 12 (max d10 + conMod)
+  //   L2: 6 + 2 = 8  (avg d10 + conMod)
+  //   L3: 6 + 2 = 8  (avg d10 + conMod)
+  //   Total: 28
+  const FIGHTER_L3_BASE: CharacterSnapshot = {
+    name: 'Rolled Fighter',
+    baseStats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 8 },
+    asisApplied: [],
+    classes: [
+      {
+        slug: 'fighter',
+        source: 'PHB',
+        level: 3,
+        subclass: { slug: 'fighter--champion', source: 'PHB' },
+        hitDie: 'd10',
+        savingThrows: ['str', 'con'],
+        armorProficiencies: ['all'],
+        weaponProficiencies: ['simple', 'martial'],
+        toolProficiencies: [],
+        skillChoices: ['athletics', 'perception'],
+      },
+    ],
+    feats: [],
+    levelUpAsis: [],
+  };
+
+  it('HP-ROLL-1: sin levelUpHpRolls → hpMax calculado con avg (baseline)', () => {
+    const sheet = computeCharacterSheet({ character: FIGHTER_L3_BASE });
+    // L1: 10+2=12, L2: 6+2=8, L3: 6+2=8 → 28
+    expect(sheet.hitPoints.max).toBe(28);
+  });
+
+  it('HP-ROLL-2: levelUpHpRoll para (fighter, L2) sustituye avg — roll=10 → delta=12', () => {
+    const charWithRoll: CharacterSnapshot = {
+      ...FIGHTER_L3_BASE,
+      levelUpHpRolls: [{ classSlug: 'fighter', level: 2, roll: 10 }],
+    };
+    const sheet = computeCharacterSheet({ character: charWithRoll });
+    // L1: 12 (unchanged — L1 is max, not avg), L2: 10+2=12 (roll), L3: 6+2=8 (avg)
+    // Total: 12 + 12 + 8 = 32
+    expect(sheet.hitPoints.max).toBe(32);
+  });
+
+  it('HP-ROLL-3: múltiples overrides para distintos niveles se aplican todos', () => {
+    const charWithRolls: CharacterSnapshot = {
+      ...FIGHTER_L3_BASE,
+      levelUpHpRolls: [
+        { classSlug: 'fighter', level: 2, roll: 10 }, // 10+2=12 instead of 8
+        { classSlug: 'fighter', level: 3, roll: 10 }, // 10+2=12 instead of 8
+      ],
+    };
+    const sheet = computeCharacterSheet({ character: charWithRolls });
+    // L1: 12, L2: 12 (roll), L3: 12 (roll) → 36
+    expect(sheet.hitPoints.max).toBe(36);
+  });
+});

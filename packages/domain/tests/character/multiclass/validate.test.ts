@@ -256,3 +256,93 @@ describe('validateMulticlassAddition — skill choices', () => {
     expect(res.issues[0]?.code).toBe('MULTICLASS_SKILL_NOT_ALLOWED');
   });
 });
+
+// ---- CL-07: tool choices (Bard multiclass — PHB p.164) --------------------
+
+const BARD: ClassCompendiumData = {
+  slug: 'bard',
+  source: 'PHB',
+  hd: { number: 1, faces: 8 },
+  proficiency: ['dex', 'cha'],
+  startingProficiencies: { armor: ['light'], weapons: [], skills: [] },
+  subclassTitle: 'Bard College',
+  classFeatures: ['Bard College|Bard||3'],
+};
+
+// Bard multiclass prereq: CHA 13
+const STATS_HIGH_CHA: AbilityScores = { str: 10, dex: 14, con: 14, int: 12, wis: 12, cha: 13 };
+
+describe('validateMulticlassAddition — CL-07 tool choices', () => {
+  it('CL07-1: Bard multiclass con instrument → AppliedClass.toolProficiencies contiene el instrumento', () => {
+    const res = validateMulticlassAddition({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      baseStats: STATS_HIGH_CHA,
+      asisApplied: [],
+      existingClasses: [{ slug: 'fighter', source: 'PHB' }],
+      newClassData: BARD,
+      skillChoices: ['arcana'], // Bard multiclass gets 1 skill from any
+      toolChoices: ['lute'],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.appliedClass.toolProficiencies).toContain('lute');
+  });
+
+  it('CL07-2: Bard multiclass sin instrument → MULTICLASS_TOOL_REQUIRED', () => {
+    const res = validateMulticlassAddition({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      baseStats: STATS_HIGH_CHA,
+      asisApplied: [],
+      existingClasses: [{ slug: 'fighter', source: 'PHB' }],
+      newClassData: BARD,
+      skillChoices: ['arcana'],
+      // no toolChoices
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    const issue = res.issues.find((i) => i.code === 'MULTICLASS_TOOL_REQUIRED');
+    expect(issue).toBeDefined();
+    if (issue?.code === 'MULTICLASS_TOOL_REQUIRED') {
+      expect(issue.classSlug).toBe('bard');
+      expect(issue.expectedCount).toBe(1);
+      expect(issue.gotCount).toBe(0);
+    }
+  });
+
+  it('CL07-3: Bard multiclass con 2 instrumentos (count excedido) → MULTICLASS_TOOL_REQUIRED', () => {
+    const res = validateMulticlassAddition({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      baseStats: STATS_HIGH_CHA,
+      asisApplied: [],
+      existingClasses: [{ slug: 'fighter', source: 'PHB' }],
+      newClassData: BARD,
+      skillChoices: ['arcana'],
+      toolChoices: ['lute', 'flute'], // 2 provided, only 1 expected
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues.some((i) => i.code === 'MULTICLASS_TOOL_REQUIRED')).toBe(true);
+  });
+
+  it('CL07-4: Fighter multiclass (sin toolChoices en la tabla) → pasa sin toolChoices', () => {
+    // Fighter has no toolChoices in MULTICLASS_PROFICIENCIES → toolChoices field irrelevant
+    const FIGHTER: ClassCompendiumData = {
+      slug: 'fighter',
+      source: 'PHB',
+      hd: { number: 1, faces: 10 },
+      proficiency: ['str', 'con'],
+      startingProficiencies: { armor: ['all'], weapons: ['simple', 'martial'], skills: [] },
+      subclassTitle: 'Martial Archetype',
+      classFeatures: ['Martial Archetype|Fighter||3'],
+    };
+    const res = validateMulticlassAddition({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      baseStats: { ...STATS_HIGH_CHA, str: 13 },
+      asisApplied: [],
+      existingClasses: [{ slug: 'bard', source: 'PHB' }],
+      newClassData: FIGHTER,
+      // no toolChoices — should be fine since Fighter has no toolChoices requirement
+    });
+    expect(res.ok).toBe(true);
+  });
+});

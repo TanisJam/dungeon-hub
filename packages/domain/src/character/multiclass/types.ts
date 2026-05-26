@@ -59,6 +59,13 @@ export type MulticlassValidationIssue =
       code: 'MULTICLASS_PROFS_TABLE_MISSING';
       classSlug: string;
       hint: string;
+    }
+  | {
+      code: 'MULTICLASS_TOOL_REQUIRED';
+      classSlug: string;
+      expectedCount: number;
+      gotCount: number;
+      slots: Array<{ kind: string; count: number }>;
     };
 
 export type MulticlassValidationResult =

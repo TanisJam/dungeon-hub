@@ -95,6 +95,13 @@ export interface CharacterSnapshot {
   currency?: Currency;
   /** ASIs aplicados via level-up (4/8/12/16/19). Independiente de los raciales. */
   levelUpAsis?: AppliedAsi[];
+  /**
+   * HP rolls stored per (classSlug, level) for the "roll" HP method.
+   * Sheet compute substitutes the stored roll instead of average for matching
+   * (classSlug, level) pairs. Absent = use average (back-compat for pre-SDD chars).
+   * Origin: SDD multiclass-class-step.
+   */
+  levelUpHpRolls?: Array<{ classSlug: string; level: number; roll: number }>;
   /** Nivel de exhaustion (0-6, PHB p.291). Default 0. */
   exhaustion?: number;
   /** Picks de class features (TCE OCF, fighting styles, invocations, maneuvers) por classSlug. */
