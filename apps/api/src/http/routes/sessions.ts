@@ -23,6 +23,7 @@ import {
   loadSession,
   loadSessionWorldId,
   sanitizeSessionForRole,
+  type LoadCharacterForSessionResult,
   type SessionStatus,
 } from '../../use-cases/sessions/load-session.js';
 import { applyTransition, type StateAction } from '../../use-cases/sessions/state-machine.js';
@@ -380,10 +381,24 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
     }
 
     const joinWorldId = await loadSessionWorldId(session);
-    const character = joinWorldId
+    const charResult: LoadCharacterForSessionResult = joinWorldId
       ? await loadCharacterForSession(body.characterId, userId, joinWorldId)
-      : null;
-    if (!character) {
+      : { ok: false, reason: 'NOT_FOUND' };
+    if (!charResult.ok) {
+      if (charResult.reason === 'WRONG_WORLD') {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [
+            {
+              code: 'CHARACTER_NOT_IN_WORLD',
+              characterId: body.characterId,
+              sessionId: id,
+              expected: joinWorldId,
+              got: charResult.characterWorldId,
+            },
+          ],
+        });
+      }
       return reply.code(400).send({
         error: 'VALIDATION_FAILED',
         issues: [

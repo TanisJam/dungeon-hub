@@ -162,28 +162,37 @@ export async function findCharacterActiveSession(
   return { sessionId: row.sessionId, status: row.status as SessionStatus };
 }
 
+export type LoadCharacterForSessionResult =
+  | { ok: true; character: { id: string; userId: string } }
+  | { ok: false; reason: 'NOT_FOUND' | 'NOT_OWNER' | 'WRONG_WORLD'; characterWorldId?: string };
+
 /**
  * Helper para validar que un character existe Y pertenece al user que lo
  * quiere joinear/leavear, EN el world de la sesión.
  *
  * Post-C2: characters no longer have campaign_id; they belong to a world.
  * The session's worldId is resolved via its campaign (campaign.worldId).
+ *
+ * C4: Returns a discriminated result so the route can emit the correct issue
+ * code — CHARACTER_NOT_IN_WORLD vs CHARACTER_NOT_ELIGIBLE.
  */
 export async function loadCharacterForSession(
   characterId: string,
   userId: string,
   sessionWorldId: string,
-): Promise<{ id: string; userId: string } | null> {
+): Promise<LoadCharacterForSessionResult> {
   const rows = await db
     .select({ id: characters.id, userId: characters.userId, worldId: characters.worldId })
     .from(characters)
     .where(eq(characters.id, characterId))
     .limit(1);
   const c = rows[0];
-  if (!c) return null;
-  if (c.userId !== userId) return null;
-  if (c.worldId !== sessionWorldId) return null;
-  return { id: c.id, userId: c.userId };
+  if (!c) return { ok: false, reason: 'NOT_FOUND' };
+  if (c.userId !== userId) return { ok: false, reason: 'NOT_OWNER' };
+  if (c.worldId !== sessionWorldId) {
+    return { ok: false, reason: 'WRONG_WORLD', characterWorldId: c.worldId };
+  }
+  return { ok: true, character: { id: c.id, userId: c.userId } };
 }
 
 export async function listSessionParticipants(sessionId: string): Promise<

@@ -340,7 +340,7 @@ describe('sessions — Slice 1', () => {
       expect(res.json().participants).toHaveLength(1);
     });
 
-    it('alice NO puede joinear char de otra campaña', async () => {
+    it('alice NO puede joinear char de otro world → CHARACTER_NOT_IN_WORLD', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
@@ -349,7 +349,9 @@ describe('sessions — Slice 1', () => {
         payload: { characterId: aliceOtherCampaignCharId },
       });
       expect(res.statusCode).toBe(400);
-      expect(res.json().issues[0].code).toBe('CHARACTER_NOT_ELIGIBLE');
+      // aliceOtherCampaignCharId belongs to a different world (created under otherCampaignId).
+      // C4: cross-world rejection emits CHARACTER_NOT_IN_WORLD, not CHARACTER_NOT_ELIGIBLE.
+      expect(res.json().issues[0].code).toBe('CHARACTER_NOT_IN_WORLD');
     });
 
     it('alice NO puede joinear char ajeno (de bob)', async () => {
