@@ -226,6 +226,9 @@ When a 5etools data shape is **new to this codebase** (e.g. `_copy`, `_versions`
 - **`_versions` pattern**: two variants — SIMPLE (15+ races, e.g. Aasimar MPMM) and ABSTRACT+IMPL (Dragonborn XPHB, FTD Chromatic/Gem/Metallic). XPHB and FTD are excluded sources in this project; PHB Dragonborn does NOT use `_versions` and instead encodes ancestry as `resist: [{choose:{from:[...]}}]` + narrative table. See [engram #558].
 - **Excluded sources** (today): XPHB, FTD. If a feature scope expands to include them, that's a separate decision documented per SDD.
 
+**House rules (intentional divergences from PHB)**:
+- `recharge='dawn'` items are treated as **long-rest equivalent** until a campaign-clock SDD lands. Proper RAW (PHB p.141) gates them on in-game time-of-day. See `packages/domain/src/character/inventory/validate.ts:matchesTrigger` comment and engram `sdd/rest-closeout/archive-report`.
+
 **See also**:
 - `docs/manuals/dsl.md` — normative description of what each compendium entity looks like after import, plus the patches the importer applies (Dragonborn ancestries, additional spells normalizer, subclass grants, etc.).
 - `docs/manuals/conflict-resolution.md` — how `rules_profile.sources` + `disabledEntities` resolve cross-manual overlaps per-world, with worked examples.

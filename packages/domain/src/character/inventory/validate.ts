@@ -559,8 +559,12 @@ export function rechargeInventoryItems(args: {
       case 'short':
         return recharge === 'short';
       case 'long':
-        // R-04 DOC deferral: 'dawn' items are treated as long-rest-equivalent
-        // until the campaign clock is implemented. PHB p.141.
+        // R-04 HOUSE RULE (audit rules-audit-rest → rest-closeout #826):
+        // `recharge='dawn'` items are treated as long-rest-equivalent. RAW
+        // (PHB p.141) gates them on in-game time-of-day (dawn), but
+        // implementing that requires a campaign clock SDD. Until that lands,
+        // dawn-recharge items behave as long-rest items so play isn't blocked
+        // by a missing mechanic. Documented in CLAUDE.md §10.
         return recharge === 'long' || recharge === 'dawn';
       case 'dawn':
         return recharge === 'dawn';

@@ -125,6 +125,10 @@ export async function loadItemData(input: {
 export async function loadItemDataMany(
   refs: ReadonlyArray<{ slug: string; source: string }>,
 ): Promise<ItemCompendiumLite[]> {
+  // R-13 (rest-closeout #826): intentional empty-inventory shortcut — avoids
+  // a Drizzle IN-with-empty-array query that some adapters mistranslate. If
+  // additional recharge triggers add a second call site for this function on
+  // the rest path, consolidate the guard at the caller. DOC-only flag for now.
   if (refs.length === 0) return [];
 
   const slugs = Array.from(new Set(refs.map((r) => r.slug)));
