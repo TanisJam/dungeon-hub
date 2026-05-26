@@ -19,6 +19,7 @@ import { DeleteCharacterButton } from './_delete-button';
 import { RestActions } from './_rest-actions';
 import { ApprovalActions } from './_components/approval-actions';
 import { DmGrantPanel } from './_components/dm-grant-panel';
+import { LevelUpEntryPoint } from './_components/level-up-entry-point';
 
 type WorldCallerRole = 'gm' | 'player' | null;
 type WorldDetailLite = { callerRole: WorldCallerRole };
@@ -164,6 +165,14 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           characterName={identity.name}
           callerRole={callerRole}
           worldId={character.worldId}
+        />
+
+        <LevelUpEntryPoint
+          characterId={id}
+          status={character.status}
+          totalLevel={totalLevel}
+          xp={xpCurrent}
+          callerRole={callerRole}
         />
 
         <SheetTabs activeTab={tab} characterId={id} />
