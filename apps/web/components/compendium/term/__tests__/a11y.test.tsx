@@ -78,7 +78,7 @@ describe('TermProvider + Term — a11y: role=dialog and Escape dismiss', () => {
 
     render(
       <TermProvider
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -107,7 +107,7 @@ describe('TermProvider + Term — a11y: role=dialog and Escape dismiss', () => {
 
     render(
       <TermProvider
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -156,7 +156,7 @@ describe('TermProvider — keyboard-open via focusin (tabIndex=0 span)', () => {
 
     render(
       <TermProvider
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -222,7 +222,7 @@ describe('TermCard — no raw Tailwind color utilities in className', () => {
 
     const { container } = render(
       <TermProvider
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}

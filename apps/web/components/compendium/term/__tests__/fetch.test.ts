@@ -15,7 +15,7 @@ function makeFetchMock(status: number, body: unknown) {
 
 const VALID_OPTS = {
   apiBaseUrl: 'http://api.example.com',
-  campaignId: 'campaign-uuid',
+  worldId: 'world-uuid',
   accessToken: 'bearer-token-123',
 };
 
@@ -39,7 +39,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('fetchTermEntry — URL shape', () => {
-  it('builds correct URL for a spell: /api/v1/compendium/spells/{slug}?campaign=...&source=...', async () => {
+  it('builds correct URL for a spell: /api/v1/compendium/spells/{slug}?world=...&source=...', async () => {
     const mockFetch = makeFetchMock(200, { data: SPELL_ENTRY });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -47,7 +47,7 @@ describe('fetchTermEntry — URL shape', () => {
 
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toContain('/api/v1/compendium/spells/fireball');
-    expect(calledUrl).toContain('campaign=campaign-uuid');
+    expect(calledUrl).toContain('world=world-uuid');
     expect(calledUrl).toContain('source=PHB');
     expect(calledUrl.startsWith('http://api.example.com')).toBe(true);
   });
@@ -99,7 +99,7 @@ describe('fetchTermEntry — missing apiBaseUrl', () => {
     await expect(
       fetchTermEntry('spell|fireball|PHB', {
         apiBaseUrl: undefined as unknown as string,
-        campaignId: 'campaign-uuid',
+        worldId: 'campaign-uuid',
         accessToken: 'token',
       })
     ).rejects.toThrow(/NEXT_PUBLIC_API_URL|apiBaseUrl/i);
@@ -109,7 +109,7 @@ describe('fetchTermEntry — missing apiBaseUrl', () => {
     await expect(
       fetchTermEntry('spell|fireball|PHB', {
         apiBaseUrl: '',
-        campaignId: 'campaign-uuid',
+        worldId: 'campaign-uuid',
         accessToken: 'token',
       })
     ).rejects.toThrow(/NEXT_PUBLIC_API_URL|apiBaseUrl/i);

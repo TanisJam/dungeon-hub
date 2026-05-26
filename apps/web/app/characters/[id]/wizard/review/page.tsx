@@ -48,7 +48,7 @@ type Character = {
   id: string;
   name: string;
   status: string;
-  campaignId: string;
+  worldId: string;
   data: {
     baseStats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
     statMethod?: string;

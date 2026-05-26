@@ -18,7 +18,7 @@ type AppliedClass = {
 
 type Character = {
   id: string;
-  campaignId: string;
+  worldId: string;
   data: {
     classes?: AppliedClass[];
     background?: { skills?: string[] };
@@ -37,14 +37,14 @@ export default async function ClassStepPage({ params }: Props) {
   const character = await api.get<Character>(`/characters/${id}`, token);
 
   const { data: list } = await api.get<{ data: ClassRow[] }>(
-    `/compendium/classes?campaign=${character.campaignId}&limit=100`,
+    `/compendium/classes?world=${character.worldId}&limit=100`,
     token,
   );
 
   const detailed: ClassDetail[] = await Promise.all(
     list.map((row) =>
       api.get<ClassDetail>(
-        `/compendium/classes/${row.slug}?source=${row.source}&campaign=${character.campaignId}`,
+        `/compendium/classes/${row.slug}?source=${row.source}&world=${character.worldId}`,
         token,
       ),
     ),
@@ -57,7 +57,7 @@ export default async function ClassStepPage({ params }: Props) {
   const subclassEntries = await Promise.all(
     l1SubclassClasses.map(async (klass) => {
       const { data } = await api.get<{ data: SubclassRow[] }>(
-        `/compendium/subclasses?campaign=${character.campaignId}&class=${klass.slug}&limit=100`,
+        `/compendium/subclasses?world=${character.worldId}&class=${klass.slug}&limit=100`,
         token,
       );
       return [`${klass.slug}|${klass.source}`, data] as const;

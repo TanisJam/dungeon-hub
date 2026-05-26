@@ -6,7 +6,7 @@
  * pattern covers `components/**` and `lib/**` only (not `app/**`), we cannot
  * render the layout directly. Instead we test the WIRING CONTRACT — that:
  *
- *   1. TermProvider accepts session access_token + campaignId (real props)
+ *   1. TermProvider accepts session access_token + worldId (real props)
  *   2. When those props are present, hover interactions work (live path)
  *   3. When accessToken is null (no session / logged-out), refs are inert
  *
@@ -39,7 +39,7 @@ function makeSessionResolver(entry: { name: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// D.2 — TermProvider wiring: real accessToken + campaignId → hover works
+// D.2 — TermProvider wiring: real accessToken + worldId → hover works
 // ---------------------------------------------------------------------------
 
 describe('wizard layout wiring — TermProvider with real session props', () => {
@@ -52,13 +52,13 @@ describe('wizard layout wiring — TermProvider with real session props', () => 
     vi.useRealTimers();
   });
 
-  it('opens hover card when session accessToken and campaignId are provided (real wiring path)', async () => {
+  it('opens hover card when session accessToken and worldId are provided (real wiring path)', async () => {
     const resolver = makeSessionResolver({ name: 'Fireball' });
 
     render(
       <TermProvider
         accessToken={REAL_SESSION_TOKEN}
-        campaignId={REAL_CAMPAIGN_ID}
+        worldId={REAL_CAMPAIGN_ID}
         apiBaseUrl={REAL_API_BASE_URL}
         mockMode={resolver}
       >
@@ -76,7 +76,7 @@ describe('wizard layout wiring — TermProvider with real session props', () => 
       await Promise.resolve();
     });
 
-    // Card opens with real props — confirms TermProvider accepts session token + campaignId
+    // Card opens with real props — confirms TermProvider accepts session token + worldId
     const dialog = screen.queryByRole('dialog');
     expect(dialog).not.toBeNull();
     expect(dialog!.textContent).toContain('Fireball');
@@ -88,7 +88,7 @@ describe('wizard layout wiring — TermProvider with real session props', () => 
     render(
       <TermProvider
         accessToken={null}
-        campaignId={REAL_CAMPAIGN_ID}
+        worldId={REAL_CAMPAIGN_ID}
         apiBaseUrl={REAL_API_BASE_URL}
         mockMode={resolver}
       >

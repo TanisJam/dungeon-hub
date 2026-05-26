@@ -10,7 +10,7 @@ export function TermHoverDemo() {
   return (
     <CompendiumEntriesWithTerms
       entries={TERM_DEMO_ENTRIES}
-      campaignId="dev-preview"
+      worldId="dev-preview"
       accessToken="mock-token"
       mockMode={createMockResolver(TERM_FIXTURES)}
     />

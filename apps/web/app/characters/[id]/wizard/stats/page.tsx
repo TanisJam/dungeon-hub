@@ -8,14 +8,14 @@ type StatGen = { standardArray: boolean; pointBuy: boolean; roll: boolean };
 
 type Character = {
   id: string;
-  campaignId: string;
+  worldId: string;
   data: {
     baseStats?: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
     statMethod?: 'standard-array' | 'point-buy' | 'roll';
   } | null;
 };
 
-type Campaign = { id: string; rulesProfile: { statGeneration: StatGen } };
+type World = { id: string; rulesProfile: { statGeneration: StatGen } };
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -26,12 +26,12 @@ export default async function StatsStepPage({ params }: Props) {
   if (!session) redirect('/');
 
   const character = await api.get<Character>(`/characters/${id}`, session.access_token);
-  const campaign = await api.get<Campaign>(
-    `/campaigns/${character.campaignId}`,
+  const world = await api.get<World>(
+    `/worlds/${character.worldId}`,
     session.access_token,
   );
 
-  const allowed = campaign.rulesProfile.statGeneration;
+  const allowed = world.rulesProfile.statGeneration;
   const allowedMethods: Array<'standard-array' | 'point-buy' | 'roll'> = [];
   if (allowed.standardArray) allowedMethods.push('standard-array');
   if (allowed.pointBuy) allowedMethods.push('point-buy');

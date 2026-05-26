@@ -10,7 +10,7 @@ import { StepSubtitle } from './_step-subtitle';
 import { TermProvider } from '@/components/compendium/term';
 import { env } from '@/lib/env';
 
-type Character = { id: string; name: string; status: string; campaignId: string };
+type Character = { id: string; name: string; status: string; worldId: string };
 
 type Props = { children: React.ReactNode; params: Promise<{ id: string }> };
 
@@ -82,7 +82,7 @@ export default async function BuildLayout({ children, params }: Props) {
       <div className="mt-8">
         <TermProvider
           accessToken={session?.access_token}
-          campaignId={character.campaignId}
+          worldId={character.worldId}
           apiBaseUrl={env.API_URL}
         >
           {children}

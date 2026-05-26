@@ -26,7 +26,7 @@ type FeatRow = {
 
 type Character = {
   id: string;
-  campaignId: string;
+  worldId: string;
   data: {
     race?: { slug: string; source: string };
     subrace?: { slug: string; source: string } | null;
@@ -111,16 +111,16 @@ export default async function RaceStepPage({ params }: Props) {
 
   const [{ data: list }, { data: featList }, { data: spellList }] = await Promise.all([
     api.get<{ data: RaceRow[] }>(
-      `/compendium/races?campaign=${character.campaignId}&limit=200`,
+      `/compendium/races?world=${character.worldId}&limit=200`,
       token,
     ),
     api.get<{ data: FeatRow[] }>(
-      `/compendium/feats?campaign=${character.campaignId}&limit=200`,
+      `/compendium/feats?world=${character.worldId}&limit=200`,
       token,
     ),
     // Batch 6: fetch wizard cantrips for High Elf picker. PHB p.23. Decision #606.
     api.get<{ data: SpellRow[] }>(
-      `/compendium/spells?campaign=${character.campaignId}&class=wizard&level=0&limit=200`,
+      `/compendium/spells?world=${character.worldId}&class=wizard&level=0&limit=200`,
       token,
     ),
   ]);
@@ -128,7 +128,7 @@ export default async function RaceStepPage({ params }: Props) {
   const detailed: RaceDetail[] = await Promise.all(
     list.map((row) =>
       api.get<RaceDetail>(
-        `/compendium/races/${row.slug}?source=${row.source}&campaign=${character.campaignId}`,
+        `/compendium/races/${row.slug}?source=${row.source}&world=${character.worldId}`,
         token,
       ),
     ),

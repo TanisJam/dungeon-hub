@@ -12,8 +12,8 @@ import type { Entry } from '@/components/compendium/types';
 export interface CompendiumEntriesWithTermsProps {
   /** Raw compendium entries to render via <CompendiumEntries />. */
   entries: Entry[] | null | undefined;
-  /** Campaign UUID passed through to TermProvider for API auth. */
-  campaignId: string | null | undefined;
+  /** World UUID passed through to TermProvider for API auth. */
+  worldId: string | null | undefined;
   /** Bearer access token. When absent/empty, all refs are inert. */
   accessToken: string | null | undefined;
   /** API base URL. Defaults to env.API_URL (NEXT_PUBLIC_API_URL). */
@@ -34,7 +34,7 @@ export interface CompendiumEntriesWithTermsProps {
  * ```tsx
  * <CompendiumEntriesWithTerms
  *   entries={entry.entries}
- *   campaignId={character.campaignId}
+ *   worldId={character.worldId}
  *   accessToken={session.access_token}
  * />
  * ```
@@ -43,7 +43,7 @@ export interface CompendiumEntriesWithTermsProps {
  * ```tsx
  * <CompendiumEntriesWithTerms
  *   entries={entries}
- *   campaignId="mock"
+ *   worldId="mock"
  *   accessToken="mock"
  *   mockMode={createMockResolver(fixtures)}
  * />
@@ -51,14 +51,14 @@ export interface CompendiumEntriesWithTermsProps {
  */
 export function CompendiumEntriesWithTerms({
   entries,
-  campaignId,
+  worldId,
   accessToken,
   apiBaseUrl,
   mockMode,
 }: CompendiumEntriesWithTermsProps) {
   return (
     <TermProvider
-      campaignId={campaignId}
+      worldId={worldId}
       accessToken={accessToken}
       apiBaseUrl={apiBaseUrl}
       mockMode={mockMode}

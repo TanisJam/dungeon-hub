@@ -19,7 +19,7 @@ import type { Cache, TermFetchResult, MockResolver } from './types';
 export interface TermProviderProps {
   children: ReactNode;
   /** null/undefined → all refs are inert */
-  campaignId: string | null | undefined;
+  worldId: string | null | undefined;
   /** null/undefined/empty → all refs are inert, no fetch made */
   accessToken: string | null | undefined;
   /** Defaults to env.API_URL (NEXT_PUBLIC_API_URL) */
@@ -65,7 +65,7 @@ const IDLE_STATE: ProviderState = {
  */
 export function TermProvider({
   children,
-  campaignId,
+  worldId,
   accessToken,
   apiBaseUrl,
   openDelayMs = 120,
@@ -108,7 +108,7 @@ export function TermProvider({
         } else {
           promise = fetchTermEntry(rawRef, {
             apiBaseUrl: apiBaseUrl ?? '',
-            campaignId: campaignId ?? '',
+            worldId: worldId ?? '',
             accessToken: accessToken ?? '',
           });
         }
@@ -149,7 +149,7 @@ export function TermProvider({
         });
       });
     },
-    [apiBaseUrl, campaignId, accessToken, mockMode],
+    [apiBaseUrl, worldId, accessToken, mockMode],
   );
 
   // -------------------------------------------------------------------------

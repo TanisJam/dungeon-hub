@@ -25,7 +25,7 @@ type AppliedClass = { skillChoices?: string[] };
 
 type Character = {
   id: string;
-  campaignId: string;
+  worldId: string;
   data: {
     background?: AppliedBackground;
     classes?: AppliedClass[];
@@ -45,14 +45,14 @@ export default async function BackgroundStepPage({ params }: Props) {
   const character = await api.get<Character>(`/characters/${id}`, token);
 
   const { data: list } = await api.get<{ data: BgRow[] }>(
-    `/compendium/backgrounds?campaign=${character.campaignId}&limit=200`,
+    `/compendium/backgrounds?world=${character.worldId}&limit=200`,
     token,
   );
 
   const detailed: BgDetail[] = await Promise.all(
     list.map((row) =>
       api.get<BgDetail>(
-        `/compendium/backgrounds/${row.slug}?source=${row.source}&campaign=${character.campaignId}`,
+        `/compendium/backgrounds/${row.slug}?source=${row.source}&world=${character.worldId}`,
         token,
       ),
     ),

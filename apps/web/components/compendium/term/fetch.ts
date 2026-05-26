@@ -3,7 +3,7 @@ import type { TermFetchResult, TermEntry } from './types';
 
 export interface FetchTermOptions {
   apiBaseUrl: string;
-  campaignId: string;
+  worldId: string;
   accessToken: string;
 }
 
@@ -23,7 +23,7 @@ export async function fetchTermEntry(
   rawRefKey: string,
   opts: FetchTermOptions
 ): Promise<TermFetchResult> {
-  const { apiBaseUrl, campaignId, accessToken } = opts;
+  const { apiBaseUrl, worldId, accessToken } = opts;
 
   // Guard: missing base URL is a configuration error, not a runtime error
   if (!apiBaseUrl) {
@@ -45,7 +45,7 @@ export async function fetchTermEntry(
     return { kind: 'error', message: `Unsupported ref kind: "${kind}"` };
   }
 
-  const url = buildUrl(apiBaseUrl, path, slug, campaignId, source);
+  const url = buildUrl(apiBaseUrl, path, slug, worldId, source);
 
   let response: Response;
   try {
@@ -81,16 +81,16 @@ export async function fetchTermEntry(
  * Compose the full API URL for a compendium term fetch.
  * Pure function — easy to test and reason about in isolation.
  *
- * Result: `{base}/api/v1/compendium/{path}/{slug}?campaign={campaignId}&source={source}`
+ * Result: `{base}/api/v1/compendium/{path}/{slug}?world={worldId}&source={source}`
  */
 function buildUrl(
   base: string,
   path: string,
   slug: string,
-  campaignId: string,
+  worldId: string,
   source: string
 ): string {
   const trimmed = base.replace(/\/$/, '');
-  const params = new URLSearchParams({ campaign: campaignId, source });
+  const params = new URLSearchParams({ world: worldId, source });
   return `${trimmed}/api/v1/compendium/${path}/${slug}?${params.toString()}`;
 }

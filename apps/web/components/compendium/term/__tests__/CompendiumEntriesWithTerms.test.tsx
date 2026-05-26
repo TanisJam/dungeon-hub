@@ -53,7 +53,7 @@ describe('CompendiumEntriesWithTerms — basic render', () => {
     render(
       <CompendiumEntriesWithTerms
         entries={entries}
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={createMockResolver(fixtures)}
@@ -70,7 +70,7 @@ describe('CompendiumEntriesWithTerms — basic render', () => {
     render(
       <CompendiumEntriesWithTerms
         entries={[]}
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={createMockResolver(fixtures)}
@@ -104,7 +104,7 @@ describe('CompendiumEntriesWithTerms — hover opens HoverCard via mock resolver
     render(
       <CompendiumEntriesWithTerms
         entries={entries}
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={createMockResolver(fixtures)}
@@ -153,7 +153,7 @@ describe('CompendiumEntriesWithTerms — hover opens HoverCard via mock resolver
     render(
       <CompendiumEntriesWithTerms
         entries={entries}
-        campaignId="c1"
+        worldId="c1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={createMockResolver(conditionFixtures)}

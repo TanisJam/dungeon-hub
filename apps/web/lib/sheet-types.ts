@@ -200,7 +200,7 @@ export interface SheetResponse {
   character: {
     id: string;
     userId: string;
-    campaignId: string;
+    worldId: string;
     status: CharacterStatus;
     xp: number;
   };

@@ -41,7 +41,7 @@ type RaceRow = {
 
 type Character = {
   id: string;
-  campaignId: string;
+  worldId: string;
   data: {
     classes?: AppliedClass[];
     spells?: Record<string, { cantrips: SpellRef[]; known: SpellRef[]; prepared: SpellRef[] }>;
@@ -129,13 +129,13 @@ export default async function SpellsStepPage({ params }: Props) {
   const [wizardCantripsResp, raceListResp] = await Promise.all([
     raceCantripRef
       ? api.get<{ data: WizardCantrip[] }>(
-          `/compendium/spells?campaign=${character.campaignId}&class=wizard&level=0&limit=200`,
+          `/compendium/spells?world=${character.worldId}&class=wizard&level=0&limit=200`,
           token,
         )
       : Promise.resolve(null),
     raceCantripRef
       ? api.get<{ data: RaceRow[] }>(
-          `/compendium/races?campaign=${character.campaignId}&limit=200`,
+          `/compendium/races?world=${character.worldId}&limit=200`,
           token,
         )
       : Promise.resolve(null),

@@ -47,7 +47,7 @@ describe('TermProvider — hover opens card after OPEN_DELAY', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -91,7 +91,7 @@ describe('TermProvider — hover opens card after OPEN_DELAY', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -138,7 +138,7 @@ describe('TermProvider — fetch dedup for same refKey', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -193,7 +193,7 @@ describe('TermProvider — missing accessToken makes all refs inert', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken={undefined}
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -221,7 +221,7 @@ describe('TermProvider — missing accessToken makes all refs inert', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken=""
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -262,7 +262,7 @@ describe('TermProvider — unsupported kind is ignored (no fetch, no card)', () 
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
@@ -307,7 +307,7 @@ describe('TermProvider — Escape dismisses open HoverCard', () => {
 
     render(
       <TermProvider
-        campaignId="campaign-1"
+        worldId="campaign-1"
         accessToken="tok"
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
