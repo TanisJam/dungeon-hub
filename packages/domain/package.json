@@ -20,6 +20,7 @@
     "./character/level-up": "./src/character/level-up/index.ts",
     "./character/class-features": "./src/character/class-features/index.ts",
     "./character/class-resources": "./src/character/class-resources/index.ts",
+    "./character/approval": "./src/character/approval/index.ts",
     "./character/rest": "./src/character/rest/index.ts",
     "./character/tool": "./src/character/tool/index.ts",
     "./entities": "./src/entities/index.ts",
