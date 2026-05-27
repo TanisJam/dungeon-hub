@@ -32,6 +32,18 @@ describe('PendingFichasCardTrigger', () => {
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
+  it('T2b: opened sheet renders title "Fichas pendientes" (PFS-SHEET-TITLE-03)', () => {
+    render(
+      <PendingFichasCardTrigger
+        fichas={MOCK_PENDING_FICHAS}
+        oldestAge={MOCK_PENDING_OLDEST_AGE}
+        quests={MOCK_QUESTS_SIN_TOCAR}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /revisar/i }));
+    expect(screen.getByText('Fichas pendientes')).toBeTruthy();
+  });
+
   it('T3: pressing Escape closes the sheet', () => {
     render(
       <PendingFichasCardTrigger

@@ -77,4 +77,10 @@ describe('rejectFichaFromInicio', () => {
     );
     expect(result).toEqual({ ok: true });
   });
+
+  it('T6: rejectFichaFromInicio calls revalidatePath("/inicio") (IPA-REJECT-02)', async () => {
+    const { rejectFichaFromInicio } = await import('./actions');
+    await rejectFichaFromInicio(VALID_UUID);
+    expect(revalidatePath).toHaveBeenCalledWith('/inicio');
+  });
 });
