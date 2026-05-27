@@ -17,3 +17,5 @@ export { CrowMark } from './crow-mark';
 export { DiscordIcon } from './discord-icon';
 
 export { V3Empty } from './empty';
+
+export { V3Sheet } from './sheet';
