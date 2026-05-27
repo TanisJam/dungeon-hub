@@ -88,6 +88,8 @@ const BASE_PROPS = {
   characterName: 'Thorin',
   flowCtx: FIGHTER_L1_CTX,
   subclassesByClass: {},
+  spellLimitsByClass: {},
+  existingSpellsByClass: {},
 };
 
 beforeEach(() => {

@@ -10,6 +10,8 @@ import {
   cantripsKnownFor,
   wizardSpellbookSize,
   SPELLCASTING_ABILITY,
+  computeSpellLimits,
+  type SpellLimitsView,
 } from '@dungeon-hub/domain/character/spellcasting';
 import type { FlowCtx } from './_step-graph';
 import type { SubclassRow } from '@/app/characters/[id]/wizard/class/_picker';
@@ -171,6 +173,47 @@ export default async function LevelUpPage({ params }: Props) {
     toLevelByClass,
   };
 
+  // Compute spell limits at NEXT level per caster class (for the spells step).
+  // Uses sheet.abilityScores which has modifiers pre-computed by the API.
+  const spellLimitsByClass: Record<string, SpellLimitsView> = {};
+  for (const cls of sheet.identity.classes) {
+    const ability = SPELLCASTING_ABILITY[cls.slug];
+    if (!ability) continue; // non-caster
+
+    const toLevel = cls.level + 1;
+    // Build minimal AppliedClass-compatible object (computeSpellLimits only uses slug + level)
+    const mockAppliedClass = {
+      slug: cls.slug,
+      source: 'PHB',
+      level: toLevel,
+      subclass: cls.subclass,
+      hitDie: HIT_DIE[cls.slug] ?? 'd8',
+      savingThrows: [] as string[],
+      armorProficiencies: [] as string[],
+      weaponProficiencies: [] as string[],
+      toolProficiencies: [] as string[],
+      skillChoices: [] as string[],
+    };
+
+    // abilityScores[ability].modifier from the sheet
+    const abilityMod = sheet.abilityScores[ability]?.modifier ?? 0;
+    spellLimitsByClass[cls.slug] = computeSpellLimits(
+      mockAppliedClass as Parameters<typeof computeSpellLimits>[0],
+      abilityMod,
+    );
+  }
+
+  // Build existing spell picks per class for pre-seeding the spells step.
+  // Maps classSlug → { cantrips, known, prepared } from the sheet's spellsByClass.
+  const existingSpellsByClass: Record<string, { cantrips: Array<{ slug: string; source: string }>; known: Array<{ slug: string; source: string }>; prepared: Array<{ slug: string; source: string }> }> = {};
+  for (const classSummary of sheet.spellsByClass ?? []) {
+    existingSpellsByClass[classSummary.classSlug] = {
+      cantrips: classSummary.spells.cantrips.map((s) => ({ slug: s.slug, source: s.source })),
+      known: classSummary.spells.leveled.map((s) => ({ slug: s.slug, source: s.source })),
+      prepared: [],
+    };
+  }
+
   // Build owned-class list with isAsiLevel flag (for backward compat with existing LevelUpFlow props).
   const ownedClasses = sheet.identity.classes.map((cls) => ({
     slug: cls.slug,
@@ -220,6 +263,8 @@ export default async function LevelUpPage({ params }: Props) {
           characterName={sheet.identity.name}
           flowCtx={flowCtx}
           subclassesByClass={subclassesByClass}
+          spellLimitsByClass={spellLimitsByClass}
+          existingSpellsByClass={existingSpellsByClass}
         />
       </div>
     </AppShell>

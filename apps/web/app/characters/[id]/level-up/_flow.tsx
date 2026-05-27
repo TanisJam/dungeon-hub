@@ -13,9 +13,16 @@
  * SDD level-up-choices-completion (C4).
  */
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { submitLevelUp, type LevelUpBody, type LevelUpSummary } from './actions';
+import {
+  submitLevelUp,
+  retrySaveSpells,
+  getSpellOptions,
+  type LevelUpBody,
+  type LevelUpSummary,
+  type AppliedClassSpellsForAction,
+} from './actions';
 import {
   buildActiveSteps,
   nextStep,
@@ -31,7 +38,13 @@ import {
   type ClassRef,
 } from './_step-graph';
 import { SubclassStep } from './_subclass-step';
+import { SpellsStep } from './_spells-step';
 import type { SubclassRow } from '@/app/characters/[id]/wizard/class/_picker';
+import type {
+  SpellLimitsView,
+  AvailableSpell,
+  AppliedClassSpells,
+} from '@/app/characters/[id]/wizard/spells/_picker';
 
 // ---- Types ------------------------------------------------------------------
 
@@ -50,6 +63,10 @@ interface LevelUpFlowProps {
   characterName: string;
   flowCtx: FlowCtx;
   subclassesByClass: Record<string, SubclassRow[]>;
+  /** Spell limits at toLevel per caster class. Computed server-side in page.tsx. */
+  spellLimitsByClass: Record<string, SpellLimitsView>;
+  /** Existing spell picks per class (for pre-seeding the spells step). */
+  existingSpellsByClass: Record<string, AppliedClassSpells>;
 }
 
 const INITIAL_STATE: FlowState = {
@@ -75,17 +92,43 @@ export function LevelUpFlow({
   characterName,
   flowCtx,
   subclassesByClass,
+  spellLimitsByClass,
+  existingSpellsByClass,
 }: LevelUpFlowProps) {
   const router = useRouter();
   const [state, setState] = useState<FlowState>(INITIAL_STATE);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<LevelUpSummary | null>(null);
+  const [partialSpellsError, setPartialSpellsError] = useState<{ code: string; message: string } | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Spell options (availableSpells) — fetched client-side when spells step is active.
+  const [availableSpells, setAvailableSpells] = useState<AvailableSpell[] | null>(null);
+  const [spellSubclassGrants, setSpellSubclassGrants] = useState<string[]>([]);
 
   function update(partial: Partial<FlowState>) {
     setState((s) => ({ ...s, ...partial }));
     setError(null);
   }
+
+  // Fetch spell options when the spells step becomes active.
+  // Clears previous results when class changes (different slug → different pool).
+  useEffect(() => {
+    if (state.step !== 'spells' || !state.selectedClass) return;
+    const { slug } = state.selectedClass;
+
+    let cancelled = false;
+    setAvailableSpells(null); // reset to loading state
+
+    getSpellOptions(characterId, slug).then((result) => {
+      if (cancelled) return;
+      setAvailableSpells(result?.availableSpells ?? []);
+      setSpellSubclassGrants(result?.subclassGrantedSlugs ?? []);
+    });
+
+    return () => { cancelled = true; };
+  }, [state.step, state.selectedClass?.slug, characterId]);
 
   // ---- Navigation helpers ---------------------------------------------------
 
@@ -153,10 +196,22 @@ export function LevelUpFlow({
     update({ asiFeat: kind, asiDeltas: deltas, step: next });
   }
 
+  function handleSpellsContinue(picks: AppliedClassSpells) {
+    // Store as AppliedClassSpellsLite (compatible shape for FlowState)
+    const spellPicks = {
+      cantrips: picks.cantrips,
+      known: picks.known,
+      prepared: picks.prepared,
+    };
+    const tentative: FlowState = { ...state, spellPicks, step: 'spells' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ spellPicks, step: next });
+  }
+
   // ---- Submit ---------------------------------------------------------------
 
   function handleSubmit() {
-    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass } = state;
+    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass, spellPicks } = state;
     if (!selectedClass || !mode) return;
 
     const body: LevelUpBody =
@@ -169,6 +224,7 @@ export function LevelUpFlow({
               ? { asiFeat: { kind: 'asi', deltas: asiDeltas } }
               : {}),
             ...(subclass ? { subclass } : {}),
+            ...(spellPicks ? { spellPicks: spellPicks as AppliedClassSpellsForAction } : {}),
           }
         : {
             kind: 'new-class',
@@ -178,12 +234,33 @@ export function LevelUpFlow({
 
     startTransition(async () => {
       const result = await submitLevelUp(characterId, body);
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error);
+        return;
+      }
+      if (result.ok === 'partial') {
+        setSummary(result.summary);
+        setPartialSpellsError(result.spellsError);
         return;
       }
       setSummary(result.summary);
     });
+  }
+
+  async function handleRetrySpells() {
+    if (!state.selectedClass || !state.spellPicks) return;
+    setIsRetrying(true);
+    const result = await retrySaveSpells(
+      characterId,
+      state.selectedClass.slug,
+      state.spellPicks as AppliedClassSpellsForAction,
+    );
+    setIsRetrying(false);
+    if (result.ok) {
+      setPartialSpellsError(null);
+    } else {
+      setPartialSpellsError({ code: result.error, message: 'Error al reintentar guardar hechizos.' });
+    }
   }
 
   // ---- Summary screen (after success) --------------------------------------
@@ -192,6 +269,9 @@ export function LevelUpFlow({
     return (
       <SuccessScreen
         summary={summary}
+        partialSpellsError={partialSpellsError}
+        isRetrying={isRetrying}
+        onRetrySpells={handleRetrySpells}
         onDone={() => router.push(`/characters/${characterId}`)}
       />
     );
@@ -291,6 +371,28 @@ export function LevelUpFlow({
         {state.step === 'asi-feat' && (
           <AsiFeatStep
             onContinue={handleAsiFeatContinue}
+          />
+        )}
+
+        {state.step === 'spells' && state.selectedClass && (
+          <SpellsStep
+            classSlug={state.selectedClass.slug}
+            classSource={state.selectedClass.source}
+            limits={spellLimitsByClass[state.selectedClass.slug] ?? {
+              cantripsKnown: 0,
+              spellsKnown: null,
+              spellsPrepared: null,
+              maxSpellLevel: 0,
+              ability: null,
+            }}
+            availableSpells={availableSpells}
+            subclassGrantedSlugs={spellSubclassGrants}
+            initialValue={existingSpellsByClass[state.selectedClass.slug] ?? {
+              cantrips: [],
+              known: [],
+              prepared: [],
+            }}
+            onContinue={handleSpellsContinue}
           />
         )}
 
@@ -661,9 +763,15 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function SuccessScreen({
   summary,
+  partialSpellsError,
+  isRetrying,
+  onRetrySpells,
   onDone,
 }: {
   summary: LevelUpSummary;
+  partialSpellsError: { code: string; message: string } | null;
+  isRetrying: boolean;
+  onRetrySpells: () => void;
   onDone: () => void;
 }) {
   return (
@@ -676,6 +784,24 @@ function SuccessScreen({
           {summary.fromClassLevel} → {summary.toClassLevel}
         </p>
       </div>
+
+      {/* Partial spell save warning (REQ-CLU-SPL-TWO-PHASE-SUBMIT) */}
+      {partialSpellsError && (
+        <div className="w-full max-w-xs rounded-xl border border-warning-soft bg-warning-soft/30 p-4 text-left">
+          <p className="text-xs text-warning-deep">
+            Subiste de nivel, pero los hechizos no se guardaron. {partialSpellsError.code}.
+            Tocá «Reintentar guardar hechizos» para reintentar.
+          </p>
+          <button
+            type="button"
+            onClick={onRetrySpells}
+            disabled={isRetrying}
+            className="mt-2 min-h-[44px] w-full rounded-lg border border-warning-deep bg-paper px-4 py-2 text-xs font-semibold text-warning-deep disabled:opacity-50"
+          >
+            {isRetrying ? 'Reintentando…' : 'Reintentar guardar hechizos'}
+          </button>
+        </div>
+      )}
 
       <dl className="w-full max-w-xs space-y-2 rounded-xl border border-line bg-paper-soft p-4 text-left">
         <Row label="HP ganados" value={`+${summary.hpDelta}`} />
