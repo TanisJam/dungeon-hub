@@ -1,20 +1,37 @@
 import type { Metadata } from 'next';
-import { Bricolage_Grotesque, Manrope } from 'next/font/google';
+import {
+  Inter,
+  JetBrains_Mono,
+  M_PLUS_Rounded_1c,
+  Noto_Serif_Georgian,
+} from 'next/font/google';
 import { Suspense } from 'react';
 import './globals.css';
-import { TweaksPanel } from '@/components/dev/tweaks-panel';
 import { NavProgress } from '@/components/layout/nav-progress';
 
-const bricolage = Bricolage_Grotesque({
+const notoSerifGeorgian = Noto_Serif_Georgian({
   subsets: ['latin'],
-  axes: ['opsz'],
-  variable: '--font-bricolage',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-noto-serif-georgian',
   display: 'swap',
 });
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-manrope',
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const mplusRounded = M_PLUS_Rounded_1c({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-mplus-rounded',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
   display: 'swap',
 });
 
@@ -25,15 +42,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-aesthetic="modern" data-palette="crepusculo">
+    <html lang="en" data-aesthetic="obsidian" data-palette="obsidian">
       <body
-        className={`${bricolage.variable} ${manrope.variable} min-h-screen bg-paper text-ink font-sans antialiased`}
+        className={`${notoSerifGeorgian.variable} ${inter.variable} ${mplusRounded.variable} ${jetbrainsMono.variable} min-h-screen bg-paper text-ink font-sans antialiased`}
       >
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
         {children}
-        {process.env.NODE_ENV !== 'production' && <TweaksPanel />}
       </body>
     </html>
   );
