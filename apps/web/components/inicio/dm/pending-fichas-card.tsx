@@ -1,24 +1,23 @@
-// TODO sdd/pendientes-sheet — wire real approval flow
 import type { PendingFichaSummary } from '../dm-mock-data';
 
 interface PendingFichasCardProps {
   fichas: PendingFichaSummary[];
   oldestAge: string;
+  onClick: () => void;
 }
 
 /**
  * PendingFichasCard — DM hero card showing pending character approvals.
  *
- * v1 stub: entire card is a non-navigating anchor (aria-disabled).
- * REQ-IDM-PENDING-CARD-02 | REQ-IDM-PENDING-CARD-STUB-03
+ * Wired via PendingFichasCardTrigger client island that opens the V3Sheet.
+ * REQ-IDM-PENDING-CARD-02 | REQ-PS-CARD-BUTTON-API-01
  */
-export function PendingFichasCard({ fichas, oldestAge }: PendingFichasCardProps) {
+export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasCardProps) {
   return (
-    <a
-      href="#"
-      aria-disabled="true"
-      onClick={(e) => e.preventDefault()}
-      className="inicio-pending-bg block rounded-2xl p-4 cursor-not-allowed"
+    <button
+      type="button"
+      onClick={onClick}
+      className="inicio-pending-bg block w-full text-left rounded-2xl p-4"
     >
       {/* Eyebrow */}
       <p className="text-xs font-semibold uppercase tracking-widest text-ink-mute mb-2">
@@ -51,6 +50,6 @@ export function PendingFichasCard({ fichas, oldestAge }: PendingFichasCardProps)
       <span className="inicio-pending-cta mt-3 inline-block px-3 py-1 text-xs font-bold uppercase tracking-wide rounded-full">
         Revisar
       </span>
-    </a>
+    </button>
   );
 }

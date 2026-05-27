@@ -7,7 +7,7 @@ import { QuickActions } from '@/components/inicio/quick-actions';
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
 import { NovedadesFeed } from '@/components/inicio/novedades-feed';
 import { MOCK_NEXT_CAMPAIGN, MOCK_ACTIVE_CHAR, MOCK_NOVEDADES } from '@/components/inicio/mock-data';
-import { PendingFichasCard } from '@/components/inicio/dm/pending-fichas-card';
+import { PendingFichasCardTrigger } from '@/components/inicio/dm/pending-fichas-card-trigger';
 import { DMNextSessionCard } from '@/components/inicio/dm/dm-next-session-card';
 import { DMQuickActions } from '@/components/inicio/dm/dm-quick-actions';
 import { QuestsSinTocarList } from '@/components/inicio/dm/quests-sin-tocar-list';
@@ -31,7 +31,11 @@ export default async function InicioPage() {
     return (
       <AppShell title="Inicio" subtitle="TU GREMIO — DM">
         <div className="flex flex-col gap-4">
-          <PendingFichasCard fichas={MOCK_PENDING_FICHAS} oldestAge={MOCK_PENDING_OLDEST_AGE} />
+          <PendingFichasCardTrigger
+            fichas={MOCK_PENDING_FICHAS}
+            oldestAge={MOCK_PENDING_OLDEST_AGE}
+            quests={MOCK_QUESTS_SIN_TOCAR}
+          />
           <DMNextSessionCard campaign={MOCK_DM_NEXT_CAMPAIGN} />
           <DMQuickActions />
           <QuestsSinTocarList quests={MOCK_QUESTS_SIN_TOCAR} />
