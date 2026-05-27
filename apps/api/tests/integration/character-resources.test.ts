@@ -380,6 +380,139 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
     expect(reloaded.data.classResourcesUsed['bard:bardic-inspiration']).toBe(0);
   });
 
+  // --- Paladin Lay on Hands (PHB p.84) ---
+  async function setupPaladin(level: number, name: string): Promise<string> {
+    const app = await getTestApp();
+    const p = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { worldId, name },
+      })
+      .then((r) => r.json());
+    const charId = p.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'paladin',
+              source: 'PHB',
+              level,
+              hitDie: 'd10',
+              subclass: null,
+              savingThrows: ['wis', 'cha'],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          baseStats: { str: 16, dex: 10, con: 14, int: 8, wis: 12, cha: 14 },
+        },
+      },
+    });
+    return charId;
+  }
+
+  it('Paladin L5 use amount 10 → used:10 (pool 25)', async () => {
+    const app = await getTestApp();
+    const paladinId = await setupPaladin(5, 'Paladin L5 pool spend');
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'paladin:lay-on-hands', amount: 10 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().classResourcesUsed['paladin:lay-on-hands']).toBe(10);
+  });
+
+  it('Paladin L5 use amount 30 → 400 RESOURCE_OVER_LIMIT', async () => {
+    const app = await getTestApp();
+    const paladinId = await setupPaladin(5, 'Paladin L5 pool over-limit');
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'paladin:lay-on-hands', amount: 30 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].code).toBe('RESOURCE_OVER_LIMIT');
+  });
+
+  it('Paladin L5 use 10, short rest → pool preserved (long-only trigger)', async () => {
+    const app = await getTestApp();
+    const paladinId = await setupPaladin(5, 'Paladin L5 short rest preserves');
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'paladin:lay-on-hands', amount: 10 },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/rest/short`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceToSpend: {} },
+    });
+    expect(res.statusCode).toBe(200);
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${paladinId}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['paladin:lay-on-hands']).toBe(10);
+  });
+
+  it('Paladin L5 use 10, long rest → pool restored', async () => {
+    const app = await getTestApp();
+    const paladinId = await setupPaladin(5, 'Paladin L5 long rest restores');
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'paladin:lay-on-hands', amount: 10 },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${paladinId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${paladinId}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['paladin:lay-on-hands']).toBe(0);
+  });
+
+  it('Paladin L1 → sheet shows max 5 + shape:pool extra', async () => {
+    const app = await getTestApp();
+    const paladinId = await setupPaladin(1, 'Paladin L1 sheet view');
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${paladinId}/sheet`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const loh = sheetRes.json().sheet.classResources['paladin:lay-on-hands'];
+    expect(loh).toBeDefined();
+    expect(loh.max).toBe(5);
+    expect(loh.recoveryTrigger).toBe('long');
+    expect(loh.extra).toEqual({ shape: 'pool' });
+  });
+
   it('Bard L1 CHA 14 → sheet shows max 2 + d6 die badge', async () => {
     const app = await getTestApp();
     const bardId = await setupBard(1, 14, 'Bard L1 sheet view');
