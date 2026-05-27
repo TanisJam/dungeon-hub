@@ -49,7 +49,7 @@ import {
   type LevelUpBody as DomainLevelUpBody,
 } from '@dungeon-hub/domain/character/level-up';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
-import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
+import { ABILITY_KEYS, type AbilityKey, type AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
@@ -2776,7 +2776,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       hp: newHp,
       hitDice,
       warlockSlotsUsed: 0,
-      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsed, classes, 'short'),
+      classResourcesUsed: resetClassResourcesForRest(
+        currentResourcesUsed,
+        classes,
+        'short',
+        Object.fromEntries(
+          ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+        ) as Record<AbilityKey, number>,
+      ),
     };
 
     // Inventory recharge — PHB p.141: items with recharge='short' regain charges
@@ -2996,7 +3003,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
       warlockSlotsUsed: 0,
       // R-07: clear all class resources on long rest (PHB p.186).
-      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsedLong, classes, 'long'),
+      classResourcesUsed: resetClassResourcesForRest(
+        currentResourcesUsedLong,
+        classes,
+        'long',
+        Object.fromEntries(
+          ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+        ) as Record<AbilityKey, number>,
+      ),
       // REST-03 (#826): persist server-clock timestamp for 24h cooldown gate.
       lastLongRestAt: new Date().toISOString(),
     };
@@ -3119,7 +3133,22 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const charData = (character.data as Record<string, unknown> | null) ?? {};
     const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
     const owningClass = classes.find((c) => c.slug === def.classSlug);
-    const max = owningClass != null ? def.maxFor(owningClass.level) : null;
+    const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+    };
+    const racialAsis = ((charData['asisApplied'] as AppliedAsi[] | undefined) ?? []);
+    const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
+    );
+    const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+    const useAbilityMods = Object.fromEntries(
+      ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+    ) as Record<AbilityKey, number>;
+    const max =
+      owningClass != null
+        ? def.maxFor({ classLevel: owningClass.level, abilityMods: useAbilityMods })
+        : null;
     if (max == null) {
       return reply
         .code(400)

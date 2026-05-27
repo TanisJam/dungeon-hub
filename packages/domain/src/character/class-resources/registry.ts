@@ -7,7 +7,7 @@
  * a rule interpretation, not data — promote to compendium per-row flags only
  * when a real homebrew use-case surfaces.
  *
- * Initial entries (this SDD): Second Wind + Ki Points. The remaining
+ * Initial entries (SDD #815): Second Wind + Ki Points. The remaining
  * 7 R-07 features (Sorcery Points, Channel Divinity, Bardic Inspiration,
  * Lay on Hands, Arcane Recovery, Indomitable, Natural Recovery) ship in
  * per-feature follow-up SDDs that extend this array.
@@ -20,20 +20,16 @@ import type { ClassResourceDef } from './types.js';
 const FIGHTER_SECOND_WIND: ClassResourceDef = {
   slug: 'fighter:second-wind',
   classSlug: 'fighter',
-  recoveryTrigger: 'short',
-  maxFor(classLevel) {
-    return classLevel >= 1 ? 1 : null;
-  },
+  maxFor: ({ classLevel }) => (classLevel >= 1 ? 1 : null),
+  recoveryTriggerFor: () => 'short',
 };
 
 /** Monk — Ki Points (PHB p.78). Equal to monk level, regained on a short or long rest, unlocks at L2. */
 const MONK_KI_POINTS: ClassResourceDef = {
   slug: 'monk:ki-points',
   classSlug: 'monk',
-  recoveryTrigger: 'short',
-  maxFor(classLevel) {
-    return classLevel >= 2 ? classLevel : null;
-  },
+  maxFor: ({ classLevel }) => (classLevel >= 2 ? classLevel : null),
+  recoveryTriggerFor: () => 'short',
 };
 
 export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
