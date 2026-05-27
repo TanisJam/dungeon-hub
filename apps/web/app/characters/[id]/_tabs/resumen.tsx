@@ -1,6 +1,7 @@
 import type { CharacterSheet } from '@/lib/sheet-types';
 import { Card } from '@/components/ui';
 import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
+import { AtributosSectionEditor } from '@/components/ficha/atributos-section-editor';
 import { RacialTraitsBlock } from './_racial-traits-block';
 
 const ABILITY_ES: Record<string, string> = {
@@ -22,11 +23,28 @@ function titleCase(s: string): string {
     .join(' ');
 }
 
+type AbilityScores = {
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+};
+
 interface ResumenTabProps {
   sheet: CharacterSheet;
+  /** Character ID — passed to AtributosSectionEditor for the save action. */
+  characterId?: string;
+  /** True when char.status ∈ {active, retired, dead}. */
+  statusLocked?: boolean;
+  /** True when the current user is a GM of the character's world. */
+  isDm?: boolean;
+  /** Raw ability scores for pre-filling the editor. Derived from sheet.abilityScores. */
+  currentStats?: AbilityScores;
 }
 
-export function ResumenTab({ sheet }: ResumenTabProps) {
+export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = false, currentStats }: ResumenTabProps) {
   return (
     <div className="space-y-4">
       {/* Atributos */}
@@ -35,9 +53,21 @@ export function ResumenTab({ sheet }: ResumenTabProps) {
           <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
             Atributos
           </p>
-          <span className="text-[10px] font-semibold text-ink-soft">
-            Comp. {fmtMod(sheet.proficiencyBonus)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold text-ink-soft">
+              Comp. {fmtMod(sheet.proficiencyBonus)}
+            </span>
+            {/* Edit pencil — opens AtributosEditor via V3Sheet (C5, sdd/ficha-restyle) */}
+            {characterId && currentStats && (
+              <AtributosSectionEditor
+                characterId={characterId}
+                currentStats={currentStats}
+                currentMethod="standard-array"
+                statusLocked={statusLocked}
+                isDm={isDm}
+              />
+            )}
+          </div>
         </div>
         <AbilityScoreGrid scores={sheet.abilityScores} />
       </Card>

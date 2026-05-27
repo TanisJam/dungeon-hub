@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import type { SheetResponse, CharacterStatus } from '@/lib/sheet-types';
 import { AppShell } from '@/components/layout/app-shell';
 import { Pill } from '@/components/ui';
+import { Icon } from '@/components/ui/icon';
 import { Banner } from '@/components/sheet/banner';
 import { SheetHero, xpForLevel } from '@/components/sheet/sheet-hero';
 import { VitalGrid } from '@/components/sheet/vital-grid';
@@ -109,6 +110,22 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   const statusBanner = getStatusBanner(character.status);
   const isActive = character.status === 'active';
 
+  // Edit-lock policy (sdd/ficha-restyle — ATRIBUTOS-EDITOR-POLICY-01)
+  const statusLocked = (['active', 'retired', 'dead'] as CharacterStatus[]).includes(
+    character.status,
+  );
+  const isDmHere = callerRole === 'gm';
+
+  // Derive ability scores from the sheet (pre-racial ASIs already folded in)
+  const currentStats = {
+    str: sheet.abilityScores.str.score,
+    dex: sheet.abilityScores.dex.score,
+    con: sheet.abilityScores.con.score,
+    int: sheet.abilityScores.int.score,
+    wis: sheet.abilityScores.wis.score,
+    cha: sheet.abilityScores.cha.score,
+  };
+
   // Hero props
   const { identity } = sheet;
   const totalLevel = identity.totalLevel;
@@ -123,6 +140,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
     <AppShell
       title={identity.name}
       subtitle={classSummary.toUpperCase()}
+      backHref="/personajes"
       rightAction={
         isActive ? (
           <Pill tone="green" size="sm">Activo</Pill>
@@ -186,7 +204,15 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         <SheetTabs activeTab={tab} characterId={id} />
 
         <div>
-          {tab === 'resumen' && <ResumenTab sheet={sheet} />}
+          {tab === 'resumen' && (
+            <ResumenTab
+              sheet={sheet}
+              characterId={id}
+              statusLocked={statusLocked}
+              isDm={isDmHere}
+              currentStats={currentStats}
+            />
+          )}
           {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
           {tab === 'hechizos' && <HechizosTab sheet={sheet} charId={id} />}
           {tab === 'recursos' && (
@@ -207,7 +233,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           href={`/characters/${id}/wizard/stats`}
           className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-ink-mute hover:text-ink-soft transition-colors"
         >
-          <span aria-hidden>✎</span>
+          <Icon name="edit" size={16} />
           Editar personaje en el constructor
         </Link>
 
