@@ -196,6 +196,51 @@ Common shape only. Used for the in-game action reference UI; no derived fields.
 
 ---
 
+## What this DSL does NOT cover
+
+The DSL describes **content** the engine can load — new races, classes, spells, items, etc. that *reuse mechanics the engine already understands*. It does **not** describe mechanics themselves. If a homebrew or new official book introduces a novel rule, the corresponding code lives in `packages/domain` and requires a PR — not a JSON pack.
+
+Concrete categories that fall outside the DSL today:
+
+### Out-of-scope: new **mechanic types**
+
+| What you can't declare in JSON | Why | Where it lives in code today |
+|---|---|---|
+| **New class-resource types** with custom recovery rules (e.g. "Mana Pool" with attunement-based recovery, "Soul Tokens" that persist across rests) | The resource registry is rule interpretation, not data. | `packages/domain/src/character/class-resources/registry.ts` — each def is a TS object. R-07 added 8 features here; future ones follow the same pattern. |
+| **New stat formulas** (e.g. "armor type that uses CON mod for AC", "save DC formula based on a new ability") | Stat math is hand-coded for type safety + testability. | `packages/domain/src/character/sheet/compute.ts` and `armor/compute-ac.ts`. |
+| **Active class/subclass feature mechanics** (e.g. "Divine Smite spends a slot to add 2d8 radiant damage") | The DSL stores feature *text* and *level gates*, but the engine doesn't simulate combat — there's no "execute this feature" runtime. | Feature metadata is parsed and surfaced via `featuresUnlocked`; the player applies the effect at the table. |
+| **Active feat mechanics** (e.g. Lucky reroll, Sharpshooter -5/+10, Resilient prof bonus) | Same reason as above. | Domain knows feats exist and prerequisites; passive effects on saves/skills/AC would need TS. |
+| **Novel spell behaviors beyond cast-time/range/components/duration/level/school** (e.g. "this spell adds an ongoing combat effect") | Combat tracking isn't modeled. | Spell DSL captures the cast-time envelope; resolution at the table. |
+
+### Out-of-scope: new **entity kinds**
+
+The DSL has 11 entity kinds (see §Entities). Introducing a 12th kind (e.g. "psionic disciplines" from UA, "vehicle stat blocks" from EGtW) requires:
+
+1. A new `compendium_*` table (Drizzle migration in `apps/api/src/infra/db/schema.ts`).
+2. A new importer file in `packages/compendium-import/src/importers/`.
+3. Domain types describing the entity's shape.
+4. Optionally, a new key in `disabledEntities` if the entity is per-world filterable.
+
+This is multi-commit work behind an SDD, not a homebrew operation.
+
+### Intentionally non-filtered: `actions` and `conditions`
+
+`actions` (Dash, Disengage, Two-Weapon Fighting, etc.) and `conditions` (Blinded, Stunned, Concentration, etc.) are imported via the DSL and queryable from the compendium API, but they are **NOT** filtered by Rules Profile. A PC who is Blinded is Blinded regardless of which sourcebooks the campaign uses; the core actions are universal to D&D 5e.
+
+This is a deliberate design decision (see `apps/api/src/http/routes/compendium.ts:786` and `:920`). `disabledEntities` accordingly does NOT have keys for these two entity kinds.
+
+If a homebrew introduces a NEW condition or action with the same slug as a PHB one, the conflict is resolved at the source level (the DM disables the homebrew source or removes the conflicting row at import time). Per-entity overrides via `disabledEntities` are not available here.
+
+### How to bridge: from JSON to code
+
+If a homebrew needs a mechanic the DSL can't express:
+
+1. **First check**: is the mechanic *really* novel, or does an existing pattern cover it? (Custom Background skill pools, Optional Class Features swap, Race ASI free-assign — these are already declarative.)
+2. If genuinely novel, open an SDD proposal documenting the mechanic + the proposed `packages/domain` extension. R-07 follow-ups (engram #935, #939, #941) are the canonical examples of the pattern.
+3. Once the domain extension exists, the JSON pack references it by slug (the same way Bardic Inspiration is now a registry slug `bard:bardic-inspiration` that the JSON-side never names directly).
+
+---
+
 ## Patches index — quick reference
 
 | Patch | File | Reason |
