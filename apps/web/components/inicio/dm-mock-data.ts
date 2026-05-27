@@ -3,6 +3,11 @@
 export type PendingFichaSummary = {
   id: string;
   portraitInitial: string;
+  pj: string;
+  lineage: string;
+  player: string;
+  sent: string;
+  fresh: boolean;
 };
 
 export type DMCampaignNextSession = {
@@ -22,9 +27,33 @@ export type QuestSinTocar = {
 };
 
 export const MOCK_PENDING_FICHAS: PendingFichaSummary[] = [
-  { id: 'pf1', portraitInitial: 'M' },
-  { id: 'pf2', portraitInitial: 'A' },
-  { id: 'pf3', portraitInitial: 'R' },
+  {
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+    portraitInitial: 'M',
+    pj: 'Mírelle Vaelthar',
+    lineage: 'Elfa de luna · Hechicera',
+    player: 'mau',
+    sent: 'hace 2 horas',
+    fresh: true,
+  },
+  {
+    id: 'b1ffcd00-ad1c-4f09-bc7e-7cc0ce491b22',
+    portraitInitial: 'A',
+    pj: 'Arken Drûm',
+    lineage: 'Enano de montaña · Clérigo',
+    player: 'lu',
+    sent: 'hace 3 días',
+    fresh: false,
+  },
+  {
+    id: 'c2aabd11-be2d-4019-bd8f-8dd1df5a2c33',
+    portraitInitial: 'R',
+    pj: 'Ravenna Solé',
+    lineage: 'Humana · Pícara',
+    player: 'fede',
+    sent: 'hace 5 días',
+    fresh: false,
+  },
 ];
 
 export const MOCK_PENDING_OLDEST_AGE = 'hace 1 semana';
