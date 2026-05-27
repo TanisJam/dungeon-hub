@@ -107,7 +107,7 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
         aria-modal="true"
         aria-labelledby={headingId}
         onClick={(e) => e.stopPropagation()}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-sm rounded-t-lg bg-surface shadow-stamp-lg max-h-[92vh] overflow-y-auto"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-sm rounded-t-lg bg-surface shadow-stamp-lg max-h-[92vh] overflow-y-auto motion-safe:[animation:v3-sheet-slide-up_var(--dur-base)_var(--ease-out)_both]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
       >
         {title && (
