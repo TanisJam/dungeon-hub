@@ -134,6 +134,43 @@
   box-shadow: 0 0 8px var(--color-accent);
 }
 
+/* ── Inicio DM tree — magenta-accented scoped classes ── */
+.inicio-pending-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(168, 90, 142, 0.22), transparent 55%),
+    linear-gradient(180deg, #1A1726 0%, #0B0A12 100%);
+}
+.inicio-pending-stack-av {
+  background: linear-gradient(135deg, rgba(168, 90, 142, 0.80), rgba(127, 63, 107, 0.80));
+  box-shadow: 0 0 0 2px var(--color-paper);
+  margin-left: -6px;
+}
+.inicio-pending-stack-av:first-child {
+  margin-left: 0;
+}
+.inicio-pending-cta {
+  background-color: var(--color-secondary);
+  color: var(--color-ink);
+  box-shadow: 0 0 8px rgba(168, 90, 142, 0.35);
+}
+.inicio-camp-dm-bg {
+  background:
+    radial-gradient(ellipse 70% 55% at 90% 10%, rgba(168, 90, 142, 0.18), transparent 50%),
+    var(--color-surface);
+}
+.inicio-camp-dm-role-pill {
+  background-color: var(--color-secondary);
+  color: var(--color-ink);
+}
+.inicio-quick-iniciativa-ic {
+  background-color: rgba(168, 90, 142, 0.18);
+  color: var(--color-secondary);
+}
+.inicio-row-quest-ic {
+  background-color: rgba(168, 90, 142, 0.15);
+  color: var(--color-secondary);
+}
+
 /* ── Personajes screen — scoped extensions ── */
 .personajes-char-card-active {
   border-color: var(--color-accent);
