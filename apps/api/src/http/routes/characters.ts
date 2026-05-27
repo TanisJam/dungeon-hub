@@ -3732,6 +3732,234 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return { character: updated, slots, applied: result.applied };
     },
   );
+
+  // ---- PUT /characters/:id/hp -----------------------------------------------
+  // Updates HP tracking fields. Owner may set current + temp only.
+  // DM (assertWorldGm) may set all three fields.
+  // If max lowered below current, current is clamped atomically.
+  // Spec: sdd/ficha-dm-affordances #995 — Requirement: PUT /characters/:id/hp
+
+  const HpPutBody = z
+    .object({
+      current: z.number().int().optional(),
+      max: z.number().int().optional(),
+      temp: z.number().int().optional(),
+    })
+    .refine((b) => b.current !== undefined || b.max !== undefined || b.temp !== undefined, {
+      message: 'at least one of current/max/temp required',
+    });
+
+  app.put('/characters/:id/hp', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = HpPutBody.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: body.error.issues });
+    }
+    const { current, max, temp } = body.data;
+
+    const userId = request.user!.sub;
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+
+    // Owner: may set current + temp; must NOT set max
+    if (access === 'owner') {
+      if (max !== undefined) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'HP_MAX_OWNER_FORBIDDEN' }],
+        });
+      }
+      // Validate field ranges
+      if (current !== undefined && current < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_CURRENT_NEGATIVE' }],
+        });
+      }
+      if (temp !== undefined && temp < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_TEMP_NEGATIVE' }],
+        });
+      }
+    } else {
+      // Check DM access — assertWorldGm(worldId, userId)
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({ error: 'FORBIDDEN', issues: [{ code: 'WORLD_GM_REQUIRED' }] });
+      }
+
+      // Validate field ranges for DM too
+      if (max !== undefined && max < 1) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_MAX_INVALID' }],
+        });
+      }
+      if (current !== undefined && current < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_CURRENT_NEGATIVE' }],
+        });
+      }
+      if (temp !== undefined && temp < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_TEMP_NEGATIVE' }],
+        });
+      }
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const existingHp = (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+
+    const newMax = max !== undefined ? max : (existingHp.max ?? null);
+    let newCurrent = current !== undefined ? current : (existingHp.current ?? null);
+    const newTemp = temp !== undefined ? temp : (existingHp.temp ?? 0);
+
+    // Clamp current to new max if max was lowered below current
+    if (newMax !== null && newCurrent !== null && newCurrent > newMax) {
+      newCurrent = newMax;
+    }
+
+    const newHp = { current: newCurrent, max: newMax, temp: newTemp };
+
+    await db
+      .update(characters)
+      .set({ data: { ...charData, hp: newHp }, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+
+    return reply.code(200).send({ ok: true, hp: newHp });
+  });
+
+  // ---- PUT /characters/:id/classes/:classSlug/known -------------------------
+  // DM-only endpoint to directly set the known spells for a class.
+  // Bypasses SPELLS_KNOWN_EXCEEDED, KNOWN_NOT_ALLOWED, assertWritableForEdit.
+  // Preserves cantrips + prepared unchanged. Only replaces 'known'.
+  // Spec: sdd/ficha-dm-affordances #995 — Requirement: PUT /characters/:id/classes/:classSlug/known
+
+  const KnownOnlyBody = z.object({
+    known: z.array(
+      z.object({
+        slug: z.string().min(1),
+        source: z.string().min(1).optional(),
+      }),
+    ),
+  });
+
+  app.put(
+    '/characters/:id/classes/:classSlug/known',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const body = KnownOnlyBody.safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: body.error.issues });
+      }
+      const { known } = body.data;
+
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // DM-only — assertWorldGm(worldId, userId) returns { ok: boolean }
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'DM_ONLY' }],
+        });
+      }
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
+      const appliedClass = classes.find((c) => c.slug === classSlug);
+      if (!appliedClass) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+
+      // Verify this class supports spellcasting
+      const ability = SPELLCASTING_ABILITY[appliedClass.slug];
+      if (!ability) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_CASTER', classSlug }],
+        });
+      }
+
+      // Duplicate slug check
+      const seenSlugs = new Set<string>();
+      for (const s of known) {
+        if (seenSlugs.has(s.slug)) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'DUPLICATE_SLUGS', slug: s.slug }],
+          });
+        }
+        seenSlugs.add(s.slug);
+      }
+
+      // Load available spells for this class (slug membership + cantrip check)
+      const campaign = await loadWorldById(character.worldId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const availableSpells = await loadClassSpells({
+        classSlug,
+        ...(appliedClass.subclass?.slug ? { subclassSlug: appliedClass.subclass.slug } : {}),
+        rulesProfile: campaign.rulesProfile,
+      });
+
+      // Validate each slug in the known list
+      for (const spellRef of known) {
+        const found = availableSpells.find((s) => s.slug === spellRef.slug);
+        if (!found) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'SPELL_NOT_IN_CLASS_LIST', slug: spellRef.slug }],
+          });
+        }
+        if (found.level === 0) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'CANTRIP_IN_KNOWN', slug: spellRef.slug }],
+          });
+        }
+      }
+
+      // Write: replace only 'known', preserve cantrips + prepared
+      const existingSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const existingClassSpells = existingSpells[classSlug] ?? {
+        cantrips: [],
+        known: [],
+        prepared: [],
+      };
+
+      // Normalize SpellRef: source defaults to 'PHB' if not provided
+      const normalizedKnown: import('@dungeon-hub/domain/character/spellcasting').SpellRef[] = known.map(
+        (s) => ({ slug: s.slug, source: s.source ?? 'PHB' }),
+      );
+
+      const updatedClassSpells: AppliedClassSpells = {
+        ...existingClassSpells,
+        known: normalizedKnown,
+      };
+
+      const nextSpells = { ...existingSpells, [classSlug]: updatedClassSpells };
+
+      await db
+        .update(characters)
+        .set({ data: { ...charData, spells: nextSpells }, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+
+      return reply.code(200).send({ ok: true, classData: updatedClassSpells });
+    },
+  );
 };
 
 /**
