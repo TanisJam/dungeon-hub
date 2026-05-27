@@ -1714,6 +1714,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         issues: [{ code: 'CLASS_NOT_FOUND', class: body.class }],
       });
     }
+    if (body.subclass && !subclassData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SUBCLASS_NOT_FOUND', subclass: body.subclass }],
+      });
+    }
 
     // ---- variantRules.feats gate (play-time) ----------------------------------
     // Mirror of wizard-time pattern at line 3427. Gate fires before feat lookup

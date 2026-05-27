@@ -262,6 +262,41 @@ describe('POST /characters/:id/level-up (play-time)', () => {
     expect(res.json().issues[0].code).toBe('LEVELUP_CLASS_NOT_OWNED');
   });
 
+  // ---- Subclass ref validation --------------------------------------------
+
+  it('SUBCLASS-1: same-class with non-existent subclass ref → 400 SUBCLASS_NOT_FOUND', async () => {
+    // Trust boundary: when body.subclass is provided, the route MUST resolve it
+    // before delegating to domain. Silently dropping an invalid ref would let the
+    // domain run on incomplete input and either pass (when subclass not required)
+    // or fail with a misleading error code. Mirrors wizard-time pattern at
+    // characters.ts:1439 (PUT /class).
+    const app = await getTestApp();
+    const charId = await setupActiveChar({
+      app,
+      name: 'Subclass Invalid Ref',
+      classSlug: 'cleric',
+      classLevel: 1,
+      subclass: { slug: 'cleric--life', source: 'PHB' },
+      skills: ['religion', 'insight'],
+    });
+    await grantXp(app, charId, 300);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        kind: 'same-class',
+        class: { slug: 'cleric', source: 'PHB' },
+        subclass: { slug: 'fake-subclass', source: 'PHB' },
+        hp: { method: 'average' },
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues[0].code).toBe('SUBCLASS_NOT_FOUND');
+    expect(res.json().issues[0].subclass).toEqual({ slug: 'fake-subclass', source: 'PHB' });
+  });
+
   // ---- ASI gate -----------------------------------------------------------
 
   it('ASI-1: Fighter L3→L4 without asiFeat → 400 LEVELUP_ASIFEAT_REQUIRED', async () => {
