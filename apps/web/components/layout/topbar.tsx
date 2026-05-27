@@ -65,8 +65,9 @@ export function TopBar({
       {/* RIGHT slot: rightAction prop OR default cluster (RoleSwitcher + bell) */}
       {right ?? (
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* RoleSwitcher suppressed when backHref is set (sub-screen) */}
-          {!backHref && canBeDM && <RoleSwitcher />}
+          {/* RoleSwitcher visible in all screens (including sub-screens) when canBeDM=true */}
+          {/* SDD ficha-dm-affordances: removed !backHref guard per spec override of design README §State management */}
+          {canBeDM && <RoleSwitcher />}
           <button
             type="button"
             aria-label="Notificaciones"

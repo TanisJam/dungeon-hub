@@ -17,8 +17,8 @@ type AppShellProps = {
   showTabBar?: boolean;
   /**
    * When set: TopBar shows a back arrow linking to this path.
-   * CrowMark is hidden; RoleSwitcher is suppressed (sub-screen pattern).
-   * Design: sdd/ficha-restyle — APPSHELL-BACKHREF-01.
+   * CrowMark is hidden. RoleSwitcher is forwarded as-is (canBeDM unchanged).
+   * SDD ficha-dm-affordances overrides old suppression: RoleSwitcher visible in sub-screens when canBeDM=true.
    */
   backHref?: string;
   children: ReactNode;
@@ -45,7 +45,7 @@ export function AppShell({
         title={title}
         subtitle={subtitle}
         right={rightAction}
-        canBeDM={backHref ? false : canBeDM}
+        canBeDM={canBeDM}
         hasNotif={hasNotif}
         backHref={backHref}
       />
