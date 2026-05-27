@@ -32,9 +32,38 @@ const MONK_KI_POINTS: ClassResourceDef = {
   recoveryTriggerFor: () => 'short',
 };
 
+/**
+ * Bard — Bardic Inspiration (PHB p.53-54).
+ *
+ * - Unlocks at Bard L1.
+ * - Max uses = max(1, CHA modifier) per PHB p.53 ("a number of times equal to
+ *   your Charisma modifier (a minimum of once)").
+ * - Recovery: long rest at L1-4; short or long rest at L5+ per PHB p.54 Font
+ *   of Inspiration.
+ * - Die size escalates per Bard table (PHB p.54): d6 L1-4, d8 L5-9, d10 L10-14,
+ *   d12 L15-20. Surfaced via `extra: { dieSize }` for UI consumption.
+ */
+const BARD_BARDIC_INSPIRATION: ClassResourceDef = {
+  slug: 'bard:bardic-inspiration',
+  classSlug: 'bard',
+  maxFor: ({ classLevel, abilityMods }) =>
+    classLevel >= 1 ? Math.max(1, abilityMods.cha) : null,
+  recoveryTriggerFor: ({ classLevel }) => (classLevel >= 5 ? 'short' : 'long'),
+  extraFor: ({ classLevel }) => {
+    if (classLevel < 1) return undefined;
+    const dieSize =
+      classLevel >= 15 ? 'd12' :
+      classLevel >= 10 ? 'd10' :
+      classLevel >= 5 ? 'd8' :
+      'd6';
+    return { dieSize };
+  },
+};
+
 export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
   FIGHTER_SECOND_WIND,
   MONK_KI_POINTS,
+  BARD_BARDIC_INSPIRATION,
 ];
 
 /**

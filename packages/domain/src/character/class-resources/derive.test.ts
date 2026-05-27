@@ -100,6 +100,74 @@ describe('deriveClassResources — multiclass', () => {
   });
 });
 
+describe('deriveClassResources — Bard Bardic Inspiration (PHB p.53-54)', () => {
+  const BARD_L1: AppliedClass = {
+    slug: 'bard',
+    source: 'PHB',
+    level: 1,
+    subclass: null,
+    hitDie: 'd8',
+    savingThrows: ['dex', 'cha'],
+    armorProficiencies: [],
+    weaponProficiencies: [],
+    toolProficiencies: [],
+    skillChoices: [],
+  };
+  const BARD_L5: AppliedClass = { ...BARD_L1, level: 5 };
+  const BARD_L10: AppliedClass = { ...BARD_L1, level: 10 };
+
+  it('Bard L1 CHA +2 → max 2, long-rest trigger, d6 die', () => {
+    const r = deriveClassResources([BARD_L1], {}, mods({ cha: 2 }));
+    expect(r['bard:bardic-inspiration']).toEqual({
+      slug: 'bard:bardic-inspiration',
+      classSlug: 'bard',
+      used: 0,
+      max: 2,
+      recoveryTrigger: 'long',
+      extra: { dieSize: 'd6' },
+    });
+  });
+
+  it('Bard L5 CHA +3 → max 3, short-rest trigger (Font of Inspiration), d8 die', () => {
+    const r = deriveClassResources([BARD_L5], {}, mods({ cha: 3 }));
+    expect(r['bard:bardic-inspiration']).toEqual({
+      slug: 'bard:bardic-inspiration',
+      classSlug: 'bard',
+      used: 0,
+      max: 3,
+      recoveryTrigger: 'short',
+      extra: { dieSize: 'd8' },
+    });
+  });
+
+  it('Bard L10 CHA +2 → max 2, d10 die', () => {
+    const r = deriveClassResources([BARD_L10], {}, mods({ cha: 2 }));
+    expect(r['bard:bardic-inspiration']?.max).toBe(2);
+    expect(r['bard:bardic-inspiration']?.extra).toEqual({ dieSize: 'd10' });
+  });
+
+  it('Bard L1 CHA -1 → max 1 (PHB minimum of once)', () => {
+    const r = deriveClassResources([BARD_L1], {}, mods({ cha: -1 }));
+    expect(r['bard:bardic-inspiration']?.max).toBe(1);
+  });
+
+  it('Bard L1 + Fighter L1 multiclass → both resources; bardic has extra, fighter does not', () => {
+    const r = deriveClassResources([BARD_L1, FIGHTER_L1], {}, mods({ cha: 2 }));
+    expect(Object.keys(r).sort()).toEqual(['bard:bardic-inspiration', 'fighter:second-wind']);
+    expect(r['bard:bardic-inspiration']?.extra).toEqual({ dieSize: 'd6' });
+    expect('extra' in (r['fighter:second-wind'] ?? {})).toBe(false);
+  });
+
+  it('Bard L1 stored used > max → clamped (read-path tolerance)', () => {
+    const r = deriveClassResources(
+      [BARD_L1],
+      { 'bard:bardic-inspiration': 5 },
+      mods({ cha: 2 }),
+    );
+    expect(r['bard:bardic-inspiration']?.used).toBe(2);
+  });
+});
+
 describe('deriveClassResources — used counter', () => {
   it('persisted used 3 on L5 Monk → ki used 3', () => {
     const r = deriveClassResources([MONK_L5], { 'monk:ki-points': 3 }, mods());
