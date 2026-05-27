@@ -8,6 +8,7 @@ const STATUS_LABELS: Record<string, string> = {
   pending_approval: 'Pendiente DM',
   retired: 'Retirado',
   dead: 'Muerto',
+  draft: 'Borrador',
 };
 
 const STATUS_TONES: Record<string, PillTone> = {
@@ -15,6 +16,7 @@ const STATUS_TONES: Record<string, PillTone> = {
   pending_approval: 'amber',
   retired: 'stone',
   dead: 'stone',
+  draft: 'stone',
 };
 
 export function PersonajeCard({
@@ -29,10 +31,14 @@ export function PersonajeCard({
   const initial = char.name.trim().charAt(0).toUpperCase() || '?';
   const tone: PillTone = STATUS_TONES[char.status] ?? 'stone';
   const label = STATUS_LABELS[char.status] ?? char.status;
+  const href =
+    char.status === 'draft'
+      ? `/characters/${char.id}/wizard`
+      : `/characters/${char.id}`;
 
   return (
     <Link
-      href={`/characters/${char.id}`}
+      href={href}
       className={`flex overflow-hidden rounded-md border bg-surface transition-colors hover:border-ink-mute ${
         highlight ? 'personajes-char-card-active' : 'border-line'
       }`}

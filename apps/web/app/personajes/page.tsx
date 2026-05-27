@@ -45,7 +45,9 @@ export default async function PersonajesPage({
       ? 'Sin pendientes'
       : chip === 'retired'
         ? 'Sin retirados'
-        : 'Sin personajes';
+        : chip === 'draft'
+          ? 'Sin borradores'
+          : 'Sin personajes';
 
   return (
     <AppShell title="Personajes" subtitle="TU ROSTER">

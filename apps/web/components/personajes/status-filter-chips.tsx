@@ -9,6 +9,7 @@ const CHIPS: ReadonlyArray<{ key: StatusChip; label: string; showCount: boolean 
   { key: 'active', label: 'Activos', showCount: true },
   { key: 'pending', label: 'Pendientes', showCount: true },
   { key: 'retired', label: 'Retirados', showCount: false },
+  { key: 'draft', label: 'Borradores', showCount: true },
   { key: 'all', label: 'Todos', showCount: false },
 ];
 

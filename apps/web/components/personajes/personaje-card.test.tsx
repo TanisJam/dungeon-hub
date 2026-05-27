@@ -38,10 +38,16 @@ describe('PersonajeCard', () => {
     expect(screen.queryByText('Tres Lunas')).toBeNull();
   });
 
-  it('link href points to /characters/{id}', () => {
+  it('link href points to /characters/{id} for non-draft', () => {
     render(<PersonajeCard char={baseChar} />);
     const link = screen.getByRole('link');
     expect(link.getAttribute('href')).toBe('/characters/abc');
+  });
+
+  it('link href points to /characters/{id}/wizard for draft', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('href')).toBe('/characters/abc/wizard');
   });
 
   it('highlight=true adds class personajes-char-card-active', () => {
@@ -76,5 +82,16 @@ describe('PersonajeCard', () => {
       render(<PersonajeCard char={{ ...baseChar, status: 'dead' }} />);
       expect(screen.getByText('Muerto')).toBeTruthy();
     });
+
+    it('draft → stone pill "Borrador"', () => {
+      render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
+      expect(screen.getByText('Borrador')).toBeTruthy();
+    });
+  });
+
+  it('draft card does NOT have personajes-char-card-active (no highlight)', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
+    const link = screen.getByRole('link');
+    expect(link.className).not.toContain('personajes-char-card-active');
   });
 });

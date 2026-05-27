@@ -15,18 +15,19 @@ vi.mock('next/navigation', () => ({
 import { StatusFilterChips } from './status-filter-chips';
 import type { ChipCounts } from './types';
 
-const counts: ChipCounts = { active: 3, pending: 1, retired: 2, all: 6 };
+const counts: ChipCounts = { active: 3, pending: 1, retired: 2, draft: 2, all: 8 };
 
 describe('StatusFilterChips', () => {
-  it('renders 4 chip links with correct hrefs', () => {
+  it('renders 5 chip links with correct hrefs', () => {
     mockGet.mockReturnValue('active');
     render(<StatusFilterChips counts={counts} />);
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
     const hrefs = links.map((l) => l.getAttribute('href'));
     expect(hrefs).toContain('/personajes?status=active');
     expect(hrefs).toContain('/personajes?status=pending');
     expect(hrefs).toContain('/personajes?status=retired');
+    expect(hrefs).toContain('/personajes?status=draft');
     expect(hrefs).toContain('/personajes?status=all');
   });
 
@@ -47,6 +48,12 @@ describe('StatusFilterChips', () => {
     render(<StatusFilterChips counts={counts} />);
     expect(screen.getByText('Activos · 3')).toBeTruthy();
     expect(screen.getByText('Pendientes · 1')).toBeTruthy();
+  });
+
+  it('shows count in Borradores label', () => {
+    mockGet.mockReturnValue('active');
+    render(<StatusFilterChips counts={counts} />);
+    expect(screen.getByText('Borradores · 2')).toBeTruthy();
   });
 
   it('Retirados and Todos chips show no count', () => {

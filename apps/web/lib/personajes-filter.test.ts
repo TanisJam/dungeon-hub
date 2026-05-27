@@ -55,6 +55,10 @@ describe('parseChip', () => {
   it('returns the chip for "all"', () => {
     expect(parseChip('all')).toBe('all');
   });
+
+  it('returns the chip for "draft"', () => {
+    expect(parseChip('draft')).toBe('draft');
+  });
 });
 
 // ── filterByStatusChip ────────────────────────────────────────────────────────
@@ -75,14 +79,29 @@ describe('filterByStatusChip', () => {
     expect(result.map((c) => c.id)).toEqual(['r1', 'd1']);
   });
 
-  it('all chip: excludes drafts but includes active+pending+retired+dead', () => {
-    const result = filterByStatusChip(MIXED, 'all');
-    expect(result.map((c) => c.id)).toEqual(['a1', 'a2', 'p1', 'r1', 'd1']);
+  it('draft chip: returns only draft chars', () => {
+    const result = filterByStatusChip(MIXED, 'draft');
+    expect(result.map((c) => c.id)).toEqual(['dr1']);
   });
 
-  it('all chip: a draft-only list returns empty', () => {
-    const result = filterByStatusChip([makeChar('dr2', 'draft')], 'all');
+  it('draft chip: returns empty for non-draft list', () => {
+    const result = filterByStatusChip(
+      [makeChar('a1', 'active'), makeChar('p1', 'pending_approval')],
+      'draft',
+    );
     expect(result).toHaveLength(0);
+  });
+
+  // Semantic change: 'all' now INCLUDES drafts (truly all)
+  it('all chip: includes active+pending+retired+dead+draft', () => {
+    const result = filterByStatusChip(MIXED, 'all');
+    expect(result.map((c) => c.id)).toEqual(['a1', 'a2', 'p1', 'r1', 'd1', 'dr1']);
+  });
+
+  it('all chip: a draft-only list returns the draft', () => {
+    const result = filterByStatusChip([makeChar('dr2', 'draft')], 'all');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('dr2');
   });
 });
 
@@ -94,6 +113,7 @@ describe('computeCounts', () => {
     expect(counts.active).toBe(2);
     expect(counts.pending).toBe(1);
     expect(counts.retired).toBe(2); // retired + dead
-    expect(counts.all).toBe(5);    // excludes 1 draft
+    expect(counts.draft).toBe(1);   // 1 draft
+    expect(counts.all).toBe(6);    // now includes draft
   });
 });

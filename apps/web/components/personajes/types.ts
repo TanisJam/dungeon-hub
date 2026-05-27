@@ -5,7 +5,7 @@ export type PersonajeStatus =
   | 'retired'
   | 'dead';
 
-export type StatusChip = 'active' | 'pending' | 'retired' | 'all';
+export type StatusChip = 'active' | 'pending' | 'retired' | 'draft' | 'all';
 
 export type RosterCharacter = {
   id: string;
@@ -16,4 +16,10 @@ export type RosterCharacter = {
   updatedAt: string;
 };
 
-export type ChipCounts = Record<StatusChip, number>;
+export type ChipCounts = {
+  active: number;
+  pending: number;
+  retired: number;
+  draft: number;
+  all: number;
+};
