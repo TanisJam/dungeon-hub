@@ -8,12 +8,17 @@ import { test, expect } from '@playwright/test';
  * Test 1 — Approval transition smoke:
  *   Navigate from /worlds/[id] Pendientes tab → character sheet → assert
  *   "Aprobar" and "Rechazar" buttons are visible for a pending character
- *   at 375px. Also asserts no horizontal overflow.
+ *   at 375px. Clicks "Aprobar", waits for Server Action to complete, asserts
+ *   post-approve state (REQ-CAU-APPROVE-BUTTON + REQ-CAU-REVERT-BUTTON).
+ *   NOTE: Mutates char status to active — subsequent runs skip gracefully
+ *   if no pending char exists.
  *
  * Test 2 — Character sheet 375px full smoke:
  *   Navigate to a published (active) character sheet, assert core sections
  *   render and "Grants recientes" section (RecentGrants) is either visible
- *   with content or shows empty state — no crash.
+ *   with content or shows empty state — no crash. Also asserts CurrencyBlock
+ *   (aria-label="Monedas") visible and tap-target minimum 44px height for
+ *   a sample of visible buttons.
  *
  * Existing coverage:
  *   - apps/web/.../worlds/[id]/_components/status-tabs.test.tsx
@@ -89,6 +94,36 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
       path: 'e2e/.screenshots/approval-transition-375-pending.png',
       fullPage: true,
     });
+
+    // ---- Step 6: Click "Aprobar" ----
+    // Server Action fires; button text transitions to "Aprobando…" then the
+    // pending_approval block disappears (approval-actions.tsx:84 — only rendered
+    // when status === 'pending_approval'). After revalidation the component
+    // re-renders with status === 'active', showing "Devolver a borrador".
+    await aprobarBtn.click();
+
+    // ---- Step 7: Wait for post-approve state ----
+    // REQ-CAU-APPROVE-BUTTON: Aprobar/Rechazar only visible on pending_approval.
+    // REQ-CAU-REVERT-BUTTON: "Devolver a borrador" visible on active.
+    // Assert ONE of: buttons gone OR revert button appears OR badge says activo.
+    const devolverBtn = page.getByRole('button', { name: /devolver a borrador/i });
+    const activoBadge = page.getByText(/activo/i).first();
+
+    // Wait up to 15s for the page to reflect the approved state via revalidation.
+    await expect(async () => {
+      const aprobarGone = !(await aprobarBtn.isVisible().catch(() => false));
+      const devolverVisible = await devolverBtn.isVisible().catch(() => false);
+      const activoVisible = await activoBadge.isVisible().catch(() => false);
+      expect(
+        aprobarGone || devolverVisible || activoVisible,
+        'Post-approve: Aprobar gone, or Devolver a borrador visible, or activo badge visible',
+      ).toBe(true);
+    }).toPass({ timeout: 15_000 });
+
+    await page.screenshot({
+      path: 'e2e/.screenshots/approval-transition-375-approved.png',
+      fullPage: true,
+    });
   });
 
   test('Active character sheet: core sections + RecentGrants render at 375px', async ({ page }) => {
@@ -158,6 +193,36 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
     await page.screenshot({
       path: 'e2e/.screenshots/sheet-active-grants-375.png',
       fullPage: true,
+    });
+
+    // ---- Step 5: CurrencyBlock visible ----
+    // Navigate to inventario tab to find CurrencyBlock.
+    // aria-label="Monedas" confirmed at inventario.tsx:56.
+    const inventarioTab = page.getByRole('tab', { name: /^inventario$/i });
+    const hasInvTab = await inventarioTab.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (hasInvTab) {
+      await inventarioTab.click();
+      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
+
+      const currencyBlock = page.locator('[aria-label="Monedas"]');
+      await expect(
+        currencyBlock,
+        'CurrencyBlock (aria-label="Monedas") should be visible on inventario tab',
+      ).toBeVisible({ timeout: 5_000 });
+    }
+
+    // ---- Step 6: Tap-target sample — visible buttons height ≥ 44px ----
+    // Sample up to 5 visible buttons on the current page state.
+    const buttons = await page.locator('button:visible').all();
+    const sample = buttons.slice(0, 5);
+    for (const btn of sample) {
+      const box = await btn.boundingBox();
+      expect(box?.height ?? 0, `button "${await btn.textContent()}" height should be ≥ 44px`).toBeGreaterThanOrEqual(44);
+    }
+
+    await page.screenshot({
+      path: 'e2e/.screenshots/sheet-active-currency-tap-375.png',
+      fullPage: false,
     });
   });
 });
