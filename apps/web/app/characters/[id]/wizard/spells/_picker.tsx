@@ -4,6 +4,10 @@ import { useMemo, useState } from 'react';
 import { Pill } from '@/components/ui/pill';
 import { decodeSchool } from '@/lib/spells/school-decode';
 import { SpellBadges } from '@/app/_components/spells/badges';
+import {
+  validateSpellsPick as validateSpellsPickDomain,
+  type SpellsPickIssue,
+} from '@dungeon-hub/domain/character/spellcasting';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -116,73 +120,37 @@ function buildHeaderSummary(limits: SpellLimitsView, mode: CasterMode): string {
  * Validates current spell picks against the limits.
  * Returns null when valid, or a user-readable error string when invalid.
  * Used by parent wrappers (SinglePickerView, MulticlassSpellsView) to gate "Siguiente".
+ *
+ * NOTE: The pure validation logic now lives in @dungeon-hub/domain/character/spellcasting
+ * (validateSpellsPick). This wrapper maps domain issues to UI strings for presentation.
+ * REQ-CLU-XCUT-LIFT-VALIDATE-SPELLS-PICK.
  */
 export function validateSpellsPick(
   limits: SpellLimitsView,
   subclassGrantedSlugs: string[],
   value: AppliedClassSpells,
 ): string | null {
-  const mode = deriveCasterMode(limits);
-  const subclassGrantedSet = new Set(subclassGrantedSlugs);
+  const issues = validateSpellsPickDomain(limits, subclassGrantedSlugs, value);
+  if (issues.length === 0) return null;
 
-  // Build key sets
-  const refToK = (r: SpellRef) => spellKey(r.slug, r.source);
-  const cantripKeys = new Set(value.cantrips.map(refToK));
-  const knownKeys = new Set(value.known.map(refToK));
-  const preparedKeys = new Set(value.prepared.map(refToK));
-
-  // Compute subclass-granted sets (locked keys)
-  const subclassGrantedCantripKeys = new Set<string>();
-  const subclassGrantedLeveledKeys = new Set<string>();
-  // We don't have availableSpells here, so approximate: any cantrip ref in value.cantrips whose slug is in subclassGrantedSet
-  for (const r of value.cantrips) {
-    if (subclassGrantedSet.has(r.slug)) subclassGrantedCantripKeys.add(refToK(r));
-  }
-  for (const r of [...value.known, ...value.prepared]) {
-    if (subclassGrantedSet.has(r.slug)) subclassGrantedLeveledKeys.add(refToK(r));
-  }
-
-  const freeCantripCount = [...cantripKeys].filter((k) => !subclassGrantedCantripKeys.has(k)).length;
-  const freeCantripLimit = (limits.cantripsKnown ?? 0) - subclassGrantedCantripKeys.size;
-
-  if (freeCantripLimit > 0 && freeCantripCount !== freeCantripLimit) {
-    return `Necesitás elegir ${freeCantripLimit} cantrip${freeCantripLimit !== 1 ? 's' : ''}.`;
-  }
-
-  if (mode === 'known') {
-    const freeLimit = (limits.spellsKnown ?? 0) - subclassGrantedLeveledKeys.size;
-    const freeLeveledCount = [...knownKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
-    if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
-      return `Necesitás elegir ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
-    }
-  } else if (mode === 'prep') {
-    const freeLimit = (limits.spellsPrepared ?? 0) - subclassGrantedLeveledKeys.size;
-    const freeLeveledCount = [...preparedKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
-    if (freeLimit > 0 && freeLeveledCount !== freeLimit) {
-      return `Necesitás preparar ${freeLimit} hechizo${freeLimit !== 1 ? 's' : ''}.`;
-    }
-  } else if (mode === 'wizard') {
-    const freeKnownCount = [...knownKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
-    const minFreeKnown = (limits.wizardSpellbookSize ?? 0) - subclassGrantedLeveledKeys.size;
-    if (minFreeKnown > 0 && freeKnownCount < minFreeKnown) {
-      return `Necesitás conocer al menos ${minFreeKnown} hechizo${minFreeKnown !== 1 ? 's' : ''} en tu libro.`;
-    }
-    if (limits.spellsPrepared !== null) {
-      const freePreparedCount = [...preparedKeys].filter((k) => !subclassGrantedLeveledKeys.has(k)).length;
-      const freePreparedLimit = limits.spellsPrepared - subclassGrantedLeveledKeys.size;
-      if (freePreparedLimit > 0 && freePreparedCount !== freePreparedLimit) {
-        return `Necesitás preparar exactamente ${freePreparedLimit} hechizo${freePreparedLimit !== 1 ? 's' : ''}.`;
+  const first = issues[0]!;
+  switch (first.code) {
+    case 'CANTRIPS_COUNT_MISMATCH':
+      return `Necesitás elegir ${first.expected} cantrip${first.expected !== 1 ? 's' : ''}.`;
+    case 'SPELLS_KNOWN_COUNT_MISMATCH':
+      return `Necesitás elegir ${first.expected} hechizo${first.expected !== 1 ? 's' : ''}.`;
+    case 'SPELLS_PREPARED_COUNT_MISMATCH': {
+      const mode = deriveCasterMode(limits);
+      if (mode === 'wizard') {
+        return `Necesitás conocer al menos ${first.expected} hechizo${first.expected !== 1 ? 's' : ''} en tu libro.`;
       }
-    }
-    for (const k of preparedKeys) {
-      if (!knownKeys.has(k)) {
-        return 'Tenés hechizos preparados que no están en tu libro. Revisá la selección.';
-      }
+      return `Necesitás preparar ${first.expected} hechizo${first.expected !== 1 ? 's' : ''}.`;
     }
   }
-
-  return null;
 }
+
+// Re-export domain type so existing callers can use it if needed
+export type { SpellsPickIssue };
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
