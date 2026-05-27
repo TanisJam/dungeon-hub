@@ -1,17 +1,18 @@
 'use server';
 
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const IdSchema = z.string().uuid();
 
 export type FichaActionResult =
   | { ok: true }
   | { ok: false; code: 'VALIDATION_FAILED' | 'UNAUTHORIZED' | 'API_ERROR'; message?: string };
 
 export async function approveFichaFromInicio(id: string): Promise<FichaActionResult> {
-  if (!UUID_RE.test(id)) return { ok: false, code: 'VALIDATION_FAILED' };
+  if (!IdSchema.safeParse(id).success) return { ok: false, code: 'VALIDATION_FAILED' };
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { ok: false, code: 'UNAUTHORIZED' };
@@ -26,7 +27,7 @@ export async function approveFichaFromInicio(id: string): Promise<FichaActionRes
 }
 
 export async function rejectFichaFromInicio(id: string): Promise<FichaActionResult> {
-  if (!UUID_RE.test(id)) return { ok: false, code: 'VALIDATION_FAILED' };
+  if (!IdSchema.safeParse(id).success) return { ok: false, code: 'VALIDATION_FAILED' };
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { ok: false, code: 'UNAUTHORIZED' };
