@@ -284,6 +284,119 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
     expect(cr['fighter:second-wind'].max).toBe(1);
   });
 
+  // --- Bardic Inspiration (PHB p.53-54) ---
+  // Foundation extension SDD: class-resource-bardic-inspiration.
+  // Setup helpers create separate Bard chars per case to keep test order independent.
+  async function setupBard(level: number, cha: number, name: string): Promise<string> {
+    const app = await getTestApp();
+    const b = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { worldId, name },
+      })
+      .then((r) => r.json());
+    const charId = b.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'bard',
+              source: 'PHB',
+              level,
+              hitDie: 'd8',
+              subclass: null,
+              savingThrows: ['dex', 'cha'],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          // CHA score → mod: 14 → +2, 16 → +3.
+          baseStats: { str: 8, dex: 14, con: 12, int: 10, wis: 10, cha },
+        },
+      },
+    });
+    return charId;
+  }
+
+  it('Bard L4 short rest → bardic-inspiration NOT restored (still long-rest trigger)', async () => {
+    const app = await getTestApp();
+    const bardId = await setupBard(4, 14, 'Bard L4 short-rest');
+    // Use 1 inspiration.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${bardId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'bard:bardic-inspiration', amount: 1 },
+    });
+    // Short rest.
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${bardId}/rest/short`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceToSpend: {} },
+    });
+    expect(res.statusCode).toBe(200);
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${bardId}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['bard:bardic-inspiration']).toBe(1);
+  });
+
+  it('Bard L5 short rest → bardic-inspiration restored (Font of Inspiration)', async () => {
+    const app = await getTestApp();
+    const bardId = await setupBard(5, 16, 'Bard L5 Font of Inspiration');
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${bardId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'bard:bardic-inspiration', amount: 2 },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${bardId}/rest/short`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceToSpend: {} },
+    });
+    expect(res.statusCode).toBe(200);
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${bardId}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['bard:bardic-inspiration']).toBe(0);
+  });
+
+  it('Bard L1 CHA 14 → sheet shows max 2 + d6 die badge', async () => {
+    const app = await getTestApp();
+    const bardId = await setupBard(1, 14, 'Bard L1 sheet view');
+    const sheetRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${bardId}/sheet`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+    });
+    expect(sheetRes.statusCode).toBe(200);
+    const insp = sheetRes.json().sheet.classResources['bard:bardic-inspiration'];
+    expect(insp).toBeDefined();
+    expect(insp.max).toBe(2);
+    expect(insp.used).toBe(0);
+    expect(insp.recoveryTrigger).toBe('long');
+    expect(insp.extra).toEqual({ dieSize: 'd6' });
+  });
+
   it('long rest resets all class resources to 0', async () => {
     const app = await getTestApp();
     // Clear REST-03 cooldown (#826) so the long rest below can succeed.
