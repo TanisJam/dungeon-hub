@@ -25,7 +25,7 @@ test.describe('Level-up spells step condition @ 375px', () => {
   test('Bard level-up triggers spells step; picking a spell enables submit', async ({ page }) => {
     // ---- Step 1: Dashboard ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Bard character eligible for level-up ----
     const allHrefs = await page
@@ -178,7 +178,7 @@ test.describe('Level-up spells step condition @ 375px', () => {
 
     // ---- Step 1: Dashboard ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Cleric character ----
     const allHrefs = await page

@@ -24,7 +24,7 @@ test.describe('DM panel mobile smoke @ 375px (iPhone SE)', () => {
   }) => {
     // ---- Dashboard: tap Master pill ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 5_000 });
 
     // The auth user owns "E2E Test Campaign" — they should also be gm of its
     // world. The GM-pill is wrapped in <Link href="/worlds/..."> with a

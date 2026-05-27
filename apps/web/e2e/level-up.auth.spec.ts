@@ -27,7 +27,7 @@ test.describe('Level-up — E2E happy path (iPhone SE 375px)', () => {
   test('Owner clicks "Subir nivel", does same-class average HP, sheet reflects new level', async ({ page }) => {
     // ---- Step 1: Navigate to dashboard ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find an owned (player) character ----
     // Go to the first world visible for the user. Any player-role world will do.

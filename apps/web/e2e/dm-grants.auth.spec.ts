@@ -25,7 +25,7 @@ test.describe('DM grants — E2E happy path (iPhone SE 375px)', () => {
   test('DM opens "Otorgar" panel, grants XP=100, sheet XP increments', async ({ page }) => {
     // ---- Step 1: Navigate to a GM world to find a character ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // The auth user must have at least one world where they are GM.
     const masterLink = page.locator('a[href^="/worlds/"]').first();
