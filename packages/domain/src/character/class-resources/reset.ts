@@ -34,13 +34,16 @@ export function resetClassResourcesForRest(
   rest: 'short' | 'long',
   abilityMods: Readonly<Record<AbilityKey, number>>,
 ): Record<string, number> {
-  const ownedByClass = new Map(classes.map((c) => [c.slug, c.level]));
+  const ownedByClass = new Map(
+    classes.map((c) => [c.slug, { level: c.level, subclassSlug: c.subclass?.slug ?? null }]),
+  );
   const next: Record<string, number> = { ...used };
 
   for (const def of CLASS_RESOURCES) {
-    const classLevel = ownedByClass.get(def.classSlug);
-    if (classLevel === undefined) continue;
-    const trigger = def.recoveryTriggerFor({ classLevel, abilityMods });
+    const entry = ownedByClass.get(def.classSlug);
+    if (!entry) continue;
+    if (def.subclassSlug && entry.subclassSlug !== def.subclassSlug) continue;
+    const trigger = def.recoveryTriggerFor({ classLevel: entry.level, abilityMods });
     if (rest === 'long' || trigger === 'short' || trigger === 'both') {
       next[def.slug] = 0;
     }

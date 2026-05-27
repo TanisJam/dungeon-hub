@@ -64,6 +64,12 @@ export interface ClassResourceDef {
   slug: string;
   classSlug: string;
   /**
+   * Optional subclass gate. When set, the resource is only emitted/reset
+   * when the character's class instance has a matching subclass slug.
+   * Example: Druid Natural Recovery requires Circle of the Land (PHB p.68).
+   */
+  subclassSlug?: string;
+  /**
    * Returns max uses at the given context, or `null` if the resource is
    * not yet unlocked at that level (e.g. Ki unlocks at Monk L2).
    */

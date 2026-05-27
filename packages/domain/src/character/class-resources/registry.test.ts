@@ -181,19 +181,127 @@ describe('CLASS_RESOURCES — Paladin Lay on Hands (PHB p.84)', () => {
   });
 });
 
+describe('CLASS_RESOURCES — Fighter Indomitable (PHB p.72)', () => {
+  // PHB p.72: 1 use at L9, 2 at L13, 3 at L17; recovers on long rest.
+  it.each([
+    [8, null], [9, 1], [12, 1], [13, 2], [16, 2], [17, 3], [20, 3],
+  ])('L%i Fighter → max %s', (lvl, expected) => {
+    const def = classResourceBySlug('fighter:indomitable');
+    if (!def) throw new Error('fighter:indomitable missing');
+    expect(def.maxFor(ctx(lvl))).toBe(expected);
+  });
+
+  it('recovery trigger is "long"', () => {
+    const def = classResourceBySlug('fighter:indomitable');
+    if (!def) throw new Error('fighter:indomitable missing');
+    expect(def.recoveryTriggerFor(ctx(9))).toBe('long');
+  });
+});
+
+describe('CLASS_RESOURCES — Cleric Channel Divinity (PHB p.59)', () => {
+  // PHB p.59: 1 at L2, 2 at L6, 3 at L18; short or long rest.
+  it.each([
+    [1, null], [2, 1], [5, 1], [6, 2], [17, 2], [18, 3], [20, 3],
+  ])('L%i Cleric → max %s', (lvl, expected) => {
+    const def = classResourceBySlug('cleric:channel-divinity');
+    if (!def) throw new Error('cleric:channel-divinity missing');
+    expect(def.maxFor(ctx(lvl))).toBe(expected);
+  });
+
+  it('recovery trigger is "short" (covers both rests per PHB)', () => {
+    const def = classResourceBySlug('cleric:channel-divinity');
+    if (!def) throw new Error('cleric:channel-divinity missing');
+    expect(def.recoveryTriggerFor(ctx(2))).toBe('short');
+  });
+});
+
+describe('CLASS_RESOURCES — Paladin Channel Divinity (PHB p.85)', () => {
+  // PHB p.85: 1 at L3, 2 at L11.
+  it.each([
+    [2, null], [3, 1], [10, 1], [11, 2], [20, 2],
+  ])('L%i Paladin → max %s', (lvl, expected) => {
+    const def = classResourceBySlug('paladin:channel-divinity');
+    if (!def) throw new Error('paladin:channel-divinity missing');
+    expect(def.maxFor(ctx(lvl))).toBe(expected);
+  });
+});
+
+describe('CLASS_RESOURCES — Wizard Arcane Recovery (PHB p.115)', () => {
+  // PHB p.115: 1 use, recovers on long rest.
+  it('L0 Wizard → null; L1+ → max 1', () => {
+    const def = classResourceBySlug('wizard:arcane-recovery');
+    if (!def) throw new Error('wizard:arcane-recovery missing');
+    expect(def.maxFor(ctx(0))).toBeNull();
+    expect(def.maxFor(ctx(1))).toBe(1);
+    expect(def.maxFor(ctx(20))).toBe(1);
+  });
+
+  it('recovery trigger is "long"', () => {
+    const def = classResourceBySlug('wizard:arcane-recovery');
+    if (!def) throw new Error('wizard:arcane-recovery missing');
+    expect(def.recoveryTriggerFor(ctx(1))).toBe('long');
+  });
+});
+
+describe('CLASS_RESOURCES — Sorcerer Sorcery Points (PHB p.101)', () => {
+  // PHB p.101: max = sorcerer level; recovers on long rest; unlocks at L2.
+  it.each([
+    [1, null], [2, 2], [10, 10], [20, 20],
+  ])('L%i Sorcerer → max %s', (lvl, expected) => {
+    const def = classResourceBySlug('sorcerer:sorcery-points');
+    if (!def) throw new Error('sorcerer:sorcery-points missing');
+    expect(def.maxFor(ctx(lvl))).toBe(expected);
+  });
+
+  it('recovery trigger is "long"', () => {
+    const def = classResourceBySlug('sorcerer:sorcery-points');
+    if (!def) throw new Error('sorcerer:sorcery-points missing');
+    expect(def.recoveryTriggerFor(ctx(2))).toBe('long');
+  });
+});
+
+describe('CLASS_RESOURCES — Druid Natural Recovery (PHB p.68, subclass-gated)', () => {
+  // PHB p.68: Circle of the Land L2+, 1 use, long rest.
+  it('def declares subclassSlug = druid--circle-of-the-land', () => {
+    const def = classResourceBySlug('druid:natural-recovery');
+    if (!def) throw new Error('druid:natural-recovery missing');
+    expect(def.subclassSlug).toBe('druid--circle-of-the-land');
+  });
+
+  it('L1 Druid → null; L2+ → max 1', () => {
+    const def = classResourceBySlug('druid:natural-recovery');
+    if (!def) throw new Error('druid:natural-recovery missing');
+    expect(def.maxFor(ctx(1))).toBeNull();
+    expect(def.maxFor(ctx(2))).toBe(1);
+    expect(def.maxFor(ctx(20))).toBe(1);
+  });
+
+  it('recovery trigger is "long"', () => {
+    const def = classResourceBySlug('druid:natural-recovery');
+    if (!def) throw new Error('druid:natural-recovery missing');
+    expect(def.recoveryTriggerFor(ctx(2))).toBe('long');
+  });
+});
+
 describe('classResourceBySlug — lookup', () => {
   it('returns undefined for unknown slug', () => {
     expect(classResourceBySlug('monk:bogus')).toBeUndefined();
     expect(classResourceBySlug('fighter:nonexistent')).toBeUndefined();
   });
 
-  it('CLASS_RESOURCES contains the four canonical entries', () => {
+  it('CLASS_RESOURCES contains all R-07 entries (10 total)', () => {
     const slugs = CLASS_RESOURCES.map((d) => d.slug).sort();
     expect(slugs).toEqual([
       'bard:bardic-inspiration',
+      'cleric:channel-divinity',
+      'druid:natural-recovery',
+      'fighter:indomitable',
       'fighter:second-wind',
       'monk:ki-points',
+      'paladin:channel-divinity',
       'paladin:lay-on-hands',
+      'sorcerer:sorcery-points',
+      'wizard:arcane-recovery',
     ]);
   });
 });

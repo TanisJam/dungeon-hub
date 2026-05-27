@@ -80,11 +80,73 @@ const PALADIN_LAY_ON_HANDS: ClassResourceDef = {
     classLevel >= 1 ? ({ shape: 'pool' } as const) : undefined,
 };
 
+/** Fighter — Indomitable (PHB p.72). 1 use L9, 2 L13, 3 L17; long rest only. */
+const FIGHTER_INDOMITABLE: ClassResourceDef = {
+  slug: 'fighter:indomitable',
+  classSlug: 'fighter',
+  maxFor: ({ classLevel }) =>
+    classLevel >= 17 ? 3 : classLevel >= 13 ? 2 : classLevel >= 9 ? 1 : null,
+  recoveryTriggerFor: () => 'long',
+};
+
+/** Cleric — Channel Divinity (PHB p.59). 1 L2, 2 L6, 3 L18; short or long rest. */
+const CLERIC_CHANNEL_DIVINITY: ClassResourceDef = {
+  slug: 'cleric:channel-divinity',
+  classSlug: 'cleric',
+  maxFor: ({ classLevel }) =>
+    classLevel >= 18 ? 3 : classLevel >= 6 ? 2 : classLevel >= 2 ? 1 : null,
+  recoveryTriggerFor: () => 'short',
+};
+
+/** Paladin — Channel Divinity (PHB p.85). 1 L3, 2 L11; short or long rest. */
+const PALADIN_CHANNEL_DIVINITY: ClassResourceDef = {
+  slug: 'paladin:channel-divinity',
+  classSlug: 'paladin',
+  maxFor: ({ classLevel }) =>
+    classLevel >= 11 ? 2 : classLevel >= 3 ? 1 : null,
+  recoveryTriggerFor: () => 'short',
+};
+
+/** Wizard — Arcane Recovery (PHB p.115). 1 use, recovers on long rest. */
+const WIZARD_ARCANE_RECOVERY: ClassResourceDef = {
+  slug: 'wizard:arcane-recovery',
+  classSlug: 'wizard',
+  maxFor: ({ classLevel }) => (classLevel >= 1 ? 1 : null),
+  recoveryTriggerFor: () => 'long',
+};
+
+/** Sorcerer — Sorcery Points (PHB p.101). Max = sorcerer level; long rest; unlocks at L2. */
+const SORCERER_SORCERY_POINTS: ClassResourceDef = {
+  slug: 'sorcerer:sorcery-points',
+  classSlug: 'sorcerer',
+  maxFor: ({ classLevel }) => (classLevel >= 2 ? classLevel : null),
+  recoveryTriggerFor: () => 'long',
+};
+
+/**
+ * Druid — Natural Recovery (PHB p.68). Subclass-gated: Circle of the Land only.
+ * 1 use, recovers on long rest; the slot-recovery action itself is out of
+ * scope for this SDD and will roll into a future polish SDD.
+ */
+const DRUID_NATURAL_RECOVERY: ClassResourceDef = {
+  slug: 'druid:natural-recovery',
+  classSlug: 'druid',
+  subclassSlug: 'druid--circle-of-the-land',
+  maxFor: ({ classLevel }) => (classLevel >= 2 ? 1 : null),
+  recoveryTriggerFor: () => 'long',
+};
+
 export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
   FIGHTER_SECOND_WIND,
   MONK_KI_POINTS,
   BARD_BARDIC_INSPIRATION,
   PALADIN_LAY_ON_HANDS,
+  FIGHTER_INDOMITABLE,
+  CLERIC_CHANNEL_DIVINITY,
+  PALADIN_CHANNEL_DIVINITY,
+  WIZARD_ARCANE_RECOVERY,
+  SORCERER_SORCERY_POINTS,
+  DRUID_NATURAL_RECOVERY,
 ];
 
 /**

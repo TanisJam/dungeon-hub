@@ -29,6 +29,7 @@ export function deriveClassResources(
   for (const klass of classes) {
     for (const def of CLASS_RESOURCES) {
       if (def.classSlug !== klass.slug) continue;
+      if (def.subclassSlug && klass.subclass?.slug !== def.subclassSlug) continue;
       const ctx = { classLevel: klass.level, abilityMods };
       const max = def.maxFor(ctx);
       if (max == null) continue;

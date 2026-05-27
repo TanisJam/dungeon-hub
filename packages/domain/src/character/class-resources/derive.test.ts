@@ -80,9 +80,10 @@ describe('deriveClassResources — single class', () => {
     expect(r).toEqual({});
   });
 
-  it('L5 Wizard → empty map (no canonical resources at this level)', () => {
+  it('L5 Wizard → wizard:arcane-recovery (PHB p.115 L1+)', () => {
     const r = deriveClassResources([WIZARD_L5], {}, mods());
-    expect(r).toEqual({});
+    expect(Object.keys(r)).toEqual(['wizard:arcane-recovery']);
+    expect(r['wizard:arcane-recovery']?.max).toBe(1);
   });
 
   it('does NOT emit `extra` key when def has no extraFor', () => {
@@ -205,10 +206,15 @@ describe('deriveClassResources — Paladin Lay on Hands (PHB p.84)', () => {
     expect(r['paladin:lay-on-hands']?.used).toBe(10);
   });
 
-  it('Paladin L5 + Fighter L1 multiclass → both resources visible', () => {
+  it('Paladin L5 + Fighter L1 multiclass → lay-on-hands + channel-divinity + second-wind', () => {
     const r = deriveClassResources([PALADIN_L5, FIGHTER_L1], {}, mods());
-    expect(Object.keys(r).sort()).toEqual(['fighter:second-wind', 'paladin:lay-on-hands']);
+    expect(Object.keys(r).sort()).toEqual([
+      'fighter:second-wind',
+      'paladin:channel-divinity',
+      'paladin:lay-on-hands',
+    ]);
     expect(r['paladin:lay-on-hands']?.max).toBe(25);
+    expect(r['paladin:channel-divinity']?.max).toBe(1);
   });
 
   it('Paladin L5 stored used > max → clamped (read-path tolerance)', () => {
@@ -218,6 +224,36 @@ describe('deriveClassResources — Paladin Lay on Hands (PHB p.84)', () => {
       mods(),
     );
     expect(r['paladin:lay-on-hands']?.used).toBe(25);
+  });
+});
+
+describe('deriveClassResources — subclass-gated resources (Druid Natural Recovery)', () => {
+  const DRUID_L2_LAND: AppliedClass = {
+    slug: 'druid', source: 'PHB', level: 2,
+    subclass: { slug: 'druid--circle-of-the-land', source: 'PHB' },
+    hitDie: 'd8', savingThrows: ['int', 'wis'],
+    armorProficiencies: [], weaponProficiencies: [], toolProficiencies: [], skillChoices: [],
+  };
+  const DRUID_L2_MOON: AppliedClass = {
+    ...DRUID_L2_LAND,
+    subclass: { slug: 'druid--circle-of-the-moon', source: 'PHB' },
+  };
+  const DRUID_L2_NO_SUBCLASS: AppliedClass = { ...DRUID_L2_LAND, subclass: null };
+
+  it('Druid L2 Circle of the Land → natural-recovery emitted', () => {
+    const r = deriveClassResources([DRUID_L2_LAND], {}, mods());
+    expect(r['druid:natural-recovery']).toBeDefined();
+    expect(r['druid:natural-recovery']?.max).toBe(1);
+  });
+
+  it('Druid L2 Circle of the Moon → natural-recovery NOT emitted (wrong subclass)', () => {
+    const r = deriveClassResources([DRUID_L2_MOON], {}, mods());
+    expect(r['druid:natural-recovery']).toBeUndefined();
+  });
+
+  it('Druid L2 no subclass → natural-recovery NOT emitted', () => {
+    const r = deriveClassResources([DRUID_L2_NO_SUBCLASS], {}, mods());
+    expect(r['druid:natural-recovery']).toBeUndefined();
   });
 });
 
@@ -234,9 +270,12 @@ describe('deriveClassResources — used counter', () => {
     expect(r['monk:ki-points']?.used).toBe(5);
   });
 
-  it('persisted used for an unlocked resource is ignored when class missing', () => {
+  it('persisted used for a resource of a class the char does NOT have is ignored', () => {
     // Stored slug for fighter resource on a Wizard-only character (legacy data).
+    // Wizard owns arcane-recovery so the wizard slot derives normally; the stored
+    // fighter-second-wind entry is silently ignored.
     const r = deriveClassResources([WIZARD_L5], { 'fighter:second-wind': 1 }, mods());
-    expect(r).toEqual({});
+    expect(Object.keys(r)).toEqual(['wizard:arcane-recovery']);
+    expect(r['fighter:second-wind']).toBeUndefined();
   });
 });

@@ -80,6 +80,32 @@ describe('resetClassResourcesForRest — Paladin Lay on Hands (PHB p.84)', () =>
   });
 });
 
+describe('resetClassResourcesForRest — subclass-gated (Druid Natural Recovery)', () => {
+  const DRUID_LAND: AppliedClass = {
+    slug: 'druid', source: 'PHB', level: 2,
+    subclass: { slug: 'druid--circle-of-the-land', source: 'PHB' },
+    hitDie: 'd8', savingThrows: ['int', 'wis'],
+    armorProficiencies: [], weaponProficiencies: [], toolProficiencies: [], skillChoices: [],
+  };
+  const DRUID_MOON: AppliedClass = {
+    ...DRUID_LAND,
+    subclass: { slug: 'druid--circle-of-the-moon', source: 'PHB' },
+  };
+
+  it('Druid Circle of the Land long rest → natural-recovery restored', () => {
+    const used = { 'druid:natural-recovery': 1 };
+    const next = resetClassResourcesForRest(used, [DRUID_LAND], 'long', mods());
+    expect(next['druid:natural-recovery']).toBe(0);
+  });
+
+  it('Druid Circle of the Moon long rest → natural-recovery untouched (wrong subclass)', () => {
+    // Stored value (legacy data) is preserved when the def's subclass gate fails.
+    const used = { 'druid:natural-recovery': 1 };
+    const next = resetClassResourcesForRest(used, [DRUID_MOON], 'long', mods());
+    expect(next['druid:natural-recovery']).toBe(1);
+  });
+});
+
 describe('resetClassResourcesForRest — Bard Bardic Inspiration (PHB p.53-54)', () => {
   const BARD_L4: AppliedClass = {
     slug: 'bard', source: 'PHB', level: 4, subclass: null, hitDie: 'd8',
