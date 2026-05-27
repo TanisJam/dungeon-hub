@@ -19,9 +19,15 @@ interface RecursosTabProps {
  */
 const RESOURCE_LABELS: Record<string, { name: string; classLabel: string }> = {
   'fighter:second-wind': { name: 'Segundo Aire', classLabel: 'Guerrero' },
+  'fighter:indomitable': { name: 'Indómito', classLabel: 'Guerrero' },
   'monk:ki-points': { name: 'Puntos de Ki', classLabel: 'Monje' },
   'bard:bardic-inspiration': { name: 'Inspiración bárdica', classLabel: 'Bardo' },
   'paladin:lay-on-hands': { name: 'Imposición de Manos', classLabel: 'Paladín' },
+  'paladin:channel-divinity': { name: 'Conducto Divino', classLabel: 'Paladín' },
+  'cleric:channel-divinity': { name: 'Conducto Divino', classLabel: 'Clérigo' },
+  'wizard:arcane-recovery': { name: 'Recuperación Arcana', classLabel: 'Mago' },
+  'sorcerer:sorcery-points': { name: 'Puntos de Hechicería', classLabel: 'Hechicero' },
+  'druid:natural-recovery': { name: 'Recuperación Natural', classLabel: 'Druida (Tierra)' },
 };
 
 const TRIGGER_LABEL: Record<ClassResourceView['recoveryTrigger'], string> = {
