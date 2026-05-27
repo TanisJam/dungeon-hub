@@ -1,7 +1,8 @@
-import type { CharacterSheet } from '@/lib/sheet-types';
+import type { CharacterSheet, CharacterStatus } from '@/lib/sheet-types';
 import { Card } from '@/components/ui';
 import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
 import { AtributosSectionEditor } from '@/components/ficha/atributos-section-editor';
+import { RaceSection, ClassSection, BackgroundSection } from '@/components/ficha';
 import { RacialTraitsBlock } from './_racial-traits-block';
 
 const ABILITY_ES: Record<string, string> = {
@@ -36,6 +37,8 @@ interface ResumenTabProps {
   sheet: CharacterSheet;
   /** Character ID — passed to AtributosSectionEditor for the save action. */
   characterId?: string;
+  /** Full character status — required for ViewOnlySectionSheet CTA logic. */
+  characterStatus?: CharacterStatus;
   /** True when char.status ∈ {active, retired, dead}. */
   statusLocked?: boolean;
   /** True when the current user is a GM of the character's world. */
@@ -46,7 +49,7 @@ interface ResumenTabProps {
   currentMethod?: 'standard-array' | 'point-buy' | 'roll';
 }
 
-export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = false, currentStats, currentMethod }: ResumenTabProps) {
+export function ResumenTab({ sheet, characterId, characterStatus, statusLocked = false, isDm = false, currentStats, currentMethod }: ResumenTabProps) {
   return (
     <div className="space-y-4">
       {/* Atributos */}
@@ -73,6 +76,72 @@ export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = fa
         </div>
         <AbilityScoreGrid scores={sheet.abilityScores} />
       </Card>
+
+      {/* Identidad — Linaje / Clase / Trasfondo con pencil affordances (C6, sdd/ficha-section-editors) */}
+      {characterId && characterStatus && (
+        <Card variant="surface" className="p-4">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+            Identidad
+          </p>
+          <div className="space-y-2">
+            {/* Linaje */}
+            {sheet.identity.race && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Linaje</p>
+                  <p className="text-sm text-ink capitalize">{sheet.identity.race.slug}</p>
+                  {sheet.identity.subrace && (
+                    <p className="text-xs text-ink-mute capitalize">{sheet.identity.subrace.slug}</p>
+                  )}
+                </div>
+                <RaceSection
+                  characterId={characterId}
+                  characterStatus={characterStatus}
+                  isDm={isDm}
+                  raceName={sheet.identity.race.slug}
+                  subraceName={sheet.identity.subrace?.slug}
+                />
+              </div>
+            )}
+
+            {/* Clase */}
+            {sheet.identity.classes.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Clase</p>
+                  {sheet.identity.classes.map((c) => (
+                    <p key={c.slug} className="text-sm text-ink capitalize">
+                      {c.slug} {c.level}
+                    </p>
+                  ))}
+                </div>
+                <ClassSection
+                  characterId={characterId}
+                  characterStatus={characterStatus}
+                  isDm={isDm}
+                  classes={sheet.identity.classes}
+                />
+              </div>
+            )}
+
+            {/* Trasfondo */}
+            {sheet.identity.background && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Trasfondo</p>
+                  <p className="text-sm text-ink capitalize">{sheet.identity.background.slug}</p>
+                </div>
+                <BackgroundSection
+                  characterId={characterId}
+                  characterStatus={characterStatus}
+                  isDm={isDm}
+                  backgroundName={sheet.identity.background.slug}
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Salvaciones — 2-col grid of cards */}
       <Card variant="surface" className="p-4">

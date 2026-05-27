@@ -22,6 +22,16 @@ vi.mock('../actions', () => ({
   deleteCharacter: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+// SpellPrepSectionEditor brings in api + supabase/client which require NEXT_PUBLIC env vars.
+// Mock the env module to avoid the env var requirement in this test.
+vi.mock('@/lib/env', () => ({
+  env: {
+    SUPABASE_URL: 'http://localhost',
+    SUPABASE_ANON_KEY: 'test-anon-key',
+    API_URL: 'http://localhost:4000',
+  },
+}));
+
 // ── Test helpers ──────────────────────────────────────────────────────────
 
 function makeSpellRef(

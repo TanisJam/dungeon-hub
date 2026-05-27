@@ -208,6 +208,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
             <ResumenTab
               sheet={sheet}
               characterId={id}
+              characterStatus={character.status}
               statusLocked={statusLocked}
               isDm={isDmHere}
               currentStats={currentStats}
