@@ -110,6 +110,8 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
         className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-sm rounded-t-lg bg-surface shadow-stamp-lg max-h-[92vh] overflow-y-auto motion-safe:[animation:v3-sheet-slide-up_var(--dur-base)_var(--ease-out)_both]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
       >
+        {/* Handle bar — decorative affordance, aria-hidden */}
+        <span aria-hidden="true" className="mx-auto mt-2 mb-1 block h-1 w-10 rounded-full bg-ink-mute" />
         {title && (
           <h2 id={headingId} className="px-4 pt-4 font-display text-lg text-ink">
             {title}

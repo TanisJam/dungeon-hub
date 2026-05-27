@@ -147,6 +147,25 @@ describe('V3Sheet — Cycle 2: keyboard + click closure', () => {
   });
 });
 
+// ─── Cycle 4: Handle bar ──────────────────────────────────────────────────────
+
+describe('V3Sheet — Cycle 4: handle bar', () => {
+  /**
+   * UIS-HANDLE-BAR-01: handle bar rendered when sheet is open
+   * UIS-HANDLE-BAR-AHIDE-02: aria-hidden="true" on handle bar
+   */
+  it('T12: renders a handle bar with aria-hidden and correct classes when open', () => {
+    render(
+      <V3Sheet open={true} title="Test" onClose={vi.fn()}>
+        <p>content</p>
+      </V3Sheet>,
+      { baseElement: document.body }
+    );
+    const handleBar = document.body.querySelector('[aria-hidden="true"].h-1.w-10.rounded-full.bg-ink-mute');
+    expect(handleBar).not.toBeNull();
+  });
+});
+
 // ─── Cycle 3: Focus trap + body lock ──────────────────────────────────────────
 
 describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
