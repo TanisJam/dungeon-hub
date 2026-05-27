@@ -67,18 +67,12 @@ describe('PUT /characters/:id/hp', () => {
       headers: { authorization: `Bearer ${player.accessToken}` },
       payload: {
         class: { slug: 'fighter', source: 'PHB' },
-        skills: ['athletics', 'perception'],
+        level: 1,
+        skillChoices: ['athletics', 'perception'],
       },
     });
 
-    await app.inject({
-      method: 'POST',
-      url: `/api/v1/characters/${charId}/classes/fighter/level-up`,
-      headers: { authorization: `Bearer ${player.accessToken}` },
-      payload: { hpMethod: 'average' },
-    });
-
-    // Set a known HP state: current=18, max=20 via DM to test clamp later
+    // Set a known HP state: current=18, max=20 via DM (no level-up needed, DM can set freely)
     await app.inject({
       method: 'PUT',
       url: `/api/v1/characters/${charId}/hp`,
