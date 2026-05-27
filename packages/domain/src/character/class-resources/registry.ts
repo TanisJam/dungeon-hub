@@ -60,10 +60,31 @@ const BARD_BARDIC_INSPIRATION: ClassResourceDef = {
   },
 };
 
+/**
+ * Paladin — Lay on Hands (PHB p.84).
+ *
+ * - Unlocks at Paladin L1.
+ * - Pool of HP = paladin level × 5.
+ * - Recovery: long rest only.
+ * - Pool-shaped: `extra: { shape: 'pool' }` instructs the UI to render an
+ *   amount selector (vs. counter-shaped +1/-1 buttons). The API's
+ *   `/resources/use` endpoint already accepts an `amount` parameter — only
+ *   the Recursos tab UX changes per shape.
+ */
+const PALADIN_LAY_ON_HANDS: ClassResourceDef = {
+  slug: 'paladin:lay-on-hands',
+  classSlug: 'paladin',
+  maxFor: ({ classLevel }) => (classLevel >= 1 ? classLevel * 5 : null),
+  recoveryTriggerFor: () => 'long',
+  extraFor: ({ classLevel }) =>
+    classLevel >= 1 ? ({ shape: 'pool' } as const) : undefined,
+};
+
 export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
   FIGHTER_SECOND_WIND,
   MONK_KI_POINTS,
   BARD_BARDIC_INSPIRATION,
+  PALADIN_LAY_ON_HANDS,
 ];
 
 /**

@@ -132,14 +132,68 @@ describe('CLASS_RESOURCES — Bard Bardic Inspiration (PHB p.53-54)', () => {
   });
 });
 
+describe('CLASS_RESOURCES — Paladin Lay on Hands (PHB p.84)', () => {
+  // PHB p.84: "a pool of healing power that replenishes when you take a long rest.
+  // With that pool, you can restore a total number of hit points equal to your
+  // paladin level × 5."
+  it('L0 Paladin → maxFor null (not unlocked)', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.maxFor(ctx(0))).toBeNull();
+  });
+
+  it('L1 Paladin → pool 5', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.classSlug).toBe('paladin');
+    expect(def.maxFor(ctx(1))).toBe(5);
+  });
+
+  it('L5 Paladin → pool 25', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.maxFor(ctx(5))).toBe(25);
+  });
+
+  it('L20 Paladin → pool 100', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.maxFor(ctx(20))).toBe(100);
+  });
+
+  it('any Paladin level → recovery trigger "long" (PHB p.84 long rest only)', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.recoveryTriggerFor(ctx(1))).toBe('long');
+    expect(def.recoveryTriggerFor(ctx(20))).toBe('long');
+  });
+
+  it('L1 Paladin → extraFor returns { shape: "pool" }', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.extraFor?.(ctx(1))).toEqual({ shape: 'pool' });
+  });
+
+  it('L0 Paladin → extraFor returns undefined', () => {
+    const def = classResourceBySlug('paladin:lay-on-hands');
+    if (!def) throw new Error('paladin:lay-on-hands missing');
+    expect(def.extraFor?.(ctx(0))).toBeUndefined();
+  });
+});
+
 describe('classResourceBySlug — lookup', () => {
   it('returns undefined for unknown slug', () => {
     expect(classResourceBySlug('monk:bogus')).toBeUndefined();
     expect(classResourceBySlug('fighter:nonexistent')).toBeUndefined();
   });
 
-  it('CLASS_RESOURCES contains the three canonical entries', () => {
+  it('CLASS_RESOURCES contains the four canonical entries', () => {
     const slugs = CLASS_RESOURCES.map((d) => d.slug).sort();
-    expect(slugs).toEqual(['bard:bardic-inspiration', 'fighter:second-wind', 'monk:ki-points']);
+    expect(slugs).toEqual([
+      'bard:bardic-inspiration',
+      'fighter:second-wind',
+      'monk:ki-points',
+      'paladin:lay-on-hands',
+    ]);
   });
 });

@@ -60,6 +60,26 @@ describe('resetClassResourcesForRest — long rest', () => {
   });
 });
 
+describe('resetClassResourcesForRest — Paladin Lay on Hands (PHB p.84)', () => {
+  const PALADIN_L5: AppliedClass = {
+    slug: 'paladin', source: 'PHB', level: 5, subclass: null, hitDie: 'd10',
+    savingThrows: ['wis', 'cha'], armorProficiencies: [], weaponProficiencies: [],
+    toolProficiencies: [], skillChoices: [],
+  };
+
+  it('Paladin L5 short rest → lay-on-hands NOT restored (long-only trigger)', () => {
+    const used = { 'paladin:lay-on-hands': 10 };
+    const next = resetClassResourcesForRest(used, [PALADIN_L5], 'short', mods());
+    expect(next['paladin:lay-on-hands']).toBe(10);
+  });
+
+  it('Paladin L5 long rest → lay-on-hands restored', () => {
+    const used = { 'paladin:lay-on-hands': 10 };
+    const next = resetClassResourcesForRest(used, [PALADIN_L5], 'long', mods());
+    expect(next['paladin:lay-on-hands']).toBe(0);
+  });
+});
+
 describe('resetClassResourcesForRest — Bard Bardic Inspiration (PHB p.53-54)', () => {
   const BARD_L4: AppliedClass = {
     slug: 'bard', source: 'PHB', level: 4, subclass: null, hitDie: 'd8',

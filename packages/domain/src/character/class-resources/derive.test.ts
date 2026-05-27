@@ -168,6 +168,59 @@ describe('deriveClassResources — Bard Bardic Inspiration (PHB p.53-54)', () =>
   });
 });
 
+describe('deriveClassResources — Paladin Lay on Hands (PHB p.84)', () => {
+  const PALADIN_L1: AppliedClass = {
+    slug: 'paladin',
+    source: 'PHB',
+    level: 1,
+    subclass: null,
+    hitDie: 'd10',
+    savingThrows: ['wis', 'cha'],
+    armorProficiencies: [],
+    weaponProficiencies: [],
+    toolProficiencies: [],
+    skillChoices: [],
+  };
+  const PALADIN_L5: AppliedClass = { ...PALADIN_L1, level: 5 };
+
+  it('Paladin L1 → pool 5, long-rest trigger, shape:pool extra', () => {
+    const r = deriveClassResources([PALADIN_L1], {}, mods());
+    expect(r['paladin:lay-on-hands']).toEqual({
+      slug: 'paladin:lay-on-hands',
+      classSlug: 'paladin',
+      used: 0,
+      max: 5,
+      recoveryTrigger: 'long',
+      extra: { shape: 'pool' },
+    });
+  });
+
+  it('Paladin L5 stored used 10 → pool 25, used 10', () => {
+    const r = deriveClassResources(
+      [PALADIN_L5],
+      { 'paladin:lay-on-hands': 10 },
+      mods(),
+    );
+    expect(r['paladin:lay-on-hands']?.max).toBe(25);
+    expect(r['paladin:lay-on-hands']?.used).toBe(10);
+  });
+
+  it('Paladin L5 + Fighter L1 multiclass → both resources visible', () => {
+    const r = deriveClassResources([PALADIN_L5, FIGHTER_L1], {}, mods());
+    expect(Object.keys(r).sort()).toEqual(['fighter:second-wind', 'paladin:lay-on-hands']);
+    expect(r['paladin:lay-on-hands']?.max).toBe(25);
+  });
+
+  it('Paladin L5 stored used > max → clamped (read-path tolerance)', () => {
+    const r = deriveClassResources(
+      [PALADIN_L5],
+      { 'paladin:lay-on-hands': 50 },
+      mods(),
+    );
+    expect(r['paladin:lay-on-hands']?.used).toBe(25);
+  });
+});
+
 describe('deriveClassResources — used counter', () => {
   it('persisted used 3 on L5 Monk → ki used 3', () => {
     const r = deriveClassResources([MONK_L5], { 'monk:ki-points': 3 }, mods());
