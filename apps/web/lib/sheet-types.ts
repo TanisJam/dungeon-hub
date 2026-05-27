@@ -19,6 +19,24 @@ export interface ClassResourceView {
   used: number;
   max: number;
   recoveryTrigger: 'short' | 'long' | 'both';
+  /**
+   * Feature-specific metadata emitted by the domain when the registry def
+   * declares an `extraFor` callback. Currently only Bardic Inspiration uses
+   * this — see `isBardicInspirationExtra` below.
+   */
+  extra?: unknown;
+}
+
+/** Bardic Inspiration metadata shape — PHB p.54 Bard table. */
+export interface BardicInspirationExtra {
+  dieSize: 'd6' | 'd8' | 'd10' | 'd12';
+}
+
+/** Type guard for Bardic Inspiration extra payload. */
+export function isBardicInspirationExtra(x: unknown): x is BardicInspirationExtra {
+  if (typeof x !== 'object' || x === null) return false;
+  const candidate = (x as { dieSize?: unknown }).dieSize;
+  return candidate === 'd6' || candidate === 'd8' || candidate === 'd10' || candidate === 'd12';
 }
 
 /**

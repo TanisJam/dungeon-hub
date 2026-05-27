@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react';
 import type { ClassResourceView } from '@/lib/sheet-types';
+import { isBardicInspirationExtra } from '@/lib/sheet-types';
 import { Card } from '@/components/ui';
 import { useClassResource, restoreClassResource } from '../actions';
 
@@ -19,6 +20,7 @@ interface RecursosTabProps {
 const RESOURCE_LABELS: Record<string, { name: string; classLabel: string }> = {
   'fighter:second-wind': { name: 'Segundo Aire', classLabel: 'Guerrero' },
   'monk:ki-points': { name: 'Puntos de Ki', classLabel: 'Monje' },
+  'bard:bardic-inspiration': { name: 'Inspiración bárdica', classLabel: 'Bardo' },
 };
 
 const TRIGGER_LABEL: Record<ClassResourceView['recoveryTrigger'], string> = {
@@ -78,6 +80,17 @@ function ResourceRow({
           <span className="text-sm text-ink-mute"> / {resource.max}</span>
         </span>
       </div>
+
+      {isBardicInspirationExtra(resource.extra) && (
+        <div className="mt-2">
+          <span
+            data-testid="resource-die-badge"
+            className="inline-flex items-center rounded-full border border-line bg-paper-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mute"
+          >
+            {resource.extra.dieSize}
+          </span>
+        </div>
+      )}
 
       <div className="mt-3 flex gap-2">
         <button
