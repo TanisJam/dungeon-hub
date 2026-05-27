@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { CrowMark } from '@/components/ui/crow-mark';
 import { Icon } from '@/components/ui/icon';
@@ -12,11 +13,18 @@ interface TopBarProps {
   canBeDM?: boolean;
   /** Render the unread dot on the notif bell. */
   hasNotif?: boolean;
+  /**
+   * When set: back arrow renders in LEFT slot (CrowMark hidden);
+   * canBeDM is suppressed; `right` prop still renders in right slot.
+   * Design: docs/design_handoff_dungeon_hub/README.md § State management.
+   */
+  backHref?: string;
 }
 
 /**
  * TopBar — sticky app header (obsidian aesthetic).
  * Crow mark + title/subtitle + role switcher (if canBeDM) + notif bell.
+ * When backHref is provided: back arrow in left slot, CrowMark hidden, RoleSwitcher suppressed.
  * Server component. RoleSwitcher is a client island.
  */
 export function TopBar({
@@ -25,13 +33,25 @@ export function TopBar({
   right,
   canBeDM = true,
   hasNotif = false,
+  backHref,
 }: TopBarProps) {
   return (
     <header
       className="sticky top-0 z-40 flex items-center gap-2.5 px-3.5 pb-3 bg-paper/90 backdrop-blur-md border-b border-line"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
-      <CrowMark />
+      {/* LEFT slot: CrowMark (default) OR back arrow (when backHref set) */}
+      {backHref ? (
+        <Link
+          href={backHref}
+          aria-label="Volver"
+          className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0"
+        >
+          <Icon name="arrow-left" size={16} />
+        </Link>
+      ) : (
+        <CrowMark />
+      )}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <span className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate">
           {title}
@@ -42,9 +62,11 @@ export function TopBar({
           </span>
         )}
       </div>
+      {/* RIGHT slot: rightAction prop OR default cluster (RoleSwitcher + bell) */}
       {right ?? (
         <div className="flex items-center gap-2 flex-shrink-0">
-          {canBeDM && <RoleSwitcher />}
+          {/* RoleSwitcher suppressed when backHref is set (sub-screen) */}
+          {!backHref && canBeDM && <RoleSwitcher />}
           <button
             type="button"
             aria-label="Notificaciones"

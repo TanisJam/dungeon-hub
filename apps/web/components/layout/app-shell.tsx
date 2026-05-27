@@ -15,6 +15,12 @@ type AppShellProps = {
   hasNotif?: boolean;
   /** Hide the morphing tabbar (e.g. wizard / full-bleed flows). Defaults true. */
   showTabBar?: boolean;
+  /**
+   * When set: TopBar shows a back arrow linking to this path.
+   * CrowMark is hidden; RoleSwitcher is suppressed (sub-screen pattern).
+   * Design: sdd/ficha-restyle — APPSHELL-BACKHREF-01.
+   */
+  backHref?: string;
   children: ReactNode;
 };
 
@@ -30,6 +36,7 @@ export function AppShell({
   canBeDM = true,
   hasNotif = false,
   showTabBar = true,
+  backHref,
   children,
 }: AppShellProps) {
   return (
@@ -38,8 +45,9 @@ export function AppShell({
         title={title}
         subtitle={subtitle}
         right={rightAction}
-        canBeDM={canBeDM}
+        canBeDM={backHref ? false : canBeDM}
         hasNotif={hasNotif}
+        backHref={backHref}
       />
       <main className="mx-auto max-w-sm px-4 py-4 pb-28">{children}</main>
       {showTabBar && <TabBar />}
