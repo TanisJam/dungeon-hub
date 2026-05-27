@@ -305,6 +305,8 @@ export interface SheetResponse {
   };
   sheet: CharacterSheet;
   currentHp: number | null;
+  /** Temporary HP (from character.data.hp.temp). Defaults to 0 when absent. */
+  tempHp: number;
   /** Stat generation method. Defaults to 'standard-array' when absent (STATMETHOD-API-01). */
   statMethod?: 'standard-array' | 'point-buy' | 'roll';
   inventory: InventoryItem[];

@@ -1,9 +1,17 @@
+import { HPSectionEditor } from '@/components/ficha/hp/hp-section-editor';
+
 interface VitalGridProps {
   hp: { current: number | null; max: number | null };
   ac: number | null;
   initiative: number | null;
   armorFormula?: string;
   walkSpeed?: number;
+  /** When set, mounts the HP editor affordance. */
+  characterId?: string;
+  /** When true, DM edit controls are shown inside HPSectionEditor. */
+  isDmHere?: boolean;
+  /** Temp HP (from character.data.hp.temp). Defaults to 0 if undefined. */
+  tempHp?: number;
 }
 
 function dash(value: number | null): string {
@@ -15,7 +23,16 @@ function formatInitiative(value: number | null): string {
   return value >= 0 ? `+${value}` : String(value);
 }
 
-export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: VitalGridProps) {
+export function VitalGrid({
+  hp,
+  ac,
+  initiative,
+  armorFormula,
+  walkSpeed,
+  characterId,
+  isDmHere,
+  tempHp = 0,
+}: VitalGridProps) {
   const effectiveCurrent = hp.current ?? hp.max;
   const hpDisplay =
     effectiveCurrent === null && hp.max === null
@@ -30,7 +47,7 @@ export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: Vital
   return (
     <div className="grid grid-cols-3 gap-2">
       {/* HP — peach gradient (ficha-vital-hp replaces inline style) */}
-      <div className="ficha-vital-hp flex flex-col items-center rounded-md px-3 py-4 text-center">
+      <div className="ficha-vital-hp flex flex-col items-center rounded-md px-3 py-4 text-center relative">
         <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
           Puntos de Golpe
         </span>
@@ -42,6 +59,20 @@ export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: Vital
             <div
               className="h-full rounded-full bg-accent"
               style={{ width: `${hpFill}%` }}
+            />
+          </div>
+        )}
+        {/* HP edit affordance — only mounted when characterId provided */}
+        {characterId !== undefined && isDmHere !== undefined && (
+          <div className="absolute top-1 right-1">
+            <HPSectionEditor
+              characterId={characterId}
+              currentHp={{
+                current: hp.current ?? 0,
+                max: hp.max ?? 1,
+                temp: tempHp,
+              }}
+              isDmHere={isDmHere}
             />
           </div>
         )}

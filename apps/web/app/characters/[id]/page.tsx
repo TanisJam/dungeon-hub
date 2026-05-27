@@ -169,6 +169,9 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           initiative={sheet.initiative}
           armorFormula={sheet.armorClass.formula}
           walkSpeed={sheet.speed.walk}
+          characterId={id}
+          isDmHere={isDmHere}
+          tempHp={data.tempHp}
         />
 
         <RestActions charId={id} />
