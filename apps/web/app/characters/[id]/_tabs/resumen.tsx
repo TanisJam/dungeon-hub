@@ -42,9 +42,11 @@ interface ResumenTabProps {
   isDm?: boolean;
   /** Raw ability scores for pre-filling the editor. Derived from sheet.abilityScores. */
   currentStats?: AbilityScores;
+  /** Stat generation method from SheetResponse.statMethod (STATMETHOD-WEB-01). */
+  currentMethod?: 'standard-array' | 'point-buy' | 'roll';
 }
 
-export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = false, currentStats }: ResumenTabProps) {
+export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = false, currentStats, currentMethod }: ResumenTabProps) {
   return (
     <div className="space-y-4">
       {/* Atributos */}
@@ -62,7 +64,7 @@ export function ResumenTab({ sheet, characterId, statusLocked = false, isDm = fa
               <AtributosSectionEditor
                 characterId={characterId}
                 currentStats={currentStats}
-                currentMethod="standard-array"
+                currentMethod={currentMethod ?? 'standard-array'}
                 statusLocked={statusLocked}
                 isDm={isDm}
               />

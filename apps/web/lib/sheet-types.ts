@@ -305,5 +305,7 @@ export interface SheetResponse {
   };
   sheet: CharacterSheet;
   currentHp: number | null;
+  /** Stat generation method. Defaults to 'standard-array' when absent (STATMETHOD-API-01). */
+  statMethod?: 'standard-array' | 'point-buy' | 'roll';
   inventory: InventoryItem[];
 }

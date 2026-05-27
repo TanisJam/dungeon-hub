@@ -211,6 +211,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
               statusLocked={statusLocked}
               isDm={isDmHere}
               currentStats={currentStats}
+              currentMethod={data.statMethod ?? 'standard-array'}
             />
           )}
           {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
