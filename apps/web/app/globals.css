@@ -119,6 +119,21 @@
   }
 }
 
+/* ── Inicio screen — scoped extensions ── */
+.inicio-hero-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(212, 162, 76, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168, 90, 142, 0.10), transparent 55%),
+    linear-gradient(180deg, #1A1726 0%, #0B0A12 100%);
+}
+.inicio-stat-glow {
+  text-shadow: 0 0 14px rgba(212, 162, 76, 0.40);
+}
+.inicio-feed-dot {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
 /* ── Palette: Obsidiana (default) ── */
 :root[data-palette="obsidian"],
 :root:not([data-palette]) {
