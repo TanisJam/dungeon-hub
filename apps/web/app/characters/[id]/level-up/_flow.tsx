@@ -1,23 +1,39 @@
 'use client';
 
 /**
- * LevelUpFlow — 6-step stepper for play-time level-up.
+ * LevelUpFlow — step-graph-driven stepper for play-time level-up.
  *
- * Steps: mode → class → hp → asi-feat (conditional) → spells (conditional) → review
+ * Steps: mode → class → hp → subclass (cond.) → asi-feat (cond.) → spells (cond.) → review
  *
  * Mobile-first: fullscreen at 375px, centered panel on md+.
  * REQ-CLU-PLAY-TIME-AUTH, REQ-CLU-BODY-DISCRIMINATOR, REQ-CLU-HP-DELTA-ATOMIC.
+ * REQ-CLU-GRAPH-BUILD-ACTIVE-STEPS, REQ-CLU-GRAPH-PREV-FROM-REVIEW.
+ * REQ-CLU-GRAPH-TOTAL-STEPS-DERIVED.
  *
- * SDD multiclass-class-step (spec #878 / design #879).
+ * SDD level-up-choices-completion (C4).
  */
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { submitLevelUp, type LevelUpBody, type LevelUpSummary } from './actions';
+import {
+  buildActiveSteps,
+  nextStep,
+  prevStep,
+  totalActiveSteps,
+  currentStepIndex,
+  type FlowState,
+  type StepId,
+  type Mode,
+  type HpMethod,
+  type AsiFeatKind,
+  type FlowCtx,
+  type ClassRef,
+} from './_step-graph';
+import { SubclassStep } from './_subclass-step';
+import type { SubclassRow } from '@/app/characters/[id]/wizard/class/_picker';
 
 // ---- Types ------------------------------------------------------------------
-
-type ClassRef = { slug: string; source: string };
 
 interface OwnedClass {
   slug: string;
@@ -27,30 +43,13 @@ interface OwnedClass {
   isAsiLevel: boolean; // true if (level + 1) is an ASI level for this class
 }
 
-type Mode = 'same-class' | 'new-class';
-type Step = 'mode' | 'class' | 'hp' | 'asi-feat' | 'review';
-type HpMethod = 'average' | 'roll';
-type AsiFeatKind = 'asi' | 'feat' | null;
-
-interface FlowState {
-  step: Step;
-  mode: Mode | null;
-  selectedClass: ClassRef | null;
-  hpMethod: HpMethod;
-  asiFeat: AsiFeatKind;
-  asiDeltas: Partial<Record<string, number>>;
-}
-
-const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-const ABILITY_LABELS: Record<string, string> = {
-  str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
-};
-
 interface LevelUpFlowProps {
   characterId: string;
   ownedClasses: OwnedClass[];
   multiclassingEnabled: boolean;
   characterName: string;
+  flowCtx: FlowCtx;
+  subclassesByClass: Record<string, SubclassRow[]>;
 }
 
 const INITIAL_STATE: FlowState = {
@@ -60,6 +59,13 @@ const INITIAL_STATE: FlowState = {
   hpMethod: 'average',
   asiFeat: null,
   asiDeltas: {},
+  subclass: null,
+  spellPicks: null,
+};
+
+const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+const ABILITY_LABELS: Record<string, string> = {
+  str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
 };
 
 export function LevelUpFlow({
@@ -67,6 +73,8 @@ export function LevelUpFlow({
   ownedClasses,
   multiclassingEnabled,
   characterName,
+  flowCtx,
+  subclassesByClass,
 }: LevelUpFlowProps) {
   const router = useRouter();
   const [state, setState] = useState<FlowState>(INITIAL_STATE);
@@ -81,59 +89,74 @@ export function LevelUpFlow({
 
   // ---- Navigation helpers ---------------------------------------------------
 
-  function goToStep(step: Step) {
+  function goToStep(step: StepId) {
     update({ step });
   }
 
   function handleBack() {
-    const { step, mode } = state;
-    if (step === 'class') goToStep('mode');
-    else if (step === 'hp') goToStep('class');
-    else if (step === 'asi-feat') goToStep('hp');
-    else if (step === 'review') {
-      // Jump back to asi-feat if the selected class needs it, else hp
-      const owned = ownedClasses.find(
-        (c) => c.slug === state.selectedClass?.slug,
-      );
-      goToStep(mode === 'same-class' && owned?.isAsiLevel ? 'asi-feat' : 'hp');
-    }
+    const prev = prevStep(state, flowCtx);
+    if (prev) goToStep(prev);
   }
 
   // ---- Step transitions -----------------------------------------------------
 
   function handleModeSelect(mode: Mode) {
-    update({ mode, selectedClass: null, step: 'class' });
+    // Build tentative state to compute next step
+    const tentative: FlowState = {
+      ...INITIAL_STATE,
+      mode,
+      step: 'mode',
+    };
+    const next = nextStep(tentative, flowCtx) ?? 'class';
+    update({ mode, selectedClass: null, subclass: null, spellPicks: null, asiFeat: null, asiDeltas: {}, step: next });
   }
 
   function handleClassSelect(cls: ClassRef) {
-    const owned = ownedClasses.find((c) => c.slug === cls.slug);
-    // Check if the next level is an ASI level (only relevant for same-class)
-    update({ selectedClass: cls, step: 'hp' });
-    // Store whether we'll need the asi-feat step
+    // Build tentative state to compute next step from 'class'
+    const tentative: FlowState = {
+      ...state,
+      selectedClass: cls,
+      step: 'class',
+      subclass: null,
+      spellPicks: null,
+      asiFeat: null,
+      asiDeltas: {},
+    };
+    const next = nextStep(tentative, flowCtx) ?? 'hp';
     setState((s) => ({
       ...s,
       selectedClass: cls,
-      step: 'hp',
-      // pre-clear any previous asi picks
+      step: next,
+      subclass: null,
+      spellPicks: null,
       asiFeat: null,
       asiDeltas: {},
     }));
+    setError(null);
   }
 
   function handleHpContinue(method: HpMethod) {
-    const owned = ownedClasses.find((c) => c.slug === state.selectedClass?.slug);
-    const needsAsiFeat = state.mode === 'same-class' && owned?.isAsiLevel;
-    update({ hpMethod: method, step: needsAsiFeat ? 'asi-feat' : 'review' });
+    const tentative: FlowState = { ...state, hpMethod: method, step: 'hp' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ hpMethod: method, step: next });
+  }
+
+  function handleSubclassContinue(sub: ClassRef) {
+    const tentative: FlowState = { ...state, subclass: sub, step: 'subclass' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ subclass: sub, step: next });
   }
 
   function handleAsiFeatContinue(kind: AsiFeatKind, deltas: Partial<Record<string, number>>) {
-    update({ asiFeat: kind, asiDeltas: deltas, step: 'review' });
+    const tentative: FlowState = { ...state, asiFeat: kind, asiDeltas: deltas, step: 'asi-feat' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ asiFeat: kind, asiDeltas: deltas, step: next });
   }
 
   // ---- Submit ---------------------------------------------------------------
 
   function handleSubmit() {
-    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas } = state;
+    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass } = state;
     if (!selectedClass || !mode) return;
 
     const body: LevelUpBody =
@@ -145,6 +168,7 @@ export function LevelUpFlow({
             ...(asiFeat === 'asi'
               ? { asiFeat: { kind: 'asi', deltas: asiDeltas } }
               : {}),
+            ...(subclass ? { subclass } : {}),
           }
         : {
             kind: 'new-class',
@@ -175,16 +199,27 @@ export function LevelUpFlow({
 
   // ---- Stepper shell -------------------------------------------------------
 
-  const stepNum: Record<Step, number> = {
-    mode: 1, class: 2, hp: 3, 'asi-feat': 4, review: 5,
+  const total = totalActiveSteps(state, flowCtx);
+  const current = currentStepIndex(state, flowCtx);
+  const hasPrev = prevStep(state, flowCtx) !== null;
+
+  // Subclass title lookup (localized) — used in the subclass step header
+  const SUBCLASS_TITLES: Record<string, string> = {
+    barbarian: 'Camino primigenio', bard: 'Colegio de bardo', cleric: 'Dominio divino',
+    druid: 'Círculo druídico', fighter: 'Arquetipo marcial', monk: 'Tradición monástica',
+    paladin: 'Juramento sagrado', ranger: 'Arquetipo de guardabosques', rogue: 'Arquetipo pícaro',
+    sorcerer: 'Origen de hechicero', warlock: 'Patrón sobrenatural', wizard: 'Tradición arcana',
   };
-  const totalSteps = 5;
+  const subclassTitle = SUBCLASS_TITLES[state.selectedClass?.slug ?? ''] ?? 'Subclase';
+  const subclassRows = state.selectedClass
+    ? (subclassesByClass[state.selectedClass.slug] ?? null)
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-2xl md:shadow-xl">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-        {state.step !== 'mode' && (
+        {hasPrev && (
           <button
             type="button"
             onClick={handleBack}
@@ -199,7 +234,7 @@ export function LevelUpFlow({
           <p className="truncate text-sm font-bold text-ink">{characterName}</p>
         </div>
         <span className="shrink-0 text-xs text-ink-mute">
-          {stepNum[state.step]}/{totalSteps}
+          {current}/{total}
         </span>
       </div>
 
@@ -207,7 +242,7 @@ export function LevelUpFlow({
       <div className="h-1 bg-paper-muted">
         <div
           className="h-full bg-primary transition-all"
-          style={{ width: `${(stepNum[state.step] / totalSteps) * 100}%` }}
+          style={{ width: `${(current / total) * 100}%` }}
         />
       </div>
 
@@ -241,6 +276,15 @@ export function LevelUpFlow({
           <HpStep
             selectedClass={state.selectedClass!}
             onContinue={handleHpContinue}
+          />
+        )}
+
+        {state.step === 'subclass' && state.selectedClass && (
+          <SubclassStep
+            selectedClass={state.selectedClass}
+            subclassTitle={subclassTitle}
+            rows={subclassRows}
+            onContinue={handleSubclassContinue}
           />
         )}
 
@@ -354,8 +398,6 @@ function ClassStep({
 }
 
 function NewClassStep({ onSelect }: { onSelect: (cls: ClassRef) => void }) {
-  const [slug, setSlug] = useState('');
-
   const AVAILABLE_CLASSES = [
     'barbarian', 'bard', 'cleric', 'druid', 'fighter',
     'monk', 'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard',
@@ -561,7 +603,7 @@ function ReviewStep({
   onSubmit: () => void;
   onBack: () => void;
 }) {
-  const { mode, selectedClass, hpMethod, asiFeat, asiDeltas } = state;
+  const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass } = state;
   const owned = mode === 'same-class';
 
   return (
@@ -580,6 +622,9 @@ function ReviewStep({
           label="HP"
           value={hpMethod === 'average' ? 'Promedio' : 'Tirar dado (el servidor tira)'}
         />
+        {subclass && (
+          <Row label="Subclase" value={subclass.slug} />
+        )}
         {asiFeat === 'asi' && Object.keys(asiDeltas).length > 0 && (
           <Row
             label="ASI"
