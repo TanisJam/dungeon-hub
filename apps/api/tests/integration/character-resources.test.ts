@@ -530,6 +530,131 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
     expect(insp.extra).toEqual({ dieSize: 'd6' });
   });
 
+  // --- R-07 finalize batch (PHB-cited) ---
+  async function setupChar(
+    name: string,
+    classSlug: string,
+    level: number,
+    subclassSlug: string | null = null,
+  ): Promise<string> {
+    const app = await getTestApp();
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { worldId, name },
+      })
+      .then((r) => r.json());
+    const charId = c.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: classSlug,
+              source: 'PHB',
+              level,
+              hitDie: 'd8',
+              subclass: subclassSlug ? { slug: subclassSlug, source: 'PHB' } : null,
+              savingThrows: [],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          baseStats: { str: 12, dex: 12, con: 14, int: 14, wis: 14, cha: 14 },
+        },
+      },
+    });
+    return charId;
+  }
+
+  it('Fighter L9 → sheet shows indomitable max=1 (PHB p.72)', async () => {
+    const app = await getTestApp();
+    const id = await setupChar('Fighter L9 indomitable', 'fighter', 9);
+    const sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${id}/sheet`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(sheet.sheet.classResources['fighter:indomitable']).toBeDefined();
+    expect(sheet.sheet.classResources['fighter:indomitable'].max).toBe(1);
+    expect(sheet.sheet.classResources['fighter:indomitable'].recoveryTrigger).toBe('long');
+  });
+
+  it('Cleric L2 short rest → channel-divinity restored (PHB p.59)', async () => {
+    const app = await getTestApp();
+    const id = await setupChar('Cleric L2 channel', 'cleric', 2);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${id}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'cleric:channel-divinity' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${id}/rest/short`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceToSpend: {} },
+    });
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${id}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['cleric:channel-divinity']).toBe(0);
+  });
+
+  it('Sorcerer L5 → sheet shows sorcery-points max=5 (PHB p.101)', async () => {
+    const app = await getTestApp();
+    const id = await setupChar('Sorcerer L5 SP', 'sorcerer', 5);
+    const sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${id}/sheet`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(sheet.sheet.classResources['sorcerer:sorcery-points'].max).toBe(5);
+    expect(sheet.sheet.classResources['sorcerer:sorcery-points'].recoveryTrigger).toBe('long');
+  });
+
+  it('Druid Circle of the Land L2 → natural-recovery emitted (PHB p.68)', async () => {
+    const app = await getTestApp();
+    const id = await setupChar('Druid Land L2', 'druid', 2, 'druid--circle-of-the-land');
+    const sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${id}/sheet`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(sheet.sheet.classResources['druid:natural-recovery']).toBeDefined();
+    expect(sheet.sheet.classResources['druid:natural-recovery'].max).toBe(1);
+  });
+
+  it('Druid Circle of the Moon L2 → natural-recovery NOT emitted (subclass gate)', async () => {
+    const app = await getTestApp();
+    const id = await setupChar('Druid Moon L2', 'druid', 2, 'druid--circle-of-the-moon');
+    const sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${id}/sheet`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(sheet.sheet.classResources['druid:natural-recovery']).toBeUndefined();
+  });
+
   it('long rest resets all class resources to 0', async () => {
     const app = await getTestApp();
     // Clear REST-03 cooldown (#826) so the long rest below can succeed.
