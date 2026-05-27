@@ -682,13 +682,16 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // Augmented fields for sheet page (D.4):
     // currentHp: from character.data.hp.current (live HP tracking), falls back to null.
     // inventory: the raw inventory array from the character row.
+    // statMethod: from character.data.statMethod (stat generation method), falls back to 'standard-array'.
     const hpData = (data as { hp?: { current?: number; max?: number } } | null)?.hp;
     const currentHp = hpData?.current ?? null;
+    const statMethod = (data as { statMethod?: string } | null)?.statMethod ?? 'standard-array';
 
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
       currentHp,
+      statMethod,
       inventory,
     };
   });

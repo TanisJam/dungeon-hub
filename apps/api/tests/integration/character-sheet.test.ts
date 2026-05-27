@@ -624,3 +624,98 @@ describe('GET /characters/:id/sheet — SP-04: spellsByClass.spells enrichment',
     expect(wizardSummary.spells).toEqual({ cantrips: [], leveled: [] });
   });
 });
+
+// ---------------------------------------------------------------------------
+// STATMETHOD-API-01 — GET /characters/:id/sheet exposes statMethod field
+// REQ: STATMETHOD-API-01 (spec #986)
+// PHB p.13 — Ability Scores (stat generation method)
+// ---------------------------------------------------------------------------
+describe('GET /characters/:id/sheet — STATMETHOD-API-01: statMethod field', () => {
+  let user: TestUser;
+  let pointBuyCharId: string;
+  let noStatMethodCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+      if (res.statusCode !== 200 && res.statusCode !== 201) {
+        throw new Error(`${label}: ${res.statusCode} ${res.body}`);
+      }
+    };
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'statMethod Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    // Character with method: 'point-buy'
+    const pbChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Stat Method PB' },
+      })
+      .then((r) => r.json());
+    pointBuyCharId = pbChar.id;
+
+    await expectOk(
+      'stats-point-buy',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${pointBuyCharId}/stats`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          method: 'point-buy',
+          scores: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+        },
+      }),
+    );
+
+    // Character without statMethod (no stats PUT yet)
+    const noStatChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Stat Method None' },
+      })
+      .then((r) => r.json());
+    noStatMethodCharId = noStatChar.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('STATMETHOD-API-01.1: character with statMethod=point-buy → response includes statMethod: "point-buy"', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${pointBuyCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.statMethod).toBe('point-buy');
+  });
+
+  it('STATMETHOD-API-01.2: character with no statMethod in data → response defaults to "standard-array"', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noStatMethodCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.statMethod).toBe('standard-array');
+  });
+});
