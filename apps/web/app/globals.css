@@ -72,9 +72,49 @@
   --shadow-glow-accent:    0 0 0 1px rgba(212, 162, 76, 0.50), 0 0 16px rgba(212, 162, 76, 0.22);
   --shadow-glow-secondary: 0 0 0 1px rgba(168, 90, 142, 0.45), 0 0 16px rgba(168, 90, 142, 0.20);
 
-  /* ── Motion (overrides Tailwind defaults) ── */
+  /* ── Motion durations ── */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ── Motion curves (overrides Tailwind defaults) ── */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Rarity glows ── */
+  --shadow-glow-rarity-uncommon:  0 0 0 1px rgba(107, 163, 104, 0.45), 0 0 16px rgba(107, 163, 104, 0.20);
+  --shadow-glow-rarity-rare:      0 0 0 1px rgba(91, 179, 201, 0.45),  0 0 18px rgba(91, 179, 201, 0.22);
+  --shadow-glow-rarity-very-rare: 0 0 0 1px rgba(168, 90, 142, 0.50),  0 0 20px rgba(168, 90, 142, 0.24);
+  --shadow-glow-rarity-legendary: 0 0 0 1px rgba(212, 162, 76, 0.55),  0 0 22px rgba(212, 162, 76, 0.26);
+  --shadow-glow-rarity-artifact:  0 0 0 1px rgba(192, 71, 62, 0.60),   0 0 24px rgba(192, 71, 62, 0.30);
+}
+
+/* ── Type-scale utilities (multi-prop — @utility bypasses @theme auto-mapping limitation) ── */
+@utility text-eyebrow {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+@utility text-stat {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sheet animation ── */
+@keyframes v3-sheet-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes v3-sheet-slide-up {
+    from { transform: none; }
+    to   { transform: none; }
+  }
 }
 
 /* ── Palette: Obsidiana (default) ── */
