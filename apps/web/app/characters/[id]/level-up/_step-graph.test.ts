@@ -16,6 +16,7 @@ import {
   prevStep,
   totalActiveSteps,
   currentStepIndex,
+  isComplete,
 } from './_step-graph';
 import type { FlowState, FlowCtx } from './_step-graph';
 
@@ -287,5 +288,22 @@ describe('currentStepIndex', () => {
     const ctx = makeCtx();
     // activeSteps = ['mode','class','hp','review'] → hp is index 3
     expect(currentStepIndex(state, ctx)).toBe(3);
+  });
+});
+
+// ── isComplete ──────────────────────────────────────────────────────────────
+
+describe('isComplete', () => {
+  it('returns true on review step', () => {
+    const state = makeState({ step: 'review' });
+    const ctx = makeCtx();
+    expect(isComplete(state, ctx)).toBe(true);
+  });
+
+  it('returns false on any non-review step', () => {
+    const ctx = makeCtx();
+    for (const step of ['mode', 'class', 'hp', 'subclass', 'asi-feat', 'spells'] as const) {
+      expect(isComplete(makeState({ step }), ctx)).toBe(false);
+    }
   });
 });
