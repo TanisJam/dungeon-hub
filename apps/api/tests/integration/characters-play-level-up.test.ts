@@ -626,6 +626,89 @@ describe('POST /characters/:id/level-up (play-time)', () => {
     expect(applied).toBeDefined();
   });
 
+  /**
+   * FEAT-DISABLED-1: variantRules.feats=false; player sends asiFeat.kind='feat' → 400 FEATS_DISABLED.
+   * REQ-CLU-FEAT-VALID: mirrors wizard-time gate (characters.ts:3427).
+   * The gate fires before loadFeatData, so even a nonexistent slug returns FEATS_DISABLED.
+   */
+  it('FEAT-DISABLED-1: feats disabled in campaign → 400 FEATS_DISABLED even with valid slug', async () => {
+    const app = await getTestApp();
+
+    // Create a separate campaign with feats disabled (no PATCH endpoint — override DB directly).
+    const noFeatCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'No Feat World' },
+      })
+      .then((r) => r.json());
+
+    {
+      const { db } = await import('../../src/infra/db/client.js');
+      const { worlds } = await import('../../src/infra/db/schema.js');
+      const { DEFAULT_RULES_PROFILE } = await import('@dungeon-hub/domain/rules-profile');
+      const noFeatProfile = {
+        ...DEFAULT_RULES_PROFILE,
+        variantRules: { ...DEFAULT_RULES_PROFILE.variantRules, feats: false },
+      };
+      await db
+        .update(worlds)
+        .set({ rulesProfile: noFeatProfile, updatedAt: new Date() })
+        .where(eq(worlds.id, noFeatCampaign.worldId));
+    }
+
+    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+    await addCampaignAndWorldMember(noFeatCampaign.id, player.id, 'player');
+
+    // Create a Fighter at L3 with subclass in the no-feat world so ASI level (L4) is reachable.
+    const c = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { worldId: noFeatCampaign.worldId, name: 'Feat Disabled Fighter' },
+      })
+      .then((r) => r.json());
+    const charId = c.id;
+
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${charId}/stats`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { method: 'standard-array', scores: { str: 15, dex: 10, con: 14, int: 12, wis: 13, cha: 8 } },
+    });
+    await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${charId}/class`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        class: { slug: 'fighter', source: 'PHB' },
+        level: 3,
+        skillChoices: ['athletics', 'perception'],
+        subclass: { slug: 'fighter--champion', source: 'PHB' },
+      },
+    });
+    await setStatus(charId, 'active');
+    await grantXp(app, charId, 2700); // enough XP for L4
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${charId}/level-up`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: {
+        kind: 'same-class',
+        class: { slug: 'fighter', source: 'PHB' },
+        hp: { method: 'average' },
+        asiFeat: { kind: 'feat', slug: 'war-caster', source: 'PHB' },
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('VALIDATION_FAILED');
+    expect(res.json().issues[0].code).toBe('FEATS_DISABLED');
+  });
+
   // ---- Level cap ----------------------------------------------------------
 
   it('CAP-1: total level 14 → 400 LEVELUP_TOTAL_LEVEL_CAP_EXCEEDED', async () => {

@@ -1715,6 +1715,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
+    // ---- variantRules.feats gate (play-time) ----------------------------------
+    // Mirror of wizard-time pattern at line 3427. Gate fires before feat lookup
+    // so FEATS_DISABLED is returned even when the slug is invalid.
+    // REQ-CLU-FEAT-VALID: feats variant rule must be enabled to pick a feat.
+    if (body.kind === 'same-class' && body.asiFeat?.kind === 'feat') {
+      if (!campaign.rulesProfile.variantRules.feats) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'FEATS_DISABLED' }],
+        });
+      }
+    }
+
     // ---- Load feat data if asiFeat.kind='feat' (REQ-CLU-FEAT-VALID) ----------
     // Trust boundary: the route resolves feat existence before passing to domain.
     let resolvedFeatData: import('@dungeon-hub/domain/character/feat').FeatCompendiumData | null = null;
