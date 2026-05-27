@@ -134,6 +134,20 @@
   box-shadow: 0 0 8px var(--color-accent);
 }
 
+/* ── Personajes screen — scoped extensions ── */
+.personajes-char-card-active {
+  border-color: var(--color-accent);
+  background:
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(212, 162, 76, 0.10), transparent 55%),
+    var(--color-surface);
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.30);
+}
+.personajes-chip-on {
+  background-color: var(--color-accent);
+  color: #1A1208;
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.40);
+}
+
 /* ── Palette: Obsidiana (default) ── */
 :root[data-palette="obsidian"],
 :root:not([data-palette]) {
