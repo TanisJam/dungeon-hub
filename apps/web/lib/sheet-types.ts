@@ -39,6 +39,17 @@ export function isBardicInspirationExtra(x: unknown): x is BardicInspirationExtr
   return candidate === 'd6' || candidate === 'd8' || candidate === 'd10' || candidate === 'd12';
 }
 
+/** Pool-shaped resource hint (Lay on Hands, future pool-style features). */
+export interface PoolShapeExtra {
+  shape: 'pool';
+}
+
+/** Type guard for pool-shaped resource extra payload. */
+export function isPoolShapeExtra(x: unknown): x is PoolShapeExtra {
+  if (typeof x !== 'object' || x === null) return false;
+  return (x as { shape?: unknown }).shape === 'pool';
+}
+
 /**
  * A descriptive racial trait surfaced on the sheet's "Rasgos raciales" card.
  * Mirrors domain RacialTrait. Populated by GET /characters/:id/sheet via

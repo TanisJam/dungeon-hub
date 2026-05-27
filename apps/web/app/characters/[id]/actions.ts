@@ -110,6 +110,7 @@ export type ResourceActionState = { ok: false; error: string } | { ok: true };
 export async function useClassResource(
   characterId: string,
   slug: string,
+  amount?: number,
 ): Promise<ResourceActionState> {
   if (!UUID_RE.test(characterId)) {
     return { ok: false, error: 'ID de personaje inválido.' };
@@ -122,7 +123,7 @@ export async function useClassResource(
   try {
     await api.post(
       `/characters/${characterId}/resources/use`,
-      { slug },
+      amount !== undefined ? { slug, amount } : { slug },
       session.access_token,
     );
   } catch (err) {
@@ -137,10 +138,11 @@ export async function useClassResource(
   return { ok: true };
 }
 
-/** Restore 1 use of a class resource (floors at 0). Maps to POST /resources/restore. */
+/** Restore N uses of a class resource (floors at 0). Maps to POST /resources/restore. */
 export async function restoreClassResource(
   characterId: string,
   slug: string,
+  amount?: number,
 ): Promise<ResourceActionState> {
   if (!UUID_RE.test(characterId)) {
     return { ok: false, error: 'ID de personaje inválido.' };
@@ -153,7 +155,7 @@ export async function restoreClassResource(
   try {
     await api.post(
       `/characters/${characterId}/resources/restore`,
-      { slug },
+      amount !== undefined ? { slug, amount } : { slug },
       session.access_token,
     );
   } catch (err) {
