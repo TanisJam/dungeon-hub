@@ -89,6 +89,14 @@ function ClassSpellSection({
     .map((s) => ({ slug: s.slug, source: s.source }));
   const existingCantrips = spells.cantrips.map((s) => ({ slug: s.slug, source: s.source }));
 
+  // Spellbook casters (Wizard/EK/AT): prep universe = spellbook intersection.
+  // Identified by wizardSpellbookSize being set. PHB p.114.
+  // SPELL-PREP-02: derive knownUniverseSlugs from the character's current leveled spells.
+  const isSpellbookCaster = summary?.wizardSpellbookSize != null;
+  const knownUniverseSlugs: ReadonlySet<string> | undefined = isSpellbookCaster
+    ? new Set(spells.leveled.filter((s) => s.level > 0).map((s) => s.slug))
+    : undefined;
+
   return (
     <Card variant="surface" className="p-4">
       {/* Class header with prep pencil for prepared casters */}
@@ -105,6 +113,7 @@ function ClassSpellSection({
             prepLimit={summary!.spellsPrepared!.max}
             existingCantrips={existingCantrips}
             existingKnown={[]}
+            knownUniverseSlugs={knownUniverseSlugs}
           />
         )}
       </div>

@@ -95,4 +95,41 @@ describe('SpellPrepSectionEditor', () => {
     // Options fetch hasn't resolved yet — should show loading indicator
     expect(screen.getByText(/cargando/i)).toBeTruthy();
   });
+
+  /**
+   * T4: knownUniverseSlugs forwarded to SpellPrepEditor.
+   * When options load and knownUniverseSlugs is provided, only spells in the set appear.
+   * SPELL-PREP-02: SpellPrepSectionEditor must accept and forward knownUniverseSlugs.
+   */
+  it('T4: knownUniverseSlugs forwarded — only spellbook spells visible after load', async () => {
+    const knownUniverseSlugs = new Set(['magic-missile']);
+
+    render(
+      <SpellPrepSectionEditor
+        {...baseProps}
+        classSlug="wizard"
+        knownUniverseSlugs={knownUniverseSlugs}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Preparar hechizos – wizard' }));
+    });
+
+    // Resolve the fetch with 2 available spells — only 1 in the known set
+    await act(async () => {
+      resolveOptions({
+        limits: { spellsPrepared: 4 },
+        availableSpells: [
+          { slug: 'magic-missile', source: 'PHB', name: 'Magic Missile', level: 1, ritual: false, concentration: false, componentsM: false, componentsMCost: null },
+          { slug: 'fireball', source: 'PHB', name: 'Fireball', level: 3, ritual: false, concentration: false, componentsM: false, componentsMCost: null },
+        ],
+        subclassGrantedSlugs: [],
+      });
+    });
+
+    // Only magic-missile (in spellbook) should appear; fireball should not
+    expect(screen.getByText('Magic Missile')).toBeTruthy();
+    expect(screen.queryByText('Fireball')).toBeNull();
+  });
 });

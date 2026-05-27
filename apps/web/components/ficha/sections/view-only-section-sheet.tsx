@@ -60,7 +60,7 @@ export function ViewOnlySectionSheet({
   const cta = resolveCta(characterStatus, isDm);
 
   return (
-    <V3Sheet open={open} onClose={onClose} title={title} labelledBy={ariaLabel ? undefined : undefined}>
+    <V3Sheet open={open} onClose={onClose} title={title} labelledBy={ariaLabel}>
       <div aria-label={ariaLabel}>
         {/* Section read-only body */}
         <div className="font-sans text-sm text-ink mb-4">{currentDisplay}</div>

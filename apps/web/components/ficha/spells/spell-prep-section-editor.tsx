@@ -35,6 +35,8 @@ interface SpellPrepSectionEditorProps {
   prepLimit: number;
   existingCantrips: SpellRef[];
   existingKnown: SpellRef[];
+  /** Optional — Wizard/EK/AT only. Limits prep universe to spellbook. SPELL-PREP-02. */
+  knownUniverseSlugs?: ReadonlySet<string>;
   onClose?: () => void;
 }
 
@@ -56,6 +58,7 @@ export function SpellPrepSectionEditor({
   prepLimit,
   existingCantrips,
   existingKnown,
+  knownUniverseSlugs,
   onClose,
 }: SpellPrepSectionEditorProps) {
   const [open, setOpen] = useState(false);
@@ -126,6 +129,7 @@ export function SpellPrepSectionEditor({
             classSource="PHB"
             availableSpells={fetchState.data.availableSpells}
             subclassGrantedSlugs={fetchState.data.subclassGrantedSlugs}
+            knownUniverseSlugs={knownUniverseSlugs}
             initialPrepared={initialPrepared}
             prepLimit={prepLimit}
             existingCantrips={existingCantrips}

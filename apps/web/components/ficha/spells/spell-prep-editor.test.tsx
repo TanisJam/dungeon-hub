@@ -159,4 +159,58 @@ describe('SpellPrepEditor', () => {
     const counterText = screen.getByText(/preparados/);
     expect(counterText).toBeTruthy();
   });
+
+  /**
+   * T8: Wizard universe — knownUniverseSlugs filters availableSpells to intersection only.
+   * PHB p.114: "The spells you add to your spellbook as you gain levels...
+   * are spells you can prepare from."
+   * SPELL-PREP-02: Wizard prep universe = spellbook intersection.
+   */
+  it('T8: knownUniverseSlugs provided — only spells in the set appear in the list', () => {
+    // availableSpells has 3 leveled spells; only 2 are in the Wizard spellbook
+    const wizardAvailable = [
+      makeSpell('magic-missile', 1, 'Magic Missile'),
+      makeSpell('shield', 1, 'Shield'),
+      makeSpell('fireball', 3, 'Fireball'), // NOT in spellbook
+    ];
+    const knownUniverseSlugs = new Set(['magic-missile', 'shield']);
+
+    render(
+      <SpellPrepEditor
+        {...baseProps}
+        availableSpells={wizardAvailable}
+        knownUniverseSlugs={knownUniverseSlugs}
+        initialPrepared={[]}
+        prepLimit={4}
+      />,
+    );
+
+    // Only spellbook spells should appear
+    expect(screen.getByText('Magic Missile')).toBeTruthy();
+    expect(screen.getByText('Shield')).toBeTruthy();
+    // Fireball is not in spellbook — must NOT appear
+    expect(screen.queryByText('Fireball')).toBeNull();
+  });
+
+  /**
+   * T9: Back-compat — when knownUniverseSlugs is undefined (non-spellbook caster),
+   * all leveled spells appear (Cleric/Druid/Paladin path).
+   * SPELL-PREP-02: no knownUniverseSlugs → full class list.
+   */
+  it('T9: knownUniverseSlugs undefined — all leveled spells rendered (back-compat)', () => {
+    render(
+      <SpellPrepEditor
+        {...baseProps}
+        // knownUniverseSlugs intentionally omitted
+        initialPrepared={[]}
+        prepLimit={6}
+      />,
+    );
+    // All 3 leveled spells should appear (cantrip filtered, 3 leveled pass through)
+    expect(screen.getByText('Bendición')).toBeTruthy();
+    expect(screen.getByText('Curar heridas')).toBeTruthy();
+    expect(screen.getByText('Arma espiritual')).toBeTruthy();
+    // cantrip must NOT appear
+    expect(screen.queryByText('Llama sagrada')).toBeNull();
+  });
 });
