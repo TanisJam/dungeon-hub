@@ -4,6 +4,7 @@ import { RacialSpellsBlock } from './_racial-spells-block';
 import { SpellBadges } from '@/app/_components/spells/badges';
 import { SlotGrid, PactSlotGrid } from './_slot-grid';
 import { SpellPrepSectionEditor } from '@/components/ficha/spells/spell-prep-section-editor';
+import { SpellKnownSectionEditor } from '@/components/ficha/spells/spell-known-section-editor';
 
 const ABILITY_ES: Record<string, string> = {
   str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
@@ -69,10 +70,12 @@ function ClassSpellSection({
   sc,
   summary,
   charId,
+  isDmHere,
 }: {
   sc: SpellcastingView;
   summary: ClassSpellSummary | undefined;
   charId: string;
+  isDmHere?: boolean;
 }) {
   // Defensive fallback: if summary or spells field is absent (legacy rollback).
   const spells = summary?.spells ?? { cantrips: [], leveled: [] };
@@ -97,25 +100,39 @@ function ClassSpellSection({
     ? new Set(spells.leveled.filter((s) => s.level > 0).map((s) => s.slug))
     : undefined;
 
+  // DM known-editor affordance: derive currentKnown from leveled spells.
+  const currentKnown = spells.leveled
+    .filter((s) => s.level > 0)
+    .map((s) => ({ slug: s.slug, source: s.source }));
+
   return (
     <Card variant="surface" className="p-4">
-      {/* Class header with prep pencil for prepared casters */}
+      {/* Class header with prep pencil (prepared casters) and wand (DM known) */}
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
           {sc.classSlug}{' '}
           <span className="normal-case text-ink-mute/60">· {sc.classSource}</span>
         </p>
-        {isPreparedCaster && charId && (
-          <SpellPrepSectionEditor
-            characterId={charId}
-            classSlug={sc.classSlug}
-            initialPrepared={existingPrepared}
-            prepLimit={summary!.spellsPrepared!.max}
-            existingCantrips={existingCantrips}
-            existingKnown={[]}
-            knownUniverseSlugs={knownUniverseSlugs}
-          />
-        )}
+        <div className="flex items-center gap-1">
+          {isPreparedCaster && charId && (
+            <SpellPrepSectionEditor
+              characterId={charId}
+              classSlug={sc.classSlug}
+              initialPrepared={existingPrepared}
+              prepLimit={summary!.spellsPrepared!.max}
+              existingCantrips={existingCantrips}
+              existingKnown={[]}
+              knownUniverseSlugs={knownUniverseSlugs}
+            />
+          )}
+          {isDmHere && charId && (
+            <SpellKnownSectionEditor
+              characterId={charId}
+              classSlug={sc.classSlug}
+              currentKnown={currentKnown}
+            />
+          )}
+        </div>
       </div>
 
       {/* Spellcasting stats */}
@@ -162,9 +179,10 @@ function ClassSpellSection({
 interface HechizosTabProps {
   sheet: CharacterSheet;
   charId: string;
+  isDmHere?: boolean;
 }
 
-export function HechizosTab({ sheet, charId }: HechizosTabProps) {
+export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
   const hasClassSpells = sheet.spellcasting && sheet.spellcasting.length > 0;
   const hasRacialSpells = sheet.racialSpells && sheet.racialSpells.length > 0;
 
@@ -199,6 +217,7 @@ export function HechizosTab({ sheet, charId }: HechizosTabProps) {
             sc={sc}
             summary={summaryByClass.get(sc.classSlug)}
             charId={charId}
+            isDmHere={isDmHere}
           />
         ))}
 

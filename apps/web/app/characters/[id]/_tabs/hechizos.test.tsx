@@ -22,6 +22,13 @@ vi.mock('../actions', () => ({
   deleteCharacter: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+// C7: mock SpellKnownSectionEditor to isolate DM-gating logic.
+vi.mock('@/components/ficha/spells/spell-known-section-editor', () => ({
+  SpellKnownSectionEditor: ({ classSlug }: { classSlug: string }) => (
+    <div data-testid={`spell-known-section-editor-${classSlug}`}>SpellKnownSectionEditor</div>
+  ),
+}));
+
 // SpellPrepSectionEditor brings in api + supabase/client which require NEXT_PUBLIC env vars.
 // Mock the env module to avoid the env var requirement in this test.
 vi.mock('@/lib/env', () => ({
@@ -437,5 +444,32 @@ describe('REQ-SP05-UX-CONSUME: HechizosTab renders SlotGrid when slots > 0', () 
     render(<HechizosTab sheet={sheet} charId="test-char-id" />);
     // 1 used, 1 available out of 2 at level 1 → "1/2"
     expect(screen.getByText('1/2')).toBeTruthy();
+  });
+});
+
+// ── C7: DM-gated SpellKnownSectionEditor wiring ──────────────────────────────
+// SPEC: SpellKnownSectionEditor mounts per class when isDmHere=true; absent when false.
+
+describe('C7: SpellKnownSectionEditor DM-gating via isDmHere', () => {
+  it('T1: isDmHere=true → SpellKnownSectionEditor present for each caster class', () => {
+    const sheet = makeSheet([
+      makeClericSummary({
+        spells: { cantrips: [], leveled: [makeSpellRef('bless', 1)] },
+      }),
+    ]);
+
+    render(<HechizosTab sheet={sheet} charId="test-char-id" isDmHere={true} />);
+    expect(screen.getByTestId('spell-known-section-editor-cleric')).toBeTruthy();
+  });
+
+  it('T2: isDmHere=false → SpellKnownSectionEditor absent', () => {
+    const sheet = makeSheet([
+      makeClericSummary({
+        spells: { cantrips: [], leveled: [makeSpellRef('bless', 1)] },
+      }),
+    ]);
+
+    render(<HechizosTab sheet={sheet} charId="test-char-id" isDmHere={false} />);
+    expect(screen.queryByTestId('spell-known-section-editor-cleric')).toBeNull();
   });
 });

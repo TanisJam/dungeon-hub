@@ -219,7 +219,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
             />
           )}
           {tab === 'habilidades' && <HabilidadesTab sheet={sheet} />}
-          {tab === 'hechizos' && <HechizosTab sheet={sheet} charId={id} />}
+          {tab === 'hechizos' && <HechizosTab sheet={sheet} charId={id} isDmHere={isDmHere} />}
           {tab === 'recursos' && (
             <RecursosTab characterId={id} classResources={sheet.classResources ?? {}} />
           )}
