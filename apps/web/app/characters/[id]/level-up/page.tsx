@@ -4,15 +4,15 @@ import { api, ApiError } from '@/lib/api';
 import type { SheetResponse } from '@/lib/sheet-types';
 import { AppShell } from '@/components/layout/app-shell';
 import { LevelUpFlow } from './_flow';
-import { computeSubclassUnlockLevel } from '@dungeon-hub/domain/character/class';
+import type { AbilityKey } from '@dungeon-hub/domain/character/stats';
 import {
   spellsKnownFor,
   cantripsKnownFor,
   wizardSpellbookSize,
   SPELLCASTING_ABILITY,
-  computeSpellLimits,
-  type SpellLimitsView,
+  maxSpellLevelFor,
 } from '@dungeon-hub/domain/character/spellcasting';
+import type { SpellLimitsView } from '@/app/characters/[id]/wizard/spells/_picker';
 import type { FlowCtx } from './_step-graph';
 import type { SubclassRow } from '@/app/characters/[id]/wizard/class/_picker';
 
@@ -116,9 +116,18 @@ export default async function LevelUpPage({ params }: Props) {
 
   // Build spell delta per owned class (server-side, no extra API call — uses domain tables).
   const spellDeltaByClass: FlowCtx['spellDeltaByClass'] = {};
+  // Empty-array stubs for structurally required AppliedClass fields that these
+  // domain helpers (cantripsKnownFor, spellsKnownFor) never actually read.
+  const _emptyAbilityKeys: AbilityKey[] = [];
   for (const cls of sheet.identity.classes) {
-    const fromC = { slug: cls.slug, source: 'PHB', level: cls.level, subclass: cls.subclass };
-    const toC = { slug: cls.slug, source: 'PHB', level: cls.level + 1, subclass: cls.subclass };
+    const fromC = {
+      slug: cls.slug, source: 'PHB', level: cls.level, subclass: cls.subclass,
+      hitDie: HIT_DIE[cls.slug] ?? 'd8',
+      savingThrows: _emptyAbilityKeys,
+      armorProficiencies: [] as string[], weaponProficiencies: [] as string[],
+      toolProficiencies: [] as string[], skillChoices: [] as string[],
+    };
+    const toC = { ...fromC, level: cls.level + 1 };
 
     let cantripsDelta = 0;
     let spellsDelta = 0;
@@ -174,33 +183,55 @@ export default async function LevelUpPage({ params }: Props) {
   };
 
   // Compute spell limits at NEXT level per caster class (for the spells step).
-  // Uses sheet.abilityScores which has modifiers pre-computed by the API.
+  // Uses sheet.abilityScores (modifiers pre-computed by API) and domain tables.
+  // Inlined to avoid AppliedClass type complexity — only slug+level are needed.
   const spellLimitsByClass: Record<string, SpellLimitsView> = {};
   for (const cls of sheet.identity.classes) {
-    const ability = SPELLCASTING_ABILITY[cls.slug];
-    if (!ability) continue; // non-caster
+    const rawAbility = SPELLCASTING_ABILITY[cls.slug];
+    if (!rawAbility) continue; // non-caster
+
+    // Narrow to the web SpellLimitsView.ability type ('int'|'wis'|'cha'|null).
+    const spellAbility = (['int', 'wis', 'cha'] as const).includes(rawAbility as 'int' | 'wis' | 'cha')
+      ? (rawAbility as 'int' | 'wis' | 'cha')
+      : null;
 
     const toLevel = cls.level + 1;
-    // Build minimal AppliedClass-compatible object (computeSpellLimits only uses slug + level)
-    const mockAppliedClass = {
+    // Build a minimal AppliedClass-compatible object. Only slug+level are read by
+    // domain helpers; the other fields are structurally required by the type.
+    const c = {
       slug: cls.slug,
       source: 'PHB',
       level: toLevel,
       subclass: cls.subclass,
       hitDie: HIT_DIE[cls.slug] ?? 'd8',
-      savingThrows: [] as string[],
+      savingThrows: _emptyAbilityKeys,
       armorProficiencies: [] as string[],
       weaponProficiencies: [] as string[],
       toolProficiencies: [] as string[],
       skillChoices: [] as string[],
     };
 
-    // abilityScores[ability].modifier from the sheet
-    const abilityMod = sheet.abilityScores[ability]?.modifier ?? 0;
-    spellLimitsByClass[cls.slug] = computeSpellLimits(
-      mockAppliedClass as Parameters<typeof computeSpellLimits>[0],
-      abilityMod,
-    );
+    // abilityScores[ability].modifier from the sheet.
+    const abilityMod = sheet.abilityScores[rawAbility]?.modifier ?? 0;
+
+    // preparedLimitFor = abilityMod + level (Cleric/Druid/Paladin/Artificer — others null).
+    // Domain: spellsKnownFor returns null for prep casters, so spellsPrepared needs manual check.
+    const spellsKnown = spellsKnownFor(c);
+    const spellsPrepared = spellsKnown === null
+      ? ((['cleric', 'druid', 'paladin'] as const).includes(cls.slug as 'cleric' | 'druid' | 'paladin')
+          ? abilityMod + toLevel
+          : null)
+      : null;
+
+    const limits: SpellLimitsView = {
+      cantripsKnown: cantripsKnownFor(c) ?? 0,
+      spellsKnown: spellsKnown,
+      spellsPrepared,
+      maxSpellLevel: maxSpellLevelFor(c),
+      ability: spellAbility,
+      ...(cls.slug === 'wizard' ? { wizardSpellbookSize: wizardSpellbookSize(toLevel) } : {}),
+    };
+    spellLimitsByClass[cls.slug] = limits;
   }
 
   // Build existing spell picks per class for pre-seeding the spells step.

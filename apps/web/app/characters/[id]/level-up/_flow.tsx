@@ -814,6 +814,20 @@ function SuccessScreen({
         )}
       </dl>
 
+      {/* Features unlocked section (REQ-CLU-FTR-SUCCESS-SCREEN) */}
+      {(summary.featuresUnlocked?.length ?? 0) > 0 && (
+        <section className="w-full max-w-xs rounded-xl border border-line bg-paper-soft p-4 text-left">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute">
+            Características nuevas
+          </p>
+          <ul className="space-y-1.5 text-sm text-ink">
+            {summary.featuresUnlocked!.map((f) => (
+              <li key={f.name}>• {f.name}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <button
         type="button"
         onClick={onDone}

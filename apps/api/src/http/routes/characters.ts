@@ -1851,7 +1851,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       payload: sessionPayload,
     });
 
-    return { character: updated, summary };
+    // Map featuresUnlocked from domain to API response shape.
+    // REQ-CLU-FTR-API-RESPONSE-SHAPE.
+    const featuresUnlocked = mutations.featuresUnlocked.map((f) => ({
+      name: f.featureName,
+      classSlug: f.classSlug,
+      level: f.level,
+    }));
+
+    return { character: updated, summary, featuresUnlocked };
   });
 
   // ---- POST /characters/:id/feats -----------------------------------------

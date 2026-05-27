@@ -19,6 +19,8 @@ export interface LevelUpSummary {
   hpDelta: number;
   rollUsed: number | null;
   asiFeatApplied?: 'asi' | 'feat';
+  /** Features unlocked at this level. Empty array when none or API pre-C6. REQ-CLU-FTR-API-RESPONSE-SHAPE. */
+  featuresUnlocked?: Array<{ name: string; classSlug: string; level: number }>;
 }
 
 export interface AppliedClassSpellsForAction {
@@ -88,12 +90,16 @@ export async function submitLevelUp(
   // ---- Phase 1: POST /level-up -----------------------------------------------
   let summary: LevelUpSummary;
   try {
-    const res = await api.post<{ character: unknown; summary: LevelUpSummary }>(
+    const res = await api.post<{
+      character: unknown;
+      summary: Omit<LevelUpSummary, 'featuresUnlocked'>;
+      featuresUnlocked?: Array<{ name: string; classSlug: string; level: number }>;
+    }>(
       `/characters/${characterId}/level-up`,
       body,
       session.access_token,
     );
-    summary = res.summary;
+    summary = { ...res.summary, featuresUnlocked: res.featuresUnlocked ?? [] };
   } catch (err) {
     if (err instanceof ApiError) {
       const apiBody = err.body as {
