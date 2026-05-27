@@ -6,7 +6,7 @@ import { SignInButton } from './_components/sign-in-button';
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) redirect('/dashboard');
+  if (user) redirect('/inicio');
 
   return (
     <main className="mx-auto max-w-sm px-4 py-16 flex flex-col items-center text-center">
@@ -22,7 +22,7 @@ export default async function HomePage() {
       </p>
 
       <div className="mt-10 w-full">
-        <SignInButton redirectTo="/dashboard" />
+        <SignInButton redirectTo="/inicio" />
       </div>
     </main>
   );
