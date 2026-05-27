@@ -8,7 +8,7 @@ import type { CharacterStatus } from '@/lib/sheet-types';
 interface ClassEntry {
   slug: string;
   level: number;
-  subclass?: { slug: string };
+  subclass?: { slug: string; source?: string } | null;
 }
 
 interface ClassSectionProps {
