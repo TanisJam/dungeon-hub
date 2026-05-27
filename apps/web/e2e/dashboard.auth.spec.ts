@@ -17,8 +17,8 @@ test.describe('dashboard (authenticated)', () => {
     ).toBeVisible();
   });
 
-  test('home redirects to dashboard when authenticated', async ({ page }) => {
+  test('home redirects to /inicio when authenticated', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/inicio$/);
   });
 });

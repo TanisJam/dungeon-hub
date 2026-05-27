@@ -110,10 +110,10 @@ setup('ensure test user + sign in + save state', async ({ page }) => {
   });
   expect(loginRes.status(), `dev/login failed: ${await loginRes.text()}`).toBe(200);
 
-  // 5. Verificar auth visitando dashboard — el role pill "Jugador" + section
-  //    heading "Tus Personajes" son señales fiables de que el dashboard rendereó.
-  await page.goto('/dashboard');
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 5000 });
+  // 5. Verificar auth visitando /inicio — el role pill "Jugador" es señal
+  //    fiable de que la shell v3 rendereó correctamente.
+  await page.goto('/inicio');
+  await expect(page).toHaveURL(/\/inicio$/, { timeout: 5000 });
   await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 5000 });
 
   // 6. Guardar storage state
