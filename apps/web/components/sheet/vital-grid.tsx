@@ -29,15 +29,8 @@ export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: Vital
 
   return (
     <div className="grid grid-cols-3 gap-2">
-      {/* HP — peach gradient */}
-      <div
-        className="flex flex-col items-center rounded-md px-3 py-4 text-center"
-        style={{
-          background:
-            'linear-gradient(135deg, rgba(251,229,216,0.9) 0%, rgba(232,148,111,0.3) 100%)',
-          border: '1px solid rgba(232,148,111,0.3)',
-        }}
-      >
+      {/* HP — peach gradient (ficha-vital-hp replaces inline style) */}
+      <div className="ficha-vital-hp flex flex-col items-center rounded-md px-3 py-4 text-center">
         <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
           Puntos de Golpe
         </span>
@@ -54,8 +47,8 @@ export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: Vital
         )}
       </div>
 
-      {/* AC */}
-      <div className="flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
+      {/* AC — ficha-vital-ac adds cyan glow ring */}
+      <div className="ficha-vital-ac flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
         <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
           Clase Armadura
         </span>
@@ -69,8 +62,8 @@ export function VitalGrid({ hp, ac, initiative, armorFormula, walkSpeed }: Vital
         )}
       </div>
 
-      {/* Initiative */}
-      <div className="flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
+      {/* Initiative — ficha-vital-init adds copper glow ring */}
+      <div className="ficha-vital-init flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
         <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
           Iniciativa
         </span>

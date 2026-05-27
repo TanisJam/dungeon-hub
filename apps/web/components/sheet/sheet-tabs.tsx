@@ -28,7 +28,7 @@ export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
               className={[
                 'rounded-pill px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap',
                 isActive
-                  ? 'bg-ink text-surface'
+                  ? 'ficha-tab-active'
                   : 'bg-surface border border-line text-ink-mute hover:text-ink hover:bg-paper-soft',
               ].join(' ')}
               aria-current={isActive ? 'page' : undefined}
