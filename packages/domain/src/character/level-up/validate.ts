@@ -11,6 +11,7 @@ import { validateAsiDelta } from './asi-delta-validator.js';
 import { computeSubclassUnlockLevel } from '../class/validate.js';
 import { validateMulticlassAddition } from '../multiclass/validate.js';
 import { computeEffectiveScores } from '../multiclass/effective-scores.js';
+import { collectClassFeaturesAtLevel } from '../class/features.js';
 
 // ---- Types -----------------------------------------------------------------
 
@@ -292,11 +293,13 @@ function validateSameClassBranch(
     return c;
   });
 
+  const featuresUnlocked = collectClassFeaturesAtLevel(classData, toClassLevel);
+
   const mutations: LevelUpMutations = {
     classesNext,
     hpDelta: hpResult.delta,
     rollUsed: hpResult.rollUsed,
-    featuresUnlocked: [],
+    featuresUnlocked,
   };
 
   if (asiPushed !== undefined) mutations.asiPushed = asiPushed;
@@ -378,11 +381,14 @@ function validateNewClassBranch(
   // ---- Build mutations -----------------------------------------------------
   const classesNext: AppliedClass[] = [...existingClasses, mcResult.appliedClass];
 
+  // New-class always starts at level 1 — collect L1 features from the new class's data.
+  const featuresUnlockedNewClass = collectClassFeaturesAtLevel(classData, 1);
+
   const mutations: LevelUpMutations = {
     classesNext,
     hpDelta: hpResult.delta,
     rollUsed: hpResult.rollUsed,
-    featuresUnlocked: [],
+    featuresUnlocked: featuresUnlockedNewClass,
   };
 
   if (hpResult.rollUsed !== null) {

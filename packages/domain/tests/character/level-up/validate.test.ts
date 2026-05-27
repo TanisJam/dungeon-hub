@@ -458,3 +458,119 @@ describe('validateLevelUp — feat at ASI level (REQ-CLU-FEAT-VALID)', () => {
     }
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// featuresUnlocked population (REQ-CLU-FTR-POPULATE-MUTATIONS)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Fighter with Action Surge at L2 (PHB p.72: Fighter L2 feature = Action Surge). */
+const FIGHTER_DATA_WITH_L2: ClassCompendiumData = {
+  slug: 'fighter',
+  source: 'PHB',
+  hd: { number: 1, faces: 10 },
+  proficiency: ['str', 'con'],
+  startingProficiencies: { armor: ['all'], weapons: ['simple', 'martial'], skills: [] },
+  subclassTitle: 'Martial Archetype',
+  classFeatures: [
+    'Fighting Style|Fighter||1',
+    'Second Wind|Fighter||1',
+    // PHB p.72: Fighter L2 = Action Surge
+    'Action Surge|Fighter||2',
+    'Martial Archetype|Fighter||3',
+    'Ability Score Improvement|Fighter||4',
+  ],
+};
+
+/** Cleric with Spellcasting + Divine Domain at L1 (PHB p.58). */
+const CLERIC_DATA: ClassCompendiumData = {
+  slug: 'cleric',
+  source: 'PHB',
+  hd: { number: 1, faces: 8 },
+  proficiency: ['wis', 'cha'],
+  startingProficiencies: { armor: ['light', 'medium', 'shields'], weapons: ['simple'], skills: [] },
+  subclassTitle: 'Divine Domain',
+  classFeatures: [
+    // PHB p.58: Cleric L1 grants both Spellcasting AND Divine Domain
+    'Spellcasting|Cleric||1',
+    'Divine Domain|Cleric||1',
+    'Channel Divinity|Cleric||2',
+  ],
+};
+
+/** Character with high WIS to meet Cleric multiclass prereq (WIS 13). */
+const FIGHTER_L1_ADDING_CLERIC: CharacterSnapshot & { xp: number; status: string } = {
+  ...FIGHTER_L1_ACTIVE,
+  baseStats: { str: 16, dex: 12, con: 14, int: 10, wis: 14, cha: 8 }, // WIS 14 >= 13 prereq
+  xp: XP_300,
+  status: 'active' as const,
+};
+
+describe('validateLevelUp — featuresUnlocked (REQ-CLU-FTR-POPULATE-MUTATIONS)', () => {
+  it('FTR-1: Fighter L1→L2 → featuresUnlocked contains Action Surge', () => {
+    // PHB p.72: Fighter L2 feature = Action Surge.
+    const result = validateLevelUp({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      character: { ...FIGHTER_L1_ACTIVE, xp: XP_300, status: 'active' },
+      body: { kind: 'same-class', class: { slug: 'fighter', source: 'PHB' }, hp: { method: 'average' } },
+      classData: FIGHTER_DATA_WITH_L2,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const fu = result.mutations.featuresUnlocked;
+      expect(fu.length).toBeGreaterThan(0);
+      const actionSurge = fu.find((f) => f.featureName === 'Action Surge');
+      expect(actionSurge).toBeDefined();
+      expect(actionSurge?.featureSlug).toBe('action-surge');
+      expect(actionSurge?.classSlug).toBe('fighter');
+      expect(actionSurge?.level).toBe(2);
+    }
+  });
+
+  it('FTR-2: Cleric L0→L1 (new-class) → featuresUnlocked contains Spellcasting and Divine Domain', () => {
+    // PHB p.58: Cleric L1 grants Spellcasting and Divine Domain.
+    // This exercises the new-class branch of validateLevelUp.
+    // Cleric unlock level = 1 (PHB p.58), so multiclass requires subclassData.
+    const clericSubclass = {
+      slug: 'cleric--life',
+      source: 'PHB',
+      classSlug: 'cleric',
+      classSource: 'PHB',
+      name: 'Life Domain',
+    };
+    const result = validateLevelUp({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      character: FIGHTER_L1_ADDING_CLERIC,
+      body: {
+        kind: 'new-class',
+        class: { slug: 'cleric', source: 'PHB' },
+        subclass: { slug: 'cleric--life', source: 'PHB' },
+        hp: { method: 'average' },
+        skillChoices: [],
+      },
+      classData: CLERIC_DATA,
+      subclassData: clericSubclass,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const fu = result.mutations.featuresUnlocked;
+      expect(fu.length).toBeGreaterThan(0);
+      const names = fu.map((f) => f.featureName);
+      expect(names).toContain('Spellcasting');
+      expect(names).toContain('Divine Domain');
+    }
+  });
+
+  it('FTR-3: level with no classFeatures in the data → featuresUnlocked is []', () => {
+    // FIGHTER_DATA (original fixture) has no L2 feature entry.
+    const result = validateLevelUp({
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      character: { ...FIGHTER_L1_ACTIVE, xp: XP_300, status: 'active' },
+      body: { kind: 'same-class', class: { slug: 'fighter', source: 'PHB' }, hp: { method: 'average' } },
+      classData: FIGHTER_DATA, // original fixture — no L2 feature
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.mutations.featuresUnlocked).toEqual([]);
+    }
+  });
+});
