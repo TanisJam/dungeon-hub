@@ -3,8 +3,9 @@
  *
  * Visibility rules (REQ-CLU-UI-ENTRY):
  *   - Only shown when character is 'active'
- *   - Only shown to the owner (callerRole !== 'gm' at this point is player|null;
- *     the actual owner check is done by the API; here we show to non-gm members)
+ *   - Only shown to the owner of the character (a DM who is ALSO the owner
+ *     of the char must see it — `callerRole` of the world is irrelevant here).
+ *     The actual ownership enforcement is on the API; this is UI surfacing only.
  *   - Only shown when character has enough XP for the next total level
  *     (xp >= XP_TABLE[totalLevel] — i.e., canReachLevel(xp, totalLevel+1) passes)
  *
@@ -20,8 +21,8 @@ interface LevelUpEntryPointProps {
   totalLevel: number;
   /** Current XP. */
   xp: number;
-  /** Caller role in this world. */
-  callerRole: 'gm' | 'player' | null;
+  /** Whether the current caller is the owner of this character. */
+  isOwner: boolean;
 }
 
 // XP required to REACH each level (same as the API/domain table, PHB p.15).
@@ -42,11 +43,10 @@ export function LevelUpEntryPoint({
   status,
   totalLevel,
   xp,
-  callerRole,
+  isOwner,
 }: LevelUpEntryPointProps) {
-  // Only active, non-GM callers (i.e. owners) who have enough XP.
   if (status !== 'active') return null;
-  if (callerRole === 'gm') return null;
+  if (!isOwner) return null;
   if (totalLevel >= 14) return null; // MVP level cap
 
   const xpNeeded = xpForLevel(totalLevel + 1);

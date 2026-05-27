@@ -173,7 +173,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           status={character.status}
           totalLevel={totalLevel}
           xp={xpCurrent}
-          callerRole={callerRole}
+          isOwner={character.userId === session.user.id}
         />
 
         {/* REQ-CRG-WIDGET: Recent grants for owner + DM (sdd/inventory-d4-d6). */}
