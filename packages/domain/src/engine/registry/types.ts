@@ -52,6 +52,13 @@ export interface ModifierInstance {
   };
   predicate?: Predicate;
   duration?: DurationSpec;
+  /**
+   * Human-readable label for provenance breakdown (e.g. "Bless (caster: Aria)").
+   * When present, applyStacking and resolveRollMode use this as Source.label
+   * instead of the raw instance ID.
+   * This keeps the ID unique in the registry while the label stays readable.
+   */
+  label?: string;
 }
 
 /** Branded string ID for a live modifier instance. */

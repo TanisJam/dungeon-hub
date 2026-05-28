@@ -42,12 +42,8 @@ export function createInMemoryRegistry(): ModifierRegistry {
 
     removeByConcentrationToken(token: string): void {
       for (const [id, instance] of store) {
-        const dur = instance.duration;
-        // Token match: duration carries a `concentrationToken` field.
-        // We check via the duration's endsOn and a loosely typed token comparison.
-        // This is safe: the data is plain JSON and the token is a string.
-        const durAny = (dur as unknown) as Record<string, unknown> | undefined;
-        if (durAny?.['concentrationToken'] === token) {
+        // concentrationToken is now a formal field on DurationSpec (Phase 7 fix).
+        if (instance.duration?.concentrationToken === token) {
           store.delete(id);
         }
       }

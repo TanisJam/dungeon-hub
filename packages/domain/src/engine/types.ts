@@ -104,6 +104,15 @@ export interface DurationSpec {
   unit: 'round' | 'minute' | 'hour';
   amount: number;
   endsOn?: EndCondition[];
+  /**
+   * Concentration token — links all modifier instances emitted by the same
+   * concentration spell cast. When concentration ends, all instances sharing
+   * this token are removed via registry.removeByConcentrationToken(token).
+   *
+   * This formalizes what Phase 3 left as a loose cast in query.ts.
+   * Required for Bless (and any future concentration spell).
+   */
+  concentrationToken?: string;
 }
 
 // ── Reaction effects ──────────────────────────────────────────────────────────

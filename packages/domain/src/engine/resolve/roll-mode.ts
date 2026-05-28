@@ -47,8 +47,9 @@ export function resolveRollMode(
   }
 
   // ── Build provenance sources for ALL instances (required for traceability) ─
+  // Use inst.label when present (human-readable), else fall back to id.
   const breakdown: Source[] = advMods.map((inst) => ({
-    label: inst.id,
+    label: inst.label ?? inst.id,
     // Use a symbolic amount to indicate advantage/disadvantage direction
     amount: inst.def.mode === 'grant' ? 1 : -1,
     type: 'AdvantageMod',

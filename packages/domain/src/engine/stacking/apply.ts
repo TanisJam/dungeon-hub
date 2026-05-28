@@ -80,8 +80,9 @@ export function applyStacking(
           totalBonus += amount;
         }
         // DiceExpr: include in breakdown but don't add to numeric total.
+        // Use inst.label when available (human-readable), else fall back to id.
         selectedSources.push({
-          label: mod.id,
+          label: mod.label ?? mod.id,
           amount,
           type: category,
           modifierId: mod.id,
@@ -102,7 +103,7 @@ export function applyStacking(
           totalBonus += amount;
         }
         selectedSources.push({
-          label: best.id,
+          label: best.label ?? best.id,
           amount,
           type: category,
           modifierId: best.id,
