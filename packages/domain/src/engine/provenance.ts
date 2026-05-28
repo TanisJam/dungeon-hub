@@ -17,14 +17,21 @@ import type { EntityRef } from './context.js';
 // ── Source ────────────────────────────────────────────────────────────────────
 
 /**
+ * The `type` discriminant on a `Source`: either a stacking category
+ * (untyped | item | status | circumstance) or a special provenance tag for
+ * non-numeric contributions the consuming UI distinguishes (substitution,
+ * advantage, retention, higher-of policy). A closed union — not `string` —
+ * so typos are caught at compile time.
+ */
+export type ProvenanceTag = StackCategory | 'ReplaceMod' | 'AdvantageMod' | 'retain' | 'higher-of';
+
+/**
  * A single contributing source in a stat breakdown.
  *
  * - `label`: human-readable name suitable for mobile drill-down
  *   (e.g. "Bless (caster: Aria)", "Wild Shape (beast form)", "base").
  * - `amount`: the numeric or dice contribution from this source.
- * - `type`: the stacking category (untyped | item | status | circumstance).
- *   Also used as a discriminant tag for special entries (e.g. 'ReplaceMod',
- *   'AdvantageMod') when the consuming UI needs to distinguish them.
+ * - `type`: the stacking category or special provenance tag (see `ProvenanceTag`).
  * - `modifierId`: links back to the live modifier instance (optional; absent
  *   for synthetic sources like 'base').
  * - `origin`: WHO contributed this bonus — supports cross-entity provenance
@@ -34,8 +41,8 @@ import type { EntityRef } from './context.js';
 export interface Source {
   label: string;
   amount: number | DiceExpr;
-  /** Stacking category or special tag ('ReplaceMod', 'AdvantageMod'). */
-  type: StackCategory | string;
+  /** Stacking category or special provenance tag. */
+  type: ProvenanceTag;
   modifierId?: ModifierInstanceId;
   origin: EntityRef;
   children?: Source[];
