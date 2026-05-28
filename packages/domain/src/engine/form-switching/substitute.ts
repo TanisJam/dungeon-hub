@@ -107,7 +107,7 @@ export function applyFormSwitch(input: FormSwitchInput): FormSwitchResult {
         {
           label: `${stat} retained from self`,
           amount: selfValue,
-          type: 'retain' as Source['type'],
+          type: 'retain',
           origin: { id: 'self' as import('../types.js').EntityId, conditions: [] },
         },
       ],
@@ -129,7 +129,7 @@ export function applyFormSwitch(input: FormSwitchInput): FormSwitchResult {
         {
           label: `beast ${stat}`,
           amount: beastValue,
-          type: 'ReplaceMod' as Source['type'],
+          type: 'ReplaceMod',
           origin: { id: 'beast' as import('../types.js').EntityId, conditions: [] },
         },
       ],
@@ -143,7 +143,7 @@ export function applyFormSwitch(input: FormSwitchInput): FormSwitchResult {
       {
         label: 'Wild Shape (beast form)',
         amount: beastValue,
-        type: 'ReplaceMod' as Source['type'],
+        type: 'ReplaceMod',
         origin: { id: 'beast' as import('../types.js').EntityId, conditions: [] },
       },
     ],
