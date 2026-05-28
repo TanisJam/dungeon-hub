@@ -38,7 +38,7 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
   test('GM sees Aprobar + Rechazar buttons on pending character at 375px', async ({ page }) => {
     // ---- Step 1: Navigate to a GM world ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     const masterLink = page.locator('a[href^="/worlds/"]').first();
     const hasMasterLink = await masterLink.isVisible({ timeout: 3_000 }).catch(() => false);
@@ -129,7 +129,7 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
   test('Active character sheet: core sections + RecentGrants render at 375px', async ({ page }) => {
     // ---- Step 1: Navigate to dashboard ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a published (active) character sheet ----
     // Collect all char hrefs

@@ -6,15 +6,18 @@
  * Domain stays pure: returns a NEW map; the caller persists.
  *
  * Origin: SDD `rules-audit-class-features` (engram #815).
+ * Foundation extended in SDD `class-resource-bardic-inspiration` (#931):
+ * resolves recovery trigger per-class-level via `def.recoveryTriggerFor(ctx)`.
  */
 import type { AppliedClass } from '../class/types.js';
+import type { AbilityKey } from '../stats/types.js';
 import { CLASS_RESOURCES } from './registry.js';
-import type { RecoveryTrigger } from './types.js';
 
 /**
  * Resets the `used` counter to 0 for every class-resource whose recovery
- * trigger matches the given rest event AND whose owning class the character
- * has at non-zero level.
+ * trigger (at the character's current class level + ability mods) matches
+ * the given rest event AND whose owning class the character has at non-zero
+ * level.
  *
  * Rest semantics (PHB p.186):
  *   - 'short' rest: clears resources with trigger ∈ { 'short', 'both' }.
@@ -29,20 +32,22 @@ export function resetClassResourcesForRest(
   used: Readonly<Record<string, number>>,
   classes: readonly AppliedClass[],
   rest: 'short' | 'long',
+  abilityMods: Readonly<Record<AbilityKey, number>>,
 ): Record<string, number> {
-  const ownedClassSlugs = new Set(classes.map((c) => c.slug));
+  const ownedByClass = new Map(
+    classes.map((c) => [c.slug, { level: c.level, subclassSlug: c.subclass?.slug ?? null }]),
+  );
   const next: Record<string, number> = { ...used };
 
   for (const def of CLASS_RESOURCES) {
-    if (!ownedClassSlugs.has(def.classSlug)) continue;
-    if (rest === 'long' || matchesShort(def.recoveryTrigger)) {
+    const entry = ownedByClass.get(def.classSlug);
+    if (!entry) continue;
+    if (def.subclassSlug && entry.subclassSlug !== def.subclassSlug) continue;
+    const trigger = def.recoveryTriggerFor({ classLevel: entry.level, abilityMods });
+    if (rest === 'long' || trigger === 'short' || trigger === 'both') {
       next[def.slug] = 0;
     }
   }
 
   return next;
-}
-
-function matchesShort(trigger: RecoveryTrigger): boolean {
-  return trigger === 'short' || trigger === 'both';
 }

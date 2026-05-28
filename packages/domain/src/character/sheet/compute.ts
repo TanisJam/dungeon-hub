@@ -577,7 +577,13 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
       return { level, effects: exhaustionEffectsFor(level) };
     })(),
     classFeatures: character.classFeatures ?? {},
-    classResources: deriveClassResources(classes, character.classResourcesUsed ?? {}),
+    classResources: deriveClassResources(
+      classes,
+      character.classResourcesUsed ?? {},
+      Object.fromEntries(
+        ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+      ) as Record<AbilityKey, number>,
+    ),
     warnings: acWarnings,
     spellSlots: ((): SpellSlotsView => {
       const r = computeSpellSlots(classes);

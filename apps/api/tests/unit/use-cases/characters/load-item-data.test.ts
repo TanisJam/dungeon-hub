@@ -4,6 +4,11 @@ import {
   extractAc,
   extractStealth,
   extractArmorStrengthMin,
+  extractRarity,
+  extractReqAttune,
+  extractDmg1,
+  extractDmgType,
+  extractEntriesSummary,
 } from '../../../../src/use-cases/characters/load-item-data.js';
 
 /**
@@ -168,5 +173,137 @@ describe('armor extractors — combined fixtures (REQ-CIP-LEGACY-MISSING)', () =
     expect(extractAc(data)).toBeUndefined();
     expect(extractStealth(data)).toBeUndefined();
     expect(extractArmorStrengthMin(data)).toBeUndefined();
+  });
+});
+
+/**
+ * Unit tests for extractRarity and extractReqAttune.
+ *
+ * Design decision sdd/inventory-v3-list/design #1064 — D3:
+ * rarity + reqAttune are projected from JSONB at read time, mirroring extractCostCp.
+ * DMG p.135 — Rarity. PHB p.136-138 — Attunement.
+ *
+ * ACSE-SHAPE-01 (spec #1063): enriched inventory items include rarity + reqAttune.
+ */
+describe('extractRarity — sdd/inventory-v3-list ACSE-SHAPE-01', () => {
+  it('4.4a returns the rarity string when present (happy path — e.g. magic ring "rare")', () => {
+    // DMG p.135: Ring of Protection is "Rare, requires attunement"
+    expect(extractRarity({ rarity: 'rare', reqAttune: true })).toBe('rare');
+  });
+
+  it('4.4b returns null when rarity field is absent (mundane items — no rarity in 5etools)', () => {
+    // Most PHB mundane items (rope, chain shirt, longsword) have no rarity field.
+    expect(extractRarity({ name: 'Longsword', type: 'M' })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractRarity(null)).toBeNull();
+    expect(extractRarity(undefined)).toBeNull();
+  });
+
+  it('returns "very rare" (with space) verbatim — normalization is callers responsibility', () => {
+    // extractRarity does NOT normalize; normalizeRarity() handles that.
+    expect(extractRarity({ rarity: 'very rare' })).toBe('very rare');
+  });
+});
+
+describe('extractReqAttune — sdd/inventory-v3-list ACSE-SHAPE-01', () => {
+  it('4.5a returns true when reqAttune is boolean true (any-class attunement)', () => {
+    // PHB p.136: "Some magic items require a creature to be attuned to them"
+    expect(extractReqAttune({ rarity: 'rare', reqAttune: true })).toBe(true);
+  });
+
+  it('4.5b returns null when reqAttune is absent (non-attunement item)', () => {
+    expect(extractReqAttune({ rarity: 'rare' })).toBeNull();
+  });
+
+  it('returns the class restriction string when reqAttune is a string', () => {
+    // 5etools uses strings like "by a spellcaster" for class-restricted attunement.
+    expect(extractReqAttune({ reqAttune: 'by a spellcaster' })).toBe('by a spellcaster');
+  });
+
+  it('returns null for boolean false (no attunement required)', () => {
+    expect(extractReqAttune({ reqAttune: false })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractReqAttune(null)).toBeNull();
+    expect(extractReqAttune(undefined)).toBeNull();
+  });
+});
+
+/**
+ * Unit tests for new detail-projection extractors.
+ *
+ * Reqs: ACIDE-NONN1-03 (spec #1070) — extractor seam for detail endpoint.
+ * Design: DBE6 (design #1071) — extend projectItemRow with includeDetail flag.
+ *
+ * PHB p.149 — Weapons table (dmg1 + dmgType codes).
+ */
+describe('extractDmg1 — ACIDE-NONN1-03: weapon damage dice', () => {
+  it('returns damage dice string from 5etools dmg1 field (e.g. "1d8")', () => {
+    // PHB p.149 — longsword: 1d8 slashing (versatile 1d10)
+    expect(extractDmg1({ dmg1: '1d8' })).toBe('1d8');
+  });
+
+  it('returns null when dmg1 is absent (non-weapon item)', () => {
+    expect(extractDmg1({ type: 'G', name: 'Rope' })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractDmg1(null)).toBeNull();
+    expect(extractDmg1(undefined)).toBeNull();
+  });
+});
+
+describe('extractDmgType — ACIDE-NONN1-03: weapon damage type humanization', () => {
+  it('humanizes S (slashing) → "Cortante" (PHB p.149)', () => {
+    expect(extractDmgType({ dmgType: 'S' })).toBe('Cortante');
+  });
+
+  it('humanizes P (piercing) → "Perforante" (PHB p.149)', () => {
+    expect(extractDmgType({ dmgType: 'P' })).toBe('Perforante');
+  });
+
+  it('humanizes B (bludgeoning) → "Contundente" (PHB p.149)', () => {
+    expect(extractDmgType({ dmgType: 'B' })).toBe('Contundente');
+  });
+
+  it('returns null when dmgType is absent (non-weapon)', () => {
+    expect(extractDmgType({ type: 'G' })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractDmgType(null)).toBeNull();
+  });
+});
+
+describe('extractEntriesSummary — ACIDE-NONN1-03: item description text', () => {
+  it('joins first string paragraph(s) to a single string', () => {
+    const data = { entries: ['Drink this potion to heal.', 'Additional note.'] };
+    const result = extractEntriesSummary(data);
+    expect(result).toContain('Drink this potion to heal.');
+  });
+
+  it('truncates to 240 chars with ellipsis when text is longer', () => {
+    const longText = 'A'.repeat(300);
+    const result = extractEntriesSummary({ entries: [longText] });
+    expect(result).not.toBeNull();
+    expect(result!.length).toBeLessThanOrEqual(243); // 240 + '...'
+    expect(result!.endsWith('...')).toBe(true);
+  });
+
+  it('returns null when entries is absent', () => {
+    expect(extractEntriesSummary({ type: 'P' })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractEntriesSummary(null)).toBeNull();
+  });
+
+  it('skips non-string entries (tables, lists) and uses only string paragraphs', () => {
+    const data = { entries: [{ type: 'table', rows: [] }, 'Actual text here.'] };
+    const result = extractEntriesSummary(data);
+    expect(result).toBe('Actual text here.');
   });
 });

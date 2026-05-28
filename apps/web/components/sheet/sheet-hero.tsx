@@ -44,30 +44,16 @@ export function SheetHero({
 
   return (
     <div
-      className="relative overflow-hidden rounded-md px-4 py-5"
-      style={{
-        background:
-          'linear-gradient(135deg, #2A2240 0%, #1B1428 100%)',
-      }}
+      className="ficha-hero-bg relative overflow-hidden rounded-md px-4 py-5"
     >
-      {/* Subtle aurora overlay */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 40% at 80% 20%, rgba(111,134,201,0.18), transparent 55%)',
-        }}
-      />
+      {/* Subtle aurora overlay — included in ficha-hero-bg radial layer */}
+      <div className="pointer-events-none absolute inset-0" />
 
       <div className="relative z-10 flex items-center gap-4">
         {/* Portrait — conic ring + initials */}
         <div
-          className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-md"
-          style={{
-            background:
-              'conic-gradient(from 180deg, #E8946F 0%, #6F86C9 40%, #B6829F 70%, #E8946F 100%)',
-            padding: '2px',
-          }}
+          className="ficha-portrait-ring flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-md"
+          style={{ padding: '2px' }}
           aria-label={`Iniciales de ${name}`}
         >
           <div

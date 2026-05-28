@@ -30,7 +30,7 @@ test.describe('Level-up Monk L1→L2 — Puntos de Ki visible @ 375px', () => {
   test('Monk levels up to L2, recursos tab shows Puntos de Ki', async ({ page }) => {
     // ---- Step 1: Navigate to dashboard ----
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Monk character ----
     // Collect all char hrefs (uuid-shaped, skip /characters/new).

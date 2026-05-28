@@ -19,6 +19,35 @@ export interface ClassResourceView {
   used: number;
   max: number;
   recoveryTrigger: 'short' | 'long' | 'both';
+  /**
+   * Feature-specific metadata emitted by the domain when the registry def
+   * declares an `extraFor` callback. Currently only Bardic Inspiration uses
+   * this — see `isBardicInspirationExtra` below.
+   */
+  extra?: unknown;
+}
+
+/** Bardic Inspiration metadata shape — PHB p.54 Bard table. */
+export interface BardicInspirationExtra {
+  dieSize: 'd6' | 'd8' | 'd10' | 'd12';
+}
+
+/** Type guard for Bardic Inspiration extra payload. */
+export function isBardicInspirationExtra(x: unknown): x is BardicInspirationExtra {
+  if (typeof x !== 'object' || x === null) return false;
+  const candidate = (x as { dieSize?: unknown }).dieSize;
+  return candidate === 'd6' || candidate === 'd8' || candidate === 'd10' || candidate === 'd12';
+}
+
+/** Pool-shaped resource hint (Lay on Hands, future pool-style features). */
+export interface PoolShapeExtra {
+  shape: 'pool';
+}
+
+/** Type guard for pool-shaped resource extra payload. */
+export function isPoolShapeExtra(x: unknown): x is PoolShapeExtra {
+  if (typeof x !== 'object' || x === null) return false;
+  return (x as { shape?: unknown }).shape === 'pool';
 }
 
 /**
@@ -266,6 +295,163 @@ export type CharacterStatus =
   | 'retired'
   | 'dead';
 
+/**
+ * V3 UI taxonomy for inventory items.
+ * Mirror of domain V3ItemType — manually maintained (DA4: no domain import in client bundles).
+ * Design decision sdd/inventory-v3-list/design #1064 — D2.
+ */
+export type V3ItemType =
+  | 'weapon'
+  | 'armor'
+  | 'consumable'
+  | 'magic'
+  | 'food'
+  | 'trinket'
+  | 'book'
+  | 'quest';
+
+/**
+ * Canonical rarity tiers per DMG p.135.
+ * Mirror of domain RarityClass — manually maintained (DA4).
+ */
+export type RarityClass = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'legendary' | 'artifact';
+
+/**
+ * Enriched inventory item for the v3 list view.
+ * Mirrors the API EnrichedInventoryItem shape (ACSE-SHAPE-01, spec #1063).
+ * Optional on SheetResponse for read-path tolerance (DA3: additive field).
+ * Design decision sdd/inventory-v3-list/design #1064.
+ */
+export interface EnrichedInventoryItem {
+  instanceId: string;
+  itemSlug: string;
+  itemSource: string;
+  displayName: string;
+  quantity: number;
+  /** true when item.state === 'equipped' */
+  equipped: boolean;
+  equipHand: 'main' | 'off' | 'both' | null;
+  charges: number | null;
+  /** V3 UI taxonomy derived from 5etools type codes + rarity. */
+  v3Type: V3ItemType;
+  /** Normalized rarity slug or null. DMG p.135. */
+  rarity: RarityClass | null;
+  /** Raw reqAttune from compendium JSONB. PHB p.136-138. */
+  reqAttune: boolean | string | null;
+  /**
+   * True when item is non-common magic: (rarity != null && rarity !== 'common') || reqAttune != null.
+   * DA2: API-layer heuristic.
+   */
+  magicFlag: boolean;
+  weight: number | null;
+  qty: number;
+}
+
+/**
+ * Inventory detail response from GET /characters/:id/inventory/:instanceId/detail.
+ * Discriminated union keyed on v3Type.
+ * Mirrors API InventoryDetailResponse — manually maintained (DA4).
+ * Reqs: ACIDE-SHAPE-01 (spec #1070). Design: DB1-DB3 (design #1071).
+ */
+interface DetailCommon {
+  instanceId: string;
+  v3Type: string;
+  displayName: string;
+  subtitle: string | null;
+  rarity: RarityClass | null;
+  magicFlag: boolean;
+  equipped: boolean;
+  weightLb: number | null;
+  costCp: number | null;
+  qty: number;
+  notes: string;
+  historyHeadline: null;
+  historyDetail: null;
+}
+
+export interface WeaponDetailVariant extends DetailCommon {
+  v3Type: 'weapon';
+  attackBonus: number;
+  dmg1: string | null;
+  dmgType: string | null;
+  range: string | null;
+  properties: string[];
+  magicBonus: number;
+}
+
+export interface ArmorDetailVariant extends DetailCommon {
+  v3Type: 'armor';
+  acBase: number | null;
+  armorCategory: string | null;
+  dexCapNote: string;
+  stealth: boolean;
+  donTime: string;
+  armorStrengthMin: number;
+}
+
+export interface ConsumableDetailVariant extends DetailCommon {
+  v3Type: 'consumable';
+  charges: number | null;
+  chargesMax: number | null;
+  entriesSummary: string | null;
+  actionCost: string;
+}
+
+export interface FoodDetailVariant extends DetailCommon {
+  v3Type: 'food';
+  servings: number;
+  foodKind: string;
+  consumeNote: string | null;
+}
+
+export interface MagicDetailVariant extends DetailCommon {
+  v3Type: 'magic';
+  /** true when item requires attunement (PHB p.136-138). */
+  attuneRequired: boolean;
+  /** true when this instance is currently attuned (per-instance). */
+  attuned: boolean;
+  /** Fixed copy (PHB p.138): 'Requiere sintonización durante un descanso corto'. */
+  restAttuneNote: string;
+  /** Always null — no 5etools mapping for power names (R7). */
+  powerName: null;
+  /** From entriesSummary. null when item has no entries. */
+  powerDesc: string | null;
+  charges: number | null;
+  chargesMax: number | null;
+}
+
+export interface BookDetailVariant extends DetailCommon {
+  v3Type: 'book';
+  passage: string;
+  pagesRead: number;
+  pages: number;
+  language: string;
+  knowledge: string[];
+}
+
+export interface TrinketDetailVariant extends DetailCommon {
+  v3Type: 'trinket';
+  /** PHB p.161: trinkets have no mechanical effect. From entriesSummary or fallback. */
+  narrative: string | null;
+}
+
+export interface QuestDetailVariant extends DetailCommon {
+  v3Type: 'quest';
+  questName: string;
+  stage: string;
+  visibleTo: string;
+}
+
+export type InventoryDetailResponse =
+  | WeaponDetailVariant
+  | ArmorDetailVariant
+  | ConsumableDetailVariant
+  | FoodDetailVariant
+  | MagicDetailVariant
+  | BookDetailVariant
+  | TrinketDetailVariant
+  | QuestDetailVariant;
+
 export interface SheetResponse {
   character: {
     id: string;
@@ -276,5 +462,14 @@ export interface SheetResponse {
   };
   sheet: CharacterSheet;
   currentHp: number | null;
+  /** Temporary HP (from character.data.hp.temp). Defaults to 0 when absent. */
+  tempHp: number;
+  /** Stat generation method. Defaults to 'standard-array' when absent (STATMETHOD-API-01). */
+  statMethod?: 'standard-array' | 'point-buy' | 'roll';
   inventory: InventoryItem[];
+  /**
+   * Enriched inventory for v3 list view. Optional for read-path tolerance (DA3).
+   * inventoryEnriched items mirror inventory[] rows with v3Type, rarity, magicFlag added.
+   */
+  inventoryEnriched?: EnrichedInventoryItem[];
 }

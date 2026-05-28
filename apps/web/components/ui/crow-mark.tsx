@@ -1,24 +1,23 @@
 /**
- * CrowMark — the Dungeon Hub brand icon.
- * Renders a small crow-silhouette mark with gradient background and glow.
+ * CrowMark — the Dungeon Hub brand icon (obsidian aesthetic).
+ * Dark obsidian gradient tile with copper border + copper glyph.
  * No props. Server component.
  */
 export function CrowMark() {
   return (
     <span
-      className="inline-flex items-center justify-center w-8 h-8 rounded-[10px] flex-shrink-0"
+      className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-md border border-accent text-accent flex-shrink-0"
       style={{
-        background: 'linear-gradient(135deg, #B6829F 0%, #6F86C9 100%)',
-        boxShadow: '0 2px 6px rgba(111,134,201,0.30)',
+        background: 'linear-gradient(135deg, #221E30, #0B0A12)',
+        boxShadow: '0 0 0 1px rgba(212, 162, 76, 0.10), 0 2px 6px rgba(0, 0, 0, 0.5)',
       }}
       aria-hidden="true"
     >
-      {/* Crow silhouette — simplified path matching design bundle crow icon */}
       <svg
         width="18"
         height="18"
         viewBox="0 -64 640 640"
-        fill="white"
+        fill="currentColor"
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
       >

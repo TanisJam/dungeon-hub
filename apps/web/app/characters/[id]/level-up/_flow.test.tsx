@@ -55,9 +55,41 @@ interface OwnedClass {
 const FIGHTER_L1: OwnedClass = { slug: 'fighter', source: 'PHB', level: 1, hitDie: 'd10', isAsiLevel: false };
 const FIGHTER_L3_ASI: OwnedClass = { slug: 'fighter', source: 'PHB', level: 3, hitDie: 'd10', isAsiLevel: true };
 
+import type { FlowCtx } from './_step-graph';
+
+/**
+ * Minimal FlowCtx for Fighter L1→L2 (no subclass, no spells, no ASI).
+ * Used by most tests that don't need conditional steps.
+ */
+const FIGHTER_L1_CTX: FlowCtx = {
+  subclassUnlockLevelByClass: { fighter: 3 },
+  alreadyHasSubclassByClass: { fighter: false },
+  spellDeltaByClass: { fighter: { cantripsDelta: 0, spellsDelta: 0, isWizardSpellbook: false } },
+  isAsiLevelByClass: { fighter: false },
+  hitDieByClass: { fighter: 'd10' },
+  toLevelByClass: { fighter: 2 },
+};
+
+/**
+ * FlowCtx for Fighter L3→L4 (ASI level 4, no subclass needed — already unlocked at 3 or not yet).
+ * isAsiLevelByClass fighter: true (L4 is an ASI level for Fighter).
+ */
+const FIGHTER_L3_CTX: FlowCtx = {
+  subclassUnlockLevelByClass: { fighter: 3 },
+  alreadyHasSubclassByClass: { fighter: true }, // already has subclass → no subclass step
+  spellDeltaByClass: { fighter: { cantripsDelta: 0, spellsDelta: 0, isWizardSpellbook: false } },
+  isAsiLevelByClass: { fighter: true },
+  hitDieByClass: { fighter: 'd10' },
+  toLevelByClass: { fighter: 4 },
+};
+
 const BASE_PROPS = {
   characterId: 'char-uuid-1',
   characterName: 'Thorin',
+  flowCtx: FIGHTER_L1_CTX,
+  subclassesByClass: {},
+  spellLimitsByClass: {},
+  existingSpellsByClass: {},
 };
 
 beforeEach(() => {
@@ -93,6 +125,8 @@ describe('T1 — ModeStep: multiclassing gate', () => {
     expect(screen.queryByText('Agregar nueva clase')).toBeNull();
   });
 });
+
+// Note: BASE_PROPS already includes flowCtx=FIGHTER_L1_CTX and subclassesByClass={}.
 
 // ---------------------------------------------------------------------------
 // T2 — Same-class branch: single class → ClassStep renders it → HP step
@@ -187,6 +221,7 @@ describe('T4 — ASI-feat step gating and validation', () => {
         {...BASE_PROPS}
         ownedClasses={[FIGHTER_L3_ASI]}
         multiclassingEnabled={false}
+        flowCtx={FIGHTER_L3_CTX}
       />,
     );
 

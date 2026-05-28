@@ -854,3 +854,71 @@ export const compendiumActions = pgTable(
   },
   (t) => [uniqueIndex('uq_actions_slug_source').on(t.slug, t.source)],
 );
+
+// ---------------------------------------------------------------------------
+// encounters — DM initiative tracker (SDD encuentros-v3).
+//
+// One encounter per "combat scene". `current_combatant_id` points to whose
+// turn it is; advanced via POST /encounters/:id/advance-turn (domain pure
+// function `advanceTurn`).
+//
+// Optimistic concurrency: every advance/HP-patch increments `version`. Stale
+// `version` in the client → 409 conflict. Avoids `SELECT FOR UPDATE` headaches.
+//
+// `current_combatant_id` is a soft reference (no FK) — adding a FK to
+// `encounter_combatants` would create a cycle since combatants reference back.
+// Runtime invariant: it MUST point at a valid combatant of THIS encounter.
+// ---------------------------------------------------------------------------
+export const encounters = pgTable(
+  'encounters',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    round: integer('round').notNull().default(1),
+    currentCombatantId: uuid('current_combatant_id'),
+    status: text('status', { enum: ['active', 'completed'] }).notNull().default('active'),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_encounters_campaign').on(t.campaignId),
+    index('idx_encounters_status').on(t.status),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// encounter_combatants — one row per combatant in an encounter.
+//
+// `character_id` is NULL for NPCs and the SOFT REFERENCE for PCs (we don't
+// CASCADE-delete combatants when a character is deleted — the encounter is
+// historical record of "who was in this fight"). `name` is a snapshot so PC
+// renames don't retroactively rewrite history.
+//
+// `insertion_order` breaks initiative ties deterministically (PHB tiebreaker
+// by Dex modifier is deferred).
+//
+// `hp_current = 0` is the dead-state marker (no separate column).
+// ---------------------------------------------------------------------------
+export const encounterCombatants = pgTable(
+  'encounter_combatants',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    encounterId: uuid('encounter_id')
+      .notNull()
+      .references(() => encounters.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['pc', 'npc'] }).notNull(),
+    characterId: uuid('character_id').references(() => characters.id, { onDelete: 'set null' }),
+    initiative: integer('initiative').notNull(),
+    hpCurrent: integer('hp_current').notNull(),
+    hpMax: integer('hp_max').notNull(),
+    insertionOrder: integer('insertion_order').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_combatants_encounter').on(t.encounterId)],
+);

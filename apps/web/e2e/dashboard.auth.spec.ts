@@ -4,8 +4,9 @@ test.describe('dashboard (authenticated)', () => {
   test('loads with identity header and characters/campaigns sections', async ({ page }) => {
     await page.goto('/dashboard');
 
-    // Identity header con role badge (ES label)
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible();
+    // Identity header con role badge (ES label) — scoped to <main> to avoid
+    // matching the topbar RoleSwitcher pill button (which also reads "Jugador").
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible();
 
     // Las dos secciones (SectionHead usa <span>, buscamos por texto)
     await expect(page.getByText('Tus Personajes')).toBeVisible();
@@ -17,8 +18,8 @@ test.describe('dashboard (authenticated)', () => {
     ).toBeVisible();
   });
 
-  test('home redirects to dashboard when authenticated', async ({ page }) => {
+  test('home redirects to /inicio when authenticated', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/inicio$/);
   });
 });

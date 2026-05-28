@@ -3,140 +3,1425 @@
 /* ============================================================
    TOKEN CONVENTION — READ BEFORE EDITING
    ============================================================
+   Aesthetic: OBSIDIAN — dark fantasy (obsidian + copper + arcane cyan + magenta).
+   Tokens follow the Dungeon Hub design system (see docs/design_handoff_dungeon_hub).
+
    REQUIRED utilities (use these):
      bg-paper, bg-paper-soft, bg-surface, bg-surface-soft
      bg-primary, bg-primary-deep, bg-primary-soft
      bg-accent, bg-accent-deep, bg-accent-soft
      bg-secondary, bg-secondary-deep, bg-secondary-soft
-     bg-ink, bg-success, bg-warning, bg-warning-soft, bg-warning-deep
+     bg-success, bg-warning, bg-warning-soft, bg-warning-deep, bg-danger
      text-ink, text-ink-soft, text-ink-mute
      border-line, border-line-soft
-     font-display, font-sans
-     rounded-sm (10px), rounded-md (14px), rounded-lg (20px), rounded-pill (999px)
+     font-display, font-sans, font-script, font-mono
+     rounded-sm (8px), rounded-md (12px), rounded-lg (18px), rounded-pill (999px)
      shadow-stamp-sm, shadow-stamp-md, shadow-stamp-lg
+     shadow-glow-primary, shadow-glow-accent, shadow-glow-secondary
+     ease-out, ease-in-out (custom curves)
 
    FORBIDDEN utilities (do NOT use):
-     text-zinc-*, text-gray-*, text-slate-*, text-indigo-*
-     bg-zinc-*, bg-gray-*, bg-slate-*, bg-stone-*, bg-neutral-*
-     border-zinc-*, border-gray-*, border-slate-*
-     Any raw Tailwind color utility (amber-500, blue-600, etc.)
+     Any raw Tailwind color (zinc-*, gray-*, slate-*, amber-*, blue-*, etc.)
    ============================================================ */
 
 @theme {
-  /* ── Colors: Crepúsculo defaults ── */
-  --color-paper:         #F4EEE5;
-  --color-paper-soft:    #EBE2D2;
-  --color-surface:       #FFFFFF;
-  --color-surface-soft:  #FBF6EE;
-  --color-ink:           #271E33;
-  --color-ink-soft:      #574A6B;
-  --color-ink-mute:      #8A7E9D;
-  --color-line:          #E5DCC8;
-  --color-line-soft:     #F1E9DB;
-  --color-primary:       #6F86C9;
-  --color-primary-deep:  #4C63A6;
-  --color-primary-soft:  #E0E6F4;
-  --color-accent:        #E8946F;
-  --color-accent-deep:   #C46F4A;
-  --color-accent-soft:   #FBE5D8;
-  --color-secondary:     #B6829F;
-  --color-secondary-deep:#8E5C77;
-  --color-secondary-soft:#F3E1EA;
-  --color-success:       #79A07A;
-  --color-warning:       #D9B95E;
-  --color-warning-soft:  #FBF0D2;
-  --color-warning-deep:  #A8842A;
+  /* ── Colors: Obsidiana (default) ── */
+  --color-paper:         #0B0A12;
+  --color-paper-soft:    #13111C;
+  --color-surface:       #1A1726;
+  --color-surface-soft:  #221E30;
+  --color-ink:           #F4EAD5;
+  --color-ink-soft:      #C9BFA8;
+  --color-ink-mute:      #8B8273;
+  --color-line:          #3A3145;
+  --color-line-soft:     #26212F;
+  --color-primary:       #5BB3C9;
+  --color-primary-deep:  #3A8FA8;
+  --color-primary-soft:  #1A2F38;
+  --color-accent:        #D4A24C;
+  --color-accent-deep:   #A87528;
+  --color-accent-soft:   #3A2D17;
+  --color-secondary:     #A85A8E;
+  --color-secondary-deep:#7F3F6B;
+  --color-secondary-soft:#2E1A28;
+  --color-success:           #6BA368;
+  --color-warning:           #D4A24C;
+  --color-warning-soft:      #3A2D17;
+  --color-warning-deep:      #A87528;
+  --color-danger:            #CC4444;
+  --color-danger-soft:       rgba(204, 68, 68, 0.12);
+  --color-danger-soft-border: rgba(204, 68, 68, 0.25);
 
-  /* ── Typography ── */
-  --font-display: var(--font-bricolage);
-  --font-sans:    var(--font-manrope);
+  /* ── Alpha-derived border tokens (soft borders for row icons) ── */
+  --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
+  --color-secondary-soft-border:  rgba(168, 90, 142, 0.30);
+  --color-secondary-soft-bg:      rgba(168, 90, 142, 0.22);
+
+  /* ── Typography (fonts wired in app/layout.tsx) ── */
+  --font-display: var(--font-noto-serif-georgian), Georgia, serif;
+  --font-sans:    var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-script:  var(--font-mplus-rounded), system-ui, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* ── Border radius ── */
-  --radius-sm:   10px;
-  --radius-md:   14px;
-  --radius-lg:   20px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
   --radius-pill: 999px;
 
-  /* ── Shadows (modern soft style) ── */
-  --shadow-stamp-sm: 0 1px 2px rgba(39, 30, 51, 0.06), 0 1px 1px rgba(39, 30, 51, 0.04);
-  --shadow-stamp-md: 0 6px 16px rgba(39, 30, 51, 0.10), 0 2px 4px rgba(39, 30, 51, 0.06);
-  --shadow-stamp-lg: 0 16px 40px rgba(39, 30, 51, 0.14);
+  /* ── Shadows (dark-mode appropriate) ── */
+  --shadow-stamp-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-stamp-md: 0 6px 16px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-stamp-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+
+  /* ── Glows (active states + accent rings) ── */
+  --shadow-glow-primary:   0 0 0 1px rgba(91, 179, 201, 0.45), 0 0 24px rgba(91, 179, 201, 0.28);
+  --shadow-glow-accent:    0 0 0 1px rgba(212, 162, 76, 0.50), 0 0 16px rgba(212, 162, 76, 0.22);
+  --shadow-glow-secondary: 0 0 0 1px rgba(168, 90, 142, 0.45), 0 0 16px rgba(168, 90, 142, 0.20);
+
+  /* ── Motion durations ── */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ── Motion curves (overrides Tailwind defaults) ── */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Rarity glows ── */
+  --shadow-glow-rarity-uncommon:  0 0 0 1px rgba(107, 163, 104, 0.45), 0 0 16px rgba(107, 163, 104, 0.20);
+  --shadow-glow-rarity-rare:      0 0 0 1px rgba(91, 179, 201, 0.45),  0 0 18px rgba(91, 179, 201, 0.22);
+  --shadow-glow-rarity-very-rare: 0 0 0 1px rgba(168, 90, 142, 0.50),  0 0 20px rgba(168, 90, 142, 0.24);
+  --shadow-glow-rarity-legendary: 0 0 0 1px rgba(212, 162, 76, 0.55),  0 0 22px rgba(212, 162, 76, 0.26);
+  --shadow-glow-rarity-artifact:  0 0 0 1px rgba(192, 71, 62, 0.60),   0 0 24px rgba(192, 71, 62, 0.30);
 }
 
-/* ── Palette: Crepúsculo (default) ── */
-:root[data-palette="crepusculo"],
+/* ── Type-scale utilities (multi-prop — @utility bypasses @theme auto-mapping limitation) ── */
+@utility text-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+@utility text-stat {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sheet animation ── */
+@keyframes v3-sheet-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes v3-sheet-slide-up {
+    from { transform: none; }
+    to   { transform: none; }
+  }
+}
+
+/* ── Inicio screen — scoped extensions ── */
+.inicio-hero-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(212, 162, 76, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(168, 90, 142, 0.10), transparent 55%),
+    linear-gradient(180deg, #1A1726 0%, #0B0A12 100%);
+}
+.inicio-stat-glow {
+  text-shadow: 0 0 14px rgba(212, 162, 76, 0.40);
+}
+.inicio-feed-dot {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+/* ── Inicio DM tree — magenta-accented scoped classes ── */
+.inicio-pending-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(168, 90, 142, 0.22), transparent 55%),
+    linear-gradient(180deg, #1A1726 0%, #0B0A12 100%);
+}
+.inicio-pending-stack-av {
+  background: linear-gradient(135deg, rgba(168, 90, 142, 0.80), rgba(127, 63, 107, 0.80));
+  box-shadow: 0 0 0 2px var(--color-paper);
+  margin-left: -6px;
+}
+.inicio-pending-stack-av:first-child {
+  margin-left: 0;
+}
+.inicio-pending-cta {
+  background-color: var(--color-secondary);
+  color: var(--color-ink);
+  box-shadow: 0 0 8px rgba(168, 90, 142, 0.35);
+}
+.inicio-camp-dm-bg {
+  background:
+    radial-gradient(ellipse 70% 55% at 90% 10%, rgba(168, 90, 142, 0.18), transparent 50%),
+    var(--color-surface);
+}
+.inicio-camp-dm-role-pill {
+  background-color: var(--color-secondary);
+  color: var(--color-ink);
+}
+.inicio-quick-iniciativa-ic {
+  background-color: rgba(168, 90, 142, 0.18);
+  color: var(--color-secondary);
+}
+.inicio-row-quest-ic {
+  background-color: rgba(168, 90, 142, 0.15);
+  color: var(--color-secondary);
+}
+
+/* ── Pendientes sheet — magenta-accented ficha cards ── */
+.pendientes-portrait {
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 30% 30%, rgba(168, 90, 142, 0.95), rgba(85, 42, 71, 0.95));
+  border: 1px solid rgba(168, 90, 142, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pendientes-card-fresh {
+  border: 1px solid rgba(168, 90, 142, 0.85);
+  box-shadow: 0 0 0 3px rgba(168, 90, 142, 0.20);
+}
+.pendientes-actions-row {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ── Personajes screen — scoped extensions ── */
+.personajes-char-card-active {
+  border-color: var(--color-accent);
+  background:
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(212, 162, 76, 0.10), transparent 55%),
+    var(--color-surface);
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.30);
+}
+.personajes-chip-on {
+  background-color: var(--color-accent);
+  color: #1A1208;
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.40);
+}
+.personajes-portrait {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 162, 76, 0.30), transparent 70%),
+    linear-gradient(135deg, #2E1A28 0%, #1A1726 100%);
+}
+
+/* ── Campañas screen — scoped extensions ── */
+.campanas-camp-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(91, 179, 201, 0.10), transparent 60%),
+    var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+.campanas-camp-card-dm {
+  background:
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(168, 90, 142, 0.12), transparent 60%),
+    var(--color-surface);
+  border-color: rgba(168, 90, 142, 0.40);
+}
+.campanas-role-pill {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  background: rgba(91, 179, 201, 0.10);
+  border: 1px solid rgba(91, 179, 201, 0.40);
+  color: var(--color-primary);
+}
+.campanas-role-pill-dm {
+  background: rgba(168, 90, 142, 0.14);
+  border-color: rgba(168, 90, 142, 0.45);
+  color: var(--color-secondary);
+}
+
+/* ── Encuentros (initiative tracker) — magenta/accent dial ── */
+.encuentros-init {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  margin: 8px auto 4px;
+}
+.encuentros-init-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(212, 162, 76, 0.10), transparent 70%),
+    linear-gradient(180deg, #1A1726 0%, #0B0A12 100%);
+  border: 1px solid var(--color-accent);
+  box-shadow: 0 0 32px rgba(212, 162, 76, 0.20), inset 0 0 0 1px rgba(212, 162, 76, 0.15);
+}
+.encuentros-init-ring::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px dashed rgba(212, 162, 76, 0.25);
+  border-radius: 50%;
+}
+.encuentros-init-token {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--color-line);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 162, 76, 0.30), transparent 70%),
+    linear-gradient(135deg, #2E1A28 0%, #1A1726 100%);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: transform 200ms, border-color 200ms;
+}
+.encuentros-init-token.current {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 24px rgba(212, 162, 76, 0.6);
+  transform: scale(1.08);
+}
+.encuentros-init-token.npc {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(168, 90, 142, 0.40), transparent 70%),
+    linear-gradient(135deg, #2E1A28 0%, #1A1726 100%);
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+.encuentros-init-token.dead {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+.encuentros-init-center {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 162, 76, 0.20), transparent 70%),
+    var(--color-paper-soft);
+  border: 1px solid var(--color-accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 24px rgba(212, 162, 76, 0.10);
+  padding: 14px;
+  text-align: center;
+}
+.encuentros-init-center .eyebrow {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.encuentros-init-center .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--color-ink);
+  margin-top: 2px;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.encuentros-init-center .meta {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-ink-mute);
+  margin-top: 2px;
+}
+.encuentros-init-center .hp-bar {
+  width: 80%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.encuentros-init-center .hp-bar .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  border-radius: 9999px;
+  box-shadow: 0 0 6px rgba(212, 162, 76, 0.5);
+}
+.encuentros-init-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 14px;
+}
+.encuentros-init-next {
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-deep));
+  color: #1A1208;
+  border: 1px solid var(--color-accent-deep);
+  padding: 12px 22px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.50), 0 0 16px rgba(212, 162, 76, 0.30);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.encuentros-init-next:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.encuentros-init-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+}
+.encuentros-init-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 0.375rem;
+  font-size: 12px;
+}
+.encuentros-init-row.current {
+  border-color: var(--color-accent);
+  background:
+    radial-gradient(ellipse 60% 100% at 0% 0%, rgba(212, 162, 76, 0.10), transparent 60%),
+    var(--color-surface);
+  box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.30);
+}
+.encuentros-init-row .ini {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-accent);
+  min-width: 22px;
+  text-align: center;
+}
+.encuentros-init-row .nm {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.encuentros-init-row .hp {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+/* ── Compendium screen — search + categories + recents + spell detail ── */
+.compendium-init {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 24px;
+}
+.compendium-init-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+.compendium-init-search .ph {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink-mute);
+}
+.compendium-init-search .kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-mute);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 2px 5px;
+  letter-spacing: 0.03em;
+}
+.compendium-init-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.compendium-init-cat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 150ms;
+  text-align: left;
+}
+.compendium-init-cat-card:hover {
+  transform: translateY(-2px);
+}
+.compendium-init-cat-card .ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  margin-bottom: 4px;
+}
+.compendium-init-cat-card.spell .ic {
+  background: var(--color-secondary-soft);
+  color: var(--color-secondary);
+}
+.compendium-init-cat-card.lore .ic {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.compendium-init-cat-card .ttl {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+.compendium-init-cat-card .ct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-mute);
+}
+.compendium-init-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-line-soft);
+  cursor: pointer;
+}
+.compendium-init-row:last-child {
+  border-bottom: none;
+}
+.compendium-init-row .ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-soft-border);
+}
+.compendium-init-row.spell .ic {
+  background: var(--color-secondary-soft);
+  color: var(--color-secondary);
+  border-color: var(--color-secondary-soft-border);
+}
+.compendium-init-row.item .ic {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.compendium-init-row.monst .ic {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger-soft-border);
+}
+.compendium-init-row .body {
+  flex: 1;
+  min-width: 0;
+}
+.compendium-init-row .body .ttl {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compendium-init-row .body .sub {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  margin-top: 1px;
+}
+.compendium-init-row .chev {
+  font-size: 18px;
+  color: var(--color-ink-mute);
+  flex-shrink: 0;
+}
+.compendium-init-detail.spell {
+  background:
+    radial-gradient(ellipse 80% 60% at 0% 0%, var(--color-secondary-soft-bg), transparent 55%),
+    var(--color-surface);
+  border: 1px solid var(--color-secondary);
+  border-radius: 0.75rem;
+  padding: 16px;
+  position: relative;
+  box-shadow: var(--shadow-glow-secondary);
+}
+.compendium-init-detail .lvl-stamp {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-secondary-soft);
+  border: 1px solid var(--color-secondary);
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-secondary);
+}
+.compendium-init-detail .eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+  margin-bottom: 4px;
+}
+.compendium-init-detail .name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+.compendium-init-detail .school {
+  font-family: var(--font-script);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  margin-bottom: 14px;
+}
+.compendium-init-detail .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.compendium-init-detail .meta-row .k {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  margin-bottom: 2px;
+}
+.compendium-init-detail .meta-row .v {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+.compendium-init-detail .desc p {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.compendium-init-detail .desc p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Ficha screen — scoped extensions ── */
+.ficha-hero-bg {
+  background:
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(111,134,201,0.18), transparent 55%),
+    linear-gradient(135deg, #2A2240 0%, #1B1428 100%);
+}
+.ficha-portrait-ring {
+  background: conic-gradient(from 180deg, #E8946F 0%, #6F86C9 40%, #B6829F 70%, #E8946F 100%);
+}
+/* HP tile — peach gradient (was inline) */
+.ficha-vital-hp {
+  background: linear-gradient(135deg, rgba(251,229,216,0.9) 0%, rgba(232,148,111,0.3) 100%);
+  border: 1px solid rgba(232,148,111,0.30);
+}
+/* AC / Init tiles — soft glow over surface (per dh-shell-v3.css inset shadow pattern) */
+.ficha-vital-ac   { box-shadow: inset 0 0 0 1px rgba(91,179,201,0.20), 0 0 12px rgba(91,179,201,0.10); }
+.ficha-vital-init { box-shadow: inset 0 0 0 1px rgba(168,90,142,0.20), 0 0 12px rgba(168,90,142,0.10); }
+/* Active tab — accent gradient + glow (dh-shell-v3.css line 170-178) */
+.ficha-tab-active {
+  background: linear-gradient(180deg, var(--color-accent) 0%, var(--color-accent-deep) 100%);
+  color: #1A1208;
+  box-shadow: 0 0 0 1px rgba(212,162,76,0.40), 0 0 8px rgba(212,162,76,0.30);
+}
+
+/* ── Inventory screen — currency · weight · equipped · chips · rows ── */
+
+.inventory-init {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Currency strip (4-col @ 375px) — DA5: per-metal tints are inline hex ── */
+/* pp: #C8DCE8 · gp: var(--color-accent) · sp: #B8B4A4 · cp: #C28C5F */
+.inventory-init-currency {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px 12px;
+  background: radial-gradient(at 50% 0%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%),
+              var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-line));
+  border-radius: 12px;
+}
+
+.inventory-init-currency .coin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.inventory-init-currency .v {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.inventory-init-currency .k {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-mute);
+}
+
+/* ── Weight bar (PHB p.176 — Lifting and Carrying) ── */
+.inventory-init-weight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+
+.inventory-init-weight .lbl {
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.inventory-init-weight .v {
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.inventory-init-weight .vmax {
+  font-size: 11px;
+  color: var(--color-ink-mute);
+}
+
+.inventory-init-weight .bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--color-ink-soft) 12%, transparent);
+  overflow: hidden;
+}
+
+.inventory-init-weight .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-success), var(--color-accent));
+  box-shadow: 0 0 8px rgba(212, 162, 76, 0.5);
+}
+
+/* ── Group heads ── */
+.inventory-init-grouphead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 2px;
+  margin-top: 4px;
+}
+
+.inventory-init-grouphead .ttl {
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.inventory-init-grouphead .meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-mute);
+}
+
+/* ── Equipped 4-slot grid ── */
+.inventory-init-equipped {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.inventory-init-equipped .slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  min-height: 80px;
+}
+
+.inventory-init-equipped .slot.filled {
+  background: radial-gradient(at 50% 0%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 70%),
+              var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-line));
+}
+
+.inventory-init-equipped .slot.empty {
+  opacity: 0.55;
+  border: 1px dashed var(--color-line);
+  background: transparent;
+}
+
+.inventory-init-equipped .slot.empty[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.inventory-init-equipped .slot .ic {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.inventory-init-equipped .slot .role {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-equipped .slot .nm {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Type filter chips (horizontal scroll — DA8) ── */
+.inventory-init-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 2px 0;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.inventory-init-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.inventory-init-chips .chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 7px 12px;
+  border-radius: 99px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  font-size: 11px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.inventory-init-chips .chip.on {
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-paper-soft));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.inventory-init-chips .chip[disabled],
+.inventory-init-chips .chip[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── List wrapper — filter-by-data-attr (DA1) ── */
+.inventory-init-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inventory-init-list[data-filter="weapon"]    .inventory-init-row:not([data-itype="weapon"])    { display: none; }
+.inventory-init-list[data-filter="armor"]     .inventory-init-row:not([data-itype="armor"])     { display: none; }
+.inventory-init-list[data-filter="magic"]     .inventory-init-row:not([data-itype="magic"])     { display: none; }
+.inventory-init-list[data-filter="consumable"].inventory-init-row:not([data-itype="consumable"]) { display: none; }
+.inventory-init-list[data-filter="food"]      .inventory-init-row:not([data-itype="food"])      { display: none; }
+.inventory-init-list[data-filter="trinket"]   .inventory-init-row:not([data-itype="trinket"])   { display: none; }
+
+/* Hide group heads when filter is set and the group isn't the active filter */
+.inventory-init-list[data-filter]:not([data-filter="all"]) .inventory-init-grouphead { display: none; }
+.inventory-init-list[data-filter="weapon"]    .inventory-init-grouphead[data-group="weapon"]    { display: flex; }
+.inventory-init-list[data-filter="armor"]     .inventory-init-grouphead[data-group="armor"]     { display: flex; }
+.inventory-init-list[data-filter="magic"]     .inventory-init-grouphead[data-group="magic"]     { display: flex; }
+.inventory-init-list[data-filter="consumable"].inventory-init-grouphead[data-group="consumable"] { display: flex; }
+.inventory-init-list[data-filter="food"]      .inventory-init-grouphead[data-group="food"]      { display: flex; }
+.inventory-init-list[data-filter="trinket"]   .inventory-init-grouphead[data-group="trinket"]   { display: flex; }
+
+/* ── Inventory row ── */
+.inventory-init-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  text-align: left;
+  width: 100%;
+}
+
+.inventory-init-row .ic-cell {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.inventory-init-row[data-itype="weapon"]     .ic-cell { background: radial-gradient(at 50% 50%, rgba(192, 71, 62, 0.20), transparent 70%); color: #E48A82; }
+.inventory-init-row[data-itype="armor"]      .ic-cell { background: radial-gradient(at 50% 50%, rgba(91, 179, 201, 0.20), transparent 70%); color: var(--color-primary); }
+.inventory-init-row[data-itype="consumable"] .ic-cell { background: radial-gradient(at 50% 50%, rgba(168, 90, 142, 0.22), transparent 70%); color: var(--color-secondary); }
+.inventory-init-row[data-itype="magic"]      .ic-cell { background: radial-gradient(at 50% 50%, rgba(168, 90, 142, 0.28), transparent 70%); color: var(--color-secondary); }
+.inventory-init-row[data-itype="food"]       .ic-cell { background: radial-gradient(at 50% 50%, rgba(107, 163, 104, 0.22), transparent 70%); color: var(--color-success); }
+.inventory-init-row[data-itype="trinket"]    .ic-cell { background: rgba(244, 234, 213, 0.10); color: var(--color-ink-soft); }
+
+.inventory-init-row .equipped-flag {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font-size: 7.5px;
+  padding: 1px 4px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inventory-init-row .body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inventory-init-row .nm {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.inventory-init-row .sub {
+  font-style: italic;
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-row .sparkle {
+  color: var(--color-secondary);
+  text-shadow: 0 0 6px rgba(168, 90, 142, 0.5);
+  margin-left: 4px;
+}
+
+.inventory-init-row .qty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+/* ── Rarity glows — reuse existing tokens (DA7 — no new rarity tokens) ── */
+/* globals.css L92-96: --shadow-glow-rarity-{uncommon|rare|very-rare|legendary|artifact} */
+.inventory-init-row.rarity-uncommon  { box-shadow: var(--shadow-glow-rarity-uncommon); }
+.inventory-init-row.rarity-rare      { box-shadow: var(--shadow-glow-rarity-rare); }
+.inventory-init-row.rarity-very-rare { box-shadow: var(--shadow-glow-rarity-very-rare); }
+.inventory-init-row.rarity-legendary { box-shadow: var(--shadow-glow-rarity-legendary); }
+.inventory-init-row.rarity-artifact  { box-shadow: var(--shadow-glow-rarity-artifact); }
+
+/* ── Empty state per filter ── */
+.inventory-init-empty {
+  padding: 18px 14px;
+  text-align: center;
+  border: 1px dashed var(--color-line);
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+}
+
+.inventory-init-empty .ttl {
+  font-size: 12px;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-empty .cta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-accent);
+  text-decoration: underline dotted;
+}
+
+/* ── Inventory detail sheet — hero, facts, use-big, actions, rule, counter, history, notes ── */
+
+/* Row reset: <button> styling for inventory-init-row (DBE2) */
+.inventory-init-row {
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.inventory-init-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* Delegation root — no layout impact */
+.inventory-init-detail-root { display: contents; }
+
+.inventory-init-detail-shell { display: flex; flex-direction: column; gap: 12px; }
+.inventory-init-detail-loading { padding: 40px 20px; text-align: center; color: var(--color-ink-mute); font-size: 12px; }
+.inventory-init-detail-error { padding: 18px 14px; border: 1px dashed var(--color-accent); border-radius: 10px; color: var(--color-accent); font-size: 12px; }
+
+/* Hero (per-type tint) */
+.inventory-init-detail-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  padding: 16px 14px;
+  border-radius: 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-hero.weapon     { background: radial-gradient(at 0% 0%, rgba(192, 71, 62, 0.18), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, #C0473E 40%, var(--color-line)); }
+.inventory-init-detail-hero.armor      { background: radial-gradient(at 0% 0%, rgba(91, 179, 201, 0.18), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-line)); }
+.inventory-init-detail-hero.consumable { background: radial-gradient(at 0% 0%, rgba(168, 90, 142, 0.20), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-line)); }
+.inventory-init-detail-hero.food       { background: radial-gradient(at 0% 0%, rgba(107, 163, 104, 0.22), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-line)); }
+
+.inventory-init-detail-hero .glyph {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  border-radius: 12px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.inventory-init-detail-hero.weapon     .glyph { color: #E48A82; }
+.inventory-init-detail-hero.armor      .glyph { color: var(--color-primary); }
+.inventory-init-detail-hero.consumable .glyph { color: var(--color-secondary); }
+.inventory-init-detail-hero.food       .glyph { color: var(--color-success); }
+
+.inventory-init-detail-hero .rarity-stamp {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-hero .rarity-stamp.rarity-uncommon  { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-rare      { color: var(--color-primary); border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-very-rare { color: var(--color-secondary); border-color: color-mix(in srgb, var(--color-secondary) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-legendary { color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-artifact  { color: #E48A82; border-color: color-mix(in srgb, #C0473E 60%, var(--color-line)); }
+
+.inventory-init-detail-hero .id { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.inventory-init-detail-hero .nm { font-family: var(--font-display); font-size: 17px; line-height: 1.2; }
+.inventory-init-detail-hero .sub { font-style: italic; font-size: 11px; color: var(--color-ink-soft); }
+
+/* Meta row (Pills) */
+.inventory-init-detail-meta-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* Equip chip */
+.inventory-init-detail-equip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  cursor: pointer;
+  min-height: 24px;
+}
+.inventory-init-detail-equip-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-paper-soft));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Facts grids */
+.inventory-init-detail-facts { display: grid; gap: 8px; }
+.inventory-init-detail-facts.three { grid-template-columns: repeat(3, 1fr); }
+.inventory-init-detail-facts.two   { grid-template-columns: repeat(2, 1fr); }
+.inventory-init-detail-facts.full  { grid-template-columns: 1fr; }
+.inventory-init-detail-facts .fact {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-facts .fact .k { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-mute); margin-bottom: 2px; }
+.inventory-init-detail-facts .fact .v { font-family: var(--font-display); font-size: 16px; line-height: 1.2; }
+.inventory-init-detail-facts .fact .v.small { font-size: 13px; }
+.inventory-init-detail-facts .fact .v.mono  { font-family: var(--font-mono); font-size: 14px; }
+
+/* Use-big CTAs */
+.inventory-init-detail-use-big {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  border: 1px solid var(--color-accent);
+  min-height: 44px;
+  cursor: pointer;
+}
+.inventory-init-detail-use-big.secondary { background: var(--color-secondary); color: var(--color-ink); border-color: var(--color-secondary); }
+.inventory-init-detail-use-big.danger    { background: transparent; color: #E48A82; border-color: color-mix(in srgb, #C0473E 50%, var(--color-line)); }
+.inventory-init-detail-use-big[data-stub="true"]::after {
+  content: "stub";
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* Action row (ghost buttons) */
+.inventory-init-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.inventory-init-detail-actions .btn-ghost {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+/* Rule chip (e.g. STR req on armor) */
+.inventory-init-detail-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-paper-soft));
+  border-left: 3px solid var(--color-accent);
+}
+.inventory-init-detail-rule .k { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-accent); }
+.inventory-init-detail-rule .v { font-size: 12px; color: var(--color-ink-soft); }
+
+/* Counter (consumable / food restantes) */
+.inventory-init-detail-counter {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-paper-soft));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 35%, var(--color-line));
+}
+.inventory-init-detail-counter .v   { font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--color-secondary); }
+.inventory-init-detail-counter .lbl { font-size: 11px; color: var(--color-ink-soft); }
+.inventory-init-detail-counter .meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-ink-mute); text-align: right; }
+
+/* Section heads + bodies */
+.inventory-init-detail-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.inventory-init-detail-section .head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--color-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.inventory-init-detail-section .head::before { content: "◈"; color: var(--color-accent); }
+
+/* History card */
+.inventory-init-detail-history {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-history .head   { font-family: var(--font-display); font-size: 13px; }
+.inventory-init-detail-history .detail { font-size: 11px; color: var(--color-ink-soft); margin-top: 4px; line-height: 1.45; }
+
+/* Notes (flavor) */
+.inventory-init-detail-notes {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px dashed var(--color-line);
+  font-style: italic;
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  line-height: 1.45;
+}
+
+/* Footer (delete) */
+.inventory-init-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line);
+}
+.inventory-init-detail-footer .danger-ghost {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, #C0473E 40%, var(--color-line));
+  color: #E48A82;
+  font-size: 11px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
+/* ── Inventory detail — advanced variants (magic, book, trinket, quest) — Slice C ── */
+/* Reqs: WIVC-CSS-01, WID4-CSS-01 (spec #1077). Scope: .inventory-init-* (WED-CSS-SCOPED-05). */
+
+/* Hero tints — per type class on .inventory-init-detail-hero */
+.inventory-init-detail-hero.magic {
+  background:
+    radial-gradient(at 0% 0%, rgba(168, 90, 142, 0.16), transparent 55%),
+    radial-gradient(at 100% 100%, rgba(212, 162, 76, 0.14), transparent 55%),
+    var(--color-paper-soft);
+  border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-line));
+}
+.inventory-init-detail-hero.book {
+  background: var(--color-paper-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-line));
+}
+.inventory-init-detail-hero.trinket {
+  background: var(--color-paper-soft);
+  border: 1px dashed var(--color-ink-soft);
+}
+.inventory-init-detail-hero.quest {
+  background:
+    radial-gradient(at 50% 0%, rgba(212, 162, 76, 0.25), transparent 65%),
+    var(--color-paper-soft);
+  border: 1px solid var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.inventory-init-detail-hero.magic .glyph   { color: var(--color-secondary); }
+.inventory-init-detail-hero.book .glyph    { color: var(--color-accent); }
+.inventory-init-detail-hero.trinket .glyph { color: var(--color-ink-soft); }
+.inventory-init-detail-hero.quest .glyph   { color: var(--color-accent); }
+
+/* Attunement pip strip — magic items (PHB p.138) */
+.inventory-init-detail-attune {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-paper-soft));
+  border-left: 3px solid var(--color-secondary);
+}
+.inventory-init-detail-attune .pip {
+  display: inline-block; width: 12px; height: 12px; border-radius: 99px;
+  background: var(--color-secondary);
+  box-shadow: 0 0 8px var(--color-secondary);
+}
+.inventory-init-detail-attune .lbl {
+  font-family: var(--font-mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--color-secondary);
+}
+.inventory-init-detail-attune .meta {
+  margin-left: auto; font-size: 11px; color: var(--color-ink-soft);
+}
+
+/* Bookpage card — book items (house rule PHB p.114; script font via --font-script L63) */
+.inventory-init-detail-bookpage {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.inventory-init-detail-bookpage::before,
+.inventory-init-detail-bookpage::after {
+  content: "❦";
+  position: absolute;
+  font-family: var(--font-display), serif;
+  font-size: 14px;
+  color: var(--color-accent);
+  opacity: 0.7;
+}
+.inventory-init-detail-bookpage::before { top: 6px; left: 8px; }
+.inventory-init-detail-bookpage::after  { bottom: 6px; right: 8px; }
+.inventory-init-detail-bookpage .passage {
+  font-family: var(--font-script);
+  font-size: 13px; line-height: 1.55;
+  color: var(--color-ink);
+  max-height: 220px; overflow-y: auto;
+  padding: 0 8px;
+}
+.inventory-init-detail-bookpage .progress {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+}
+.inventory-init-detail-bookpage .progress .lbl {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-mute);
+}
+.inventory-init-detail-bookpage .progress .bar {
+  height: 4px; border-radius: 99px; background: var(--color-line); overflow: hidden;
+}
+.inventory-init-detail-bookpage .progress .fill {
+  height: 100%; background: var(--color-accent);
+  transition: width 200ms ease;
+}
+
+/* Queststamp card — quest items (house rule §1.2) — ERC5: ellipsis at 375px */
+.inventory-init-detail-queststamp {
+  display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center;
+  padding: 12px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper-soft));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, var(--color-line));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+.inventory-init-detail-queststamp .symbol {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 99px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font-family: var(--font-display), serif;
+  font-size: 22px;
+}
+.inventory-init-detail-queststamp .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inventory-init-detail-queststamp .ttl {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-accent);
+}
+.inventory-init-detail-queststamp .qn {
+  font-family: var(--font-display); font-size: 14px; line-height: 1.2;
+  /* R3: max-width + ellipsis to prevent 375px overflow (ERC5) */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inventory-init-detail-queststamp .stg {
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-soft);
+}
+
+/* Filter CSS extension for book + quest (D4 chip unlock — WID4-CSS-01, R5) */
+.inventory-init-list[data-filter="book"]  .inventory-init-row:not([data-itype="book"])  { display: none; }
+.inventory-init-list[data-filter="quest"] .inventory-init-row:not([data-itype="quest"]) { display: none; }
+
+/* ── Palette: Obsidiana (default) ── */
+:root[data-palette="obsidian"],
 :root:not([data-palette]) {
-  --color-paper:         #F4EEE5;
-  --color-paper-soft:    #EBE2D2;
-  --color-surface:       #FFFFFF;
-  --color-surface-soft:  #FBF6EE;
-  --color-ink:           #271E33;
-  --color-ink-soft:      #574A6B;
-  --color-ink-mute:      #8A7E9D;
-  --color-line:          #E5DCC8;
-  --color-line-soft:     #F1E9DB;
-  --color-primary:       #6F86C9;
-  --color-primary-deep:  #4C63A6;
-  --color-primary-soft:  #E0E6F4;
-  --color-accent:        #E8946F;
-  --color-accent-deep:   #C46F4A;
-  --color-accent-soft:   #FBE5D8;
-  --color-secondary:     #B6829F;
-  --color-secondary-deep:#8E5C77;
-  --color-secondary-soft:#F3E1EA;
-  --color-success:       #79A07A;
-  --color-warning:       #D9B95E;
-  --color-warning-soft:  #FBF0D2;
-  --color-warning-deep:  #A8842A;
+  --color-paper:         #0B0A12;
+  --color-paper-soft:    #13111C;
+  --color-surface:       #1A1726;
+  --color-surface-soft:  #221E30;
+  --color-ink:           #F4EAD5;
+  --color-ink-soft:      #C9BFA8;
+  --color-ink-mute:      #8B8273;
+  --color-line:          #3A3145;
+  --color-line-soft:     #26212F;
+  --color-primary:       #5BB3C9;
+  --color-primary-deep:  #3A8FA8;
+  --color-primary-soft:  #1A2F38;
+  --color-accent:        #D4A24C;
+  --color-accent-deep:   #A87528;
+  --color-accent-soft:   #3A2D17;
+  --color-secondary:     #A85A8E;
+  --color-secondary-deep:#7F3F6B;
+  --color-secondary-soft:#2E1A28;
+  --color-danger:            #CC4444;
+  --color-danger-soft:       rgba(204, 68, 68, 0.12);
+  --color-danger-soft-border: rgba(204, 68, 68, 0.25);
+  --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
+  --color-secondary-soft-border:  rgba(168, 90, 142, 0.30);
+  --color-secondary-soft-bg:      rgba(168, 90, 142, 0.22);
 }
 
-/* ── Palette: Bosque ── */
-[data-palette="bosque"] {
-  --color-paper:         #EEF0E5;
-  --color-paper-soft:    #DDE2CE;
-  --color-surface:       #FAFBF6;
-  --color-surface-soft:  #F1F3E8;
-  --color-ink:           #1F2A22;
-  --color-ink-soft:      #3F5343;
-  --color-ink-mute:      #6E8475;
-  --color-line:          #D2DAC2;
-  --color-line-soft:     #E4EAD8;
-  --color-primary:       #5B8C5A;
-  --color-primary-deep:  #3A6539;
-  --color-primary-soft:  #DDE9D6;
-  --color-accent:        #C97A4B;
-  --color-accent-deep:   #9E5B30;
-  --color-accent-soft:   #F4DDC8;
-  --color-secondary:     #8E7351;
-  --color-secondary-deep:#634F33;
-  --color-secondary-soft:#E8DEC6;
-  --color-warning-soft:  #F4DDC8;
-  --color-warning-deep:  #9E5B30;
-}
-
-/* ── Palette: Reposo ── */
-[data-palette="reposo"] {
-  --color-paper:         #F5EFE5;
-  --color-paper-soft:    #E7DEC9;
-  --color-surface:       #FBF7EE;
-  --color-surface-soft:  #F3ECDA;
-  --color-ink:           #2A2926;
-  --color-ink-soft:      #5A554D;
-  --color-ink-mute:      #8C8478;
-  --color-line:          #DDD2BC;
-  --color-line-soft:     #EAE0CC;
-  --color-primary:       #58804F;
-  --color-primary-deep:  #3E5E37;
-  --color-primary-soft:  #D8E2CE;
-  --color-accent:        #B83E3E;
-  --color-accent-deep:   #8C2E2E;
-  --color-accent-soft:   #F1D4D4;
-  --color-secondary:     #C97DA0;
-  --color-secondary-deep:#95577A;
-  --color-secondary-soft:#F0D9E3;
-  --color-warning-soft:  #F1D4D4;
-  --color-warning-deep:  #8C2E2E;
-}
+/* Alternate palettes (sangremoon, verdant) — placeholders.
+   Values live in docs/design_handoff_dungeon_hub/design-system/dh-obsidian.css
+   and should be ported when the palette picker UI is implemented. */
 
 /* Indeterminate loading bar used by WizardFooterNav while a server action runs. */
 @keyframes wizard-loading {

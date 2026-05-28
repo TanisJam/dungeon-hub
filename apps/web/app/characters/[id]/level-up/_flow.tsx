@@ -1,23 +1,52 @@
 'use client';
 
 /**
- * LevelUpFlow — 6-step stepper for play-time level-up.
+ * LevelUpFlow — step-graph-driven stepper for play-time level-up.
  *
- * Steps: mode → class → hp → asi-feat (conditional) → spells (conditional) → review
+ * Steps: mode → class → hp → subclass (cond.) → asi-feat (cond.) → spells (cond.) → review
  *
  * Mobile-first: fullscreen at 375px, centered panel on md+.
  * REQ-CLU-PLAY-TIME-AUTH, REQ-CLU-BODY-DISCRIMINATOR, REQ-CLU-HP-DELTA-ATOMIC.
+ * REQ-CLU-GRAPH-BUILD-ACTIVE-STEPS, REQ-CLU-GRAPH-PREV-FROM-REVIEW.
+ * REQ-CLU-GRAPH-TOTAL-STEPS-DERIVED.
  *
- * SDD multiclass-class-step (spec #878 / design #879).
+ * SDD level-up-choices-completion (C4).
  */
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { submitLevelUp, type LevelUpBody, type LevelUpSummary } from './actions';
+import {
+  submitLevelUp,
+  retrySaveSpells,
+  getSpellOptions,
+  type LevelUpBody,
+  type LevelUpSummary,
+  type AppliedClassSpellsForAction,
+} from './actions';
+import {
+  buildActiveSteps,
+  nextStep,
+  prevStep,
+  totalActiveSteps,
+  currentStepIndex,
+  type FlowState,
+  type StepId,
+  type Mode,
+  type HpMethod,
+  type AsiFeatKind,
+  type FlowCtx,
+  type ClassRef,
+} from './_step-graph';
+import { SubclassStep } from './_subclass-step';
+import { SpellsStep } from './_spells-step';
+import type { SubclassRow } from '@/app/characters/[id]/wizard/class/_picker';
+import type {
+  SpellLimitsView,
+  AvailableSpell,
+  AppliedClassSpells,
+} from '@/app/characters/[id]/wizard/spells/_picker';
 
 // ---- Types ------------------------------------------------------------------
-
-type ClassRef = { slug: string; source: string };
 
 interface OwnedClass {
   slug: string;
@@ -27,30 +56,17 @@ interface OwnedClass {
   isAsiLevel: boolean; // true if (level + 1) is an ASI level for this class
 }
 
-type Mode = 'same-class' | 'new-class';
-type Step = 'mode' | 'class' | 'hp' | 'asi-feat' | 'review';
-type HpMethod = 'average' | 'roll';
-type AsiFeatKind = 'asi' | 'feat' | null;
-
-interface FlowState {
-  step: Step;
-  mode: Mode | null;
-  selectedClass: ClassRef | null;
-  hpMethod: HpMethod;
-  asiFeat: AsiFeatKind;
-  asiDeltas: Partial<Record<string, number>>;
-}
-
-const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-const ABILITY_LABELS: Record<string, string> = {
-  str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
-};
-
 interface LevelUpFlowProps {
   characterId: string;
   ownedClasses: OwnedClass[];
   multiclassingEnabled: boolean;
   characterName: string;
+  flowCtx: FlowCtx;
+  subclassesByClass: Record<string, SubclassRow[]>;
+  /** Spell limits at toLevel per caster class. Computed server-side in page.tsx. */
+  spellLimitsByClass: Record<string, SpellLimitsView>;
+  /** Existing spell picks per class (for pre-seeding the spells step). */
+  existingSpellsByClass: Record<string, AppliedClassSpells>;
 }
 
 const INITIAL_STATE: FlowState = {
@@ -60,6 +76,13 @@ const INITIAL_STATE: FlowState = {
   hpMethod: 'average',
   asiFeat: null,
   asiDeltas: {},
+  subclass: null,
+  spellPicks: null,
+};
+
+const ABILITY_KEYS = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+const ABILITY_LABELS: Record<string, string> = {
+  str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR',
 };
 
 export function LevelUpFlow({
@@ -67,73 +90,128 @@ export function LevelUpFlow({
   ownedClasses,
   multiclassingEnabled,
   characterName,
+  flowCtx,
+  subclassesByClass,
+  spellLimitsByClass,
+  existingSpellsByClass,
 }: LevelUpFlowProps) {
   const router = useRouter();
   const [state, setState] = useState<FlowState>(INITIAL_STATE);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<LevelUpSummary | null>(null);
+  const [partialSpellsError, setPartialSpellsError] = useState<{ code: string; message: string } | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Spell options (availableSpells) — fetched client-side when spells step is active.
+  const [availableSpells, setAvailableSpells] = useState<AvailableSpell[] | null>(null);
+  const [spellSubclassGrants, setSpellSubclassGrants] = useState<string[]>([]);
 
   function update(partial: Partial<FlowState>) {
     setState((s) => ({ ...s, ...partial }));
     setError(null);
   }
 
+  // Fetch spell options when the spells step becomes active.
+  // Clears previous results when class changes (different slug → different pool).
+  useEffect(() => {
+    if (state.step !== 'spells' || !state.selectedClass) return;
+    const { slug } = state.selectedClass;
+
+    let cancelled = false;
+    setAvailableSpells(null); // reset to loading state
+
+    getSpellOptions(characterId, slug).then((result) => {
+      if (cancelled) return;
+      setAvailableSpells(result?.availableSpells ?? []);
+      setSpellSubclassGrants(result?.subclassGrantedSlugs ?? []);
+    });
+
+    return () => { cancelled = true; };
+  }, [state.step, state.selectedClass?.slug, characterId]);
+
   // ---- Navigation helpers ---------------------------------------------------
 
-  function goToStep(step: Step) {
+  function goToStep(step: StepId) {
     update({ step });
   }
 
   function handleBack() {
-    const { step, mode } = state;
-    if (step === 'class') goToStep('mode');
-    else if (step === 'hp') goToStep('class');
-    else if (step === 'asi-feat') goToStep('hp');
-    else if (step === 'review') {
-      // Jump back to asi-feat if the selected class needs it, else hp
-      const owned = ownedClasses.find(
-        (c) => c.slug === state.selectedClass?.slug,
-      );
-      goToStep(mode === 'same-class' && owned?.isAsiLevel ? 'asi-feat' : 'hp');
-    }
+    const prev = prevStep(state, flowCtx);
+    if (prev) goToStep(prev);
   }
 
   // ---- Step transitions -----------------------------------------------------
 
   function handleModeSelect(mode: Mode) {
-    update({ mode, selectedClass: null, step: 'class' });
+    // Build tentative state to compute next step
+    const tentative: FlowState = {
+      ...INITIAL_STATE,
+      mode,
+      step: 'mode',
+    };
+    const next = nextStep(tentative, flowCtx) ?? 'class';
+    update({ mode, selectedClass: null, subclass: null, spellPicks: null, asiFeat: null, asiDeltas: {}, step: next });
   }
 
   function handleClassSelect(cls: ClassRef) {
-    const owned = ownedClasses.find((c) => c.slug === cls.slug);
-    // Check if the next level is an ASI level (only relevant for same-class)
-    update({ selectedClass: cls, step: 'hp' });
-    // Store whether we'll need the asi-feat step
+    // Build tentative state to compute next step from 'class'
+    const tentative: FlowState = {
+      ...state,
+      selectedClass: cls,
+      step: 'class',
+      subclass: null,
+      spellPicks: null,
+      asiFeat: null,
+      asiDeltas: {},
+    };
+    const next = nextStep(tentative, flowCtx) ?? 'hp';
     setState((s) => ({
       ...s,
       selectedClass: cls,
-      step: 'hp',
-      // pre-clear any previous asi picks
+      step: next,
+      subclass: null,
+      spellPicks: null,
       asiFeat: null,
       asiDeltas: {},
     }));
+    setError(null);
   }
 
   function handleHpContinue(method: HpMethod) {
-    const owned = ownedClasses.find((c) => c.slug === state.selectedClass?.slug);
-    const needsAsiFeat = state.mode === 'same-class' && owned?.isAsiLevel;
-    update({ hpMethod: method, step: needsAsiFeat ? 'asi-feat' : 'review' });
+    const tentative: FlowState = { ...state, hpMethod: method, step: 'hp' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ hpMethod: method, step: next });
+  }
+
+  function handleSubclassContinue(sub: ClassRef) {
+    const tentative: FlowState = { ...state, subclass: sub, step: 'subclass' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ subclass: sub, step: next });
   }
 
   function handleAsiFeatContinue(kind: AsiFeatKind, deltas: Partial<Record<string, number>>) {
-    update({ asiFeat: kind, asiDeltas: deltas, step: 'review' });
+    const tentative: FlowState = { ...state, asiFeat: kind, asiDeltas: deltas, step: 'asi-feat' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ asiFeat: kind, asiDeltas: deltas, step: next });
+  }
+
+  function handleSpellsContinue(picks: AppliedClassSpells) {
+    // Store as AppliedClassSpellsLite (compatible shape for FlowState)
+    const spellPicks = {
+      cantrips: picks.cantrips,
+      known: picks.known,
+      prepared: picks.prepared,
+    };
+    const tentative: FlowState = { ...state, spellPicks, step: 'spells' };
+    const next = nextStep(tentative, flowCtx) ?? 'review';
+    update({ spellPicks, step: next });
   }
 
   // ---- Submit ---------------------------------------------------------------
 
   function handleSubmit() {
-    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas } = state;
+    const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass, spellPicks } = state;
     if (!selectedClass || !mode) return;
 
     const body: LevelUpBody =
@@ -145,6 +223,8 @@ export function LevelUpFlow({
             ...(asiFeat === 'asi'
               ? { asiFeat: { kind: 'asi', deltas: asiDeltas } }
               : {}),
+            ...(subclass ? { subclass } : {}),
+            ...(spellPicks ? { spellPicks: spellPicks as AppliedClassSpellsForAction } : {}),
           }
         : {
             kind: 'new-class',
@@ -154,12 +234,33 @@ export function LevelUpFlow({
 
     startTransition(async () => {
       const result = await submitLevelUp(characterId, body);
-      if (!result.ok) {
+      if (result.ok === false) {
         setError(result.error);
+        return;
+      }
+      if (result.ok === 'partial') {
+        setSummary(result.summary);
+        setPartialSpellsError(result.spellsError);
         return;
       }
       setSummary(result.summary);
     });
+  }
+
+  async function handleRetrySpells() {
+    if (!state.selectedClass || !state.spellPicks) return;
+    setIsRetrying(true);
+    const result = await retrySaveSpells(
+      characterId,
+      state.selectedClass.slug,
+      state.spellPicks as AppliedClassSpellsForAction,
+    );
+    setIsRetrying(false);
+    if (result.ok) {
+      setPartialSpellsError(null);
+    } else {
+      setPartialSpellsError({ code: result.error, message: 'Error al reintentar guardar hechizos.' });
+    }
   }
 
   // ---- Summary screen (after success) --------------------------------------
@@ -168,6 +269,9 @@ export function LevelUpFlow({
     return (
       <SuccessScreen
         summary={summary}
+        partialSpellsError={partialSpellsError}
+        isRetrying={isRetrying}
+        onRetrySpells={handleRetrySpells}
         onDone={() => router.push(`/characters/${characterId}`)}
       />
     );
@@ -175,16 +279,27 @@ export function LevelUpFlow({
 
   // ---- Stepper shell -------------------------------------------------------
 
-  const stepNum: Record<Step, number> = {
-    mode: 1, class: 2, hp: 3, 'asi-feat': 4, review: 5,
+  const total = totalActiveSteps(state, flowCtx);
+  const current = currentStepIndex(state, flowCtx);
+  const hasPrev = prevStep(state, flowCtx) !== null;
+
+  // Subclass title lookup (localized) — used in the subclass step header
+  const SUBCLASS_TITLES: Record<string, string> = {
+    barbarian: 'Camino primigenio', bard: 'Colegio de bardo', cleric: 'Dominio divino',
+    druid: 'Círculo druídico', fighter: 'Arquetipo marcial', monk: 'Tradición monástica',
+    paladin: 'Juramento sagrado', ranger: 'Arquetipo de guardabosques', rogue: 'Arquetipo pícaro',
+    sorcerer: 'Origen de hechicero', warlock: 'Patrón sobrenatural', wizard: 'Tradición arcana',
   };
-  const totalSteps = 5;
+  const subclassTitle = SUBCLASS_TITLES[state.selectedClass?.slug ?? ''] ?? 'Subclase';
+  const subclassRows = state.selectedClass
+    ? (subclassesByClass[state.selectedClass.slug] ?? null)
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-2xl md:shadow-xl">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-        {state.step !== 'mode' && (
+        {hasPrev && (
           <button
             type="button"
             onClick={handleBack}
@@ -199,7 +314,7 @@ export function LevelUpFlow({
           <p className="truncate text-sm font-bold text-ink">{characterName}</p>
         </div>
         <span className="shrink-0 text-xs text-ink-mute">
-          {stepNum[state.step]}/{totalSteps}
+          {current}/{total}
         </span>
       </div>
 
@@ -207,7 +322,7 @@ export function LevelUpFlow({
       <div className="h-1 bg-paper-muted">
         <div
           className="h-full bg-primary transition-all"
-          style={{ width: `${(stepNum[state.step] / totalSteps) * 100}%` }}
+          style={{ width: `${(current / total) * 100}%` }}
         />
       </div>
 
@@ -244,9 +359,40 @@ export function LevelUpFlow({
           />
         )}
 
+        {state.step === 'subclass' && state.selectedClass && (
+          <SubclassStep
+            selectedClass={state.selectedClass}
+            subclassTitle={subclassTitle}
+            rows={subclassRows}
+            onContinue={handleSubclassContinue}
+          />
+        )}
+
         {state.step === 'asi-feat' && (
           <AsiFeatStep
             onContinue={handleAsiFeatContinue}
+          />
+        )}
+
+        {state.step === 'spells' && state.selectedClass && (
+          <SpellsStep
+            classSlug={state.selectedClass.slug}
+            classSource={state.selectedClass.source}
+            limits={spellLimitsByClass[state.selectedClass.slug] ?? {
+              cantripsKnown: 0,
+              spellsKnown: null,
+              spellsPrepared: null,
+              maxSpellLevel: 0,
+              ability: null,
+            }}
+            availableSpells={availableSpells}
+            subclassGrantedSlugs={spellSubclassGrants}
+            initialValue={existingSpellsByClass[state.selectedClass.slug] ?? {
+              cantrips: [],
+              known: [],
+              prepared: [],
+            }}
+            onContinue={handleSpellsContinue}
           />
         )}
 
@@ -354,8 +500,6 @@ function ClassStep({
 }
 
 function NewClassStep({ onSelect }: { onSelect: (cls: ClassRef) => void }) {
-  const [slug, setSlug] = useState('');
-
   const AVAILABLE_CLASSES = [
     'barbarian', 'bard', 'cleric', 'druid', 'fighter',
     'monk', 'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard',
@@ -561,7 +705,7 @@ function ReviewStep({
   onSubmit: () => void;
   onBack: () => void;
 }) {
-  const { mode, selectedClass, hpMethod, asiFeat, asiDeltas } = state;
+  const { mode, selectedClass, hpMethod, asiFeat, asiDeltas, subclass } = state;
   const owned = mode === 'same-class';
 
   return (
@@ -580,6 +724,9 @@ function ReviewStep({
           label="HP"
           value={hpMethod === 'average' ? 'Promedio' : 'Tirar dado (el servidor tira)'}
         />
+        {subclass && (
+          <Row label="Subclase" value={subclass.slug} />
+        )}
         {asiFeat === 'asi' && Object.keys(asiDeltas).length > 0 && (
           <Row
             label="ASI"
@@ -616,9 +763,15 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function SuccessScreen({
   summary,
+  partialSpellsError,
+  isRetrying,
+  onRetrySpells,
   onDone,
 }: {
   summary: LevelUpSummary;
+  partialSpellsError: { code: string; message: string } | null;
+  isRetrying: boolean;
+  onRetrySpells: () => void;
   onDone: () => void;
 }) {
   return (
@@ -632,6 +785,24 @@ function SuccessScreen({
         </p>
       </div>
 
+      {/* Partial spell save warning (REQ-CLU-SPL-TWO-PHASE-SUBMIT) */}
+      {partialSpellsError && (
+        <div className="w-full max-w-xs rounded-xl border border-warning-soft bg-warning-soft/30 p-4 text-left">
+          <p className="text-xs text-warning-deep">
+            Subiste de nivel, pero los hechizos no se guardaron. {partialSpellsError.code}.
+            Tocá «Reintentar guardar hechizos» para reintentar.
+          </p>
+          <button
+            type="button"
+            onClick={onRetrySpells}
+            disabled={isRetrying}
+            className="mt-2 min-h-[44px] w-full rounded-lg border border-warning-deep bg-paper px-4 py-2 text-xs font-semibold text-warning-deep disabled:opacity-50"
+          >
+            {isRetrying ? 'Reintentando…' : 'Reintentar guardar hechizos'}
+          </button>
+        </div>
+      )}
+
       <dl className="w-full max-w-xs space-y-2 rounded-xl border border-line bg-paper-soft p-4 text-left">
         <Row label="HP ganados" value={`+${summary.hpDelta}`} />
         {summary.rollUsed !== null && (
@@ -642,6 +813,20 @@ function SuccessScreen({
           <Row label="ASI/Dote" value={summary.asiFeatApplied === 'asi' ? 'Atributo' : 'Dote'} />
         )}
       </dl>
+
+      {/* Features unlocked section (REQ-CLU-FTR-SUCCESS-SCREEN) */}
+      {(summary.featuresUnlocked?.length ?? 0) > 0 && (
+        <section className="w-full max-w-xs rounded-xl border border-line bg-paper-soft p-4 text-left">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute">
+            Características nuevas
+          </p>
+          <ul className="space-y-1.5 text-sm text-ink">
+            {summary.featuresUnlocked!.map((f) => (
+              <li key={f.name}>• {f.name}</li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <button
         type="button"

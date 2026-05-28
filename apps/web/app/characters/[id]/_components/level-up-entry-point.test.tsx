@@ -2,11 +2,12 @@
  * LevelUpEntryPoint — visibility matrix tests.
  *
  * REQ-CLU-UI-ENTRY visibility rules:
- *   - active + non-gm + enough XP → shown
+ *   - active + owner + enough XP → shown
  *   - draft → hidden
- *   - active + gm → hidden (DM should not level up player chars)
- *   - active + non-gm + insufficient XP → hidden
+ *   - active + non-owner → hidden (even if caller is the world's GM)
+ *   - active + owner + insufficient XP → hidden
  *   - active + totalLevel 14 (cap) → hidden
+ *   - active + owner who is ALSO the world's GM → shown (regression: owner==gm case)
  */
 
 import React from 'react';
@@ -19,11 +20,11 @@ const BASE = {
   status: 'active',
   totalLevel: 1,
   xp: 300, // exactly enough for L2
-  callerRole: 'player' as const,
+  isOwner: true,
 };
 
 describe('LevelUpEntryPoint — visibility', () => {
-  it('EP-1: active player with sufficient XP → shows pill', () => {
+  it('EP-1: active owner with sufficient XP → shows pill', () => {
     render(<LevelUpEntryPoint {...BASE} />);
     expect(screen.getByRole('link', { name: /subir de nivel/i })).toBeTruthy();
   });
@@ -33,20 +34,19 @@ describe('LevelUpEntryPoint — visibility', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('EP-3: gm caller → hidden (DM does not level up player chars)', () => {
-    const { container } = render(<LevelUpEntryPoint {...BASE} callerRole="gm" />);
+  it('EP-3: non-owner caller → hidden', () => {
+    const { container } = render(<LevelUpEntryPoint {...BASE} isOwner={false} />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('EP-4: null callerRole → shown (non-member still could be player)', () => {
-    // callerRole null means the world fetch failed; we show the button optimistically
-    // since the API will enforce ownership. But spec says only non-gm.
-    // null is not 'gm' so the button is shown.
-    render(<LevelUpEntryPoint {...BASE} callerRole={null} />);
+  it('EP-4: owner who is also the world GM → shown (DM levels up own char)', () => {
+    // Regression: previous logic hid the pill whenever callerRole==='gm', which
+    // broke single-user DM-also-player setups. Ownership is the only gate now.
+    render(<LevelUpEntryPoint {...BASE} isOwner={true} />);
     expect(screen.getByRole('link', { name: /subir de nivel/i })).toBeTruthy();
   });
 
-  it('EP-5: active player with insufficient XP (299) → hidden', () => {
+  it('EP-5: active owner with insufficient XP (299) → hidden', () => {
     const { container } = render(
       <LevelUpEntryPoint {...BASE} xp={299} />,
     );

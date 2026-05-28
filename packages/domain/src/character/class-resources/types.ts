@@ -6,10 +6,26 @@
  * recovery trigger consumed by `/rest/{short,long}`.
  *
  * Origin: SDD `rules-audit-class-features` (engram #815).
+ * Foundation extended in SDD `class-resource-bardic-inspiration` (engram #931)
+ * with uniform `ResourceCtx` callbacks for ability-mod max, level-gated
+ * recovery transitions, and dynamic `extra` emission.
  */
+import type { AbilityKey } from '../stats/types.js';
 
 /** When a resource's `used` counter resets. */
 export type RecoveryTrigger = 'short' | 'long' | 'both';
+
+/**
+ * Context passed to every ClassResourceDef callback.
+ *
+ * Carries the matching class's level on the character + their effective
+ * ability modifiers (post-ASI/feat/race). Defs that don't need ability
+ * mods simply ignore them (Fighter Second Wind, Monk Ki Points).
+ */
+export interface ResourceCtx {
+  classLevel: number;
+  abilityMods: Readonly<Record<AbilityKey, number>>;
+}
 
 /**
  * Sheet view of a single class resource.
@@ -24,21 +40,21 @@ export interface ClassResource {
   classSlug: string;
   /** Uses currently consumed (clamped to [0, max] at derive time). */
   used: number;
-  /** Maximum uses at the character's current class level. */
+  /** Maximum uses at the character's current class level (+ ability mods). */
   max: number;
   recoveryTrigger: RecoveryTrigger;
   /**
-   * Optional feature-specific metadata. Forward-compat slot for:
-   *   - Bardic Inspiration die size (`{ dieSize: 'd6' | 'd8' | ... }`)
-   *   - Lay on Hands HP pool (`{ shape: 'pool', poolMax: number }`)
-   * Empty for the canonical Second Wind + Ki implementations.
+   * Optional feature-specific metadata. Emitted by `def.extraFor(ctx)` when
+   * the def declares one and it returns non-undefined.
+   *   - Bardic Inspiration: `{ dieSize: 'd6' | 'd8' | 'd10' | 'd12' }`
+   *   - Future: Lay on Hands pool shape, etc.
    */
   extra?: unknown;
 }
 
 /**
  * Definition of a class resource — the PHB-RAW rules that produce
- * `max` + `recoveryTrigger` from a class level.
+ * `max` + `recoveryTrigger` (and optional `extra`) from a resource ctx.
  *
  * Registry entries live in `./registry.ts`. Future SDDs may promote this to
  * the compendium (per-row flags on classes/subclasses) — see proposal #813
@@ -47,10 +63,26 @@ export interface ClassResource {
 export interface ClassResourceDef {
   slug: string;
   classSlug: string;
-  recoveryTrigger: RecoveryTrigger;
   /**
-   * Returns max uses at the given class level, or `null` if the resource is
+   * Optional subclass gate. When set, the resource is only emitted/reset
+   * when the character's class instance has a matching subclass slug.
+   * Example: Druid Natural Recovery requires Circle of the Land (PHB p.68).
+   */
+  subclassSlug?: string;
+  /**
+   * Returns max uses at the given context, or `null` if the resource is
    * not yet unlocked at that level (e.g. Ki unlocks at Monk L2).
    */
-  maxFor(classLevel: number): number | null;
+  maxFor(ctx: ResourceCtx): number | null;
+  /**
+   * Returns the recovery trigger at the given context. Allows level-gated
+   * transitions like Bardic Inspiration (long L1-4 → short L5+ per Font of
+   * Inspiration, PHB p.54).
+   */
+  recoveryTriggerFor(ctx: ResourceCtx): RecoveryTrigger;
+  /**
+   * Optional: emit a feature-specific extra payload. Returns `undefined`
+   * to omit the `extra` field from the derived `ClassResource`.
+   */
+  extraFor?(ctx: ResourceCtx): unknown | undefined;
 }

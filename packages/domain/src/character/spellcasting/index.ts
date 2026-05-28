@@ -28,3 +28,8 @@ export {
   type SpellsValidationIssue,
   type SpellsValidationResult,
 } from './validate-spells.js';
+export {
+  validateSpellsPick,
+  type SpellsPickIssue,
+  type SpellsPickIssueCode,
+} from './validate-spells-pick.js';

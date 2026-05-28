@@ -1,9 +1,14 @@
 /**
  * Tests for ClassResource shape.
- * Covers REQ-RAC-SHAPE from sdd/rules-audit-class-features/spec (#814).
+ * Covers REQ-RAC-SHAPE from sdd/rules-audit-class-features/spec (#814)
+ * + REQ-BRD-FND-RESOURCE-CTX from sdd/class-resource-bardic-inspiration/spec (#930).
  */
 import { describe, expect, it } from 'vitest';
-import type { ClassResource, ClassResourceDef, RecoveryTrigger } from './types.js';
+import type { ClassResource, ClassResourceDef, RecoveryTrigger, ResourceCtx } from './types.js';
+
+const ZERO_MODS: ResourceCtx['abilityMods'] = {
+  str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
+};
 
 describe('ClassResource — shape', () => {
   it('accepts a well-formed instance', () => {
@@ -32,15 +37,27 @@ describe('ClassResource — shape', () => {
 });
 
 describe('ClassResourceDef — shape', () => {
-  it('accepts a definition with a level-based formula', () => {
+  it('accepts a definition with ctx-based callbacks', () => {
     const def: ClassResourceDef = {
       slug: 'monk:ki-points',
       classSlug: 'monk',
-      recoveryTrigger: 'short',
-      maxFor: (lv) => (lv >= 2 ? lv : null),
+      maxFor: ({ classLevel }) => (classLevel >= 2 ? classLevel : null),
+      recoveryTriggerFor: () => 'short',
     };
-    expect(def.maxFor(1)).toBeNull();
-    expect(def.maxFor(5)).toBe(5);
+    expect(def.maxFor({ classLevel: 1, abilityMods: ZERO_MODS })).toBeNull();
+    expect(def.maxFor({ classLevel: 5, abilityMods: ZERO_MODS })).toBe(5);
+    expect(def.recoveryTriggerFor({ classLevel: 5, abilityMods: ZERO_MODS })).toBe('short');
+  });
+
+  it('optionally declares extraFor for dynamic per-level payloads', () => {
+    const def: ClassResourceDef = {
+      slug: 'sample:thing',
+      classSlug: 'sample',
+      maxFor: () => 1,
+      recoveryTriggerFor: () => 'long',
+      extraFor: ({ classLevel }) => ({ hint: `lvl-${classLevel}` }),
+    };
+    expect(def.extraFor?.({ classLevel: 3, abilityMods: ZERO_MODS })).toEqual({ hint: 'lvl-3' });
   });
 });
 

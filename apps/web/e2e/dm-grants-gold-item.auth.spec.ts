@@ -29,7 +29,7 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
    */
   async function navigateToFirstActivoChar(page: Page): Promise<string> {
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     const masterLink = page.locator('a[href^="/worlds/"]').first();
     const hasMasterLink = await masterLink.isVisible({ timeout: 3_000 }).catch(() => false);

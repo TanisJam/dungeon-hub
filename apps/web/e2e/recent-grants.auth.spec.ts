@@ -20,7 +20,7 @@ test.describe('RecentGrants widget — mobile smoke @ 375px', () => {
   }) => {
     // Navigate to dashboard to find a character link
     await page.goto('/dashboard');
-    await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
     // Find the first character link (Jugador section → character name → href to /characters/[id])
     const charLink = page.locator('a[href^="/characters/"]').first();

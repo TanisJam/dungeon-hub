@@ -239,6 +239,119 @@ describe('characters CRUD', () => {
     expect('campaignId' in body).toBe(false);
   });
 
+  // ── v3 list fields (spec personajes-v3-data: ACLE-LINEAGE-01, ACLE-HP-02) ──
+
+  it('GET /characters: row.lineage is composed from data.race + data.classes (ACLE-LINEAGE-01)', async () => {
+    const app = await getTestApp();
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          worldId: aliceWorldId,
+          name: 'Lineage Test',
+          data: {
+            race: { slug: 'lineage-test-human', source: 'phb' },
+            classes: [{ classSlug: 'lineage-test-fighter', source: 'phb', level: 3 }],
+          },
+        },
+      })
+      .then((r) => r.json());
+
+    const list = await app
+      .inject({
+        method: 'GET',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+      })
+      .then((r) => r.json());
+    const row = list.data.find((c: { id: string }) => c.id === created.id);
+    expect(row).toBeDefined();
+    expect(row.lineage).toBe('Lineage-test-human · Lineage-test-fighter 3');
+    // ACLE-BACKCOMPAT-03: prior fields preserved alongside new ones
+    expect(row.id).toBe(created.id);
+    expect(row.worldId).toBe(aliceWorldId);
+    expect(row.name).toBe('Lineage Test');
+    expect(row.status).toBe('draft');
+    expect(typeof row.xp).toBe('number');
+    expect(row.createdAt).toBeDefined();
+    expect(row.updatedAt).toBeDefined();
+  });
+
+  it('GET /characters: row.hpCurrent + row.hpMax come from data.hp; null when missing (ACLE-HP-02)', async () => {
+    const app = await getTestApp();
+    const withHp = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          worldId: aliceWorldId,
+          name: 'HP With',
+          data: { hp: { current: 28, max: 32 } },
+        },
+      })
+      .then((r) => r.json());
+
+    const withoutHp = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { worldId: aliceWorldId, name: 'HP Without', data: {} },
+      })
+      .then((r) => r.json());
+
+    const list = await app
+      .inject({
+        method: 'GET',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+      })
+      .then((r) => r.json());
+
+    const hpRow = list.data.find((c: { id: string }) => c.id === withHp.id);
+    expect(hpRow.hpCurrent).toBe(28);
+    expect(hpRow.hpMax).toBe(32);
+
+    const noHpRow = list.data.find((c: { id: string }) => c.id === withoutHp.id);
+    expect(noHpRow.hpCurrent).toBeNull();
+    expect(noHpRow.hpMax).toBeNull();
+  });
+
+  it('GET /characters: multiclass lineage sorted by level desc, joined with " / " (ACLE-LINEAGE-01)', async () => {
+    const app = await getTestApp();
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          worldId: aliceWorldId,
+          name: 'Multiclass Test',
+          data: {
+            race: { slug: 'multi-halfling', source: 'phb' },
+            classes: [
+              { classSlug: 'multi-rogue', source: 'phb', level: 1 },
+              { classSlug: 'multi-bard', source: 'phb', level: 3 },
+            ],
+          },
+        },
+      })
+      .then((r) => r.json());
+
+    const list = await app
+      .inject({
+        method: 'GET',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+      })
+      .then((r) => r.json());
+    const row = list.data.find((c: { id: string }) => c.id === created.id);
+    expect(row.lineage).toBe('Multi-halfling · Multi-bard 3 / Multi-rogue 1');
+  });
+
   it('sheet endpoint devuelve la ficha calculada para un draft vacío', async () => {
     const app = await getTestApp();
 

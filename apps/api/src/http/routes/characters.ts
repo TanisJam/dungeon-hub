@@ -21,7 +21,10 @@ import {
   removeItemFromInventory,
   transferItemBetweenCharacters,
   updateInventoryItem,
+  deriveV3Type,
+  normalizeRarity,
   type InventoryItem,
+  type ItemCompendiumLite,
 } from '@dungeon-hub/domain/character/inventory';
 import { validateLongRestEligibility } from '@dungeon-hub/domain/character/rest';
 import {
@@ -49,7 +52,7 @@ import {
   type LevelUpBody as DomainLevelUpBody,
 } from '@dungeon-hub/domain/character/level-up';
 import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
-import type { AbilityScores } from '@dungeon-hub/domain/character/stats';
+import { ABILITY_KEYS, type AbilityKey, type AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
@@ -59,6 +62,7 @@ import {
   getCharacterAccess,
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
+import { listRosterCharacters } from '../../use-cases/characters/list-roster-characters.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
@@ -71,6 +75,7 @@ import {
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
 import { buildFeatContext } from '../../use-cases/characters/build-feat-context.js';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
+import { loadInventoryDetail } from '../../use-cases/characters/load-inventory-detail.js';
 import { recordSessionEventForCharacter, routeTransferEvent } from '../../use-cases/sessions/events.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
 import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
@@ -87,6 +92,39 @@ import {
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
+
+/**
+ * Enriched inventory item for the v3 list view.
+ * Computed per-row at sheet projection time; reuses the existing loadItemDataMany batch.
+ * Design decision DA2 (sdd/inventory-v3-list #1064): magicFlag is an API-layer heuristic,
+ * not a domain rule — it mixes rarity + reqAttune signals as a UI affordance.
+ * Design decision DA3: additive field — inventory[] kept verbatim for read-path tolerance.
+ * ACSE-SHAPE-01 (spec #1063).
+ */
+interface EnrichedInventoryItem {
+  instanceId: string;
+  itemSlug: string;
+  itemSource: string;
+  displayName: string;
+  quantity: number;
+  /** true when item.state === 'equipped' */
+  equipped: boolean;
+  equipHand: 'main' | 'off' | 'both' | null;
+  charges: number | null;
+  /** V3 UI taxonomy derived from 5etools type codes + rarity (deriveV3Type). */
+  v3Type: ReturnType<typeof deriveV3Type>;
+  /** Normalized rarity slug or null (normalizeRarity). DMG p.135. */
+  rarity: ReturnType<typeof normalizeRarity>;
+  /** Raw reqAttune from compendium JSONB. PHB p.136-138. */
+  reqAttune: boolean | string | null;
+  /**
+   * True when item is non-common magic: (rarity != null && rarity !== 'common') || reqAttune != null.
+   * DA2: API-layer heuristic, not a PHB rule.
+   */
+  magicFlag: boolean;
+  weight: number | null;
+  qty: number;
+}
 
 const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
 
@@ -407,6 +445,17 @@ const UpdateInventoryItemBody = z
     equipHand: z.enum(['main', 'off', 'both']).nullable().optional(),
     charges: z.number().int().min(0).nullable().optional(),
     containerId: z.string().uuid().nullable().optional(),
+    /**
+     * DM-side v3 type override. Stored in JSONB. optional — absence preserves
+     * existing value (read-path tolerance per CLAUDE.md §11 + DC1).
+     * null = clear the override (fallback to derived v3Type).
+     * Only DM-assignable overrides: 'book' | 'quest' | 'trinket' | 'magic'.
+     * Req: ACVT-PATCH-01 (spec #1077).
+     */
+    v3TypeOverride: z
+      .enum(['book', 'quest', 'trinket', 'magic'])
+      .nullable()
+      .optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
@@ -499,35 +548,16 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
   // ---- GET /characters -----------------------------------------------------
   // Lista los personajes del user actual. Opcional ?campaign=:id para filtrar.
   // Opcional ?status=active,pending_approval (CSV) para filtrar por status.
+  // Returns row + lineage + hpCurrent/hpMax (SDD personajes-v3-data).
   app.get('/characters', { preHandler: app.authenticate }, async (request) => {
     const userId = request.user!.sub;
     const { campaign, status: statusFilter } = ListQuery.parse(request.query);
-
-    const conditions = [eq(characters.userId, userId)];
-    // Post-C2: characters belong to worlds, not campaigns. The `campaign` query param
-    // is kept for API compat but now filters by worldId (C5 will rename the param).
-    if (campaign) conditions.push(eq(characters.worldId, campaign));
-    if (statusFilter && statusFilter.length > 0) {
-      conditions.push(inArray(characters.status, statusFilter));
-    }
-
-    const whereExpr = conditions.length === 1 ? conditions[0] : and(...conditions);
-
-    const rows = await db
-      .select({
-        id: characters.id,
-        worldId: characters.worldId,
-        name: characters.name,
-        status: characters.status,
-        xp: characters.xp,
-        createdAt: characters.createdAt,
-        updatedAt: characters.updatedAt,
-      })
-      .from(characters)
-      .where(whereExpr)
-      .orderBy(characters.createdAt);
-
-    return { data: rows };
+    const data = await listRosterCharacters({
+      userId,
+      ...(campaign ? { worldId: campaign } : {}),
+      ...(statusFilter ? { statusFilter } : {}),
+    });
+    return { data };
   });
 
   // ---- GET /characters/:id -------------------------------------------------
@@ -681,15 +711,62 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // Augmented fields for sheet page (D.4):
     // currentHp: from character.data.hp.current (live HP tracking), falls back to null.
+    // tempHp: from character.data.hp.temp (temporary HP), falls back to 0.
     // inventory: the raw inventory array from the character row.
-    const hpData = (data as { hp?: { current?: number; max?: number } } | null)?.hp;
+    // statMethod: from character.data.statMethod (stat generation method), falls back to 'standard-array'.
+    const hpData = (data as { hp?: { current?: number; max?: number; temp?: number } } | null)?.hp;
     const currentHp = hpData?.current ?? null;
+    const tempHp = hpData?.temp ?? 0;
+    const statMethod = (data as { statMethod?: string } | null)?.statMethod ?? 'standard-array';
+
+    // ── inventoryEnriched: additive v3 list view data (ACSE-SHAPE-01) ──────────
+    // Reuses the existing itemWeights batch — zero new DB queries (ACSE-NONN1-01).
+    // Build a map from slug|source → ItemCompendiumLite for O(1) lookup per row.
+    const itemMap = new Map<string, ItemCompendiumLite>();
+    for (const lite of itemWeights) {
+      itemMap.set(`${lite.slug}|${lite.source}`, lite);
+    }
+
+    const inventoryEnriched: EnrichedInventoryItem[] = inventory.map((item: InventoryItem) => {
+      const lite = itemMap.get(`${item.itemSlug}|${item.itemSource}`);
+      const liteOrEmpty: ItemCompendiumLite = lite ?? {
+        slug: item.itemSlug,
+        source: item.itemSource,
+        name: item.itemSlug,
+        type: null,
+        weight: null,
+      };
+
+      const rarity = normalizeRarity(liteOrEmpty.rarity);
+      const reqAttune = liteOrEmpty.reqAttune ?? null;
+
+      return {
+        instanceId: item.instanceId,
+        itemSlug: item.itemSlug,
+        itemSource: item.itemSource,
+        displayName: item.customName ?? liteOrEmpty.name ?? item.itemSlug,
+        quantity: item.quantity,
+        equipped: item.state === 'equipped',
+        equipHand: item.equipHand ?? null,
+        charges: item.charges ?? null,
+        // ACVT-DERIVE-01: pass instance.v3TypeOverride so DM overrides propagate to sheet.
+        v3Type: deriveV3Type(liteOrEmpty, item.v3TypeOverride ?? null),
+        rarity,
+        reqAttune,
+        magicFlag: (rarity != null && rarity !== 'common') || reqAttune != null,
+        weight: liteOrEmpty.weight,
+        qty: item.quantity,
+      };
+    });
 
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
       currentHp,
+      tempHp,
+      statMethod,
       inventory,
+      inventoryEnriched,
     };
   });
 
@@ -1714,6 +1791,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         issues: [{ code: 'CLASS_NOT_FOUND', class: body.class }],
       });
     }
+    if (body.subclass && !subclassData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'SUBCLASS_NOT_FOUND', subclass: body.subclass }],
+      });
+    }
 
     // ---- variantRules.feats gate (play-time) ----------------------------------
     // Mirror of wizard-time pattern at line 3427. Gate fires before feat lookup
@@ -1851,7 +1934,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       payload: sessionPayload,
     });
 
-    return { character: updated, summary };
+    // Map featuresUnlocked from domain to API response shape.
+    // REQ-CLU-FTR-API-RESPONSE-SHAPE.
+    const featuresUnlocked = mutations.featuresUnlocked.map((f) => ({
+      name: f.featureName,
+      classSlug: f.classSlug,
+      level: f.level,
+    }));
+
+    return { character: updated, summary, featuresUnlocked };
   });
 
   // ---- POST /characters/:id/feats -----------------------------------------
@@ -1933,6 +2024,33 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send(updated);
   });
+
+  // ---- GET /characters/:id/inventory/:instanceId/detail -------------------
+  // Returns the detail view for a single inventory instance, projected by v3Type.
+  // ACIDE-SHAPE-01 (spec #1070). Reads-only — observers and world-members can access.
+  app.get(
+    '/characters/:id/inventory/:instanceId/detail',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, instanceId } = InventoryInstanceParams.parse(request.params);
+      const userId = request.user!.sub;
+
+      const result = await loadInventoryDetail({ characterId: id, instanceId, userId });
+      if (!result.ok) {
+        const status =
+          result.code === 'NOT_FOUND' ||
+          result.code === 'INSTANCE_NOT_FOUND' ||
+          result.code === 'ITEM_NOT_FOUND'
+            ? 404
+            : result.code === 'FORBIDDEN'
+              ? 403
+              : 400;
+        return reply.code(status).send({ error: result.code });
+      }
+
+      return reply.send({ detail: result.detail });
+    },
+  );
 
   // ---- POST /characters/:id/inventory -------------------------------------
   // Agrega un ítem al inventario. Hard rule: attune cap 3.
@@ -2128,6 +2246,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           ...(body.equipHand !== undefined ? { equipHand: body.equipHand } : {}),
           ...(body.charges !== undefined ? { charges: body.charges } : {}),
           ...(body.containerId !== undefined ? { containerId: body.containerId } : {}),
+          // ACVT-PATCH-01: v3TypeOverride passthrough to domain (DC1).
+          ...(body.v3TypeOverride !== undefined ? { v3TypeOverride: body.v3TypeOverride } : {}),
         },
         itemData,
         weights,
@@ -2762,7 +2882,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       hp: newHp,
       hitDice,
       warlockSlotsUsed: 0,
-      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsed, classes, 'short'),
+      classResourcesUsed: resetClassResourcesForRest(
+        currentResourcesUsed,
+        classes,
+        'short',
+        Object.fromEntries(
+          ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+        ) as Record<AbilityKey, number>,
+      ),
     };
 
     // Inventory recharge — PHB p.141: items with recharge='short' regain charges
@@ -2982,7 +3109,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
       warlockSlotsUsed: 0,
       // R-07: clear all class resources on long rest (PHB p.186).
-      classResourcesUsed: resetClassResourcesForRest(currentResourcesUsedLong, classes, 'long'),
+      classResourcesUsed: resetClassResourcesForRest(
+        currentResourcesUsedLong,
+        classes,
+        'long',
+        Object.fromEntries(
+          ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+        ) as Record<AbilityKey, number>,
+      ),
       // REST-03 (#826): persist server-clock timestamp for 24h cooldown gate.
       lastLongRestAt: new Date().toISOString(),
     };
@@ -3105,7 +3239,22 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const charData = (character.data as Record<string, unknown> | null) ?? {};
     const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
     const owningClass = classes.find((c) => c.slug === def.classSlug);
-    const max = owningClass != null ? def.maxFor(owningClass.level) : null;
+    const baseStats = (charData['baseStats'] as AbilityScores | undefined) ?? {
+      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
+    };
+    const racialAsis = ((charData['asisApplied'] as AppliedAsi[] | undefined) ?? []);
+    const levelUpAsis = (charData['levelUpAsis'] as AppliedAsi[] | undefined) ?? [];
+    const featAsis = ((charData['feats'] as AppliedFeat[] | undefined) ?? []).flatMap((f) =>
+      f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
+    );
+    const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+    const useAbilityMods = Object.fromEntries(
+      ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
+    ) as Record<AbilityKey, number>;
+    const max =
+      owningClass != null
+        ? def.maxFor({ classLevel: owningClass.level, abilityMods: useAbilityMods })
+        : null;
     if (max == null) {
       return reply
         .code(400)
@@ -3684,6 +3833,234 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .returning();
 
       return { character: updated, slots, applied: result.applied };
+    },
+  );
+
+  // ---- PUT /characters/:id/hp -----------------------------------------------
+  // Updates HP tracking fields. Owner may set current + temp only.
+  // DM (assertWorldGm) may set all three fields.
+  // If max lowered below current, current is clamped atomically.
+  // Spec: sdd/ficha-dm-affordances #995 — Requirement: PUT /characters/:id/hp
+
+  const HpPutBody = z
+    .object({
+      current: z.number().int().optional(),
+      max: z.number().int().optional(),
+      temp: z.number().int().optional(),
+    })
+    .refine((b) => b.current !== undefined || b.max !== undefined || b.temp !== undefined, {
+      message: 'at least one of current/max/temp required',
+    });
+
+  app.put('/characters/:id/hp', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = HpPutBody.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: body.error.issues });
+    }
+    const { current, max, temp } = body.data;
+
+    const userId = request.user!.sub;
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+
+    // Owner: may set current + temp; must NOT set max
+    if (access === 'owner') {
+      if (max !== undefined) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'HP_MAX_OWNER_FORBIDDEN' }],
+        });
+      }
+      // Validate field ranges
+      if (current !== undefined && current < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_CURRENT_NEGATIVE' }],
+        });
+      }
+      if (temp !== undefined && temp < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_TEMP_NEGATIVE' }],
+        });
+      }
+    } else {
+      // Check DM access — assertWorldGm(worldId, userId)
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({ error: 'FORBIDDEN', issues: [{ code: 'WORLD_GM_REQUIRED' }] });
+      }
+
+      // Validate field ranges for DM too
+      if (max !== undefined && max < 1) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_MAX_INVALID' }],
+        });
+      }
+      if (current !== undefined && current < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_CURRENT_NEGATIVE' }],
+        });
+      }
+      if (temp !== undefined && temp < 0) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'HP_TEMP_NEGATIVE' }],
+        });
+      }
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const existingHp = (charData['hp'] as { current?: number; max?: number; temp?: number } | undefined) ?? {};
+
+    const newMax = max !== undefined ? max : (existingHp.max ?? null);
+    let newCurrent = current !== undefined ? current : (existingHp.current ?? null);
+    const newTemp = temp !== undefined ? temp : (existingHp.temp ?? 0);
+
+    // Clamp current to new max if max was lowered below current
+    if (newMax !== null && newCurrent !== null && newCurrent > newMax) {
+      newCurrent = newMax;
+    }
+
+    const newHp = { current: newCurrent, max: newMax, temp: newTemp };
+
+    await db
+      .update(characters)
+      .set({ data: { ...charData, hp: newHp }, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+
+    return reply.code(200).send({ ok: true, hp: newHp });
+  });
+
+  // ---- PUT /characters/:id/classes/:classSlug/known -------------------------
+  // DM-only endpoint to directly set the known spells for a class.
+  // Bypasses SPELLS_KNOWN_EXCEEDED, KNOWN_NOT_ALLOWED, assertWritableForEdit.
+  // Preserves cantrips + prepared unchanged. Only replaces 'known'.
+  // Spec: sdd/ficha-dm-affordances #995 — Requirement: PUT /characters/:id/classes/:classSlug/known
+
+  const KnownOnlyBody = z.object({
+    known: z.array(
+      z.object({
+        slug: z.string().min(1),
+        source: z.string().min(1).optional(),
+      }),
+    ),
+  });
+
+  app.put(
+    '/characters/:id/classes/:classSlug/known',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, classSlug } = ClassSpellsParams.parse(request.params);
+      const body = KnownOnlyBody.safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: body.error.issues });
+      }
+      const { known } = body.data;
+
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // DM-only — assertWorldGm(worldId, userId) returns { ok: boolean }
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'DM_ONLY' }],
+        });
+      }
+
+      const charData = (character.data as Record<string, unknown> | null) ?? {};
+      const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
+      const appliedClass = classes.find((c) => c.slug === classSlug);
+      if (!appliedClass) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_ON_CHARACTER', classSlug }],
+        });
+      }
+
+      // Verify this class supports spellcasting
+      const ability = SPELLCASTING_ABILITY[appliedClass.slug];
+      if (!ability) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CLASS_NOT_CASTER', classSlug }],
+        });
+      }
+
+      // Duplicate slug check
+      const seenSlugs = new Set<string>();
+      for (const s of known) {
+        if (seenSlugs.has(s.slug)) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'DUPLICATE_SLUGS', slug: s.slug }],
+          });
+        }
+        seenSlugs.add(s.slug);
+      }
+
+      // Load available spells for this class (slug membership + cantrip check)
+      const campaign = await loadWorldById(character.worldId);
+      if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+      const availableSpells = await loadClassSpells({
+        classSlug,
+        ...(appliedClass.subclass?.slug ? { subclassSlug: appliedClass.subclass.slug } : {}),
+        rulesProfile: campaign.rulesProfile,
+      });
+
+      // Validate each slug in the known list
+      for (const spellRef of known) {
+        const found = availableSpells.find((s) => s.slug === spellRef.slug);
+        if (!found) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'SPELL_NOT_IN_CLASS_LIST', slug: spellRef.slug }],
+          });
+        }
+        if (found.level === 0) {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'CANTRIP_IN_KNOWN', slug: spellRef.slug }],
+          });
+        }
+      }
+
+      // Write: replace only 'known', preserve cantrips + prepared
+      const existingSpells = (charData['spells'] as Record<string, AppliedClassSpells> | undefined) ?? {};
+      const existingClassSpells = existingSpells[classSlug] ?? {
+        cantrips: [],
+        known: [],
+        prepared: [],
+      };
+
+      // Normalize SpellRef: source defaults to 'PHB' if not provided
+      const normalizedKnown: import('@dungeon-hub/domain/character/spellcasting').SpellRef[] = known.map(
+        (s) => ({ slug: s.slug, source: s.source ?? 'PHB' }),
+      );
+
+      const updatedClassSpells: AppliedClassSpells = {
+        ...existingClassSpells,
+        known: normalizedKnown,
+      };
+
+      const nextSpells = { ...existingSpells, [classSlug]: updatedClassSpells };
+
+      await db
+        .update(characters)
+        .set({ data: { ...charData, spells: nextSpells }, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+
+      return reply.code(200).send({ ok: true, classData: updatedClassSpells });
     },
   );
 };
