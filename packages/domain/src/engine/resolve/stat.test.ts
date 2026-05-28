@@ -2,22 +2,27 @@
  * resolveStat — pull-first stat resolution with provenance.
  *
  * // REQ-RESOLVE-01: pull-first provenance (c.2)
+ * // REQ-PROF-01: ProficiencyMod proficiency gather branch (c.2.2)
  *
  * The engine gathers modifiers from the registry at evaluation time,
  * applies type-level stacking, and returns { value, breakdown: Source[] }.
  *
- * Tests cover the 4 spec scenarios from REQ-RESOLVE-01:
+ * Tests cover the 4 spec scenarios from REQ-RESOLVE-01 + 3 from REQ-PROF-01:
  *   1. Basic numeric modifier with provenance (base + item mod → value + breakdown)
  *   2. Same-type stacking — keep highest (two item mods → only highest counts)
  *   3. Cross-type stacking — all apply (item + status → both in breakdown)
  *   4. Round-trip — serialize registry state → reload → identical value+breakdown
+ *   5. ProficiencyMod skill.athletics → breakdown includes {amount: pb, type:'untyped'}
+ *   6. ProficiencyMod level:'expertise' → amount = 2 * pb
+ *   7. ProficiencyMod round-trip JSON cycle preserves breakdown
  *
  * Design ref: sdd/resolution-engine/design — "Resolution algorithm" §5-step pipeline.
+ * Design ref: sdd/authoring-dsl/design — Decision 3, proficiency gather branch.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveStat } from './stat.js';
 import { createInMemoryRegistry } from '../registry/query.js';
-import type { EntityId, StatKey } from '../types.js';
+import type { EntityId, StatKey, ProficiencyMod } from '../types.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
 import type { EvaluationContext } from '../context.js';
 import type { NumMod } from '../types.js';
@@ -134,5 +139,91 @@ describe('resolveStat', () => {
     expect(reloadedResult.breakdown.map((s) => ({ amount: s.amount, type: s.type }))).toEqual(
       originalResult.breakdown.map((s) => ({ amount: s.amount, type: s.type })),
     );
+  });
+});
+
+// ── Proficiency gather branch (REQ-PROF-01 / Phase 2) ─────────────────────────
+
+function makeProficiencyModInstance(
+  id: string,
+  domain: ProficiencyMod['domain'],
+  ref: string,
+  label: string,
+  level?: ProficiencyMod['level'],
+  ownerId: EntityId = CHAR_ID,
+): ModifierInstance {
+  const def: ProficiencyMod = { kind: 'proficiency', domain, ref, ...(level !== undefined ? { level } : {}) };
+  return {
+    id: id as ModifierInstanceId,
+    def,
+    scope: {
+      owner: ownerId,
+      target: { axis: 'self' },
+      trigger: 'always',
+    },
+    label,
+  };
+}
+
+describe('resolveStat — proficiency gather branch (REQ-PROF-01)', () => {
+  it('ProficiencyMod skill.athletics → breakdown includes {amount: proficiencyBonus, type:"untyped"}', () => {
+    // REQ-PROF-01 / Scenario: Happy path — proficiency modifier gathered and projected as Source
+    // PHB 140 (Soldier background): "Skill Proficiencies: Athletics, Intimidation."
+    const proficiencyBonus = 2;
+    const registry = createInMemoryRegistry();
+    registry.register(makeProficiencyModInstance('prof-athletics', 'skill', 'athletics', 'Soldier (background)'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Soldier (background)');
+    expect(profSource, 'breakdown should include proficiency source').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
+  });
+
+  it('ProficiencyMod level:"expertise" → amount = 2 * proficiencyBonus', () => {
+    // REQ-PROF-01 / Scenario: Expertise doubles the proficiency bonus
+    // PHB 96 (Rogue): "Expertise — Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies."
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('exp-athletics', 'skill', 'athletics', 'Expertise (Rogue)', 'expertise'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, registry, proficiencyBonus);
+
+    const expSource = result.breakdown.find((s) => s.label === 'Expertise (Rogue)');
+    expect(expSource, 'breakdown should include expertise source').toBeDefined();
+    expect(expSource!.amount).toBe(2 * proficiencyBonus);
+    expect(expSource!.type).toBe('untyped');
+    expect(result.value).toBe(2 * proficiencyBonus);
+  });
+
+  it('round-trip JSON cycle: ProficiencyMod instance preserves breakdown after serialize+reload', () => {
+    // REQ-PROF-01 / Scenario: Round-trip — ProficiencyMod survives JSON serialization
+    // Plain-JSON-serializable: ProficiencyMod carries no functions.
+    const proficiencyBonus = 2;
+    const instance = makeProficiencyModInstance('rt-prof', 'skill', 'athletics', 'Soldier (background)');
+
+    // Serialize + reload
+    const serialized = JSON.stringify([instance]);
+    const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
+
+    const freshRegistry = createInMemoryRegistry();
+    for (const inst of reloaded) {
+      freshRegistry.register(inst);
+    }
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, freshRegistry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Soldier (background)');
+    expect(profSource, 'round-trip: proficiency source should be preserved').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
   });
 });
