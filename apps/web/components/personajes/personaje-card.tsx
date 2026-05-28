@@ -51,7 +51,9 @@ export function PersonajeCard({
           {char.name}
         </div>
         {char.lineage ? (
-          <div className="font-sans text-xs italic text-ink-mute">{char.lineage}</div>
+          <div data-testid="char-lineage" className="font-sans text-xs italic text-ink-mute">
+            {char.lineage}
+          </div>
         ) : null}
         <div className="mt-1 flex flex-wrap gap-1.5">
           {worldName ? <Pill size="sm" tone="ink">{worldName}</Pill> : null}

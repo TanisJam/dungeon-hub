@@ -269,6 +269,14 @@ describe('characters CRUD', () => {
     const row = list.data.find((c: { id: string }) => c.id === created.id);
     expect(row).toBeDefined();
     expect(row.lineage).toBe('Lineage-test-human · Lineage-test-fighter 3');
+    // ACLE-BACKCOMPAT-03: prior fields preserved alongside new ones
+    expect(row.id).toBe(created.id);
+    expect(row.worldId).toBe(aliceWorldId);
+    expect(row.name).toBe('Lineage Test');
+    expect(row.status).toBe('draft');
+    expect(typeof row.xp).toBe('number');
+    expect(row.createdAt).toBeDefined();
+    expect(row.updatedAt).toBeDefined();
   });
 
   it('GET /characters: row.hpCurrent + row.hpMax come from data.hp; null when missing (ACLE-HP-02)', async () => {

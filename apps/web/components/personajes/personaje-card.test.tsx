@@ -110,9 +110,13 @@ describe('PersonajeCard', () => {
   });
 
   it('WPVC-LINEAGE-LINE-01: no lineage line when empty', () => {
-    const { container } = render(<PersonajeCard char={{ ...baseChar, lineage: '' }} />);
-    // Lineage line uses italic styling; no italic descendant in body when empty.
-    expect(container.querySelector('.italic')).toBeNull();
+    render(<PersonajeCard char={{ ...baseChar, lineage: '' }} />);
+    expect(screen.queryByTestId('char-lineage')).toBeNull();
+  });
+
+  it('WPVC-PORTRAIT-CSS-04: portrait element has class personajes-portrait', () => {
+    const { container } = render(<PersonajeCard char={baseChar} />);
+    expect(container.querySelector('.personajes-portrait')).not.toBeNull();
   });
 
   it('WPVC-HP-PILL-02: HP pill rendered when active + hpCurrent + hpMax set', () => {
