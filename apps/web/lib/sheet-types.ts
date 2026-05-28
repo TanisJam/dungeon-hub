@@ -295,6 +295,58 @@ export type CharacterStatus =
   | 'retired'
   | 'dead';
 
+/**
+ * V3 UI taxonomy for inventory items.
+ * Mirror of domain V3ItemType — manually maintained (DA4: no domain import in client bundles).
+ * Design decision sdd/inventory-v3-list/design #1064 — D2.
+ */
+export type V3ItemType =
+  | 'weapon'
+  | 'armor'
+  | 'consumable'
+  | 'magic'
+  | 'food'
+  | 'trinket'
+  | 'book'
+  | 'quest';
+
+/**
+ * Canonical rarity tiers per DMG p.135.
+ * Mirror of domain RarityClass — manually maintained (DA4).
+ */
+export type RarityClass = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'legendary' | 'artifact';
+
+/**
+ * Enriched inventory item for the v3 list view.
+ * Mirrors the API EnrichedInventoryItem shape (ACSE-SHAPE-01, spec #1063).
+ * Optional on SheetResponse for read-path tolerance (DA3: additive field).
+ * Design decision sdd/inventory-v3-list/design #1064.
+ */
+export interface EnrichedInventoryItem {
+  instanceId: string;
+  itemSlug: string;
+  itemSource: string;
+  displayName: string;
+  quantity: number;
+  /** true when item.state === 'equipped' */
+  equipped: boolean;
+  equipHand: 'main' | 'off' | 'both' | null;
+  charges: number | null;
+  /** V3 UI taxonomy derived from 5etools type codes + rarity. */
+  v3Type: V3ItemType;
+  /** Normalized rarity slug or null. DMG p.135. */
+  rarity: RarityClass | null;
+  /** Raw reqAttune from compendium JSONB. PHB p.136-138. */
+  reqAttune: boolean | string | null;
+  /**
+   * True when item is non-common magic: (rarity != null && rarity !== 'common') || reqAttune != null.
+   * DA2: API-layer heuristic.
+   */
+  magicFlag: boolean;
+  weight: number | null;
+  qty: number;
+}
+
 export interface SheetResponse {
   character: {
     id: string;
@@ -310,4 +362,9 @@ export interface SheetResponse {
   /** Stat generation method. Defaults to 'standard-array' when absent (STATMETHOD-API-01). */
   statMethod?: 'standard-array' | 'point-buy' | 'roll';
   inventory: InventoryItem[];
+  /**
+   * Enriched inventory for v3 list view. Optional for read-path tolerance (DA3).
+   * inventoryEnriched items mirror inventory[] rows with v3Type, rarity, magicFlag added.
+   */
+  inventoryEnriched?: EnrichedInventoryItem[];
 }
