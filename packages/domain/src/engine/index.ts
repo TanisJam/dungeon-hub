@@ -25,6 +25,7 @@ export type {
   ReplaceMod,
   GmRulingMod,
   NoopMod,
+  ProficiencyMod,
   // Supporting types
   DurationSpec,
   EndCondition,
@@ -54,6 +55,7 @@ export {
   isReplaceMod,
   isGmRulingMod,
   isNoopMod,
+  isProficiencyMod,
 } from './types.js';
 
 // ── Provenance types ──────────────────────────────────────────────────────────
@@ -137,6 +139,26 @@ export type {
 export { PRONE_CONDITION_DEF } from './conditions/prone.js';
 export type { ConditionDefinition } from './conditions/prone.js';
 
+// ── Authoring DSL ─────────────────────────────────────────────────────────────
+
+export { parseRule } from './authoring/parse.js';
+export type { ParseResult, ParseOk, ParseFail, ParseIssue } from './authoring/parse.js';
+
+export { compileRule, EscapeHatchNotImplemented } from './authoring/compile.js';
+
+export { generateTestStub } from './authoring/testgen.js';
+
+export type { RuleDoc, RuleEmit, RuleParams, CompiledRule } from './authoring/types.js';
+
+// ── Character validation (final gate) ────────────────────────────────────────
+
+export { validateCharacterFinal } from './validate/character-final.js';
+export type {
+  CharacterFinalResult,
+  CharacterFinalIssue,
+  ProficiencyAlreadyGrantedIssue,
+} from './validate/character-final.js';
+
 // ── Rule builders ─────────────────────────────────────────────────────────────
 
 export { buildBlessModifiers } from './rules/bless.js';
@@ -165,3 +187,11 @@ export type {
   BuildWildShapeResult,
   ResolverNotInjectedIssue as WildShapeResolverNotInjectedIssue,
 } from './rules/wild-shape.js';
+
+// ── Authored rule builders (Slice 2 — DSL pipeline) ──────────────────────────
+
+export { buildSoldierAthleticsModifiers } from './rules/soldier-athletics.js';
+export { buildResilientConModifiers } from './rules/resilient-con.js';
+export { buildCloakOfProtectionModifiers } from './rules/cloak-of-protection.js';
+export { buildGuidanceModifiers } from './rules/guidance.js';
+export { buildFrightenedModifiers } from './rules/frightened.js';
