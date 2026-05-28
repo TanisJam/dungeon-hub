@@ -96,6 +96,24 @@ export interface ItemCompendiumLite {
    */
   costCp?: number | null;
   /**
+   * Raw 5etools rarity string (e.g. "rare", "very rare", "common").
+   * null when the compendium entry has no rarity field (most mundane items).
+   * Read-time projection from `data.rarity` — `extractRarity` in `load-item-data.ts`.
+   * Design decision sdd/inventory-v3-list/design #1064 — D3.
+   * Normalized form is obtained via `normalizeRarity(lite.rarity)` → `RarityClass | null`.
+   */
+  rarity?: string | null;
+  /**
+   * Attunement requirement from 5etools. Can be:
+   * - `true` — requires attunement (any class)
+   * - `string` — requires attunement by a specific class (e.g. "by a spellcaster")
+   * - `false | null` — no attunement required
+   * Read-time projection from `data.reqAttune` — `extractReqAttune` in `load-item-data.ts`.
+   * PHB p.136-138 — Magic Items (Attunement).
+   * Design decision sdd/inventory-v3-list/design #1064 — D3.
+   */
+  reqAttune?: boolean | string | null;
+  /**
    * Si el ítem es un container, define su capacidad y si "cancela" el peso
    * del contenido (Bag of Holding, Heward's Handy Haversack, etc.). null si
    * no es un container.
