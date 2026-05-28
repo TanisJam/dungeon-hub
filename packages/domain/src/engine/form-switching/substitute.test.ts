@@ -49,11 +49,14 @@ describe('applyFormSwitch — ReplaceMod substitution', () => {
       retain: ['int', 'wis', 'cha'],
     });
 
-    expect(result.value).toBe(18);
-    expect(result.breakdown).toHaveLength(1);
-    expect(result.breakdown[0]!.label).toBe('Wild Shape (beast form)');
-    expect(result.breakdown[0]!.type).toBe('ReplaceMod');
-    expect(result.breakdown[0]!.amount).toBe(18);
+    expect(result.gmRuling).toBeUndefined();
+    if (!result.gmRuling) {
+      expect(result.value).toBe(18);
+      expect(result.breakdown).toHaveLength(1);
+      expect(result.breakdown[0]!.label).toBe('Wild Shape (beast form)');
+      expect(result.breakdown[0]!.type).toBe('ReplaceMod');
+      expect(result.breakdown[0]!.amount).toBe(18);
+    }
   });
 
   it('retains INT from self when stat is in the retain list', () => {
@@ -65,9 +68,12 @@ describe('applyFormSwitch — ReplaceMod substitution', () => {
       retain: ['int', 'wis', 'cha'],
     });
 
-    expect(result.value).toBe(14); // self INT=14, beast INT=3 → retain self
-    expect(result.breakdown[0]!.label).toContain('retained');
-    expect(result.breakdown[0]!.type).toBe('retain');
+    expect(result.gmRuling).toBeUndefined();
+    if (!result.gmRuling) {
+      expect(result.value).toBe(14); // self INT=14, beast INT=3 → retain self
+      expect(result.breakdown[0]!.label).toContain('retained');
+      expect(result.breakdown[0]!.type).toBe('retain');
+    }
   });
 
   it('applies max(self,beast) policy for skill.perception when self bonus is higher', () => {
@@ -80,12 +86,15 @@ describe('applyFormSwitch — ReplaceMod substitution', () => {
       policy: 'max-self-beast',
     });
 
-    expect(result.value).toBe(5); // max(self=5, beast=3) = 5
-    expect(result.breakdown).toHaveLength(2);
-    // Both sources listed for traceability
-    const labels = result.breakdown.map((s) => s.label);
-    expect(labels.some((l) => l.includes('self'))).toBe(true);
-    expect(labels.some((l) => l.includes('beast'))).toBe(true);
+    expect(result.gmRuling).toBeUndefined();
+    if (!result.gmRuling) {
+      expect(result.value).toBe(5); // max(self=5, beast=3) = 5
+      expect(result.breakdown).toHaveLength(2);
+      // Both sources listed for traceability
+      const labels = result.breakdown.map((s) => s.label);
+      expect(labels.some((l) => l.includes('self'))).toBe(true);
+      expect(labels.some((l) => l.includes('beast'))).toBe(true);
+    }
   });
 
   it('returns gmRuling passthrough for equipment stat queries', () => {
