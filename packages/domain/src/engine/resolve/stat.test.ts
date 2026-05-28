@@ -287,3 +287,87 @@ describe('resolveStat — proficiency gather branch (REQ-PROF-01)', () => {
     expect(result.value).toBe(proficiencyBonus);
   });
 });
+
+// ── T2.6 Cross-stat isolation (REQ-RESOLVE-01) ────────────────────────────────
+//
+// REQ-RESOLVE-01: numeric mods apply only to their target stat (cross-stat isolation);
+// flat saving-throw = all saves.
+//
+// Bug: resolveStat line ~122 filters numInstances only by kind === 'num',
+// never by inst.def.stat === stat. A num{stat:'ac', value:1} would therefore
+// add +1 to EVERY stat resolution (str, attack-roll, etc.) — silent cross-stat
+// contamination. PHB has no mechanic where a generic item bonus applies to all stats.
+
+describe('resolveStat — T2.6 cross-stat isolation (REQ-RESOLVE-01)', () => {
+  it('(1) num{stat:"ac", value:1} does NOT affect resolveStat(…, "str", …)', () => {
+    // REQ-RESOLVE-01: cross-stat isolation. An AC bonus (e.g. Cloak of Protection +1 AC)
+    // MUST NOT add to STR. Currently FAILS because the num branch does not filter by stat.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('ac-mod', 1, 'item', 'ac'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'str', BASE_STR, ctx, registry);
+
+    // AC modifier must NOT leak into STR resolution.
+    expect(result.value).toBe(BASE_STR); // 10, not 11
+    const acSource = result.breakdown.find((s) => s.modifierId === 'ac-mod');
+    expect(acSource, 'AC modifier must not appear in STR breakdown').toBeUndefined();
+  });
+
+  it('(2) num{stat:"attack-roll", value:2} does NOT affect resolveStat(…, "ac", …)', () => {
+    // REQ-RESOLVE-01: cross-stat isolation. An attack-roll bonus must NOT pollute AC.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('atk-mod', 2, 'status', 'attack-roll'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'ac', 15, ctx, registry);
+
+    expect(result.value).toBe(15); // not 17
+    const atkSource = result.breakdown.find((s) => s.modifierId === 'atk-mod');
+    expect(atkSource, 'attack-roll modifier must not appear in AC breakdown').toBeUndefined();
+  });
+
+  it('(3) num{stat:"ac", value:1} DOES apply when resolving "ac" (exact match still works)', () => {
+    // Regression guard: after fixing cross-stat isolation the exact-match case must still work.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('ac-mod', 1, 'item', 'ac'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'ac', 15, ctx, registry);
+
+    expect(result.value).toBe(16); // 15 base + 1 AC mod
+    const acSource = result.breakdown.find((s) => s.modifierId === 'ac-mod');
+    expect(acSource, 'AC modifier must appear in AC breakdown').toBeDefined();
+    expect(acSource!.amount).toBe(1);
+  });
+
+  it('(4a) flat num{stat:"saving-throw", value:1} applies when resolving "saving-throw.con" (all-saves rule)', () => {
+    // PHB (Cloak of Protection, DMG 159): +1 to all saving throws.
+    // A flat 'saving-throw' numeric modifier MUST contribute to any per-ability save resolution.
+    // This is the "all-saves" semantic — must be PRESERVED by the stat-filter fix.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('cloak-all-saves', 1, 'item', 'saving-throw'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry);
+
+    const src = result.breakdown.find((s) => s.modifierId === 'cloak-all-saves');
+    expect(src, 'flat saving-throw +1 should appear in saving-throw.con breakdown').toBeDefined();
+    expect(src!.amount).toBe(1);
+    expect(result.value).toBe(1);
+  });
+
+  it('(4b) num{stat:"saving-throw.con", value:2} does NOT leak to "saving-throw.dex"', () => {
+    // REQ-RESOLVE-01: a per-ability save bonus must only apply to that ability's save.
+    // e.g. a feature that grants +2 to CON saves only must not affect DEX saves.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('con-save-bonus', 2, 'status', 'saving-throw.con' as StatKey));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.dex' as StatKey, 0, ctx, registry);
+
+    expect(result.value).toBe(0);
+    const src = result.breakdown.find((s) => s.modifierId === 'con-save-bonus');
+    expect(src, 'saving-throw.con bonus must not appear in saving-throw.dex breakdown').toBeUndefined();
+  });
+});
