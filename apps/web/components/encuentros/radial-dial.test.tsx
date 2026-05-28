@@ -16,6 +16,8 @@ describe('RadialDial', () => {
     const { container } = render(
       <RadialDial combatants={combatants} currentCombatantId="b" />,
     );
+    // WED-CSS-SCOPED-05: outer container has .encuentros-init
+    expect(container.querySelector('.encuentros-init')).not.toBeNull();
     const tokens = container.querySelectorAll('.encuentros-init-token');
     expect(tokens.length).toBe(combatants.length);
     const currents = container.querySelectorAll('.encuentros-init-token.current');
