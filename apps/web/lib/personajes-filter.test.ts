@@ -18,6 +18,9 @@ const makeChar = (
   status,
   xp: 0,
   updatedAt: '2026-01-01',
+  lineage: '',
+  hpCurrent: null,
+  hpMax: null,
 });
 
 const MIXED: RosterCharacter[] = [

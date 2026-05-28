@@ -26,6 +26,7 @@ const sizeClasses: Record<PillSize, string> = {
 export function Pill({ tone = 'stone', size = 'md', children }: PillProps) {
   return (
     <span
+      data-tone={tone}
       className={`inline-flex items-center gap-1 rounded-pill font-medium ${toneClasses[tone]} ${sizeClasses[size]}`}
     >
       {children}

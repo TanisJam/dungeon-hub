@@ -10,6 +10,9 @@ const baseChar: RosterCharacter = {
   status: 'active',
   xp: 100,
   updatedAt: '2026-01-01',
+  lineage: '',
+  hpCurrent: null,
+  hpMax: null,
 };
 
 describe('PersonajeCard', () => {
@@ -93,5 +96,46 @@ describe('PersonajeCard', () => {
     render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
     const link = screen.getByRole('link');
     expect(link.className).not.toContain('personajes-char-card-active');
+  });
+
+  // ── v3 design (spec personajes-v3-data) ──
+
+  it('WPVC-LINEAGE-LINE-01: lineage rendered when non-empty', () => {
+    render(
+      <PersonajeCard
+        char={{ ...baseChar, lineage: 'Semielfo · Bardo (Colegio del Saber) 4' }}
+      />,
+    );
+    expect(screen.getByText('Semielfo · Bardo (Colegio del Saber) 4')).toBeTruthy();
+  });
+
+  it('WPVC-LINEAGE-LINE-01: no lineage line when empty', () => {
+    const { container } = render(<PersonajeCard char={{ ...baseChar, lineage: '' }} />);
+    // Lineage line uses italic styling; no italic descendant in body when empty.
+    expect(container.querySelector('.italic')).toBeNull();
+  });
+
+  it('WPVC-HP-PILL-02: HP pill rendered when active + hpCurrent + hpMax set', () => {
+    render(
+      <PersonajeCard
+        char={{ ...baseChar, status: 'active', hpCurrent: 28, hpMax: 32 }}
+      />,
+    );
+    expect(screen.getByText('HP 28/32')).toBeTruthy();
+  });
+
+  it('WPVC-HP-PILL-02: no HP pill when hpCurrent/hpMax null', () => {
+    render(
+      <PersonajeCard
+        char={{ ...baseChar, status: 'active', hpCurrent: null, hpMax: null }}
+      />,
+    );
+    expect(screen.queryByText(/^HP /)).toBeNull();
+  });
+
+  it('WPVC-PENDING-TONE-03: pending_approval status pill has data-tone="pink"', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'pending_approval' }} />);
+    const pill = screen.getByText('Pendiente DM');
+    expect(pill.getAttribute('data-tone')).toBe('pink');
   });
 });

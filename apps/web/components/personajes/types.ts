@@ -14,6 +14,9 @@ export type RosterCharacter = {
   status: PersonajeStatus | string; // tolerate unknown server values
   xp: number;
   updatedAt: string;
+  lineage: string;
+  hpCurrent: number | null;
+  hpMax: number | null;
 };
 
 export type ChipCounts = {

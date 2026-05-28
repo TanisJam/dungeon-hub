@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_TONES: Record<string, PillTone> = {
   active: 'green',
-  pending_approval: 'amber',
+  pending_approval: 'pink',
   retired: 'stone',
   dead: 'stone',
   draft: 'stone',
@@ -43,15 +43,21 @@ export function PersonajeCard({
         highlight ? 'personajes-char-card-active' : 'border-line'
       }`}
     >
-      <div className="grid w-[72px] shrink-0 place-items-center border-r border-line bg-gradient-to-br from-[#2E1A28] to-[#1A1726] font-display text-[26px] font-bold text-accent">
+      <div className="personajes-portrait grid w-[72px] shrink-0 place-items-center border-r border-line font-display text-[26px] font-bold text-accent">
         {initial}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5">
         <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
           {char.name}
         </div>
+        {char.lineage ? (
+          <div className="font-sans text-xs italic text-ink-mute">{char.lineage}</div>
+        ) : null}
         <div className="mt-1 flex flex-wrap gap-1.5">
           {worldName ? <Pill size="sm" tone="ink">{worldName}</Pill> : null}
+          {char.status === 'active' && char.hpCurrent != null && char.hpMax != null ? (
+            <Pill size="sm" tone="coral">HP {char.hpCurrent}/{char.hpMax}</Pill>
+          ) : null}
           <Pill size="sm" tone={tone}>{label}</Pill>
         </div>
       </div>
