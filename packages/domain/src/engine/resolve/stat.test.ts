@@ -142,6 +142,66 @@ describe('resolveStat', () => {
   });
 });
 
+// ── T2.5 Per-ability saving-throw proficiency (REQ-PROF-02) ──────────────────
+//
+// PHB 168/179: Resilient grants proficiency in ONE ability's saves; saves are per-ability.
+// A `proficiency{domain:'save', ref:'con'}` must contribute ONLY to 'saving-throw.con',
+// NOT to 'saving-throw.dex' or any other per-ability save key.
+// A flat 'saving-throw' numeric mod (e.g. Cloak +1, Bless +1d4) MUST still apply
+// when resolving any per-ability key like 'saving-throw.con'.
+
+describe('resolveStat — per-ability saving-throw proficiency (T2.5 / REQ-PROF-02)', () => {
+  it('(a) proficiency{domain:"save", ref:"con"} contributes to resolveStat(…, "saving-throw.con", …)', () => {
+    // PHB 168/179: Resilient (Constitution) grants proficiency in CON saves ONLY.
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('prof-con-save', 'save', 'con', 'Resilient (Constitution)'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Resilient (Constitution)');
+    expect(profSource, 'breakdown should include CON-save proficiency source').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
+  });
+
+  it('(b) proficiency{domain:"save", ref:"con"} does NOT contribute to resolveStat(…, "saving-throw.dex", …)', () => {
+    // Bug-proof test: CON-save proficiency must NOT apply to DEX saves.
+    // PHB 168/179: each save proficiency is per-ability.
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('prof-con-save', 'save', 'con', 'Resilient (Constitution)'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.dex' as StatKey, 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Resilient (Constitution)');
+    expect(profSource, 'CON-save proficiency must not appear in DEX-save breakdown').toBeUndefined();
+    expect(result.value).toBe(0);
+  });
+
+  it('(c) flat "saving-throw" NumMod (+1) still applies when resolving "saving-throw.con" (all-saves semantic)', () => {
+    // PHB (Cloak of Protection, DMG 159): +1 to all saving throws.
+    // A flat 'saving-throw' numeric modifier must contribute to ANY per-ability save resolution.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('cloak-save', 1, 'item', 'saving-throw'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry);
+
+    const cloakSource = result.breakdown.find((s) => s.modifierId === 'cloak-save');
+    expect(cloakSource, 'flat saving-throw +1 should appear in saving-throw.con breakdown').toBeDefined();
+    expect(cloakSource!.amount).toBe(1);
+    expect(result.value).toBe(1);
+  });
+});
+
 // ── Proficiency gather branch (REQ-PROF-01 / Phase 2) ─────────────────────────
 
 function makeProficiencyModInstance(
