@@ -98,3 +98,51 @@ describe('InventoryDetailHero — WIDS-SHELL-01', () => {
     expect(chip.getAttribute('aria-pressed')).toBe('false');
   });
 });
+
+// ── Slice C: hero tint class assertions (T9) ──────────────────────────────────
+
+import type {
+  MagicDetailVariant,
+  BookDetailVariant,
+  TrinketDetailVariant,
+  QuestDetailVariant,
+} from '@/lib/sheet-types';
+
+describe('InventoryDetailHero — Slice C hero tints (T9)', () => {
+  it('applies "magic" tint class for v3Type==="magic"', () => {
+    const detail: MagicDetailVariant = {
+      ...makeWeapon(), v3Type: 'magic', attuneRequired: false, attuned: false,
+      restAttuneNote: '', powerName: null, powerDesc: null, charges: null, chargesMax: null,
+    };
+    const { container } = render(<InventoryDetailHero detail={detail} characterId="ch-1" />);
+    const hero = container.querySelector('.inventory-init-detail-hero');
+    expect(hero?.classList.contains('magic')).toBe(true);
+  });
+
+  it('applies "book" tint class for v3Type==="book"', () => {
+    const detail: BookDetailVariant = {
+      ...makeWeapon(), v3Type: 'book', passage: '…', pagesRead: 0, pages: 100, language: 'Común', knowledge: [],
+    };
+    const { container } = render(<InventoryDetailHero detail={detail} characterId="ch-1" />);
+    const hero = container.querySelector('.inventory-init-detail-hero');
+    expect(hero?.classList.contains('book')).toBe(true);
+  });
+
+  it('applies "trinket" tint class for v3Type==="trinket"', () => {
+    const detail: TrinketDetailVariant = {
+      ...makeWeapon(), v3Type: 'trinket', narrative: null,
+    };
+    const { container } = render(<InventoryDetailHero detail={detail} characterId="ch-1" />);
+    const hero = container.querySelector('.inventory-init-detail-hero');
+    expect(hero?.classList.contains('trinket')).toBe(true);
+  });
+
+  it('applies "quest" tint class for v3Type==="quest"', () => {
+    const detail: QuestDetailVariant = {
+      ...makeWeapon(), v3Type: 'quest', questName: 'Test', stage: 'Etapa 1', visibleTo: 'el grupo',
+    };
+    const { container } = render(<InventoryDetailHero detail={detail} characterId="ch-1" />);
+    const hero = container.querySelector('.inventory-init-detail-hero');
+    expect(hero?.classList.contains('quest')).toBe(true);
+  });
+});
