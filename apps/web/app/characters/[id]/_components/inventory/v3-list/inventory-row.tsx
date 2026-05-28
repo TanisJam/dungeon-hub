@@ -1,8 +1,8 @@
 /**
  * InventoryRow — single inventory item row in the v3 list view.
  *
- * Server Component (pure render — row tap for stub sheet handled via V3SheetStub
- * which is a client island composed by InventoryV3List at the parent level).
+ * Server Component rendered as a <button data-instance-id data-v3-type>. Tap is
+ * captured by InventoryDetailIsland via event delegation on a single root (DBE1).
  * Reqs: WIVLS-ROWS-01 (spec #1063)
  *
  * Each row:
