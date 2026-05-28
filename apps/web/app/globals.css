@@ -1059,7 +1059,6 @@
 .inventory-init-detail-hero.armor      { background: radial-gradient(at 0% 0%, rgba(91, 179, 201, 0.18), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-line)); }
 .inventory-init-detail-hero.consumable { background: radial-gradient(at 0% 0%, rgba(168, 90, 142, 0.20), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-line)); }
 .inventory-init-detail-hero.food       { background: radial-gradient(at 0% 0%, rgba(107, 163, 104, 0.22), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-line)); }
-.inventory-init-detail-hero.incomplete { background: var(--color-paper-soft); }
 
 .inventory-init-detail-hero .glyph {
   width: 72px;
@@ -1074,7 +1073,6 @@
 .inventory-init-detail-hero.armor      .glyph { color: var(--color-primary); }
 .inventory-init-detail-hero.consumable .glyph { color: var(--color-secondary); }
 .inventory-init-detail-hero.food       .glyph { color: var(--color-success); }
-.inventory-init-detail-hero.incomplete .glyph { color: var(--color-ink-mute); }
 
 .inventory-init-detail-hero .rarity-stamp {
   position: absolute;
