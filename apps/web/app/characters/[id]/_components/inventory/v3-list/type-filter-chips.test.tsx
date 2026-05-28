@@ -6,7 +6,6 @@
  * Design DA8: CSS-only scroll (no JS carousel).
  * Design DA9: Libros + Quest chips are disabled (D4 deferral).
  */
-'use client';
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
