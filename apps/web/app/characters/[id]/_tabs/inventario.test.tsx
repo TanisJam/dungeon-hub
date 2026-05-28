@@ -1,24 +1,28 @@
 /**
- * Component tests for InventarioTab — v3 layout (migrated from bucket-list, C10).
+ * Component tests for InventarioTab — v3 layout (migrated C10).
  *
- * Coverage (spec #1063 — inventory-v3-list Slice A):
+ * Coverage (spec #1063 — inventory-v3-list Slice A + spec #1070 — inventory-v3-simple Slice B):
  *   - WIVS-SCOPE-01: .inventory-init outer wrapper present.
  *   - WIVLS-CURRENCY-01: currency strip rendered.
  *   - WIVLS-WEIGHT-01: weight bar (progressbar role) with correct values.
  *   - WIVLS-EMPTY-01: empty state when inventory is empty.
  *   - WIVLS-ROWS-01: item names visible in grouped rows.
  *   - STR warning banner rendered when sheet.warnings contains INSUFFICIENT_STRENGTH_FOR_ARMOR.
- *   - Equip round-trip: EquipToggle calls updateInventoryItem (ER10 legacy affordance).
- *   - Delete round-trip: DeleteButton calls removeInventoryItem (ER10 legacy affordance).
+ *   - Equip round-trip (Slice B path): row tap → sheet opens → equip chip → calls updateInventoryItem.
+ *   - Delete round-trip (Slice B path): row tap → sheet opens → footer button → calls removeInventoryItem.
  *   - Picker open: clicking "Agregar ítem" opens the modal.
  *
  * Server actions are mocked — pure render-layer tests.
- * ER10: EquipToggle + DeleteButton are still in DOM (sr-only list) until Slice B.
+ * Slice B: EquipToggle + DeleteButton moved from sr-only list to detail sheet (ER10 migration).
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import type { CharacterSheet, EnrichedInventoryItem } from '@/lib/sheet-types';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type {
+  CharacterSheet,
+  EnrichedInventoryItem,
+  InventoryDetailResponse,
+} from '@/lib/sheet-types';
 import { InventarioTab } from './inventario';
 
 vi.mock('../actions', () => ({
@@ -30,6 +34,8 @@ vi.mock('../actions', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Reset any global fetch mock
+  vi.unstubAllGlobals();
 });
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -104,6 +110,56 @@ function makeEnrichedItem(overrides: Partial<EnrichedInventoryItem> = {}): Enric
     weight: 20,
     qty: 1,
     ...overrides,
+  };
+}
+
+/** Mock global fetch for the InventoryDetailIsland detail fetch */
+function mockDetailFetch(detail: InventoryDetailResponse) {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({ detail }),
+  }));
+}
+
+function makeArmorDetail(instanceId: string, equipped: boolean): InventoryDetailResponse {
+  return {
+    instanceId,
+    v3Type: 'armor',
+    displayName: 'chain-shirt',
+    subtitle: 'MA',
+    rarity: null,
+    magicFlag: false,
+    equipped,
+    weightLb: 20,
+    costCp: 5000,
+    qty: 1,
+    notes: '',
+    historyHeadline: null,
+    historyDetail: null,
+    acBase: 13,
+    armorCategory: 'MA',
+    dexCapNote: '+ DEX (máx +2)',
+    stealth: false,
+    donTime: '5 min',
+    armorStrengthMin: 0,
+  };
+}
+
+function makeTrinketDetail(instanceId: string): InventoryDetailResponse {
+  return {
+    instanceId,
+    v3Type: 'incomplete',
+    displayName: 'rope',
+    subtitle: 'G',
+    rarity: null,
+    magicFlag: false,
+    equipped: false,
+    weightLb: 10,
+    costCp: 100,
+    qty: 1,
+    notes: '',
+    historyHeadline: null,
+    historyDetail: null,
   };
 }
 
@@ -249,71 +305,98 @@ describe('InventarioTab — encumbrance warning copy', () => {
   });
 });
 
-describe('InventarioTab — equip round-trip (ER10 legacy affordance)', () => {
-  it('tapping "Equipar" calls updateInventoryItem with state: equipped', async () => {
+describe('InventarioTab — equip round-trip (Slice B detail-sheet path, ER10 migration)', () => {
+  it('tapping row → sheet → "Equipar" chip calls updateInventoryItem with state: equipped', async () => {
     const { updateInventoryItem } = await import('../actions');
+    const INSTANCE_ID = '00000000-0000-0000-0000-000000000010';
+    mockDetailFetch(makeArmorDetail(INSTANCE_ID, false));
+
     render(
       <InventarioTab
         characterId={CHAR_ID}
         worldId={WORLD_ID}
         inventory={[
           makeEnrichedItem({
-            instanceId: '00000000-0000-0000-0000-000000000010',
+            instanceId: INSTANCE_ID,
             itemSlug: 'chain-shirt',
             displayName: 'chain-shirt',
             equipped: false,
+            v3Type: 'armor',
           }),
         ]}
         sheet={makeSheet()}
       />,
     );
 
-    const equipBtn = screen.getByRole('button', { name: /Equipar ítem/ });
+    // Find the inventory row button via data-instance-id (avoids ambiguity with equipped slots)
+    const rowBtn = document.querySelector(`[data-instance-id="${INSTANCE_ID}"]`) as HTMLElement;
+    expect(rowBtn).toBeTruthy();
+    fireEvent.click(rowBtn);
+
+    // Wait for the detail sheet to appear
+    await waitFor(() => screen.getByRole('dialog'));
+
+    // Click the equip chip inside the dialog
+    const equipBtn = screen.getByRole('button', { name: /equipar ítem/i });
     fireEvent.click(equipBtn);
 
     await vi.waitFor(() => {
       expect(updateInventoryItem).toHaveBeenCalledWith(
         CHAR_ID,
-        '00000000-0000-0000-0000-000000000010',
+        INSTANCE_ID,
         { state: 'equipped' },
       );
     });
   });
 
-  it('tapping "Desequipar" calls updateInventoryItem with state: carried', async () => {
+  it('tapping row → sheet → "Desequipar" chip calls updateInventoryItem with state: carried', async () => {
     const { updateInventoryItem } = await import('../actions');
+    const INSTANCE_ID = '00000000-0000-0000-0000-000000000020';
+    mockDetailFetch(makeArmorDetail(INSTANCE_ID, true));
+
     render(
       <InventarioTab
         characterId={CHAR_ID}
         worldId={WORLD_ID}
         inventory={[
           makeEnrichedItem({
-            instanceId: '00000000-0000-0000-0000-000000000020',
+            instanceId: INSTANCE_ID,
             itemSlug: 'chain-shirt',
             displayName: 'chain-shirt',
             equipped: true,
+            v3Type: 'armor',
           }),
         ]}
         sheet={makeSheet()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Desequipar ítem/ }));
+    // Find the inventory row button via data-instance-id
+    const rowBtn = document.querySelector(`[data-instance-id="${INSTANCE_ID}"]`) as HTMLElement;
+    expect(rowBtn).toBeTruthy();
+    fireEvent.click(rowBtn);
+
+    await waitFor(() => screen.getByRole('dialog'));
+
+    const desequipBtn = screen.getByRole('button', { name: /desequipar ítem/i });
+    fireEvent.click(desequipBtn);
 
     await vi.waitFor(() => {
       expect(updateInventoryItem).toHaveBeenCalledWith(
         CHAR_ID,
-        '00000000-0000-0000-0000-000000000020',
+        INSTANCE_ID,
         { state: 'carried' },
       );
     });
   });
 });
 
-describe('InventarioTab — delete round-trip (ER10 legacy affordance)', () => {
-  it('confirmed delete calls removeInventoryItem', async () => {
+describe('InventarioTab — delete round-trip (Slice B detail-sheet path, ER10 migration)', () => {
+  it('confirmed delete: row → sheet → footer button → calls removeInventoryItem', async () => {
     const { removeInventoryItem } = await import('../actions');
+    const INSTANCE_ID = '00000000-0000-0000-0000-000000000030';
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockDetailFetch(makeTrinketDetail(INSTANCE_ID));
 
     render(
       <InventarioTab
@@ -321,44 +404,65 @@ describe('InventarioTab — delete round-trip (ER10 legacy affordance)', () => {
         worldId={WORLD_ID}
         inventory={[
           makeEnrichedItem({
-            instanceId: '00000000-0000-0000-0000-000000000030',
+            instanceId: INSTANCE_ID,
             itemSlug: 'rope',
             displayName: 'rope',
+            v3Type: 'trinket',
           }),
         ]}
         sheet={makeSheet()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar rope/ }));
+    const rowBtn = document.querySelector(`[data-instance-id="${INSTANCE_ID}"]`) as HTMLElement;
+    expect(rowBtn).toBeTruthy();
+    fireEvent.click(rowBtn);
+
+    await waitFor(() => screen.getByRole('dialog'));
+
+    const deleteBtn = screen.getByRole('button', { name: /eliminar rope/i });
+    fireEvent.click(deleteBtn);
 
     expect(confirmSpy).toHaveBeenCalled();
     await vi.waitFor(() => {
-      expect(removeInventoryItem).toHaveBeenCalledWith(
-        CHAR_ID,
-        '00000000-0000-0000-0000-000000000030',
-      );
+      expect(removeInventoryItem).toHaveBeenCalledWith(CHAR_ID, INSTANCE_ID);
     });
+
     confirmSpy.mockRestore();
   });
 
   it('cancelled delete does NOT call removeInventoryItem', async () => {
     const { removeInventoryItem } = await import('../actions');
+    const INSTANCE_ID = '00000000-0000-0000-0000-000000000031';
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    mockDetailFetch(makeTrinketDetail(INSTANCE_ID));
 
     render(
       <InventarioTab
         characterId={CHAR_ID}
         worldId={WORLD_ID}
-        inventory={[makeEnrichedItem({ itemSlug: 'rope', displayName: 'rope' })]}
+        inventory={[makeEnrichedItem({
+          instanceId: INSTANCE_ID,
+          itemSlug: 'rope',
+          displayName: 'rope',
+          v3Type: 'trinket',
+        })]}
         sheet={makeSheet()}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar rope/ }));
+    const rowBtn = document.querySelector(`[data-instance-id="${INSTANCE_ID}"]`) as HTMLElement;
+    expect(rowBtn).toBeTruthy();
+    fireEvent.click(rowBtn);
+
+    await waitFor(() => screen.getByRole('dialog'));
+
+    const deleteBtn = screen.getByRole('button', { name: /eliminar rope/i });
+    fireEvent.click(deleteBtn);
 
     expect(confirmSpy).toHaveBeenCalled();
     expect(removeInventoryItem).not.toHaveBeenCalled();
+
     confirmSpy.mockRestore();
   });
 });

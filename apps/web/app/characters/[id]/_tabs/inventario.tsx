@@ -1,14 +1,14 @@
 /**
- * Inventario tab — Slice A composition.
+ * Inventario tab — Slice B composition.
  *
- * Composes Picker + InventoryV3List. Legacy EquipToggle + DeleteButton are
- * preserved inline per row (ER10 — visible until Slice B ships V3Sheet renderers).
+ * Composes Picker + InventoryV3List (which wraps InventoryDetailIsland).
+ * V3SheetStub and sr-only ER10 legacy list have been retired (Slice B ER10 migration).
  *
  * Replaces the bucket-grouped layout (Equipados / Portados / Guardados) with
  * the v3 list view (currency strip · weight bar · equipped grid · type chips · grouped rows).
+ * Row tap opens the detail sheet via InventoryDetailIsland event delegation.
  *
- * Reqs: WIVLS-CURRENCY-01 through WIVLS-EMPTY-01, WIVS-SCOPE-01
- * TODO (Slice B): delete encumbrance-bar.tsx — only consumer was this file.
+ * Reqs: WIVLS-CURRENCY-01 through WIVLS-EMPTY-01, WIVS-SCOPE-01, WIE10-MIGRATE-01..03
  */
 import type {
   CharacterSheet,
@@ -17,8 +17,6 @@ import type {
   SheetWarningCode,
 } from '@/lib/sheet-types';
 import { Picker } from '../_components/inventory/picker';
-import { EquipToggle } from '../_components/inventory/equip-toggle';
-import { DeleteButton } from '../_components/inventory/delete-button';
 import { InventoryV3List } from '../_components/inventory/v3-list/inventory-v3-list';
 
 interface InventarioTabProps {
@@ -62,28 +60,6 @@ export function InventarioTab({
           encumbrance={encumbrance}
           warnings={warnings}
         />
-      )}
-
-      {/* ER10 — legacy affordances: EquipToggle + DeleteButton accessible for round-trip tests.
-          Preserved until Slice B ships V3Sheet renderers that absorb these actions.
-          TODO (Slice B): remove this block and wire through V3SheetStub. */}
-      {inventory.length > 0 && (
-        <ul aria-label="Acciones de inventario (legado)" className="sr-only" aria-hidden={false}>
-          {inventory.map((item) => (
-            <li key={item.instanceId}>
-              <EquipToggle
-                characterId={characterId}
-                instanceId={item.instanceId}
-                currentState={item.equipped ? 'equipped' : 'carried'}
-              />
-              <DeleteButton
-                characterId={characterId}
-                instanceId={item.instanceId}
-                itemName={item.displayName ?? item.itemSlug}
-              />
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
