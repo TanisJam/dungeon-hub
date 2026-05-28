@@ -347,6 +347,74 @@ export interface EnrichedInventoryItem {
   qty: number;
 }
 
+/**
+ * Inventory detail response from GET /characters/:id/inventory/:instanceId/detail.
+ * Discriminated union keyed on v3Type.
+ * Mirrors API InventoryDetailResponse — manually maintained (DA4).
+ * Reqs: ACIDE-SHAPE-01 (spec #1070). Design: DB1-DB3 (design #1071).
+ */
+interface DetailCommon {
+  instanceId: string;
+  v3Type: string;
+  displayName: string;
+  subtitle: string | null;
+  rarity: RarityClass | null;
+  magicFlag: boolean;
+  equipped: boolean;
+  weightLb: number | null;
+  costCp: number | null;
+  qty: number;
+  notes: string;
+  historyHeadline: null;
+  historyDetail: null;
+}
+
+export interface WeaponDetailVariant extends DetailCommon {
+  v3Type: 'weapon';
+  attackBonus: number;
+  dmg1: string | null;
+  dmgType: string | null;
+  range: string | null;
+  properties: string[];
+  magicBonus: number;
+}
+
+export interface ArmorDetailVariant extends DetailCommon {
+  v3Type: 'armor';
+  acBase: number | null;
+  armorCategory: string | null;
+  dexCapNote: string;
+  stealth: boolean;
+  donTime: string;
+  armorStrengthMin: number;
+}
+
+export interface ConsumableDetailVariant extends DetailCommon {
+  v3Type: 'consumable';
+  charges: number | null;
+  chargesMax: number | null;
+  entriesSummary: string | null;
+  actionCost: string;
+}
+
+export interface FoodDetailVariant extends DetailCommon {
+  v3Type: 'food';
+  servings: number;
+  foodKind: string;
+  consumeNote: string | null;
+}
+
+export interface IncompleteDetailVariant extends DetailCommon {
+  v3Type: 'incomplete';
+}
+
+export type InventoryDetailResponse =
+  | WeaponDetailVariant
+  | ArmorDetailVariant
+  | ConsumableDetailVariant
+  | FoodDetailVariant
+  | IncompleteDetailVariant;
+
 export interface SheetResponse {
   character: {
     id: string;

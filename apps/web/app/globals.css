@@ -1022,6 +1022,247 @@
   text-decoration: underline dotted;
 }
 
+/* ── Inventory detail sheet — hero, facts, use-big, actions, rule, counter, history, notes ── */
+
+/* Row reset: <button> styling for inventory-init-row (DBE2) */
+.inventory-init-row {
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.inventory-init-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* Delegation root — no layout impact */
+.inventory-init-detail-root { display: contents; }
+
+.inventory-init-detail-shell { display: flex; flex-direction: column; gap: 12px; }
+.inventory-init-detail-loading { padding: 40px 20px; text-align: center; color: var(--color-ink-mute); font-size: 12px; }
+.inventory-init-detail-error { padding: 18px 14px; border: 1px dashed var(--color-accent); border-radius: 10px; color: var(--color-accent); font-size: 12px; }
+
+/* Hero (per-type tint) */
+.inventory-init-detail-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  padding: 16px 14px;
+  border-radius: 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-hero.weapon     { background: radial-gradient(at 0% 0%, rgba(192, 71, 62, 0.18), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, #C0473E 40%, var(--color-line)); }
+.inventory-init-detail-hero.armor      { background: radial-gradient(at 0% 0%, rgba(91, 179, 201, 0.18), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-line)); }
+.inventory-init-detail-hero.consumable { background: radial-gradient(at 0% 0%, rgba(168, 90, 142, 0.20), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-line)); }
+.inventory-init-detail-hero.food       { background: radial-gradient(at 0% 0%, rgba(107, 163, 104, 0.22), transparent 65%), var(--color-paper-soft); border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-line)); }
+.inventory-init-detail-hero.incomplete { background: var(--color-paper-soft); }
+
+.inventory-init-detail-hero .glyph {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  border-radius: 12px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.inventory-init-detail-hero.weapon     .glyph { color: #E48A82; }
+.inventory-init-detail-hero.armor      .glyph { color: var(--color-primary); }
+.inventory-init-detail-hero.consumable .glyph { color: var(--color-secondary); }
+.inventory-init-detail-hero.food       .glyph { color: var(--color-success); }
+.inventory-init-detail-hero.incomplete .glyph { color: var(--color-ink-mute); }
+
+.inventory-init-detail-hero .rarity-stamp {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-hero .rarity-stamp.rarity-uncommon  { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-rare      { color: var(--color-primary); border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-very-rare { color: var(--color-secondary); border-color: color-mix(in srgb, var(--color-secondary) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-legendary { color: var(--color-accent); border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line)); }
+.inventory-init-detail-hero .rarity-stamp.rarity-artifact  { color: #E48A82; border-color: color-mix(in srgb, #C0473E 60%, var(--color-line)); }
+
+.inventory-init-detail-hero .id { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.inventory-init-detail-hero .nm { font-family: var(--font-display); font-size: 17px; line-height: 1.2; }
+.inventory-init-detail-hero .sub { font-style: italic; font-size: 11px; color: var(--color-ink-soft); }
+
+/* Meta row (Pills) */
+.inventory-init-detail-meta-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* Equip chip */
+.inventory-init-detail-equip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  cursor: pointer;
+  min-height: 24px;
+}
+.inventory-init-detail-equip-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-paper-soft));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Facts grids */
+.inventory-init-detail-facts { display: grid; gap: 8px; }
+.inventory-init-detail-facts.three { grid-template-columns: repeat(3, 1fr); }
+.inventory-init-detail-facts.two   { grid-template-columns: repeat(2, 1fr); }
+.inventory-init-detail-facts.full  { grid-template-columns: 1fr; }
+.inventory-init-detail-facts .fact {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-facts .fact .k { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-mute); margin-bottom: 2px; }
+.inventory-init-detail-facts .fact .v { font-family: var(--font-display); font-size: 16px; line-height: 1.2; }
+.inventory-init-detail-facts .fact .v.small { font-size: 13px; }
+.inventory-init-detail-facts .fact .v.mono  { font-family: var(--font-mono); font-size: 14px; }
+
+/* Use-big CTAs */
+.inventory-init-detail-use-big {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  border: 1px solid var(--color-accent);
+  min-height: 44px;
+  cursor: pointer;
+}
+.inventory-init-detail-use-big.secondary { background: var(--color-secondary); color: var(--color-ink); border-color: var(--color-secondary); }
+.inventory-init-detail-use-big.danger    { background: transparent; color: #E48A82; border-color: color-mix(in srgb, #C0473E 50%, var(--color-line)); }
+.inventory-init-detail-use-big[data-stub="true"]::after {
+  content: "stub";
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* Action row (ghost buttons) */
+.inventory-init-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.inventory-init-detail-actions .btn-ghost {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+/* Rule chip (e.g. STR req on armor) */
+.inventory-init-detail-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-paper-soft));
+  border-left: 3px solid var(--color-accent);
+}
+.inventory-init-detail-rule .k { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-accent); }
+.inventory-init-detail-rule .v { font-size: 12px; color: var(--color-ink-soft); }
+
+/* Counter (consumable / food restantes) */
+.inventory-init-detail-counter {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-paper-soft));
+  border: 1px solid color-mix(in srgb, var(--color-secondary) 35%, var(--color-line));
+}
+.inventory-init-detail-counter .v   { font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--color-secondary); }
+.inventory-init-detail-counter .lbl { font-size: 11px; color: var(--color-ink-soft); }
+.inventory-init-detail-counter .meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-ink-mute); text-align: right; }
+
+/* Section heads + bodies */
+.inventory-init-detail-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.inventory-init-detail-section .head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--color-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.inventory-init-detail-section .head::before { content: "◈"; color: var(--color-accent); }
+
+/* History card */
+.inventory-init-detail-history {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+}
+.inventory-init-detail-history .head   { font-family: var(--font-display); font-size: 13px; }
+.inventory-init-detail-history .detail { font-size: 11px; color: var(--color-ink-soft); margin-top: 4px; line-height: 1.45; }
+
+/* Notes (flavor) */
+.inventory-init-detail-notes {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px dashed var(--color-line);
+  font-style: italic;
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  line-height: 1.45;
+}
+
+/* Footer (delete) */
+.inventory-init-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line);
+}
+.inventory-init-detail-footer .danger-ghost {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, #C0473E 40%, var(--color-line));
+  color: #E48A82;
+  font-size: 11px;
+  min-height: 36px;
+  cursor: pointer;
+}
+
 /* ── Palette: Obsidiana (default) ── */
 :root[data-palette="obsidian"],
 :root:not([data-palette]) {
