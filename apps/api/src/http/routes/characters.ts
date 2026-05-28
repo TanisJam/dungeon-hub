@@ -59,6 +59,7 @@ import {
   getCharacterAccess,
   loadCharacter,
 } from '../../use-cases/characters/load-character.js';
+import { listRosterCharacters } from '../../use-cases/characters/list-roster-characters.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
@@ -499,35 +500,16 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
   // ---- GET /characters -----------------------------------------------------
   // Lista los personajes del user actual. Opcional ?campaign=:id para filtrar.
   // Opcional ?status=active,pending_approval (CSV) para filtrar por status.
+  // Returns row + lineage + hpCurrent/hpMax (SDD personajes-v3-data).
   app.get('/characters', { preHandler: app.authenticate }, async (request) => {
     const userId = request.user!.sub;
     const { campaign, status: statusFilter } = ListQuery.parse(request.query);
-
-    const conditions = [eq(characters.userId, userId)];
-    // Post-C2: characters belong to worlds, not campaigns. The `campaign` query param
-    // is kept for API compat but now filters by worldId (C5 will rename the param).
-    if (campaign) conditions.push(eq(characters.worldId, campaign));
-    if (statusFilter && statusFilter.length > 0) {
-      conditions.push(inArray(characters.status, statusFilter));
-    }
-
-    const whereExpr = conditions.length === 1 ? conditions[0] : and(...conditions);
-
-    const rows = await db
-      .select({
-        id: characters.id,
-        worldId: characters.worldId,
-        name: characters.name,
-        status: characters.status,
-        xp: characters.xp,
-        createdAt: characters.createdAt,
-        updatedAt: characters.updatedAt,
-      })
-      .from(characters)
-      .where(whereExpr)
-      .orderBy(characters.createdAt);
-
-    return { data: rows };
+    const data = await listRosterCharacters({
+      userId,
+      ...(campaign ? { worldId: campaign } : {}),
+      ...(statusFilter ? { statusFilter } : {}),
+    });
+    return { data };
   });
 
   // ---- GET /characters/:id -------------------------------------------------
