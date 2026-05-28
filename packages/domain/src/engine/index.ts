@@ -1,0 +1,167 @@
+/**
+ * Public API barrel for the Resolution Engine (Composable Modifier System — Slice 1).
+ *
+ * Import from this barrel for all engine functionality.
+ * Internal module paths (predicate/evaluate.ts, etc.) are considered private
+ * implementation details — do NOT import them directly outside of engine/.
+ *
+ * Design ref: sdd/resolution-engine — T8.1 public API surface.
+ */
+
+// ── Core types ────────────────────────────────────────────────────────────────
+
+export type {
+  // Branded IDs
+  EntityId,
+  ModifierDefId,
+  // Modifier union + all kinds
+  Modifier,
+  NumMod,
+  AdvantageMod,
+  ChoiceMod,
+  ConcentrationMod,
+  ReactionMod,
+  UsageMod,
+  ReplaceMod,
+  GmRulingMod,
+  NoopMod,
+  // Supporting types
+  DurationSpec,
+  EndCondition,
+  StatKey,
+  Trigger,
+  StackCategory,
+  RollType,
+  DiceExpr,
+  ValueSource,
+  EntityRef,
+  ConditionRef,
+  DomainRef,
+  ResetTrigger,
+  EventKind,
+  ReactionEffect,
+  Ability,
+} from './types.js';
+
+export {
+  // Type guards
+  isNumMod,
+  isAdvantageMod,
+  isChoiceMod,
+  isConcentrationMod,
+  isReactionMod,
+  isUsageMod,
+  isReplaceMod,
+  isGmRulingMod,
+  isNoopMod,
+} from './types.js';
+
+// ── Provenance types ──────────────────────────────────────────────────────────
+
+export type { Source, Breakdown, Resolved } from './provenance.js';
+
+// ── Evaluation context ────────────────────────────────────────────────────────
+
+export type {
+  EvaluationContext,
+  WeaponInUse,
+  ActionInFlight,
+} from './context.js';
+
+export { attackerDistanceFt } from './context.js';
+
+// ── Predicate AST + evaluator ─────────────────────────────────────────────────
+
+export type { Predicate, WorldQuery } from './predicate/types.js';
+export { isPredicate } from './predicate/types.js';
+
+// AST builder helpers
+export {
+  and,
+  or,
+  not,
+  query,
+  attackerWithin,
+  weaponKind,
+  hasCondition,
+  canSee,
+  spellLevelAtMost,
+} from './predicate/ast.js';
+
+// Evaluator
+export { evaluatePredicate, PredicateError } from './predicate/evaluate.js';
+export type { PredicateMissingCtxFieldError } from './predicate/evaluate.js';
+
+// ── Registry ──────────────────────────────────────────────────────────────────
+
+export type {
+  ModifierRegistry,
+  ModifierInstance,
+  ModifierInstanceId,
+  TargetScope,
+  RegistryQueryInput,
+} from './registry/types.js';
+
+export { createInMemoryRegistry } from './registry/query.js';
+
+// ── Stacking ──────────────────────────────────────────────────────────────────
+
+export { STACKING_STRATEGIES } from './stacking/categories.js';
+export { applyStacking } from './stacking/apply.js';
+
+// ── Resolution functions ──────────────────────────────────────────────────────
+
+export { resolveStat } from './resolve/stat.js';
+export { resolveRollMode } from './resolve/roll-mode.js';
+export type { RollModeResult } from './resolve/roll-mode.js';
+
+// ── Action pipeline ───────────────────────────────────────────────────────────
+
+export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
+export { advancePhase } from './pipeline/state-machine.js';
+export type { PipelineSignal, AdvanceResult } from './pipeline/state-machine.js';
+
+// ── Form-switching subsystem ──────────────────────────────────────────────────
+
+export { applyFormSwitch } from './form-switching/substitute.js';
+export type {
+  FormSwitchInput,
+  FormSwitchResult,
+  FormSwitchResolved,
+  FormSwitchGmRuling,
+  StatBag,
+} from './form-switching/substitute.js';
+
+// ── Conditions ────────────────────────────────────────────────────────────────
+
+export { PRONE_CONDITION_DEF } from './conditions/prone.js';
+export type { ConditionDefinition } from './conditions/prone.js';
+
+// ── Rule builders ─────────────────────────────────────────────────────────────
+
+export { buildBlessModifiers } from './rules/bless.js';
+
+export { buildProneModifiers } from './rules/prone.js';
+export type {
+  ConditionResolver,
+  BuildProneResult,
+  ConditionNotFoundIssue,
+} from './rules/prone.js';
+
+export { buildCounterspellReaction } from './rules/counterspell.js';
+export type {
+  SpellSlotResolver,
+  SlotPool,
+  BuildCounterspellResult,
+  CounterspellFireResult,
+  SlotTierInsufficientIssue,
+  ResolverNotInjectedIssue as CounterspellResolverNotInjectedIssue,
+} from './rules/counterspell.js';
+
+export { buildWildShapeModifiers } from './rules/wild-shape.js';
+export type {
+  BeastStatResolver,
+  BeastStatBlock,
+  BuildWildShapeResult,
+  ResolverNotInjectedIssue as WildShapeResolverNotInjectedIssue,
+} from './rules/wild-shape.js';
