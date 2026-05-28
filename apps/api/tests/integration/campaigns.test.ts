@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
 
 describe('campaigns', () => {
   let user: TestUser;
@@ -77,5 +78,140 @@ describe('campaigns', () => {
       expect(c.gmUserId).toBe(user.id);
       expect(c.memberRole).toBe('gm');
     }
+  });
+
+  // ── v3 aggregations (spec campanas-v3: ACLE-FIELDS-01, ACLE-PENDING-FICHAS-DM-ONLY-02) ──
+
+  describe('GET /campaigns — v3 aggregations', () => {
+    it('T1: row includes playersCount + sessionsCount + nextSession (ACLE-FIELDS-01)', async () => {
+      const app = await getTestApp();
+      // Create campaign as user
+      const created = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { name: 'Counts Test Campaign' },
+        })
+        .then((r) => r.json());
+
+      // Add 3 player members via helper
+      const p1 = await createTestUser();
+      const p2 = await createTestUser();
+      const p3 = await createTestUser();
+      try {
+        await addCampaignAndWorldMember(created.id, p1.id, 'player');
+        await addCampaignAndWorldMember(created.id, p2.id, 'player');
+        await addCampaignAndWorldMember(created.id, p3.id, 'player');
+
+        // Insert 2 completed sessions directly via DB
+        const { db } = await import('../../src/infra/db/client.js');
+        const { sessions } = await import('../../src/infra/db/schema.js');
+        await db.insert(sessions).values([
+          { campaignId: created.id, gmUserId: user.id, title: 'S1', status: 'completed' },
+          { campaignId: created.id, gmUserId: user.id, title: 'S2', status: 'completed' },
+        ]);
+
+        const list = await app
+          .inject({
+            method: 'GET',
+            url: '/api/v1/campaigns',
+            headers: { authorization: `Bearer ${user.accessToken}` },
+          })
+          .then((r) => r.json());
+        const row = list.data.find((c: { id: string }) => c.id === created.id);
+        expect(row).toBeDefined();
+        expect(row.playersCount).toBe(3);
+        expect(row.sessionsCount).toBe(2);
+      } finally {
+        await deleteTestUser(p1.id);
+        await deleteTestUser(p2.id);
+        await deleteTestUser(p3.id);
+      }
+    });
+
+    it('T2: one-shot fresh — playersCount/sessionsCount=0, nextSession=null (memory #1031)', async () => {
+      const app = await getTestApp();
+      const created = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { name: 'One-shot Fresh' },
+        })
+        .then((r) => r.json());
+
+      const list = await app
+        .inject({
+          method: 'GET',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+        })
+        .then((r) => r.json());
+      const row = list.data.find((c: { id: string }) => c.id === created.id);
+      expect(row.playersCount).toBe(0);
+      expect(row.sessionsCount).toBe(0);
+      expect(row.nextSession).toBeNull();
+    });
+
+    it('T3: pendingFichas computed only for GM caller (ACLE-PENDING-FICHAS-DM-ONLY-02)', async () => {
+      const app = await getTestApp();
+      const created = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { name: 'Pending Fichas Test' },
+        })
+        .then((r) => r.json());
+
+      // Add player member (B)
+      const playerB = await createTestUser();
+      try {
+        await addCampaignAndWorldMember(created.id, playerB.id, 'player');
+
+        // Seed 2 pending_approval characters in the world (as playerB)
+        for (const name of ['Pend One', 'Pend Two']) {
+          const c = await app
+            .inject({
+              method: 'POST',
+              url: '/api/v1/characters',
+              headers: { authorization: `Bearer ${playerB.accessToken}` },
+              payload: { worldId: created.worldId, name },
+            })
+            .then((r) => r.json());
+          await app.inject({
+            method: 'PATCH',
+            url: `/api/v1/characters/${c.id}`,
+            headers: { authorization: `Bearer ${playerB.accessToken}` },
+            payload: { status: 'pending_approval' },
+          });
+        }
+
+        // GM sees count
+        const gmList = await app
+          .inject({
+            method: 'GET',
+            url: '/api/v1/campaigns',
+            headers: { authorization: `Bearer ${user.accessToken}` },
+          })
+          .then((r) => r.json());
+        const gmRow = gmList.data.find((c: { id: string }) => c.id === created.id);
+        expect(gmRow.pendingFichas).toBe(2);
+
+        // Player sees null
+        const plList = await app
+          .inject({
+            method: 'GET',
+            url: '/api/v1/campaigns',
+            headers: { authorization: `Bearer ${playerB.accessToken}` },
+          })
+          .then((r) => r.json());
+        const plRow = plList.data.find((c: { id: string }) => c.id === created.id);
+        expect(plRow.pendingFichas).toBeNull();
+      } finally {
+        await deleteTestUser(playerB.id);
+      }
+    });
   });
 });
