@@ -55,13 +55,7 @@ export function InventoryDetailShell({
       {detail.v3Type === 'armor' && <ArmorDetailBody detail={detail} />}
       {detail.v3Type === 'consumable' && <ConsumableDetailBody detail={detail} />}
       {detail.v3Type === 'food' && <FoodDetailBody detail={detail} />}
-      {detail.v3Type === 'incomplete' && (
-        <InventoryDetailSection title="Detalles incompletos">
-          <p style={{ fontSize: '12px', color: 'var(--color-ink-soft)' }}>
-            No tenemos datos mecánicos de este ítem.
-          </p>
-        </InventoryDetailSection>
-      )}
+      {/* magic, book, trinket, quest bodies — added in T9 after body components are implemented */}
 
       {detail.notes && (
         <div className="inventory-init-detail-notes">{detail.notes}</div>

@@ -83,8 +83,76 @@ export interface FoodDetailVariant extends DetailCommon {
   consumeNote: string | null;
 }
 
-export interface IncompleteDetailVariant extends DetailCommon {
-  v3Type: 'incomplete';
+// ── 4 new Slice C variants ────────────────────────────────────────────────────
+
+export interface MagicDetailVariant extends DetailCommon {
+  v3Type: 'magic';
+  /** true when item requires attunement (PHB p.136-138). */
+  attuneRequired: boolean;
+  /** true when this instance is currently attuned (per-instance). */
+  attuned: boolean;
+  /**
+   * Fixed copy: 'Requiere sintonización durante un descanso corto' (PHB p.138).
+   * Only shown when attuneRequired=true && attuned=false.
+   */
+  restAttuneNote: string;
+  /** Always null — no 5etools mapping for power names. R7 from proposal. */
+  powerName: null;
+  /** From entriesSummary. null when item has no entries. */
+  powerDesc: string | null;
+  /** Per-instance charges (null when item has no charge system). */
+  charges: number | null;
+  /** Compendium max charges (null when item has no charge system). */
+  chargesMax: number | null;
+}
+
+/** Book metadata parsed from item.notes JSON (DC3 — no DB column). */
+export interface BookMetadata {
+  passage?: string;
+  pagesRead?: number;
+  pages?: number;
+  language?: string;
+  knowledge?: string[];
+}
+
+export interface BookDetailVariant extends DetailCommon {
+  v3Type: 'book';
+  /** Excerpt text in script font. Default '…' when absent. */
+  passage: string;
+  /** Pages read (client-stubbed per DC3 — no persistence yet). Default 0. */
+  pagesRead: number;
+  /** Total pages. Default 100 when absent. */
+  pages: number;
+  /** Language the book is written in. Default 'Común'. */
+  language: string;
+  /** Unlocked knowledge entries. Default []. */
+  knowledge: string[];
+}
+
+/** Quest metadata parsed from item.notes JSON. */
+export interface QuestMetadata {
+  questName?: string;
+  stage?: string;
+  visibleTo?: string;
+}
+
+export interface TrinketDetailVariant extends DetailCommon {
+  v3Type: 'trinket';
+  /**
+   * From entriesSummary, or fallback flavor text per PHB p.161.
+   * PHB p.161: trinkets have no mechanical effect.
+   */
+  narrative: string | null;
+}
+
+export interface QuestDetailVariant extends DetailCommon {
+  v3Type: 'quest';
+  /** Name of the quest. Default 'Quest sin nombre'. */
+  questName: string;
+  /** Current stage. Default 'Etapa 1'. */
+  stage: string;
+  /** Who can see this quest item. Default 'el grupo'. */
+  visibleTo: string;
 }
 
 export type InventoryDetailResponse =
@@ -92,7 +160,31 @@ export type InventoryDetailResponse =
   | ArmorDetailVariant
   | ConsumableDetailVariant
   | FoodDetailVariant
-  | IncompleteDetailVariant;
+  | MagicDetailVariant
+  | BookDetailVariant
+  | TrinketDetailVariant
+  | QuestDetailVariant;
+
+// ── parseInventoryMetadata — display-only (DCE3: lives in use-case, NOT domain) ─
+
+/**
+ * Parses item.notes as JSON to extract book or quest metadata.
+ *
+ * DCE3 (design #1078): this is a display concern, not a PHB rule — lives here.
+ * Returns null for empty, non-JSON, or malformed input WITHOUT throwing.
+ *
+ * Req: ACIDA-PARSER-01 (spec #1077).
+ */
+export function parseInventoryMetadata(
+  notes: string | null | undefined,
+): { book?: BookMetadata; quest?: QuestMetadata } | null {
+  if (!notes || !notes.trim().startsWith('{')) return null;
+  try {
+    return JSON.parse(notes) as { book?: BookMetadata; quest?: QuestMetadata };
+  } catch {
+    return null;
+  }
+}
 
 // ── Don time table (PHB p.144) ────────────────────────────────────────────────
 
@@ -251,15 +343,75 @@ export async function loadInventoryDetail(input: {
       };
     }
 
-    default: {
-      // ERB2: 'incomplete' variant for magic, trinket, book, quest, unknown
+    case 'magic': {
+      // PHB p.136-138: attunement. reqAttune from compendium; attuned per-instance.
+      const attuneRequired = detail.reqAttune != null && detail.reqAttune !== false;
       return {
         ok: true,
         detail: {
           ...common,
-          v3Type: 'incomplete',
-        } as IncompleteDetailVariant,
+          v3Type: 'magic',
+          attuneRequired,
+          attuned: instance.attuned,
+          restAttuneNote: 'Requiere sintonización durante un descanso corto',
+          powerName: null, // R7: no 5etools mapping for power names
+          powerDesc: detail.entriesSummary,
+          charges: instance.charges ?? null,
+          chargesMax: detail.charges ?? null,
+        },
       };
+    }
+
+    case 'book': {
+      // DC3: book metadata from notes JSON; no persistence yet.
+      const meta = parseInventoryMetadata(instance.notes ?? '');
+      const bookMeta = meta?.book;
+      return {
+        ok: true,
+        detail: {
+          ...common,
+          v3Type: 'book',
+          passage: bookMeta?.passage ?? '…',
+          pagesRead: bookMeta?.pagesRead ?? 0,
+          pages: bookMeta?.pages ?? 100,
+          language: bookMeta?.language ?? 'Común',
+          knowledge: bookMeta?.knowledge ?? [],
+        },
+      };
+    }
+
+    case 'trinket': {
+      // PHB p.161: trinkets have no mechanical effect — flavor only.
+      return {
+        ok: true,
+        detail: {
+          ...common,
+          v3Type: 'trinket',
+          narrative: detail.entriesSummary,
+        },
+      };
+    }
+
+    case 'quest': {
+      // House rule §1.2: quest items are DM-assigned via v3TypeOverride (DC4).
+      const meta = parseInventoryMetadata(instance.notes ?? '');
+      const questMeta = meta?.quest;
+      return {
+        ok: true,
+        detail: {
+          ...common,
+          v3Type: 'quest',
+          questName: questMeta?.questName ?? 'Quest sin nombre',
+          stage: questMeta?.stage ?? 'Etapa 1',
+          visibleTo: questMeta?.visibleTo ?? 'el grupo',
+        },
+      };
+    }
+
+    default: {
+      // DCE2: exhaustive switch — compile-time safety against future V3ItemType additions.
+      const _exhaustive: never = v3Type;
+      throw new Error(`Unhandled v3Type: ${String(_exhaustive)}`);
     }
   }
 }

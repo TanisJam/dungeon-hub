@@ -404,8 +404,42 @@ export interface FoodDetailVariant extends DetailCommon {
   consumeNote: string | null;
 }
 
-export interface IncompleteDetailVariant extends DetailCommon {
-  v3Type: 'incomplete';
+export interface MagicDetailVariant extends DetailCommon {
+  v3Type: 'magic';
+  /** true when item requires attunement (PHB p.136-138). */
+  attuneRequired: boolean;
+  /** true when this instance is currently attuned (per-instance). */
+  attuned: boolean;
+  /** Fixed copy (PHB p.138): 'Requiere sintonización durante un descanso corto'. */
+  restAttuneNote: string;
+  /** Always null — no 5etools mapping for power names (R7). */
+  powerName: null;
+  /** From entriesSummary. null when item has no entries. */
+  powerDesc: string | null;
+  charges: number | null;
+  chargesMax: number | null;
+}
+
+export interface BookDetailVariant extends DetailCommon {
+  v3Type: 'book';
+  passage: string;
+  pagesRead: number;
+  pages: number;
+  language: string;
+  knowledge: string[];
+}
+
+export interface TrinketDetailVariant extends DetailCommon {
+  v3Type: 'trinket';
+  /** PHB p.161: trinkets have no mechanical effect. From entriesSummary or fallback. */
+  narrative: string | null;
+}
+
+export interface QuestDetailVariant extends DetailCommon {
+  v3Type: 'quest';
+  questName: string;
+  stage: string;
+  visibleTo: string;
 }
 
 export type InventoryDetailResponse =
@@ -413,7 +447,10 @@ export type InventoryDetailResponse =
   | ArmorDetailVariant
   | ConsumableDetailVariant
   | FoodDetailVariant
-  | IncompleteDetailVariant;
+  | MagicDetailVariant
+  | BookDetailVariant
+  | TrinketDetailVariant
+  | QuestDetailVariant;
 
 export interface SheetResponse {
   character: {

@@ -148,7 +148,7 @@ function makeArmorDetail(instanceId: string, equipped: boolean): InventoryDetail
 function makeTrinketDetail(instanceId: string): InventoryDetailResponse {
   return {
     instanceId,
-    v3Type: 'incomplete',
+    v3Type: 'trinket',
     displayName: 'rope',
     subtitle: 'G',
     rarity: null,
@@ -160,6 +160,7 @@ function makeTrinketDetail(instanceId: string): InventoryDetailResponse {
     notes: '',
     historyHeadline: null,
     historyDetail: null,
+    narrative: null,
   };
 }
 
