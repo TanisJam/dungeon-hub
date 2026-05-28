@@ -105,6 +105,47 @@ export function extractArmorStrengthMin(data: unknown): number | undefined {
 }
 
 /**
+ * Extrae `rarity` del JSONB 5etools al shape lite del dominio.
+ *
+ * 5etools encodea la rareza como un string en `data.rarity`
+ * (e.g. "common", "uncommon", "rare", "very rare", "legendary", "artifact",
+ * "none", "varies"). Devuelve null cuando el campo está ausente o no es string.
+ *
+ * La normalización a `RarityClass` la hace el caller vía `normalizeRarity`.
+ * Design decision sdd/inventory-v3-list/design #1064 — D3.
+ * DMG p.135 — Rarity.
+ *
+ * Exportado para unit testing.
+ */
+export function extractRarity(data: unknown): string | null {
+  if (data == null || typeof data !== 'object') return null;
+  const r = (data as Record<string, unknown>)['rarity'];
+  if (typeof r !== 'string' || r.length === 0) return null;
+  return r;
+}
+
+/**
+ * Extrae `reqAttune` del JSONB 5etools al shape lite del dominio.
+ *
+ * 5etools encodea la atunación requerida como:
+ * - `true` → requiere atunación (cualquier clase)
+ * - `string` (e.g. "by a spellcaster") → requiere atunación con restricción
+ * - absent/null/false → no requiere atunación
+ *
+ * PHB p.136-138 — Magic Items (Attunement): max 3 items attuned simultaneously.
+ * Design decision sdd/inventory-v3-list/design #1064 — D3.
+ *
+ * Exportado para unit testing.
+ */
+export function extractReqAttune(data: unknown): boolean | string | null {
+  if (data == null || typeof data !== 'object') return null;
+  const r = (data as Record<string, unknown>)['reqAttune'];
+  if (typeof r === 'boolean') return r || null; // false → null (no attune)
+  if (typeof r === 'string' && r.length > 0) return r;
+  return null;
+}
+
+/**
  * Extrae `costCp` del JSONB 5etools al shape lite del dominio.
  *
  * 5etools encodea el costo en `data.value` como número en copper pieces (CP).
@@ -223,6 +264,11 @@ function projectItemRow(row: {
   // Cost projection (REQ-CIP-COST-PROJECTION, sdd/inventory-d4-d6 #889).
   // Always set — null when absent/non-numeric. Consumer must handle null.
   lite.costCp = extractCostCp(row.data);
+
+  // Rarity + attunement projection (sdd/inventory-v3-list #1064 — D3).
+  // Always set — null when absent. Consumer normalizes via `normalizeRarity`.
+  lite.rarity = extractRarity(row.data);
+  lite.reqAttune = extractReqAttune(row.data);
 
   return lite;
 }

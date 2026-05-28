@@ -4,6 +4,8 @@ import {
   extractAc,
   extractStealth,
   extractArmorStrengthMin,
+  extractRarity,
+  extractReqAttune,
 } from '../../../../src/use-cases/characters/load-item-data.js';
 
 /**
@@ -168,5 +170,61 @@ describe('armor extractors — combined fixtures (REQ-CIP-LEGACY-MISSING)', () =
     expect(extractAc(data)).toBeUndefined();
     expect(extractStealth(data)).toBeUndefined();
     expect(extractArmorStrengthMin(data)).toBeUndefined();
+  });
+});
+
+/**
+ * Unit tests for extractRarity and extractReqAttune.
+ *
+ * Design decision sdd/inventory-v3-list/design #1064 — D3:
+ * rarity + reqAttune are projected from JSONB at read time, mirroring extractCostCp.
+ * DMG p.135 — Rarity. PHB p.136-138 — Attunement.
+ *
+ * ACSE-SHAPE-01 (spec #1063): enriched inventory items include rarity + reqAttune.
+ */
+describe('extractRarity — sdd/inventory-v3-list ACSE-SHAPE-01', () => {
+  it('4.4a returns the rarity string when present (happy path — e.g. magic ring "rare")', () => {
+    // DMG p.135: Ring of Protection is "Rare, requires attunement"
+    expect(extractRarity({ rarity: 'rare', reqAttune: true })).toBe('rare');
+  });
+
+  it('4.4b returns null when rarity field is absent (mundane items — no rarity in 5etools)', () => {
+    // Most PHB mundane items (rope, chain shirt, longsword) have no rarity field.
+    expect(extractRarity({ name: 'Longsword', type: 'M' })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractRarity(null)).toBeNull();
+    expect(extractRarity(undefined)).toBeNull();
+  });
+
+  it('returns "very rare" (with space) verbatim — normalization is callers responsibility', () => {
+    // extractRarity does NOT normalize; normalizeRarity() handles that.
+    expect(extractRarity({ rarity: 'very rare' })).toBe('very rare');
+  });
+});
+
+describe('extractReqAttune — sdd/inventory-v3-list ACSE-SHAPE-01', () => {
+  it('4.5a returns true when reqAttune is boolean true (any-class attunement)', () => {
+    // PHB p.136: "Some magic items require a creature to be attuned to them"
+    expect(extractReqAttune({ rarity: 'rare', reqAttune: true })).toBe(true);
+  });
+
+  it('4.5b returns null when reqAttune is absent (non-attunement item)', () => {
+    expect(extractReqAttune({ rarity: 'rare' })).toBeNull();
+  });
+
+  it('returns the class restriction string when reqAttune is a string', () => {
+    // 5etools uses strings like "by a spellcaster" for class-restricted attunement.
+    expect(extractReqAttune({ reqAttune: 'by a spellcaster' })).toBe('by a spellcaster');
+  });
+
+  it('returns null for boolean false (no attunement required)', () => {
+    expect(extractReqAttune({ reqAttune: false })).toBeNull();
+  });
+
+  it('returns null for null / non-object input', () => {
+    expect(extractReqAttune(null)).toBeNull();
+    expect(extractReqAttune(undefined)).toBeNull();
   });
 });
