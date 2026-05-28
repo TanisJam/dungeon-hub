@@ -11,9 +11,10 @@
  * PHB p.149 — Weapons (longsword type='M').
  * DMG p.135 — Rarity (ring-of-protection is "rare, requires attunement").
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import * as loadItemDataModule from '../../src/use-cases/characters/load-item-data.js';
 
 describe('GET /characters/:id/sheet — inventoryEnriched[] (ACSE-SHAPE-01)', () => {
   let user: TestUser;
@@ -155,24 +156,38 @@ describe('GET /characters/:id/sheet — inventoryEnriched[] (ACSE-SHAPE-01)', ()
     expect(['consumable', 'trinket']).toContain(torch.v3Type);
   });
 
-  it('5.5 inventoryEnriched uses existing batch — inventory[] still present (ACSE-NONN1-01 + DA3)', async () => {
-    const app = await getTestApp();
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/v1/characters/${characterId}/sheet`,
-      headers: { authorization: `Bearer ${user.accessToken}` },
+  describe('ACSE-NONN1-01 — no N+1: loadItemDataMany called exactly once per sheet request', () => {
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    afterEach(() => {
+      spy?.mockRestore();
     });
 
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
+    it('5.5 inventoryEnriched uses existing batch — loadItemDataMany called once + inventory[] still present (ACSE-NONN1-01 + DA3)', async () => {
+      spy = vi.spyOn(loadItemDataModule, 'loadItemDataMany');
 
-    // DA3: inventory[] kept verbatim — additive enrichment, no replacement
-    expect(body.inventory).toHaveLength(body.inventoryEnriched.length);
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/sheet`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+      });
 
-    // Each entry in inventoryEnriched must match a corresponding row in inventory[]
-    const inventoryIds = new Set(body.inventory.map((it: { instanceId: string }) => it.instanceId));
-    for (const enriched of body.inventoryEnriched) {
-      expect(inventoryIds.has(enriched.instanceId)).toBe(true);
-    }
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+
+      // ACSE-NONN1-01: loadItemDataMany must be called exactly once (batch, not per-item).
+      // inventoryEnriched reuses the same itemWeights batch — zero additional DB queries.
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      // DA3: inventory[] kept verbatim — additive enrichment, no replacement
+      expect(body.inventory).toHaveLength(body.inventoryEnriched.length);
+
+      // Each entry in inventoryEnriched must match a corresponding row in inventory[]
+      const inventoryIds = new Set(body.inventory.map((it: { instanceId: string }) => it.instanceId));
+      for (const enriched of body.inventoryEnriched) {
+        expect(inventoryIds.has(enriched.instanceId)).toBe(true);
+      }
+    });
   });
 });
