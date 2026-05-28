@@ -12,24 +12,15 @@
  * Design ref: sdd/resolution-engine/design — EvaluationContext shape.
  */
 import type { EntityId, EntityRef, ConditionRef, StatKey } from './types.js';
+import type { ActionInFlight } from './pipeline/phases.js';
 
 export type { ConditionRef };
 
 // ── ActionInFlight ────────────────────────────────────────────────────────────
 
-/**
- * An action currently progressing through the pipeline state machine.
- * Carried on EvaluationContext.currentAction during pipeline phases.
- */
-export interface ActionInFlight {
-  id: string;
-  /** Attack or spell pipeline. */
-  type: 'attack' | 'spell';
-  /** Current phase name — managed by the state machine. */
-  phase: string;
-  /** Present for spell actions; absent for attacks. */
-  spellLevel?: number;
-}
+// ActionInFlight is defined in pipeline/phases.ts and re-exported here so
+// consumers can import it from either location.
+export type { ActionInFlight };
 
 // ── EvaluationContext ─────────────────────────────────────────────────────────
 
