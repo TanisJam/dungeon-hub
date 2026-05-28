@@ -171,3 +171,67 @@ describe('loadInventoryDetail — ACIDE-AUTH-02: auth checks', () => {
     expect(result.code).toBe('INSTANCE_NOT_FOUND');
   });
 });
+
+// ── ACVT-DERIVE-01: v3TypeOverride propagation in detail dispatch ─────────────
+
+describe('loadInventoryDetail — ACVT-DERIVE-01: v3TypeOverride propagation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCharacterAccess.mockResolvedValue('owner');
+  });
+
+  it('instance with v3TypeOverride="book" is threaded through deriveV3Type (pre-T4: falls to incomplete default)', async () => {
+    // This test verifies the PATCH/GET wiring: v3TypeOverride IS passed to deriveV3Type.
+    // Pre-T4, 'book' has no switch case → falls to default → returns 'incomplete'.
+    // After T4 ships the 'book' branch, this test is updated to expect v3Type: 'book'.
+    const charWithBookOverride = makeCharacter({
+      inventory: [
+        {
+          instanceId: INSTANCE_ID,
+          itemSlug: 'longsword',
+          itemSource: 'PHB',
+          quantity: 1,
+          state: 'carried',
+          attuned: false,
+          customName: null,
+          notes: '',
+          equipHand: null,
+          charges: null,
+          v3TypeOverride: 'book', // override set — threaded via ACVT-DERIVE-01
+        },
+      ],
+    });
+    mockLoadCharacter.mockResolvedValue(charWithBookOverride);
+    mockLoadItemDataDetailMany.mockResolvedValue([makeLongswordDetail()]);
+
+    const result = await loadInventoryDetail({
+      characterId: CHAR_ID,
+      instanceId: INSTANCE_ID,
+      userId: USER_ID,
+    });
+
+    // deriveV3Type returns 'book' (override wins), but switch default overwrites with 'incomplete'.
+    // This is expected pre-T4 — the WIRING is confirmed, the handler ships in T4.
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Pre-T4: 'book' goes to default → 'incomplete'. UPDATED in T4 to expect 'book'.
+    expect(result.detail.v3Type).toBe('incomplete');
+  });
+
+  it('instance without v3TypeOverride falls back to derived type from compendium', async () => {
+    // Given: no override on the instance
+    mockLoadCharacter.mockResolvedValue(makeCharacter()); // instance has no v3TypeOverride
+    mockLoadItemDataDetailMany.mockResolvedValue([makeLongswordDetail()]);
+
+    const result = await loadInventoryDetail({
+      characterId: CHAR_ID,
+      instanceId: INSTANCE_ID,
+      userId: USER_ID,
+    });
+
+    // longsword type='M' → deriveV3Type returns 'weapon' (compendium-derived)
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.detail.v3Type).toBe('weapon');
+  });
+});

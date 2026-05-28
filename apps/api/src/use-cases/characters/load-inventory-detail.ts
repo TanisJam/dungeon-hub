@@ -151,7 +151,8 @@ export async function loadInventoryDetail(input: {
   ]);
   if (!detail) return { ok: false, code: 'ITEM_NOT_FOUND' };
 
-  const v3Type = deriveV3Type(detail, null);
+  // ACVT-DERIVE-01: pass instance.v3TypeOverride so DM overrides propagate to detail dispatch.
+  const v3Type = deriveV3Type(detail, instance.v3TypeOverride ?? null);
   const rarity = normalizeRarity(detail.rarity);
   const reqAttune = detail.reqAttune ?? null;
   const magicFlag = (rarity != null && rarity !== 'common') || reqAttune != null;

@@ -445,6 +445,17 @@ const UpdateInventoryItemBody = z
     equipHand: z.enum(['main', 'off', 'both']).nullable().optional(),
     charges: z.number().int().min(0).nullable().optional(),
     containerId: z.string().uuid().nullable().optional(),
+    /**
+     * DM-side v3 type override. Stored in JSONB. optional — absence preserves
+     * existing value (read-path tolerance per CLAUDE.md §11 + DC1).
+     * null = clear the override (fallback to derived v3Type).
+     * Only DM-assignable overrides: 'book' | 'quest' | 'trinket' | 'magic'.
+     * Req: ACVT-PATCH-01 (spec #1077).
+     */
+    v3TypeOverride: z
+      .enum(['book', 'quest', 'trinket', 'magic'])
+      .nullable()
+      .optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
@@ -738,7 +749,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         equipped: item.state === 'equipped',
         equipHand: item.equipHand ?? null,
         charges: item.charges ?? null,
-        v3Type: deriveV3Type(liteOrEmpty, null),
+        // ACVT-DERIVE-01: pass instance.v3TypeOverride so DM overrides propagate to sheet.
+        v3Type: deriveV3Type(liteOrEmpty, item.v3TypeOverride ?? null),
         rarity,
         reqAttune,
         magicFlag: (rarity != null && rarity !== 'common') || reqAttune != null,
@@ -2234,6 +2246,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           ...(body.equipHand !== undefined ? { equipHand: body.equipHand } : {}),
           ...(body.charges !== undefined ? { charges: body.charges } : {}),
           ...(body.containerId !== undefined ? { containerId: body.containerId } : {}),
+          // ACVT-PATCH-01: v3TypeOverride passthrough to domain (DC1).
+          ...(body.v3TypeOverride !== undefined ? { v3TypeOverride: body.v3TypeOverride } : {}),
         },
         itemData,
         weights,
