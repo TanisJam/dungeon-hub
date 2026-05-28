@@ -121,7 +121,7 @@ export type EventKind = 'cast' | 'attacked' | 'damaged';
 
 export type ReactionEffect = { kind: 'counter'; autoIfSlotGe: number };
 
-// ── Modifier discriminated union (9 kinds, closed) ────────────────────────────
+// ── Modifier discriminated union (10 kinds, closed) ───────────────────────────
 
 /**
  * NumMod — numeric bonus/penalty on a stat.
@@ -212,7 +212,23 @@ export type GmRulingMod = {
  */
 export type NoopMod = { kind: 'noop' };
 
-/** Closed union of all 9 modifier kinds in this slice. */
+/**
+ * ProficiencyMod — grants proficiency or expertise in a skill, save, or tool.
+ *
+ * `domain` is a closed enum of six categories (PHB proficiency types).
+ * `ref` is a FREE string — homebrew skills / custom tools pass without list validation.
+ * `level` defaults to 'proficient' when absent; 'expertise' doubles the bonus.
+ *
+ * // TODO #513: `ref` validation against catalog is deferred until DB-injected resolver.
+ */
+export type ProficiencyMod = {
+  kind: 'proficiency';
+  domain: 'skill' | 'save' | 'tool' | 'language' | 'weapon' | 'armor';
+  ref: string;
+  level?: 'proficient' | 'expertise';
+};
+
+/** Closed union of all 10 modifier kinds in this slice. */
 export type Modifier =
   | NumMod
   | AdvantageMod
@@ -222,7 +238,8 @@ export type Modifier =
   | UsageMod
   | ReplaceMod
   | GmRulingMod
-  | NoopMod;
+  | NoopMod
+  | ProficiencyMod;
 
 // ── Type guards ───────────────────────────────────────────────────────────────
 
@@ -260,4 +277,8 @@ export function isGmRulingMod(m: Modifier): m is GmRulingMod {
 
 export function isNoopMod(m: Modifier): m is NoopMod {
   return m.kind === 'noop';
+}
+
+export function isProficiencyMod(m: Modifier): m is ProficiencyMod {
+  return m.kind === 'proficiency';
 }
