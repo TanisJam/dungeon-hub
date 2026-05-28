@@ -20,25 +20,32 @@ function spell(phase: ActionInFlight['phase'], spellLevel = 2): ActionInFlight {
   return { id: 'spell-1', type: 'spell', phase, spellLevel };
 }
 
+/** Asserts ok:true and returns the action (narrows the discriminated union for tests). */
+function step(action: ActionInFlight, signal: Parameters<typeof advancePhase>[1]): ActionInFlight {
+  const result = advancePhase(action, signal);
+  if (!result.ok) throw new Error(`Expected ok:true but got ok:false (phase=${action.phase}, signal=${signal})`);
+  return result.action;
+}
+
 // ── attack pipeline ───────────────────────────────────────────────────────────
 
 describe('advancePhase — attack pipeline', () => {
   it('progresses DECLARED → TO_HIT → ON_HIT → DAMAGE → ON_DAMAGE_APPLIED → RESOLVED in sequence', () => {
     let action = attack('DECLARED');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('TO_HIT');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('ON_HIT');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('DAMAGE');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('ON_DAMAGE_APPLIED');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('RESOLVED');
   });
 
@@ -54,13 +61,13 @@ describe('advancePhase — spell pipeline', () => {
   it('progresses DECLARED → CAST_ANNOUNCED → RESOLVING → RESOLVED with no reaction', () => {
     let action = spell('DECLARED');
 
-    action = advancePhase(action, 'announce').action;
+    action = step(action, 'announce');
     expect(action.phase).toBe('CAST_ANNOUNCED');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('RESOLVING');
 
-    action = advancePhase(action, 'advance').action;
+    action = step(action, 'advance');
     expect(action.phase).toBe('RESOLVED');
   });
 
@@ -68,24 +75,24 @@ describe('advancePhase — spell pipeline', () => {
     let action = spell('CAST_ANNOUNCED');
 
     // Reaction fires at CAST_ANNOUNCED
-    action = advancePhase(action, 'reaction').action;
+    action = step(action, 'reaction');
     expect(action.phase).toBe('INTERRUPTED');
 
     // Counter succeeds — spell cancelled
     const result = advancePhase(action, 'counter-success');
     expect(result.ok).toBe(true);
-    expect(result.action.phase).toBe('CANCELLED');
+    if (result.ok) expect(result.action.phase).toBe('CANCELLED');
   });
 
   it('CAST_ANNOUNCED → reaction fires → INTERRUPTED → counter fails → RESOLVING', () => {
     let action = spell('CAST_ANNOUNCED');
 
-    action = advancePhase(action, 'reaction').action;
+    action = step(action, 'reaction');
     expect(action.phase).toBe('INTERRUPTED');
 
     const result = advancePhase(action, 'counter-fail');
     expect(result.ok).toBe(true);
-    expect(result.action.phase).toBe('RESOLVING');
+    if (result.ok) expect(result.action.phase).toBe('RESOLVING');
   });
 });
 
@@ -95,7 +102,7 @@ describe('advancePhase — cancel signal', () => {
   it('DECLARED + cancel → CANCELLED (terminal)', () => {
     const result = advancePhase(attack('DECLARED'), 'cancel');
     expect(result.ok).toBe(true);
-    expect(result.action.phase).toBe('CANCELLED');
+    if (result.ok) expect(result.action.phase).toBe('CANCELLED');
   });
 
   it('CANCELLED is terminal — subsequent advance returns ok:false', () => {
