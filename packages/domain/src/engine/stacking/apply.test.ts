@@ -65,7 +65,8 @@ describe('applyStacking', () => {
     const result = applyStacking(mods, 10, SELF_REF);
     // base(10) + untyped(4) + untyped(3) = 17
     expect(result.value).toBe(17);
-    const untypedSources = result.breakdown.filter((s) => s.type === 'untyped');
+    // Filter out the base source (label='base'); count only modifier contributions
+    const untypedSources = result.breakdown.filter((s) => s.type === 'untyped' && s.label !== 'base');
     expect(untypedSources).toHaveLength(2);
   });
 });
