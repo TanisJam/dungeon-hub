@@ -85,7 +85,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
     );
   }
 
-  const { character, sheet, currentHp, inventory } = data;
+  const { character, sheet, currentHp, inventory, inventoryEnriched } = data;
 
   // Draft → redirect to wizard
   if (character.status === 'draft') {
@@ -227,7 +227,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
             <InventarioTab
               characterId={id}
               worldId={character.worldId}
-              inventory={inventory}
+              inventory={inventoryEnriched ?? []}
               sheet={sheet}
             />
           )}
