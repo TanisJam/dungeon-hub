@@ -148,7 +148,11 @@ export function resolveStat(
         // skill.athletics matches domain:'skill', ref:'athletics'
         matches = stat === `skill.${def.ref}`;
       } else if (def.domain === 'save') {
-        matches = stat === 'saving-throw';
+        // PHB 179: saving throws are per-ability. PHB 168: Resilient grants proficiency in
+        // ONE ability's saves only. A proficiency{domain:'save', ref:'con'} must match ONLY
+        // 'saving-throw.con', not 'saving-throw.dex' or any other save key.
+        // Mirror the skill branch: ref must match the ability suffix after the dot.
+        matches = stat === `saving-throw.${def.ref}`;
       } else {
         // tool/language/weapon/armor — direct stat key match
         matches = stat === def.ref;

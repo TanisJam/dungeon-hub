@@ -37,6 +37,10 @@ export type Ability = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 /**
  * Addressable stats in the resolution engine.
  * Skill keys use the `skill.<name>` dotted form to avoid collision with ability scores.
+ *
+ * `saving-throw` — flat key for all-saves effects (Bless +1d4, Cloak of Protection +1).
+ * `saving-throw.${Ability}` — per-ability key for targeted proficiencies (Resilient (Con) → 'saving-throw.con').
+ *   PHB 179: saving throws are per-ability. PHB 168: Resilient grants proficiency in ONE ability's saves.
  */
 export type StatKey =
   | Ability
@@ -46,6 +50,7 @@ export type StatKey =
   | 'initiative'
   | 'attack-roll'
   | 'saving-throw'
+  | `saving-throw.${Ability}`
   | 'damage'
   | `skill.${string}`;
 
