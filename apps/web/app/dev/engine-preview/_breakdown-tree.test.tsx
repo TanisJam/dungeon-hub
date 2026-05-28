@@ -11,31 +11,31 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { BreakdownTree } from './_breakdown-tree';
-import type { Source } from '@dungeon-hub/domain';
+import type { Source, EntityId } from '@dungeon-hub/domain';
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 // Mirrors the real engine output for: unarmored DEX-14 fighter + Cloak of Protection
 // base=12 (PHB p.144), Cloak +1 (DMG 159) → value=13
-const ORIGIN = { id: 'fixture-char' as ReturnType<typeof String>, conditions: [] };
+const ORIGIN = { id: 'fixture-char' as unknown as EntityId, conditions: [] };
 
 const breakdown: Source[] = [
   {
     label: 'base',
     amount: 12,
     type: 'untyped',
-    origin: ORIGIN as Source['origin'],
+    origin: ORIGIN,
   },
   {
     label: 'Cloak of Protection',
     amount: 1,
     type: 'item',
-    origin: ORIGIN as Source['origin'],
+    origin: ORIGIN,
     children: [
       {
         label: 'saving-throw bonus',
         amount: 1,
         type: 'item',
-        origin: ORIGIN as Source['origin'],
+        origin: ORIGIN,
       },
     ],
   },
