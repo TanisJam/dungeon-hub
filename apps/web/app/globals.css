@@ -207,6 +207,11 @@
   color: #1A1208;
   box-shadow: 0 0 0 1px rgba(212, 162, 76, 0.40);
 }
+.personajes-portrait {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 162, 76, 0.30), transparent 70%),
+    linear-gradient(135deg, #2E1A28 0%, #1A1726 100%);
+}
 
 /* ── Ficha screen — scoped extensions ── */
 .ficha-hero-bg {
