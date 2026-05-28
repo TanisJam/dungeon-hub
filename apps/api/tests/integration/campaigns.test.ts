@@ -123,6 +123,13 @@ describe('campaigns', () => {
         expect(row).toBeDefined();
         expect(row.playersCount).toBe(3);
         expect(row.sessionsCount).toBe(2);
+        // ACLE-BACKCOMPAT-03: prior fields preserved alongside new ones
+        expect(row.id).toBe(created.id);
+        expect(row.name).toBe('Counts Test Campaign');
+        expect(row.gmUserId).toBe(user.id);
+        expect(row.worldId).toBe(created.worldId);
+        expect(row.memberRole).toBe('gm');
+        expect(row.createdAt).toBeDefined();
       } finally {
         await deleteTestUser(p1.id);
         await deleteTestUser(p2.id);
@@ -180,6 +187,12 @@ describe('campaigns', () => {
           .then((r) => r.json());
         expect(Array.isArray(res.members)).toBe(true);
         expect(res.members).toHaveLength(3);
+        // ACDM-BACKCOMPAT-02: prior fields preserved alongside members[]
+        expect(res.id).toBe(created.id);
+        expect(res.name).toBe('Members Test Campaign');
+        expect(res.gmUserId).toBe(user.id);
+        expect(res.worldId).toBe(created.worldId);
+        expect(res.rulesProfile).toBeDefined();
         const roles = res.members.map((m: { role: string }) => m.role).sort();
         expect(roles).toEqual(['gm', 'player', 'player']);
         const usernames = res.members.map((m: { username: string }) => m.username);
