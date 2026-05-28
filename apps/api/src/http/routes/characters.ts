@@ -75,6 +75,7 @@ import {
 import { loadFeatData } from '../../use-cases/characters/load-feat-data.js';
 import { buildFeatContext } from '../../use-cases/characters/build-feat-context.js';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
+import { loadInventoryDetail } from '../../use-cases/characters/load-inventory-detail.js';
 import { recordSessionEventForCharacter, routeTransferEvent } from '../../use-cases/sessions/events.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
 import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
@@ -2011,6 +2012,33 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send(updated);
   });
+
+  // ---- GET /characters/:id/inventory/:instanceId/detail -------------------
+  // Returns the detail view for a single inventory instance, projected by v3Type.
+  // ACIDE-SHAPE-01 (spec #1070). Reads-only — observers and world-members can access.
+  app.get(
+    '/characters/:id/inventory/:instanceId/detail',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id, instanceId } = InventoryInstanceParams.parse(request.params);
+      const userId = request.user!.sub;
+
+      const result = await loadInventoryDetail({ characterId: id, instanceId, userId });
+      if (!result.ok) {
+        const status =
+          result.code === 'NOT_FOUND' ||
+          result.code === 'INSTANCE_NOT_FOUND' ||
+          result.code === 'ITEM_NOT_FOUND'
+            ? 404
+            : result.code === 'FORBIDDEN'
+              ? 403
+              : 400;
+        return reply.code(status).send({ error: result.code });
+      }
+
+      return reply.send({ detail: result.detail });
+    },
+  );
 
   // ---- POST /characters/:id/inventory -------------------------------------
   // Agrega un ítem al inventario. Hard rule: attune cap 3.
