@@ -213,6 +213,42 @@
     linear-gradient(135deg, #2E1A28 0%, #1A1726 100%);
 }
 
+/* ── Campañas screen — scoped extensions ── */
+.campanas-camp-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(91, 179, 201, 0.10), transparent 60%),
+    var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+.campanas-camp-card-dm {
+  background:
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(168, 90, 142, 0.12), transparent 60%),
+    var(--color-surface);
+  border-color: rgba(168, 90, 142, 0.40);
+}
+.campanas-role-pill {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  background: rgba(91, 179, 201, 0.10);
+  border: 1px solid rgba(91, 179, 201, 0.40);
+  color: var(--color-primary);
+}
+.campanas-role-pill-dm {
+  background: rgba(168, 90, 142, 0.14);
+  border-color: rgba(168, 90, 142, 0.45);
+  color: var(--color-secondary);
+}
+
 /* ── Ficha screen — scoped extensions ── */
 .ficha-hero-bg {
   background:
