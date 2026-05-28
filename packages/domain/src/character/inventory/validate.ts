@@ -324,6 +324,8 @@ export function updateInventoryItem(args: {
     ...(patch.equipHand !== undefined && { equipHand: patch.equipHand }),
     ...(patch.charges !== undefined && { charges: patch.charges }),
     ...(patch.containerId !== undefined && { containerId: patch.containerId }),
+    // DC1: v3TypeOverride passthrough — no validation; pure JSONB spread.
+    ...(patch.v3TypeOverride !== undefined && { v3TypeOverride: patch.v3TypeOverride }),
   };
 
   const nextInventory = [...inventory];

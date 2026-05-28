@@ -44,6 +44,14 @@ export interface InventoryItem {
    * la UI decide qué mostrar.
    */
   containerId?: string | null;
+  /**
+   * DM-side UI type override. Stored in JSONB `character_inventory.data`.
+   * DC1 (design #1078): no DB migration required; optional field.
+   * - undefined: absent from stored JSON (legacy tolerance per CLAUDE.md §11)
+   * - null: override explicitly cleared; fallback to deriveV3Type()
+   * - 'book'|'quest'|'trinket'|'magic': DM-selected v3 type
+   */
+  v3TypeOverride?: 'book' | 'quest' | 'trinket' | 'magic' | null;
 }
 
 /** Subset del compendio que necesita el validador. Lo carga el caller. */
@@ -264,6 +272,12 @@ export interface UpdateItemInput {
   charges?: number | null;
   /** Mover el ítem a un container distinto. null = mover a root. */
   containerId?: string | null;
+  /**
+   * DM-side UI type override. Stored in JSONB. undefined = absent (legacy tolerance).
+   * null = override cleared (fallback to derived v3Type).
+   * DC1 (design #1078): no DB migration; no validation rules (pure passthrough).
+   */
+  v3TypeOverride?: 'book' | 'quest' | 'trinket' | 'magic' | null;
 }
 
 export type InventoryOpResult =
