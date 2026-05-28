@@ -52,15 +52,16 @@ export function EncuentrosListView({ role, rows }: Props) {
           </Link>
         ))
       )}
-      <Link
-        href="#"
+      <button
+        type="button"
+        disabled
         aria-disabled="true"
-        className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line p-4 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
-        onClick={(e) => e.preventDefault()}
+        title="Próximamente"
+        className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line p-4 font-sans text-[13px] font-semibold text-ink-mute cursor-not-allowed opacity-70 transition-colors"
       >
         <span className="text-lg text-accent">+</span>
         <span>Iniciar encuentro nuevo</span>
-      </Link>
+      </button>
     </div>
   );
 }
