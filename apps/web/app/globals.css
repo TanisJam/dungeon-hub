@@ -432,6 +432,237 @@
   color: var(--color-ink-soft);
 }
 
+/* ── Compendium screen — search + categories + recents + spell detail ── */
+.compendium-init {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 24px;
+}
+.compendium-init-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+.compendium-init-search .ph {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink-mute);
+}
+.compendium-init-search .kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-mute);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 2px 5px;
+  letter-spacing: 0.03em;
+}
+.compendium-init-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.compendium-init-cat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 150ms;
+  text-align: left;
+}
+.compendium-init-cat-card:hover {
+  transform: translateY(-2px);
+}
+.compendium-init-cat-card .ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  margin-bottom: 4px;
+}
+.compendium-init-cat-card.spell .ic {
+  background: var(--color-secondary-soft);
+  color: var(--color-secondary);
+}
+.compendium-init-cat-card.lore .ic {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.compendium-init-cat-card .ttl {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+.compendium-init-cat-card .ct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-mute);
+}
+.compendium-init-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-line-soft);
+  cursor: pointer;
+}
+.compendium-init-row:last-child {
+  border-bottom: none;
+}
+.compendium-init-row .ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid rgba(212, 162, 76, 0.25);
+}
+.compendium-init-row.spell .ic {
+  background: var(--color-secondary-soft);
+  color: var(--color-secondary);
+  border-color: rgba(168, 90, 142, 0.30);
+}
+.compendium-init-row.item .ic {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.compendium-init-row.monst .ic {
+  background: rgba(204, 68, 68, 0.12);
+  color: #CC4444;
+  border-color: rgba(204, 68, 68, 0.25);
+}
+.compendium-init-row .body {
+  flex: 1;
+  min-width: 0;
+}
+.compendium-init-row .body .ttl {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compendium-init-row .body .sub {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  margin-top: 1px;
+}
+.compendium-init-row .chev {
+  font-size: 18px;
+  color: var(--color-ink-mute);
+  flex-shrink: 0;
+}
+.compendium-init-detail.spell {
+  background:
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(168, 90, 142, 0.22), transparent 55%),
+    var(--color-surface);
+  border: 1px solid var(--color-secondary);
+  border-radius: 0.75rem;
+  padding: 16px;
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(168, 90, 142, 0.30), 0 0 20px rgba(168, 90, 142, 0.15);
+}
+.compendium-init-detail .lvl-stamp {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-secondary-soft);
+  border: 1px solid var(--color-secondary);
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-secondary);
+}
+.compendium-init-detail .eyebrow {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+  margin-bottom: 4px;
+}
+.compendium-init-detail .name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+.compendium-init-detail .school {
+  font-family: var(--font-script);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  margin-bottom: 14px;
+}
+.compendium-init-detail .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.compendium-init-detail .meta-row .k {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  margin-bottom: 2px;
+}
+.compendium-init-detail .meta-row .v {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink);
+}
+.compendium-init-detail .desc p {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  line-height: 1.55;
+  margin-bottom: 8px;
+}
+.compendium-init-detail .desc p:last-child {
+  margin-bottom: 0;
+}
+
 /* ── Ficha screen — scoped extensions ── */
 .ficha-hero-bg {
   background:
