@@ -57,7 +57,8 @@ describe('BreakdownTree — REQ-TREE-02', () => {
   it('renders the "Cloak of Protection" source label with signed +1 amount', () => {
     render(<BreakdownTree stat="ac" value={13} breakdown={breakdown} />);
     expect(screen.getByText('Cloak of Protection')).toBeTruthy();
-    expect(screen.getByText('+1')).toBeTruthy();
+    // Both the Cloak and its nested child have amount=1 → two "+1" spans, use getAllByText
+    expect(screen.getAllByText('+1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders nested child label "saving-throw bonus"', () => {
