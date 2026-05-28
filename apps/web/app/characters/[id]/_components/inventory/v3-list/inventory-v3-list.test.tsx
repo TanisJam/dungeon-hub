@@ -5,10 +5,18 @@
  * Mirrors the WED-CSS-SCOPED-05 pattern from compendium-screen.test.tsx.
  */
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { InventoryV3List } from './inventory-v3-list.js';
 import type { Currency, EncumbranceView, EnrichedInventoryItem } from '@/lib/sheet-types';
+
+// Mock actions (InventoryDetailIsland pulls in equip-chip → actions → Supabase env)
+vi.mock('../../../actions', () => ({
+  updateInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
+  removeInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
+  addInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
+  searchCompendiumItems: vi.fn().mockResolvedValue([]),
+}));
 
 const defaultCurrency: Currency = { pp: 0, gp: 0, sp: 0, cp: 0, ep: 0 };
 const defaultEncumbrance: EncumbranceView = {

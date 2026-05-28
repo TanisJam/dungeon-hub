@@ -33,9 +33,13 @@ export function InventoryRow({ item, characterId: _characterId }: InventoryRowPr
   const rarityClass = item.rarity ? `rarity-${item.rarity}` : '';
 
   return (
-    <div
+    <button
+      type="button"
       className={`inventory-init-row ${rarityClass}`.trim()}
       data-itype={item.v3Type}
+      data-instance-id={item.instanceId}
+      data-v3-type={item.v3Type}
+      aria-label={item.displayName}
     >
       {/* Icon cell */}
       <div className="ic-cell">
@@ -62,6 +66,6 @@ export function InventoryRow({ item, characterId: _characterId }: InventoryRowPr
       {item.qty > 1 && (
         <span className="qty">×{item.qty}</span>
       )}
-    </div>
+    </button>
   );
 }

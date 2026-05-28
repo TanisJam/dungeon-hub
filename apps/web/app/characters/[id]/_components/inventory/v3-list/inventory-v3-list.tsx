@@ -21,6 +21,7 @@ import { TypeFilterChips } from './type-filter-chips.js';
 import { InventoryGroup } from './inventory-group.js';
 import { EmptyState } from './empty-state.js';
 import { CHIP_LABELS, GROUP_ORDER } from './types.js';
+import { InventoryDetailIsland } from '../v3-detail/index.js';
 
 interface InventoryV3ListProps {
   characterId: string;
@@ -45,29 +46,31 @@ export function InventoryV3List({
 
   return (
     <div className="inventory-init">
-      <TypeFilterChips>
-        <CurrencyStrip currency={currency} />
-        {encumbrance && <WeightBar encumbrance={encumbrance} />}
-        <EquippedSlotsGrid items={inventory} />
+      <InventoryDetailIsland characterId={characterId}>
+        <TypeFilterChips>
+          <CurrencyStrip currency={currency} />
+          {encumbrance && <WeightBar encumbrance={encumbrance} />}
+          <EquippedSlotsGrid items={inventory} />
 
-        {isEmpty ? (
-          <EmptyState filter="all" />
-        ) : (
-          GROUP_ORDER.map((key) => {
-            const items = grouped[key];
-            if (!items || items.length === 0) return null;
-            return (
-              <InventoryGroup
-                key={key}
-                v3Type={key}
-                label={CHIP_LABELS[key]}
-                items={items}
-                characterId={characterId}
-              />
-            );
-          })
-        )}
-      </TypeFilterChips>
+          {isEmpty ? (
+            <EmptyState filter="all" />
+          ) : (
+            GROUP_ORDER.map((key) => {
+              const items = grouped[key];
+              if (!items || items.length === 0) return null;
+              return (
+                <InventoryGroup
+                  key={key}
+                  v3Type={key}
+                  label={CHIP_LABELS[key]}
+                  items={items}
+                  characterId={characterId}
+                />
+              );
+            })
+          )}
+        </TypeFilterChips>
+      </InventoryDetailIsland>
     </div>
   );
 }

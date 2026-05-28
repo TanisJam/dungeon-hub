@@ -1,3 +1,4 @@
+export { InventoryDetailIsland } from './inventory-detail-island';
 export { InventoryDetailShell } from './inventory-detail-shell';
 export { InventoryDetailHero } from './inventory-detail-hero';
 export { InventoryDetailSection } from './inventory-detail-section';
