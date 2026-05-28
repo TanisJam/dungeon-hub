@@ -1,10 +1,10 @@
 /**
  * Component tests for TypeFilterChips.
  *
- * Reqs: WIVLS-CHIPS-01 (spec #1063)
+ * Reqs: WIVLS-CHIPS-01 (spec #1063), WID4-CHIPS-01 (spec #1077)
  * Design DA1: filter state owned by TypeFilterChips client island.
  * Design DA8: CSS-only scroll (no JS carousel).
- * Design DA9: Libros + Quest chips are disabled (D4 deferral).
+ * Design DCE4 (Slice C): DEFERRED_TYPES = empty set → Libros + Quest chips are now ENABLED.
  */
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -40,27 +40,42 @@ describe('TypeFilterChips — WIVLS-CHIPS-01', () => {
     expect(list!.getAttribute('data-filter')).toBe('weapon');
   });
 
-  it('9.4 "Libros" chip has aria-disabled="true" — D4 deferred (DA9)', () => {
+  // 9.4 — FLIPPED in-place (DCE4 Slice C): Libros + Quest chips are now ENABLED (R5)
+  it('9.4 "Libros" chip is enabled — DCE4 (DEFERRED_TYPES = empty, WID4-CHIPS-01)', () => {
+    // DCE4: DEFERRED_TYPES is now an empty set — Libros chip should NOT be aria-disabled
     render(<TypeFilterChips><div /></TypeFilterChips>);
     const librosChip = screen.getByText('Libros');
-    expect(librosChip.closest('[aria-disabled="true"]') ?? librosChip.getAttribute('aria-disabled')).toBeTruthy();
+    const btn = librosChip.closest('button') ?? librosChip;
+    expect(btn.getAttribute('aria-disabled')).not.toBe('true');
   });
 
-  it('9.4 "Quest" chip has aria-disabled="true" — D4 deferred (DA9)', () => {
+  it('9.4 "Quest" chip is enabled — DCE4 (DEFERRED_TYPES = empty, WID4-CHIPS-01)', () => {
+    // DCE4: DEFERRED_TYPES is now an empty set — Quest chip should NOT be aria-disabled
     render(<TypeFilterChips><div /></TypeFilterChips>);
     const questChip = screen.getByText('Quest');
-    // DA9: Quest chip is disabled — clicking is a no-op
-    expect(questChip.closest('[aria-disabled="true"]') ?? questChip.getAttribute('aria-disabled')).toBeTruthy();
+    const btn = questChip.closest('button') ?? questChip;
+    expect(btn.getAttribute('aria-disabled')).not.toBe('true');
   });
 
-  it('9.4 clicking "Libros" chip is a no-op (does not change filter)', () => {
+  it('9.4 clicking "Libros" chip sets data-filter="book" (now functional — WID4-CHIPS-01)', () => {
     const { container } = render(<TypeFilterChips><div /></TypeFilterChips>);
     const list = container.querySelector('.inventory-init-list');
 
     const librosChip = screen.getByText('Libros');
     fireEvent.click(librosChip);
 
-    // Filter should remain 'all' since Libros is disabled
-    expect(list!.getAttribute('data-filter')).toBe('all');
+    // DCE4: Libros chip is now active → filter changes to 'book'
+    expect(list!.getAttribute('data-filter')).toBe('book');
+  });
+
+  it('9.4 clicking "Quest" chip sets data-filter="quest" (now functional — WID4-CHIPS-01)', () => {
+    const { container } = render(<TypeFilterChips><div /></TypeFilterChips>);
+    const list = container.querySelector('.inventory-init-list');
+
+    const questChip = screen.getByText('Quest');
+    fireEvent.click(questChip);
+
+    // DCE4: Quest chip is now active → filter changes to 'quest'
+    expect(list!.getAttribute('data-filter')).toBe('quest');
   });
 });

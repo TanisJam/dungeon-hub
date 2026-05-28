@@ -54,7 +54,8 @@ export const CHIP_ICONS: Record<FilterKey, string> = {
 };
 
 /**
- * Types where the filter chip is deferred to Slice C (D4 — v3TypeOverride).
- * DA9: chips are disabled + show "Próximamente" empty state.
+ * Types where the filter chip is deferred to a future SDD.
+ * DCE4 (Slice C): 'book' and 'quest' are now enabled. Empty set — no chips deferred.
+ * Future SDDs can add new types here without changing the chips component.
  */
-export const DEFERRED_TYPES: ReadonlySet<FilterKey> = new Set<FilterKey>(['book', 'quest']);
+export const DEFERRED_TYPES: ReadonlySet<FilterKey> = new Set<FilterKey>();

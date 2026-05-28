@@ -135,6 +135,32 @@ async function main(): Promise<void> {
     toolChoices: { anyGamingSet: ['dice-set'] },
   });
 
+  // Slice C (R6 mitigation): add 1 quest item for v3TypeOverride='quest' visual QA.
+  // Uses a longsword as the compendium base (type='M' → normally 'weapon').
+  // After adding, PATCH v3TypeOverride='quest' to override the derived type.
+  console.log(`[seed] POST inventory (longsword as quest item base)…`);
+  const addedItem = await call<{ addedInstanceId: string }>(
+    'POST',
+    `/api/v1/characters/${created.id}/inventory`,
+    jwt,
+    { item: { slug: 'longsword', source: 'PHB' }, state: 'carried' },
+  );
+  const questInstanceId = addedItem.addedInstanceId;
+
+  console.log(`[seed] PATCH v3TypeOverride=quest + notes JSON…`);
+  await call('PATCH', `/api/v1/characters/${created.id}/inventory/${questInstanceId}`, jwt, {
+    v3TypeOverride: 'quest',
+    customName: 'El Medallón del Traidor',
+    notes: JSON.stringify({
+      quest: {
+        questName: 'La Conspiración del Gremio',
+        stage: 'Fase 2: El encuentro',
+        visibleTo: 'el grupo',
+      },
+    }),
+  });
+  console.log(`[seed] Quest item seeded (instanceId: ${questInstanceId})`);
+
   console.log(`\n✓ Done. Character created with id: ${created.id}`);
   console.log(`  Probá: /character show name:${CHARACTER_NAME} en Discord.`);
 }
