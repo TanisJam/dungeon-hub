@@ -131,6 +131,7 @@ describe('buildCounterspellReaction — ForcedCheck (PHB 228)', () => {
     if (!result.ok) return;
 
     expect(result.outcome).toBe('forced-check');
+    if (result.outcome !== 'forced-check') return;
     expect(result.dc).toBe(15); // 10 + 5
     expect(result.action.phase).toBe('INTERRUPTED');
   });
