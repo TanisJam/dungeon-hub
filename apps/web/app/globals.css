@@ -44,11 +44,18 @@
   --color-secondary:     #A85A8E;
   --color-secondary-deep:#7F3F6B;
   --color-secondary-soft:#2E1A28;
-  --color-success:       #6BA368;
-  --color-warning:       #D4A24C;
-  --color-warning-soft:  #3A2D17;
-  --color-warning-deep:  #A87528;
-  --color-danger:        #C0473E;
+  --color-success:           #6BA368;
+  --color-warning:           #D4A24C;
+  --color-warning-soft:      #3A2D17;
+  --color-warning-deep:      #A87528;
+  --color-danger:            #CC4444;
+  --color-danger-soft:       rgba(204, 68, 68, 0.12);
+  --color-danger-soft-border: rgba(204, 68, 68, 0.25);
+
+  /* ── Alpha-derived border tokens (soft borders for row icons) ── */
+  --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
+  --color-secondary-soft-border:  rgba(168, 90, 142, 0.30);
+  --color-secondary-soft-bg:      rgba(168, 90, 142, 0.22);
 
   /* ── Typography (fonts wired in app/layout.tsx) ── */
   --font-display: var(--font-noto-serif-georgian), Georgia, serif;
@@ -542,21 +549,21 @@
   flex-shrink: 0;
   background: var(--color-accent-soft);
   color: var(--color-accent);
-  border: 1px solid rgba(212, 162, 76, 0.25);
+  border: 1px solid var(--color-accent-soft-border);
 }
 .compendium-init-row.spell .ic {
   background: var(--color-secondary-soft);
   color: var(--color-secondary);
-  border-color: rgba(168, 90, 142, 0.30);
+  border-color: var(--color-secondary-soft-border);
 }
 .compendium-init-row.item .ic {
   background: var(--color-accent-soft);
   color: var(--color-accent);
 }
 .compendium-init-row.monst .ic {
-  background: rgba(204, 68, 68, 0.12);
-  color: #CC4444;
-  border-color: rgba(204, 68, 68, 0.25);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger-soft-border);
 }
 .compendium-init-row .body {
   flex: 1;
@@ -584,13 +591,13 @@
 }
 .compendium-init-detail.spell {
   background:
-    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(168, 90, 142, 0.22), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 0% 0%, var(--color-secondary-soft-bg), transparent 55%),
     var(--color-surface);
   border: 1px solid var(--color-secondary);
   border-radius: 0.75rem;
   padding: 16px;
   position: relative;
-  box-shadow: 0 0 0 1px rgba(168, 90, 142, 0.30), 0 0 20px rgba(168, 90, 142, 0.15);
+  box-shadow: var(--shadow-glow-secondary);
 }
 .compendium-init-detail .lvl-stamp {
   position: absolute;
@@ -708,6 +715,12 @@
   --color-secondary:     #A85A8E;
   --color-secondary-deep:#7F3F6B;
   --color-secondary-soft:#2E1A28;
+  --color-danger:            #CC4444;
+  --color-danger-soft:       rgba(204, 68, 68, 0.12);
+  --color-danger-soft-border: rgba(204, 68, 68, 0.25);
+  --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
+  --color-secondary-soft-border:  rgba(168, 90, 142, 0.30);
+  --color-secondary-soft-bg:      rgba(168, 90, 142, 0.22);
 }
 
 /* Alternate palettes (sangremoon, verdant) — placeholders.
