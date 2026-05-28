@@ -694,6 +694,334 @@
   box-shadow: 0 0 0 1px rgba(212,162,76,0.40), 0 0 8px rgba(212,162,76,0.30);
 }
 
+/* ── Inventory screen — currency · weight · equipped · chips · rows ── */
+
+.inventory-init {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Currency strip (4-col @ 375px) — DA5: per-metal tints are inline hex ── */
+/* pp: #C8DCE8 · gp: var(--color-accent) · sp: #B8B4A4 · cp: #C28C5F */
+.inventory-init-currency {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px 12px;
+  background: radial-gradient(at 50% 0%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%),
+              var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-line));
+  border-radius: 12px;
+}
+
+.inventory-init-currency .coin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.inventory-init-currency .v {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.inventory-init-currency .k {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-mute);
+}
+
+/* ── Weight bar (PHB p.176 — Lifting and Carrying) ── */
+.inventory-init-weight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+
+.inventory-init-weight .lbl {
+  font-size: 11px;
+  color: var(--color-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.inventory-init-weight .v {
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.inventory-init-weight .vmax {
+  font-size: 11px;
+  color: var(--color-ink-mute);
+}
+
+.inventory-init-weight .bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--color-ink-soft) 12%, transparent);
+  overflow: hidden;
+}
+
+.inventory-init-weight .fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-success), var(--color-accent));
+  box-shadow: 0 0 8px rgba(212, 162, 76, 0.5);
+}
+
+/* ── Group heads ── */
+.inventory-init-grouphead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 2px;
+  margin-top: 4px;
+}
+
+.inventory-init-grouphead .ttl {
+  font-family: var(--font-display);
+  font-size: 13px;
+}
+
+.inventory-init-grouphead .meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-mute);
+}
+
+/* ── Equipped 4-slot grid ── */
+.inventory-init-equipped {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.inventory-init-equipped .slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  min-height: 80px;
+}
+
+.inventory-init-equipped .slot.filled {
+  background: radial-gradient(at 50% 0%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent 70%),
+              var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-line));
+}
+
+.inventory-init-equipped .slot.empty {
+  opacity: 0.55;
+  border: 1px dashed var(--color-line);
+  background: transparent;
+}
+
+.inventory-init-equipped .slot.empty[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.inventory-init-equipped .slot .ic {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.inventory-init-equipped .slot .role {
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-equipped .slot .nm {
+  font-family: var(--font-display);
+  font-size: 11px;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Type filter chips (horizontal scroll — DA8) ── */
+.inventory-init-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 2px 0;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.inventory-init-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.inventory-init-chips .chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 7px 12px;
+  border-radius: 99px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  font-size: 11px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.inventory-init-chips .chip.on {
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-paper-soft));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.inventory-init-chips .chip[disabled],
+.inventory-init-chips .chip[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── List wrapper — filter-by-data-attr (DA1) ── */
+.inventory-init-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inventory-init-list[data-filter="weapon"]    .inventory-init-row:not([data-itype="weapon"])    { display: none; }
+.inventory-init-list[data-filter="armor"]     .inventory-init-row:not([data-itype="armor"])     { display: none; }
+.inventory-init-list[data-filter="magic"]     .inventory-init-row:not([data-itype="magic"])     { display: none; }
+.inventory-init-list[data-filter="consumable"].inventory-init-row:not([data-itype="consumable"]) { display: none; }
+.inventory-init-list[data-filter="food"]      .inventory-init-row:not([data-itype="food"])      { display: none; }
+.inventory-init-list[data-filter="trinket"]   .inventory-init-row:not([data-itype="trinket"])   { display: none; }
+
+/* Hide group heads when filter is set and the group isn't the active filter */
+.inventory-init-list[data-filter]:not([data-filter="all"]) .inventory-init-grouphead { display: none; }
+.inventory-init-list[data-filter="weapon"]    .inventory-init-grouphead[data-group="weapon"]    { display: flex; }
+.inventory-init-list[data-filter="armor"]     .inventory-init-grouphead[data-group="armor"]     { display: flex; }
+.inventory-init-list[data-filter="magic"]     .inventory-init-grouphead[data-group="magic"]     { display: flex; }
+.inventory-init-list[data-filter="consumable"].inventory-init-grouphead[data-group="consumable"] { display: flex; }
+.inventory-init-list[data-filter="food"]      .inventory-init-grouphead[data-group="food"]      { display: flex; }
+.inventory-init-list[data-filter="trinket"]   .inventory-init-grouphead[data-group="trinket"]   { display: flex; }
+
+/* ── Inventory row ── */
+.inventory-init-row {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-line);
+  text-align: left;
+  width: 100%;
+}
+
+.inventory-init-row .ic-cell {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.inventory-init-row[data-itype="weapon"]     .ic-cell { background: radial-gradient(at 50% 50%, rgba(192, 71, 62, 0.20), transparent 70%); color: #E48A82; }
+.inventory-init-row[data-itype="armor"]      .ic-cell { background: radial-gradient(at 50% 50%, rgba(91, 179, 201, 0.20), transparent 70%); color: var(--color-primary); }
+.inventory-init-row[data-itype="consumable"] .ic-cell { background: radial-gradient(at 50% 50%, rgba(168, 90, 142, 0.22), transparent 70%); color: var(--color-secondary); }
+.inventory-init-row[data-itype="magic"]      .ic-cell { background: radial-gradient(at 50% 50%, rgba(168, 90, 142, 0.28), transparent 70%); color: var(--color-secondary); }
+.inventory-init-row[data-itype="food"]       .ic-cell { background: radial-gradient(at 50% 50%, rgba(107, 163, 104, 0.22), transparent 70%); color: var(--color-success); }
+.inventory-init-row[data-itype="trinket"]    .ic-cell { background: rgba(244, 234, 213, 0.10); color: var(--color-ink-soft); }
+
+.inventory-init-row .equipped-flag {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font-size: 7.5px;
+  padding: 1px 4px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inventory-init-row .body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inventory-init-row .nm {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.inventory-init-row .sub {
+  font-style: italic;
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-row .sparkle {
+  color: var(--color-secondary);
+  text-shadow: 0 0 6px rgba(168, 90, 142, 0.5);
+  margin-left: 4px;
+}
+
+.inventory-init-row .qty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-soft);
+}
+
+/* ── Rarity glows — reuse existing tokens (DA7 — no new rarity tokens) ── */
+/* globals.css L92-96: --shadow-glow-rarity-{uncommon|rare|very-rare|legendary|artifact} */
+.inventory-init-row.rarity-uncommon  { box-shadow: var(--shadow-glow-rarity-uncommon); }
+.inventory-init-row.rarity-rare      { box-shadow: var(--shadow-glow-rarity-rare); }
+.inventory-init-row.rarity-very-rare { box-shadow: var(--shadow-glow-rarity-very-rare); }
+.inventory-init-row.rarity-legendary { box-shadow: var(--shadow-glow-rarity-legendary); }
+.inventory-init-row.rarity-artifact  { box-shadow: var(--shadow-glow-rarity-artifact); }
+
+/* ── Empty state per filter ── */
+.inventory-init-empty {
+  padding: 18px 14px;
+  text-align: center;
+  border: 1px dashed var(--color-line);
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+}
+
+.inventory-init-empty .ttl {
+  font-size: 12px;
+  color: var(--color-ink-soft);
+}
+
+.inventory-init-empty .cta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-accent);
+  text-decoration: underline dotted;
+}
+
 /* ── Palette: Obsidiana (default) ── */
 :root[data-palette="obsidian"],
 :root:not([data-palette]) {
