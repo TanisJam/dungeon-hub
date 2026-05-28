@@ -1263,6 +1263,135 @@
   cursor: pointer;
 }
 
+/* ── Inventory detail — advanced variants (magic, book, trinket, quest) — Slice C ── */
+/* Reqs: WIVC-CSS-01, WID4-CSS-01 (spec #1077). Scope: .inventory-init-* (WED-CSS-SCOPED-05). */
+
+/* Hero tints — per type class on .inventory-init-detail-hero */
+.inventory-init-detail-hero.magic {
+  background:
+    radial-gradient(at 0% 0%, rgba(168, 90, 142, 0.16), transparent 55%),
+    radial-gradient(at 100% 100%, rgba(212, 162, 76, 0.14), transparent 55%),
+    var(--color-paper-soft);
+  border-color: color-mix(in srgb, var(--color-secondary) 40%, var(--color-line));
+}
+.inventory-init-detail-hero.book {
+  background: var(--color-paper-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-line));
+}
+.inventory-init-detail-hero.trinket {
+  background: var(--color-paper-soft);
+  border: 1px dashed var(--color-ink-soft);
+}
+.inventory-init-detail-hero.quest {
+  background:
+    radial-gradient(at 50% 0%, rgba(212, 162, 76, 0.25), transparent 65%),
+    var(--color-paper-soft);
+  border: 1px solid var(--color-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.inventory-init-detail-hero.magic .glyph   { color: var(--color-secondary); }
+.inventory-init-detail-hero.book .glyph    { color: var(--color-accent); }
+.inventory-init-detail-hero.trinket .glyph { color: var(--color-ink-soft); }
+.inventory-init-detail-hero.quest .glyph   { color: var(--color-accent); }
+
+/* Attunement pip strip — magic items (PHB p.138) */
+.inventory-init-detail-attune {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 8px;
+  background: color-mix(in srgb, var(--color-secondary) 8%, var(--color-paper-soft));
+  border-left: 3px solid var(--color-secondary);
+}
+.inventory-init-detail-attune .pip {
+  display: inline-block; width: 12px; height: 12px; border-radius: 99px;
+  background: var(--color-secondary);
+  box-shadow: 0 0 8px var(--color-secondary);
+}
+.inventory-init-detail-attune .lbl {
+  font-family: var(--font-mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--color-secondary);
+}
+.inventory-init-detail-attune .meta {
+  margin-left: auto; font-size: 11px; color: var(--color-ink-soft);
+}
+
+/* Bookpage card — book items (house rule PHB p.114; script font via --font-script L63) */
+.inventory-init-detail-bookpage {
+  position: relative;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--color-paper-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.inventory-init-detail-bookpage::before,
+.inventory-init-detail-bookpage::after {
+  content: "❦";
+  position: absolute;
+  font-family: var(--font-display), serif;
+  font-size: 14px;
+  color: var(--color-accent);
+  opacity: 0.7;
+}
+.inventory-init-detail-bookpage::before { top: 6px; left: 8px; }
+.inventory-init-detail-bookpage::after  { bottom: 6px; right: 8px; }
+.inventory-init-detail-bookpage .passage {
+  font-family: var(--font-script);
+  font-size: 13px; line-height: 1.55;
+  color: var(--color-ink);
+  max-height: 220px; overflow-y: auto;
+  padding: 0 8px;
+}
+.inventory-init-detail-bookpage .progress {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+}
+.inventory-init-detail-bookpage .progress .lbl {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-mute);
+}
+.inventory-init-detail-bookpage .progress .bar {
+  height: 4px; border-radius: 99px; background: var(--color-line); overflow: hidden;
+}
+.inventory-init-detail-bookpage .progress .fill {
+  height: 100%; background: var(--color-accent);
+  transition: width 200ms ease;
+}
+
+/* Queststamp card — quest items (house rule §1.2) — ERC5: ellipsis at 375px */
+.inventory-init-detail-queststamp {
+  display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center;
+  padding: 12px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-paper-soft));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, var(--color-line));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+.inventory-init-detail-queststamp .symbol {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 99px;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font-family: var(--font-display), serif;
+  font-size: 22px;
+}
+.inventory-init-detail-queststamp .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inventory-init-detail-queststamp .ttl {
+  font-family: var(--font-mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-accent);
+}
+.inventory-init-detail-queststamp .qn {
+  font-family: var(--font-display); font-size: 14px; line-height: 1.2;
+  /* R3: max-width + ellipsis to prevent 375px overflow (ERC5) */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inventory-init-detail-queststamp .stg {
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-soft);
+}
+
+/* Filter CSS extension for book + quest (D4 chip unlock — WID4-CSS-01, R5) */
+.inventory-init-list[data-filter="book"]  .inventory-init-row:not([data-itype="book"])  { display: none; }
+.inventory-init-list[data-filter="quest"] .inventory-init-row:not([data-itype="quest"]) { display: none; }
+
 /* ── Palette: Obsidiana (default) ── */
 :root[data-palette="obsidian"],
 :root:not([data-palette]) {
