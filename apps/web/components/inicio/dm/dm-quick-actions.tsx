@@ -29,9 +29,9 @@ export function DMQuickActions() {
         {/* Nuevo NPC — stub */}
         <button
           type="button"
+          disabled
           aria-disabled="true"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
-          onClick={(e) => e.preventDefault()}
         >
           <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
             🧙
@@ -42,9 +42,9 @@ export function DMQuickActions() {
         {/* Loot — stub */}
         <button
           type="button"
+          disabled
           aria-disabled="true"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
-          onClick={(e) => e.preventDefault()}
         >
           <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
             💰
