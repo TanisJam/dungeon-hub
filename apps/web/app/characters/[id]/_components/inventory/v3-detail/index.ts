@@ -1,0 +1,10 @@
+export { InventoryDetailShell } from './inventory-detail-shell';
+export { InventoryDetailHero } from './inventory-detail-hero';
+export { InventoryDetailSection } from './inventory-detail-section';
+export { InventoryDetailFooter } from './inventory-detail-footer';
+export { EquipChip } from './equip-chip';
+export { WeaponDetailBody } from './weapon-detail-body';
+export { ArmorDetailBody } from './armor-detail-body';
+export { ConsumableDetailBody } from './consumable-detail-body';
+export { FoodDetailBody } from './food-detail-body';
+export { RollAttackStubButton } from './roll-attack-stub-button';
