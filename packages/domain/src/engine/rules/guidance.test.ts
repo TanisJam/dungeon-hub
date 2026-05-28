@@ -138,4 +138,29 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
       false,
     );
   });
+
+  // ── Scenario (d): non-default statKey — template parameterization guard ───────
+
+  it('(d) statKey param targets the chosen ability check, not a different one', () => {
+    // PHB 248: "one ability check of its choice". The choice is modeled via the statKey
+    // param (full choice-runtime tracking deferred — // TODO: choice-runtime).
+    // This guards the compileRule template slot for a NON-default stat ('int').
+    const registry = createInMemoryRegistry();
+    const instances = buildGuidanceModifiers(CASTER_ID, TARGET_ID, TOKEN, 'int');
+    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+
+    const ctx = makeCtx(TARGET_ID);
+
+    // +1d4 applies to the chosen check (int)
+    const intResult = resolveStat(TARGET_ID, 'int', 0, ctx, registry);
+    const onInt = intResult.breakdown.find((s) => s.label === `Guidance (${CASTER_ID})`);
+    expect(onInt, 'Guidance should apply to the chosen stat (int)').toBeDefined();
+    expect(onInt!.amount).toBe('1d4');
+
+    // …and NOT to a different, unchosen check (skill.athletics) — proves the template
+    // slot bound the specific chosen stat, not a wildcard.
+    const athResult = resolveStat(TARGET_ID, 'skill.athletics', 0, ctx, registry);
+    const onAth = athResult.breakdown.find((s) => s.label === `Guidance (${CASTER_ID})`);
+    expect(onAth, 'Guidance should NOT apply to an unchosen check').toBeUndefined();
+  });
 });
