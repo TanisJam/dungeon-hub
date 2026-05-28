@@ -23,3 +23,5 @@ export {
   type TransferIssue,
   type TransferResult,
 } from './transfer.js';
+export { deriveV3Type, type V3ItemType } from './derive-v3-type.js';
+export { normalizeRarity, type RarityClass } from './normalize-rarity.js';

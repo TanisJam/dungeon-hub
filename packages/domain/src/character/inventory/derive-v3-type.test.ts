@@ -97,7 +97,8 @@ describe('deriveV3Type — book/quest D4 deferral (DIVT-BOOK-01)', () => {
   it('1.6 type="G" + no charges + v3TypeOverride=null → "trinket" (not "book" — D4 deferred, DIVT-BOOK-01)', () => {
     // D4: book/quest are not derivable from 5etools codes in Slice A.
     // Spellbooks, adventure journals etc. resolve to "trinket" until Slice C ships v3TypeOverride.
-    expect(deriveV3Type(makeLite({ type: 'G', charges: undefined }), null)).toBe('trinket');
+    // charges omitted (exactOptionalPropertyTypes) → same as no charges present.
+    expect(deriveV3Type(makeLite({ type: 'G' }), null)).toBe('trinket');
   });
 });
 
