@@ -21,7 +21,10 @@ import {
   removeItemFromInventory,
   transferItemBetweenCharacters,
   updateInventoryItem,
+  deriveV3Type,
+  normalizeRarity,
   type InventoryItem,
+  type ItemCompendiumLite,
 } from '@dungeon-hub/domain/character/inventory';
 import { validateLongRestEligibility } from '@dungeon-hub/domain/character/rest';
 import {
@@ -88,6 +91,39 @@ import {
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
+
+/**
+ * Enriched inventory item for the v3 list view.
+ * Computed per-row at sheet projection time; reuses the existing loadItemDataMany batch.
+ * Design decision DA2 (sdd/inventory-v3-list #1064): magicFlag is an API-layer heuristic,
+ * not a domain rule — it mixes rarity + reqAttune signals as a UI affordance.
+ * Design decision DA3: additive field — inventory[] kept verbatim for read-path tolerance.
+ * ACSE-SHAPE-01 (spec #1063).
+ */
+interface EnrichedInventoryItem {
+  instanceId: string;
+  itemSlug: string;
+  itemSource: string;
+  displayName: string;
+  quantity: number;
+  /** true when item.state === 'equipped' */
+  equipped: boolean;
+  equipHand: 'main' | 'off' | 'both' | null;
+  charges: number | null;
+  /** V3 UI taxonomy derived from 5etools type codes + rarity (deriveV3Type). */
+  v3Type: ReturnType<typeof deriveV3Type>;
+  /** Normalized rarity slug or null (normalizeRarity). DMG p.135. */
+  rarity: ReturnType<typeof normalizeRarity>;
+  /** Raw reqAttune from compendium JSONB. PHB p.136-138. */
+  reqAttune: boolean | string | null;
+  /**
+   * True when item is non-common magic: (rarity != null && rarity !== 'common') || reqAttune != null.
+   * DA2: API-layer heuristic, not a PHB rule.
+   */
+  magicFlag: boolean;
+  weight: number | null;
+  qty: number;
+}
 
 const SPELLBOOK_REF = { slug: 'spellbook', source: 'PHB' } as const;
 
@@ -671,6 +707,45 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const tempHp = hpData?.temp ?? 0;
     const statMethod = (data as { statMethod?: string } | null)?.statMethod ?? 'standard-array';
 
+    // ── inventoryEnriched: additive v3 list view data (ACSE-SHAPE-01) ──────────
+    // Reuses the existing itemWeights batch — zero new DB queries (ACSE-NONN1-01).
+    // Build a map from slug|source → ItemCompendiumLite for O(1) lookup per row.
+    const itemMap = new Map<string, ItemCompendiumLite>();
+    for (const lite of itemWeights) {
+      itemMap.set(`${lite.slug}|${lite.source}`, lite);
+    }
+
+    const inventoryEnriched: EnrichedInventoryItem[] = inventory.map((item: InventoryItem) => {
+      const lite = itemMap.get(`${item.itemSlug}|${item.itemSource}`);
+      const liteOrEmpty: ItemCompendiumLite = lite ?? {
+        slug: item.itemSlug,
+        source: item.itemSource,
+        name: item.itemSlug,
+        type: null,
+        weight: null,
+      };
+
+      const rarity = normalizeRarity(liteOrEmpty.rarity);
+      const reqAttune = liteOrEmpty.reqAttune ?? null;
+
+      return {
+        instanceId: item.instanceId,
+        itemSlug: item.itemSlug,
+        itemSource: item.itemSource,
+        displayName: item.customName ?? liteOrEmpty.name ?? item.itemSlug,
+        quantity: item.quantity,
+        equipped: item.state === 'equipped',
+        equipHand: item.equipHand ?? null,
+        charges: item.charges ?? null,
+        v3Type: deriveV3Type(liteOrEmpty, null),
+        rarity,
+        reqAttune,
+        magicFlag: (rarity != null && rarity !== 'common') || reqAttune != null,
+        weight: liteOrEmpty.weight,
+        qty: item.quantity,
+      };
+    });
+
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
@@ -678,6 +753,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       tempHp,
       statMethod,
       inventory,
+      inventoryEnriched,
     };
   });
 
