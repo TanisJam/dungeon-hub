@@ -37,6 +37,10 @@ export type Ability = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 /**
  * Addressable stats in the resolution engine.
  * Skill keys use the `skill.<name>` dotted form to avoid collision with ability scores.
+ *
+ * `saving-throw` — flat key for all-saves effects (Bless +1d4, Cloak of Protection +1).
+ * `saving-throw.${Ability}` — per-ability key for targeted proficiencies (Resilient (Con) → 'saving-throw.con').
+ *   PHB 179: saving throws are per-ability. PHB 168: Resilient grants proficiency in ONE ability's saves.
  */
 export type StatKey =
   | Ability
@@ -46,6 +50,7 @@ export type StatKey =
   | 'initiative'
   | 'attack-roll'
   | 'saving-throw'
+  | `saving-throw.${Ability}`
   | 'damage'
   | `skill.${string}`;
 
@@ -121,7 +126,7 @@ export type EventKind = 'cast' | 'attacked' | 'damaged';
 
 export type ReactionEffect = { kind: 'counter'; autoIfSlotGe: number };
 
-// ── Modifier discriminated union (9 kinds, closed) ────────────────────────────
+// ── Modifier discriminated union (10 kinds, closed) ───────────────────────────
 
 /**
  * NumMod — numeric bonus/penalty on a stat.
@@ -212,7 +217,23 @@ export type GmRulingMod = {
  */
 export type NoopMod = { kind: 'noop' };
 
-/** Closed union of all 9 modifier kinds in this slice. */
+/**
+ * ProficiencyMod — grants proficiency or expertise in a skill, save, or tool.
+ *
+ * `domain` is a closed enum of six categories (PHB proficiency types).
+ * `ref` is a FREE string — homebrew skills / custom tools pass without list validation.
+ * `level` defaults to 'proficient' when absent; 'expertise' doubles the bonus.
+ *
+ * // TODO #513: `ref` validation against catalog is deferred until DB-injected resolver.
+ */
+export type ProficiencyMod = {
+  kind: 'proficiency';
+  domain: 'skill' | 'save' | 'tool' | 'language' | 'weapon' | 'armor';
+  ref: string;
+  level?: 'proficient' | 'expertise';
+};
+
+/** Closed union of all 10 modifier kinds in this slice. */
 export type Modifier =
   | NumMod
   | AdvantageMod
@@ -222,7 +243,8 @@ export type Modifier =
   | UsageMod
   | ReplaceMod
   | GmRulingMod
-  | NoopMod;
+  | NoopMod
+  | ProficiencyMod;
 
 // ── Type guards ───────────────────────────────────────────────────────────────
 
@@ -260,4 +282,8 @@ export function isGmRulingMod(m: Modifier): m is GmRulingMod {
 
 export function isNoopMod(m: Modifier): m is NoopMod {
   return m.kind === 'noop';
+}
+
+export function isProficiencyMod(m: Modifier): m is ProficiencyMod {
+  return m.kind === 'proficiency';
 }

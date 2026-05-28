@@ -2,22 +2,27 @@
  * resolveStat — pull-first stat resolution with provenance.
  *
  * // REQ-RESOLVE-01: pull-first provenance (c.2)
+ * // REQ-PROF-01: ProficiencyMod proficiency gather branch (c.2.2)
  *
  * The engine gathers modifiers from the registry at evaluation time,
  * applies type-level stacking, and returns { value, breakdown: Source[] }.
  *
- * Tests cover the 4 spec scenarios from REQ-RESOLVE-01:
+ * Tests cover the 4 spec scenarios from REQ-RESOLVE-01 + 3 from REQ-PROF-01:
  *   1. Basic numeric modifier with provenance (base + item mod → value + breakdown)
  *   2. Same-type stacking — keep highest (two item mods → only highest counts)
  *   3. Cross-type stacking — all apply (item + status → both in breakdown)
  *   4. Round-trip — serialize registry state → reload → identical value+breakdown
+ *   5. ProficiencyMod skill.athletics → breakdown includes {amount: pb, type:'untyped'}
+ *   6. ProficiencyMod level:'expertise' → amount = 2 * pb
+ *   7. ProficiencyMod round-trip JSON cycle preserves breakdown
  *
  * Design ref: sdd/resolution-engine/design — "Resolution algorithm" §5-step pipeline.
+ * Design ref: sdd/authoring-dsl/design — Decision 3, proficiency gather branch.
  */
 import { describe, it, expect } from 'vitest';
 import { resolveStat } from './stat.js';
 import { createInMemoryRegistry } from '../registry/query.js';
-import type { EntityId, StatKey } from '../types.js';
+import type { EntityId, StatKey, ProficiencyMod } from '../types.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
 import type { EvaluationContext } from '../context.js';
 import type { NumMod } from '../types.js';
@@ -134,5 +139,235 @@ describe('resolveStat', () => {
     expect(reloadedResult.breakdown.map((s) => ({ amount: s.amount, type: s.type }))).toEqual(
       originalResult.breakdown.map((s) => ({ amount: s.amount, type: s.type })),
     );
+  });
+});
+
+// ── T2.5 Per-ability saving-throw proficiency (REQ-PROF-02) ──────────────────
+//
+// PHB 168/179: Resilient grants proficiency in ONE ability's saves; saves are per-ability.
+// A `proficiency{domain:'save', ref:'con'}` must contribute ONLY to 'saving-throw.con',
+// NOT to 'saving-throw.dex' or any other per-ability save key.
+// A flat 'saving-throw' numeric mod (e.g. Cloak +1, Bless +1d4) MUST still apply
+// when resolving any per-ability key like 'saving-throw.con'.
+
+describe('resolveStat — per-ability saving-throw proficiency (T2.5 / REQ-PROF-02)', () => {
+  it('(a) proficiency{domain:"save", ref:"con"} contributes to resolveStat(…, "saving-throw.con", …)', () => {
+    // PHB 168/179: Resilient (Constitution) grants proficiency in CON saves ONLY.
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('prof-con-save', 'save', 'con', 'Resilient (Constitution)'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Resilient (Constitution)');
+    expect(profSource, 'breakdown should include CON-save proficiency source').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
+  });
+
+  it('(b) proficiency{domain:"save", ref:"con"} does NOT contribute to resolveStat(…, "saving-throw.dex", …)', () => {
+    // Bug-proof test: CON-save proficiency must NOT apply to DEX saves.
+    // PHB 168/179: each save proficiency is per-ability.
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('prof-con-save', 'save', 'con', 'Resilient (Constitution)'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.dex' as StatKey, 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Resilient (Constitution)');
+    expect(profSource, 'CON-save proficiency must not appear in DEX-save breakdown').toBeUndefined();
+    expect(result.value).toBe(0);
+  });
+
+  it('(c) flat "saving-throw" NumMod (+1) still applies when resolving "saving-throw.con" (all-saves semantic)', () => {
+    // PHB (Cloak of Protection, DMG 159): +1 to all saving throws.
+    // A flat 'saving-throw' numeric modifier must contribute to ANY per-ability save resolution.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('cloak-save', 1, 'item', 'saving-throw'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry);
+
+    const cloakSource = result.breakdown.find((s) => s.modifierId === 'cloak-save');
+    expect(cloakSource, 'flat saving-throw +1 should appear in saving-throw.con breakdown').toBeDefined();
+    expect(cloakSource!.amount).toBe(1);
+    expect(result.value).toBe(1);
+  });
+});
+
+// ── Proficiency gather branch (REQ-PROF-01 / Phase 2) ─────────────────────────
+
+function makeProficiencyModInstance(
+  id: string,
+  domain: ProficiencyMod['domain'],
+  ref: string,
+  label: string,
+  level?: ProficiencyMod['level'],
+  ownerId: EntityId = CHAR_ID,
+): ModifierInstance {
+  const def: ProficiencyMod = { kind: 'proficiency', domain, ref, ...(level !== undefined ? { level } : {}) };
+  return {
+    id: id as ModifierInstanceId,
+    def,
+    scope: {
+      owner: ownerId,
+      target: { axis: 'self' },
+      trigger: 'always',
+    },
+    label,
+  };
+}
+
+describe('resolveStat — proficiency gather branch (REQ-PROF-01)', () => {
+  it('ProficiencyMod skill.athletics → breakdown includes {amount: proficiencyBonus, type:"untyped"}', () => {
+    // REQ-PROF-01 / Scenario: Happy path — proficiency modifier gathered and projected as Source
+    // PHB 140 (Soldier background): "Skill Proficiencies: Athletics, Intimidation."
+    const proficiencyBonus = 2;
+    const registry = createInMemoryRegistry();
+    registry.register(makeProficiencyModInstance('prof-athletics', 'skill', 'athletics', 'Soldier (background)'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, registry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Soldier (background)');
+    expect(profSource, 'breakdown should include proficiency source').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
+  });
+
+  it('ProficiencyMod level:"expertise" → amount = 2 * proficiencyBonus', () => {
+    // REQ-PROF-01 / Scenario: Expertise doubles the proficiency bonus
+    // PHB 96 (Rogue): "Expertise — Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies."
+    const proficiencyBonus = 3;
+    const registry = createInMemoryRegistry();
+    registry.register(
+      makeProficiencyModInstance('exp-athletics', 'skill', 'athletics', 'Expertise (Rogue)', 'expertise'),
+    );
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, registry, proficiencyBonus);
+
+    const expSource = result.breakdown.find((s) => s.label === 'Expertise (Rogue)');
+    expect(expSource, 'breakdown should include expertise source').toBeDefined();
+    expect(expSource!.amount).toBe(2 * proficiencyBonus);
+    expect(expSource!.type).toBe('untyped');
+    expect(result.value).toBe(2 * proficiencyBonus);
+  });
+
+  it('round-trip JSON cycle: ProficiencyMod instance preserves breakdown after serialize+reload', () => {
+    // REQ-PROF-01 / Scenario: Round-trip — ProficiencyMod survives JSON serialization
+    // Plain-JSON-serializable: ProficiencyMod carries no functions.
+    const proficiencyBonus = 2;
+    const instance = makeProficiencyModInstance('rt-prof', 'skill', 'athletics', 'Soldier (background)');
+
+    // Serialize + reload
+    const serialized = JSON.stringify([instance]);
+    const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
+
+    const freshRegistry = createInMemoryRegistry();
+    for (const inst of reloaded) {
+      freshRegistry.register(inst);
+    }
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, freshRegistry, proficiencyBonus);
+
+    const profSource = result.breakdown.find((s) => s.label === 'Soldier (background)');
+    expect(profSource, 'round-trip: proficiency source should be preserved').toBeDefined();
+    expect(profSource!.amount).toBe(proficiencyBonus);
+    expect(profSource!.type).toBe('untyped');
+    expect(result.value).toBe(proficiencyBonus);
+  });
+});
+
+// ── T2.6 Cross-stat isolation (REQ-RESOLVE-01) ────────────────────────────────
+//
+// REQ-RESOLVE-01: numeric mods apply only to their target stat (cross-stat isolation);
+// flat saving-throw = all saves.
+//
+// Bug: resolveStat line ~122 filters numInstances only by kind === 'num',
+// never by inst.def.stat === stat. A num{stat:'ac', value:1} would therefore
+// add +1 to EVERY stat resolution (str, attack-roll, etc.) — silent cross-stat
+// contamination. PHB has no mechanic where a generic item bonus applies to all stats.
+
+describe('resolveStat — T2.6 cross-stat isolation (REQ-RESOLVE-01)', () => {
+  it('(1) num{stat:"ac", value:1} does NOT affect resolveStat(…, "str", …)', () => {
+    // REQ-RESOLVE-01: cross-stat isolation. An AC bonus (e.g. Cloak of Protection +1 AC)
+    // MUST NOT add to STR. Currently FAILS because the num branch does not filter by stat.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('ac-mod', 1, 'item', 'ac'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'str', BASE_STR, ctx, registry);
+
+    // AC modifier must NOT leak into STR resolution.
+    expect(result.value).toBe(BASE_STR); // 10, not 11
+    const acSource = result.breakdown.find((s) => s.modifierId === 'ac-mod');
+    expect(acSource, 'AC modifier must not appear in STR breakdown').toBeUndefined();
+  });
+
+  it('(2) num{stat:"attack-roll", value:2} does NOT affect resolveStat(…, "ac", …)', () => {
+    // REQ-RESOLVE-01: cross-stat isolation. An attack-roll bonus must NOT pollute AC.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('atk-mod', 2, 'status', 'attack-roll'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'ac', 15, ctx, registry);
+
+    expect(result.value).toBe(15); // not 17
+    const atkSource = result.breakdown.find((s) => s.modifierId === 'atk-mod');
+    expect(atkSource, 'attack-roll modifier must not appear in AC breakdown').toBeUndefined();
+  });
+
+  it('(3) num{stat:"ac", value:1} DOES apply when resolving "ac" (exact match still works)', () => {
+    // Regression guard: after fixing cross-stat isolation the exact-match case must still work.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('ac-mod', 1, 'item', 'ac'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'ac', 15, ctx, registry);
+
+    expect(result.value).toBe(16); // 15 base + 1 AC mod
+    const acSource = result.breakdown.find((s) => s.modifierId === 'ac-mod');
+    expect(acSource, 'AC modifier must appear in AC breakdown').toBeDefined();
+    expect(acSource!.amount).toBe(1);
+  });
+
+  it('(4a) flat num{stat:"saving-throw", value:1} applies when resolving "saving-throw.con" (all-saves rule)', () => {
+    // PHB (Cloak of Protection, DMG 159): +1 to all saving throws.
+    // A flat 'saving-throw' numeric modifier MUST contribute to any per-ability save resolution.
+    // This is the "all-saves" semantic — must be PRESERVED by the stat-filter fix.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('cloak-all-saves', 1, 'item', 'saving-throw'));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.con' as StatKey, 0, ctx, registry);
+
+    const src = result.breakdown.find((s) => s.modifierId === 'cloak-all-saves');
+    expect(src, 'flat saving-throw +1 should appear in saving-throw.con breakdown').toBeDefined();
+    expect(src!.amount).toBe(1);
+    expect(result.value).toBe(1);
+  });
+
+  it('(4b) num{stat:"saving-throw.con", value:2} does NOT leak to "saving-throw.dex"', () => {
+    // REQ-RESOLVE-01: a per-ability save bonus must only apply to that ability's save.
+    // e.g. a feature that grants +2 to CON saves only must not affect DEX saves.
+    const registry = createInMemoryRegistry();
+    registry.register(makeNumModInstance('con-save-bonus', 2, 'status', 'saving-throw.con' as StatKey));
+
+    const ctx = makeCtx();
+    const result = resolveStat(CHAR_ID, 'saving-throw.dex' as StatKey, 0, ctx, registry);
+
+    expect(result.value).toBe(0);
+    const src = result.breakdown.find((s) => s.modifierId === 'con-save-bonus');
+    expect(src, 'saving-throw.con bonus must not appear in saving-throw.dex breakdown').toBeUndefined();
   });
 });
