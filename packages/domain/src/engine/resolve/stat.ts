@@ -119,7 +119,20 @@ export function resolveStat(
   })();
 
   // ── Step 4: Type-level stacking on NumMod instances ────────────────────────
-  const numInstances = allInstances.filter((inst) => inst.def.kind === 'num');
+  // REQ-RESOLVE-01: numeric mods apply only to their target stat (cross-stat isolation).
+  // Filter by both kind AND stat-match. Stat-match rules:
+  //   - Exact match: inst.def.stat === stat (covers all ordinary cases).
+  //   - All-saves rule: when resolving a per-ability save ('saving-throw.<ability>'),
+  //     also include flat 'saving-throw' mods (Bless +1d4, Cloak +1 — PHB/DMG all-saves effects).
+  //     This is the ONLY cross-key inclusion; it is one-directional (flat → per-ability, never reverse).
+  const numInstances = allInstances.filter((inst) => {
+    if (inst.def.kind !== 'num') return false;
+    const modStat = inst.def.stat;
+    if (modStat === stat) return true;
+    // All-saves rule: flat 'saving-throw' mod applies to any per-ability save resolution.
+    if (modStat === 'saving-throw' && stat.startsWith('saving-throw.')) return true;
+    return false;
+  });
   const stackedResult = applyStacking(numInstances, resolvedBase, selfRef);
 
   // ── Step 4b: Proficiency gather branch ────────────────────────────────────
