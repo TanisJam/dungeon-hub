@@ -154,6 +154,49 @@ describe('campaigns', () => {
       expect(row.nextSession).toBeNull();
     });
 
+    it('T4: GET /campaigns/:id includes members[] (ACDM-MEMBERS-01)', async () => {
+      const app = await getTestApp();
+      const created = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${user.accessToken}` },
+          payload: { name: 'Members Test Campaign' },
+        })
+        .then((r) => r.json());
+
+      const p1 = await createTestUser();
+      const p2 = await createTestUser();
+      try {
+        await addCampaignAndWorldMember(created.id, p1.id, 'player');
+        await addCampaignAndWorldMember(created.id, p2.id, 'player');
+
+        const res = await app
+          .inject({
+            method: 'GET',
+            url: `/api/v1/campaigns/${created.id}`,
+            headers: { authorization: `Bearer ${user.accessToken}` },
+          })
+          .then((r) => r.json());
+        expect(Array.isArray(res.members)).toBe(true);
+        expect(res.members).toHaveLength(3);
+        const roles = res.members.map((m: { role: string }) => m.role).sort();
+        expect(roles).toEqual(['gm', 'player', 'player']);
+        const usernames = res.members.map((m: { username: string }) => m.username);
+        const expectedP1 = p1.email.split('@')[0];
+        const expectedP2 = p2.email.split('@')[0];
+        expect(usernames).toContain(expectedP1);
+        expect(usernames).toContain(expectedP2);
+        for (const m of res.members) {
+          expect(m.userId).toMatch(/^[0-9a-f-]{36}$/);
+          expect(m.joinedAt).toBeDefined();
+        }
+      } finally {
+        await deleteTestUser(p1.id);
+        await deleteTestUser(p2.id);
+      }
+    });
+
     it('T3: pendingFichas computed only for GM caller (ACLE-PENDING-FICHAS-DM-ONLY-02)', async () => {
       const app = await getTestApp();
       const created = await app

@@ -7,6 +7,7 @@ import { db } from '../../infra/db/client.js';
 import { campaigns, campaignMembers, users, worlds, worldMembers } from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { listUserCampaigns } from '../../use-cases/campaigns/list-user-campaigns.js';
+import { loadCampaignMembers } from '../../use-cases/campaigns/load-campaign-members.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 
 const CreateCampaignBody = z.object({
@@ -127,7 +128,8 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
       .limit(1);
     if (member.length === 0) return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    return campaign;
+    const members = await loadCampaignMembers(id);
+    return { ...campaign, members };
   });
 
   // ---- PATCH /campaigns/:id ------------------------------------------------
