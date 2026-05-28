@@ -27,4 +27,27 @@ describe('CompendiumDemoIsland', () => {
     const dialog = document.body.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
   });
+
+  it('WCDS-OPEN-02: backdrop click closes sheet — [role="dialog"] removed', async () => {
+    // WCDS-OPEN-02: close path — V3Sheet backdrop click calls onClose, island resets
+    // openDetail to false, V3Sheet unmounts and [role="dialog"] is removed from DOM.
+    const { getByLabelText } = render(<CompendiumDemoIsland />);
+    // 1. Open via search trigger
+    const trigger = getByLabelText('Buscar en el compendium');
+    await act(async () => { fireEvent.click(trigger); });
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    // 2. Close via backdrop — V3Sheet backdrop is a fixed inset-0 div with aria-hidden="true"
+    //    rendered BEFORE the panel in the portal, so querySelector finds it first.
+    const backdrop = document.body.querySelector(
+      'div[aria-hidden="true"].fixed',
+    ) as HTMLElement;
+    expect(backdrop).not.toBeNull();
+    await act(async () => {
+      fireEvent.click(backdrop);
+      // Flush pending microtasks so React state update + V3Sheet re-render completes
+      await Promise.resolve();
+    });
+    // 3. Assert sheet is gone
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  });
 });
