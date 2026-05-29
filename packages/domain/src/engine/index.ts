@@ -205,3 +205,8 @@ export { blessRuleDoc } from './rules-authored/bless.js';
 
 export { deriveInventoryModifiers } from './adapter/derive-inventory-modifiers.js';
 export type { ItemModifierMap } from './adapter/derive-inventory-modifiers.js';
+
+// ── ASI adapter (engine-ability-scores) ───────────────────────────────────────
+
+export { deriveAbilityScoreModifiers } from './adapter/derive-ability-score-modifiers.js';
+export type { AbilityScoreModifierInput } from './adapter/derive-ability-score-modifiers.js';
