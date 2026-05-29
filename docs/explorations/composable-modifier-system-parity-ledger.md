@@ -71,7 +71,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 | Dominio | Legacy (file:line) | Engine StatKey | Estado | Parity gate | Notas / diffs PHB |
 |---|---|---|---|---|---|
 | **AC** | `compute.ts:545` (`armorClass`) | `'ac'` ✅ | `dual-shadow (native)` ✅ | ✅ [`armor-class.test.ts`](../../packages/domain/src/engine/rules/armor-class.test.ts) | `engineAc` nativo en `/sheet` (base 0, `deriveArmorClassModifiers`). 9 arquetipos (PHB p.14/48/78/144/149). legacy-deleted blocked by formula-cliff → tracked fast-follow `engine-ac-authoritative`. |
-| **Attack roll** | `compute.ts:432` (`attackBonus` per skill/weapon) | `'attack-roll'` ✅ | `dual-shadow` | ❌ falta corpus | `engineStats.attackRoll` (`characters.ts:824`). Hoy base 0 + mods; legacy es `pb+mod`. Reconciliar base. |
+| **Attack roll** | per-arma (`load-inventory-detail.ts:278` `computeWeaponAttackBonus`) + spell (`compute.ts:430` `spellcasting[].attackBonus`) | `'attack-roll'` (delta-channel) | `legacy-only` ⚠️ **NO es candidato de parity** | n/a | `engineStats.attackRoll` es un **canal de delta** (Bless/active-effects; value SIEMPRE 0; breakdown-only) — NO computa ningún valor legacy. Attack-roll es per-arma + ctx (`weaponInUse`, ability selection, Sharpshooter) → requiere el **action pipeline** (sin cablear). Weapon attacks → `sdd/engine-action-pipeline`. Spell-attack-bonus (estático per-clase) = sub-pieza separable → posible `sdd/engine-spell-attack-parity` (necesita #513). Ver explore #1197. |
 | **Saving throws** | `compute.ts:386-394 (DELETED)` | `'saving-throw.*'` ✅ | `legacy-deleted` | ✅ [`saving-throws.test.ts`](../../packages/domain/src/engine/rules/saving-throws.test.ts) | Resilient+class overlap → 2\*pb (class(a) engine-más-correcto, write-blocked by PROFICIENCY_ALREADY_GRANTED, PHB p.168). `engineStats.savingThrow` flat field removed; per-ability array at `engineStats.savingThrows`. |
 | **Initiative** | `compute.ts:544 (DELETED)` | `'initiative'` ✅ | `legacy-deleted` | ✅ [`initiative.test.ts`](../../packages/domain/src/engine/rules/initiative.test.ts) | Pure DEX mod (PHB p.177). No proficiency, no adapter needed. 5-archetype gate: DEX 10/16/20/8 + NumMod +2 (forward-compat for Alert/JOAT). Route: `resolveStat('initiative', nativeDexMod)` with tolerate-read guard. |
 | **Speed** | `compute.ts:554` (`speed`, +encumbrance +exhaustion) | `'speed'` 🟡 | `legacy-only` | — | StatKey existe. Legacy aplica penalties (encumbrance/exhaustion) — el engine necesita esos como CondMod antes de poder shadowear con fidelidad. |
@@ -82,7 +82,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 | **HP (max)** | `compute.ts:546` (`hitPoints`) | ❌ sin StatKey | `legacy-only` | — | Necesita StatKey `'hp-max'`. Form-switching (HP stacking del §4.3) depende de esto. |
 | **Spell save DC / attack** | (spellcasting module) | ❌ sin StatKey | `legacy-only` | — | Deriva de ability + pb. Migra junto con ability scores. |
 
-**Resumen al 2026-05-29 (post engine-initiative-parity)**: 3 en `dual-shadow` (AC ✅, attack-roll, **ability-scores/mods** ✅) — AC y ability-scores TIENEN parity gate; attack-roll sigue sin corpus. 2 `legacy-deleted` (**saving-throws** ✅ PRIMER ciclo completo, **initiative** ✅ SEGUNDO ciclo completo). 1 engine-capable sin cablear (speed). 5 `legacy-only` sin soporte engine.
+**Resumen al 2026-05-29 (post engine-initiative-parity + attack-roll explore)**: 2 en `dual-shadow (native)` (AC ✅, **ability-scores/mods** ✅) — ambos con parity gate. 2 `legacy-deleted` (**saving-throws** ✅ PRIMER ciclo completo, **initiative** ✅ SEGUNDO ciclo completo). **attack-roll**: reclasificado a `legacy-only` — NO es candidato de parity (canal de delta; per-arma/ctx → action-pipeline SDD; ver explore #1197). 1 engine-capable sin cablear (speed). Resto `legacy-only` sin soporte engine.
 
 ---
 
@@ -100,7 +100,7 @@ Por dependencia (no por costo):
 2. **Proficiency bonus** → escalar por nivel; probablemente input del engine, no dominio del ledger. Confirmar en ability-scores.
 3. **AC** → con ability mods nativos, el engine computa la fórmula de armadura sin sembrar del legacy → Gate B real. (El parity gate corpus de AC, 9 arquetipos, se puede escribir junto con este paso; sobrevive la transición a nativo.)
 4. **Saving throws** → `resolveStat` por ability con `abilityMod + pb` nativo → reemplaza `savingThrows[*]`.
-5. **Attack roll** → reconciliar el concepto (¿`'attack-roll-bonus'` delta vs valor pleno?) una vez que ability scores son nativos.
+5. ~~**Attack roll**~~ → **NO es migración de parity** (explore #1197): es per-arma + ctx-dependiente, sin valor legacy escalar único; `engineStats.attackRoll` es solo un canal de delta (Bless). Weapon attacks → `sdd/engine-action-pipeline` (cablear `advancePhase` a rutas de encounter con `weaponInUse` en ctx). Spell-attack-bonus (estático per-clase) → posible `sdd/engine-spell-attack-parity` separado (prerequisito #513, `SPELLCASTING_ABILITY` hardcoded).
 6. **Initiative** → cablear `resolveStat('initiative')` (legacy = dexMod, trivial una vez que dexMod es engine-native).
 7. **Skills + passive perception** → tras ability.
 8. **Speed** → requiere CondMod para encumbrance/exhaustion penalties primero.
