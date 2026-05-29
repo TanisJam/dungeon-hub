@@ -84,16 +84,9 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
   // emits savingThrows (Omit<CharacterSheet,'savingThrows'> return type). The 9-archetype
   // gate in packages/domain/src/engine/rules/saving-throws.test.ts replaces these.
 
-  it('skills: arcana proficient (class + background), history proficient (background)', () => {
-    const arcana = sheet.skills.find((s) => s.name === 'arcana')!;
-    expect(arcana.proficient).toBe(true);
-    expect(arcana.modifier).toBe(3 + 2); // INT mod + PB
-    const history = sheet.skills.find((s) => s.name === 'history')!;
-    expect(history.proficient).toBe(true);
-    const athletics = sheet.skills.find((s) => s.name === 'athletics')!;
-    expect(athletics.proficient).toBe(false);
-    expect(athletics.modifier).toBe(-1); // STR mod
-  });
+  // REQ-LEGACY-03: legacy skill assertions removed — computeCharacterSheet no longer emits
+  // skills/passivePerception (Omit<CharacterSheet,'skills'|'passivePerception'> return type).
+  // Coverage moved to packages/domain/src/engine/rules/skills.test.ts (Gate A archetypes 1-4,9).
 
   it('AC: unarmored 10 + DEX(3) = 13', () => {
     expect(sheet.armorClass.value).toBe(13);
@@ -102,10 +95,6 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
 
   it('HP: max d6 (6) + CON(2) = 8 al nivel 1', () => {
     expect(sheet.hitPoints.max).toBe(8);
-  });
-
-  it('passive perception = 10 + WIS mod (sin profic) = 11', () => {
-    expect(sheet.passivePerception).toBe(11);
   });
 
   it('carrying capacity = STR × 15', () => {
@@ -571,73 +560,9 @@ describe('sheet: inventory views (1.6c)', () => {
   });
 });
 
-// ============================================================
-// S-1..S-4: raceSkillChoices merged into proficientSkills
-// ============================================================
-describe('computeCharacterSheet — raceSkillChoices merged into proficientSkills', () => {
-  it('S-1: raceSkillChoices=[perception,stealth], no class skills → both proficient', () => {
-    const sheet = computeCharacterSheet({
-      character: {
-        name: 'Test',
-        raceSkillChoices: ['perception', 'stealth'],
-      },
-    });
-    const perception = sheet.skills.find((s) => s.name === 'perception');
-    const stealth = sheet.skills.find((s) => s.name === 'stealth');
-    expect(perception?.proficient).toBe(true);
-    expect(stealth?.proficient).toBe(true);
-  });
-
-  it('S-2: raceSkillChoices=[perception] + class has perception → proficient once (Set dedup)', () => {
-    const sheet = computeCharacterSheet({
-      character: {
-        name: 'Test',
-        raceSkillChoices: ['perception'],
-        classes: [
-          {
-            slug: 'fighter',
-            source: 'PHB',
-            level: 1,
-            subclass: null,
-            hitDie: 'd10',
-            savingThrows: ['str', 'con'],
-            armorProficiencies: ['light', 'medium', 'heavy', 'shields'],
-            weaponProficiencies: ['simple', 'martial'],
-            toolProficiencies: [],
-            skillChoices: ['perception', 'athletics'],
-          },
-        ],
-      },
-    });
-    const perceptionSkills = sheet.skills.filter((s) => s.name === 'perception');
-    expect(perceptionSkills).toHaveLength(1);
-    expect(perceptionSkills[0]!.proficient).toBe(true);
-  });
-
-  it('S-3: raceSkillChoices=[] → no race skills added', () => {
-    const sheet = computeCharacterSheet({
-      character: {
-        name: 'Test',
-        raceSkillChoices: [],
-      },
-    });
-    // All skills should be non-proficient (no class/bg either)
-    const proficientSkills = sheet.skills.filter((s) => s.proficient);
-    expect(proficientSkills).toHaveLength(0);
-  });
-
-  it('S-4: raceSkillChoices undefined (legacy) → no crash, no race skill added', () => {
-    const sheet = computeCharacterSheet({
-      character: {
-        name: 'Legacy Variant Human',
-        // No raceSkillChoices field at all
-      },
-    });
-    expect(sheet.skills).toHaveLength(18); // all 18 PHB skills
-    const proficientSkills = sheet.skills.filter((s) => s.proficient);
-    expect(proficientSkills).toHaveLength(0);
-  });
-});
+// REQ-LEGACY-03: S-1..S-4 raceSkillChoices describe block removed — computeCharacterSheet
+// no longer emits skills/passivePerception. Coverage moved to:
+// packages/domain/src/engine/rules/skills.test.ts (Gate A archetypes 4, 5, 9).
 
 // ── Batch 4: DarkvisionView computation (race-darkvision-grant) ───────────────
 // PHB p.17 — Darkvision definition. PHB p.24 — Superior Darkvision (Drow 120 ft).

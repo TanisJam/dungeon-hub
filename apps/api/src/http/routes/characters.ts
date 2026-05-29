@@ -13,7 +13,7 @@ import {
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
-import { computeCharacterSheet, type SpellSheetRef } from '@dungeon-hub/domain/character/sheet';
+import { computeCharacterSheet, type SpellSheetRef, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
 import {
   addItemToInventory,
   consumeInventoryItem,
@@ -104,6 +104,7 @@ import {
   deriveAbilityScoreModifiers,
   deriveArmorClassModifiers,
   deriveSavingThrowProficiencies,
+  deriveSkillProficiencies,
   type EvaluationContext,
   type EntityId,
   type Breakdown,
@@ -932,15 +933,61 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const nativeDexMod = engineAbilityScores?.['dex']?.modifier ?? sheet.abilityScores.dex.modifier;
     const resolvedInitiative = resolveStat(charId, 'initiative', nativeDexMod, ctx, registry);
 
-    // Assemble full CharacterSheet: merge partialSheet (no savingThrows, no initiative) + engine values.
+    // engine-skill-parity: native 18-skill + passive perception resolution.
+    // REQ-SKILL-PROF-01: proficient skills → abilityMod + pb via resolveStat('skill.<name>').
+    // REQ-SKILL-NONPROF-01: non-proficient skills → abilityMod only.
+    // REQ-SKILL-ABILITY-01: SKILL_TO_ABILITY maps each skill to correct governing ability (PHB p.173-179).
+    // REQ-SKILL-BASE-01: base = engine-native ability mod, ?? fallback for legacy rows.
+    // REQ-SKILL-ENUM-01: ALL_SKILLS guarantees exactly 18 skills resolved.
+    // REQ-SKILL-EXPERTISE-01: expertise: false on every entry (legacy contract preserved).
+    // REQ-PP-01: passivePerception = 10 + perception modifier (PHB p.177).
+    // REQ-DEDUP-01: adapter deduplicates across 3 sources via Set before emitting ProficiencyMods.
+    // REQ-TOLREAD-01: ?? guards for legacy snapshots missing raceSkillChoices / background / skillChoices.
+    const rawClassesForSkill = (data['classes'] as Array<{ skillChoices?: string[] }> | undefined) ?? [];
+    const rawBackgroundSkills = (data['background'] as { skills?: string[] } | undefined)?.skills ?? [];
+    const rawRaceSkillChoices = (data['raceSkillChoices'] as string[] | undefined) ?? [];
+
+    // Adapter deduplicates across all three sources (Set, lowercase). proficientSet = truth for `proficient`.
+    const skillProfMods = deriveSkillProficiencies(
+      { classes: rawClassesForSkill, backgroundSkills: rawBackgroundSkills, raceSkillChoices: rawRaceSkillChoices },
+      charId,
+    );
+    for (const m of skillProfMods) registry.register(m);
+    const proficientSet = new Set(skillProfMods.map((m) => (m.def as { ref: string }).ref));
+
+    const engineSkills = ALL_SKILLS.map((name) => {
+      const ability = SKILL_TO_ABILITY[name]!;
+      // Base = engine-native ability modifier (post-ASI, post-racial-bonus). ?? fallback for legacy rows.
+      const base = engineAbilityScores?.[ability]?.modifier ?? sheet.abilityScores[ability].modifier;
+      const resolved = resolveStat(charId, `skill.${name}`, base, ctx, registry, sheet.proficiencyBonus);
+      return {
+        name,
+        ability,
+        modifier: resolved.value,
+        proficient: proficientSet.has(name),  // REQ-DSP-03: explicit derivation from adapter output, not breakdown
+        expertise: false,                       // REQ-SKILL-EXPERTISE-01: bot/web read this field; preserved contract
+      };
+    });
+
+    // REQ-PP-01: passivePerception = 10 + Wisdom (Perception) check modifier (PHB p.177).
+    const enginePassivePerception = 10 + engineSkills.find((s) => s.name === 'perception')!.modifier;
+
+    // Assemble full CharacterSheet: merge partialSheet (no savingThrows, no initiative, no skills,
+    // no passivePerception) + engine values.
     // REQ-SERVE-01: sheet.savingThrows assembled in route from engine output.
     // REQ-LEGACY-01: computeCharacterSheet no longer emits savingThrows (Omit return type).
     // REQ-SERVE-INIT-01: sheet.initiative assembled in route from engine output.
     // REQ-LEGACY-02: computeCharacterSheet no longer emits initiative (Omit return type extended).
+    // REQ-ROUTE-01: sheet.skills assembled in route from engine output.
+    // REQ-LEGACY-03: computeCharacterSheet no longer emits skills (Omit return type extended).
+    // REQ-ROUTE-02: sheet.passivePerception assembled in route from engine output.
+    // REQ-LEGACY-04: computeCharacterSheet no longer emits passivePerception (Omit return type extended).
     const fullSheet = {
       ...sheet,
       savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })),
       initiative: resolvedInitiative.value,
+      skills: engineSkills,
+      passivePerception: enginePassivePerception,
     };
 
     const engineStats = {

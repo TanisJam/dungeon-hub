@@ -5,13 +5,10 @@ import {
 } from '../multiclass/effective-scores.js';
 import type { AppliedAsi } from '../race/types.js';
 import {
-  ALL_SKILLS,
   EMPTY_CURRENCY,
-  SKILL_TO_ABILITY,
   type CharacterSheet,
   type CharacterSnapshot,
   type RaceSheetData,
-  type SkillView,
   type BreathWeaponView,
   type BreathWeaponData,
   type DarkvisionView,
@@ -300,7 +297,11 @@ interface ComputeInput {
 // The route assembles sheet.initiative natively via resolveStat('initiative', nativeDexMod).
 // Omit<CharacterSheet,'savingThrows'|'initiative'> makes the contract honest.
 // PHB p.177 — initiative = DEX modifier. Resolved by engine in characters.ts.
-export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative'> {
+// REQ-LEGACY-03: computeCharacterSheet no longer emits skills.
+// The route assembles sheet.skills natively via deriveSkillProficiencies + ALL_SKILLS.map(resolveStat).
+// REQ-LEGACY-04: computeCharacterSheet no longer emits passivePerception.
+// The route assembles sheet.passivePerception = 10 + engineSkills.perception.modifier (PHB p.177).
+export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative' | 'skills' | 'passivePerception'> {
   const { character } = input;
   const raceData = input.raceData ?? null;
 
@@ -390,31 +391,6 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     }
   }
   const hpFormula = hpParts.join(' + ') || '0';
-
-  // ---- Skills -----------------------------------------------------------
-  // Profs vienen de: class.skillChoices + background.skills + race.raceSkillChoices
-  // (Variant Human / Half-Elf / Custom Lineage). Expertise: futura iteración.
-  // TODO(race-skill-prof-grant, Batch 6): add cross-step dedup gate in validateCharacterFinal.
-  const proficientSkills = new Set<string>();
-  for (const c of classes) for (const s of c.skillChoices ?? []) proficientSkills.add(s.toLowerCase());
-  for (const s of character.background?.skills ?? []) proficientSkills.add(s.toLowerCase());
-  for (const s of character.raceSkillChoices ?? []) proficientSkills.add(s.toLowerCase());
-
-  const skills: SkillView[] = ALL_SKILLS.map((name) => {
-    const ab = SKILL_TO_ABILITY[name]!;
-    const mod = abilityModifier(effective[ab]);
-    const prof = proficientSkills.has(name);
-    return {
-      name,
-      ability: ab,
-      modifier: prof ? mod + pb : mod,
-      proficient: prof,
-      expertise: false,
-    };
-  });
-
-  const perception = skills.find((s) => s.name === 'perception')!;
-  const passivePerception = 10 + perception.modifier;
 
   // ---- Spellcasting -----------------------------------------------------
   const spellcasting = classes
@@ -536,8 +512,6 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     abilityScores: Object.fromEntries(
       ABILITY_KEYS.map((a) => [a, { score: effective[a], modifier: abilityModifier(effective[a]) }]),
     ) as CharacterSheet['abilityScores'],
-    skills,
-    passivePerception,
     armorClass: { value: acValue, formula: acFormula },
     hitPoints: ((): { max: number; formula: string } => {
       const effects = exhaustionEffectsFor(character.exhaustion ?? 0);
