@@ -93,6 +93,7 @@ import { validateCharacterTransition } from '@dungeon-hub/domain/character/appro
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
 import { deriveCharacterModifiers } from '../../use-cases/characters/derive-character-modifiers.js';
+import { loadModifierDefinitions } from '../../use-cases/characters/load-modifier-definitions.js';
 import { loadPersistedModifiers } from '../../use-cases/characters/load-persisted-modifiers.js';
 import { castBless } from '../../use-cases/characters/cast-bless.js';
 import { removeByConcentrationToken } from '../../use-cases/characters/remove-by-concentration-token.js';
@@ -789,8 +790,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     //   persisted modifier instances (Bless, etc.) loaded from DB.
     // Additive only — legacy sheet.armorClass + engineAc are UNCHANGED.
     // REQ-ENGINEAC-01/02/03, REQ-ENGINESTATS-01/02/03.
+    // Slice 6 (engine-catalog): load modifier definitions from DB catalog.
+    // Resolves #513: the hardcoded itemModifierMap literal is gone; map is built from
+    // modifier_definitions rows at request time. Malformed rows are warn-skipped (§11).
+    // TODO: module-level cache of compiled map (profile at 50+ rows). Seam = here.
+    const modifierCatalog = await loadModifierDefinitions();
     const charId = character.id as EntityId;
-    const modifiers = deriveCharacterModifiers(inventory, charId);
+    const modifiers = deriveCharacterModifiers(inventory, charId, modifierCatalog);
     // Slice 5: load persisted modifiers targeting this character (e.g. Bless).
     // Indexed SELECT WHERE target_character_id — single query, fast.
     const persisted = await loadPersistedModifiers(character.id);

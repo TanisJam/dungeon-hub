@@ -1,6 +1,5 @@
 import {
   deriveInventoryModifiers,
-  buildCloakOfProtectionModifiers,
   type ItemModifierMap,
   type ModifierInstance,
   type EntityId,
@@ -10,19 +9,15 @@ import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 /**
  * Derives modifier instances from a character's inventory.
  *
- * Holds the hardcoded item→modifier map that will be replaced by a
- * DB-backed modifier_definition catalog in Slice 5.
+ * REQ-MDREFACTOR-01: the hardcoded itemModifierMap literal has been removed (#513 resolved).
+ * The map is now injected by the caller (the GET /sheet route loads it via loadModifierDefinitions).
  *
  * No DB read/write — pure transformation using already-loaded data.
  */
-// TODO #513: DB-backed modifier_definition catalog (Slice 5)
-const itemModifierMap: ItemModifierMap = {
-  'cloak-of-protection': buildCloakOfProtectionModifiers,
-};
-
 export function deriveCharacterModifiers(
   inventory: InventoryItem[],
   charId: string,
+  map: ItemModifierMap,
 ): ModifierInstance[] {
-  return deriveInventoryModifiers(inventory, charId as EntityId, itemModifierMap);
+  return deriveInventoryModifiers(inventory, charId as EntityId, map);
 }
