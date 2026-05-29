@@ -104,10 +104,6 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
     expect(sheet.hitPoints.max).toBe(8);
   });
 
-  it('initiative = DEX mod', () => {
-    expect(sheet.initiative).toBe(3);
-  });
-
   it('passive perception = 10 + WIS mod (sin profic) = 11', () => {
     expect(sheet.passivePerception).toBe(11);
   });

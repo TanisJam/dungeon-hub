@@ -296,7 +296,11 @@ interface ComputeInput {
 // The route assembles sheet.savingThrows natively via deriveSavingThrowProficiencies
 // + resolveStat('saving-throw.<a>'). Omit<CharacterSheet,'savingThrows'> makes the
 // contract honest: compute.ts is NOT the source of truth for saves anymore.
-export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows'> {
+// REQ-LEGACY-02: computeCharacterSheet no longer emits initiative.
+// The route assembles sheet.initiative natively via resolveStat('initiative', nativeDexMod).
+// Omit<CharacterSheet,'savingThrows'|'initiative'> makes the contract honest.
+// PHB p.177 — initiative = DEX modifier. Resolved by engine in characters.ts.
+export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative'> {
   const { character } = input;
   const raceData = input.raceData ?? null;
 
@@ -534,7 +538,6 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     ) as CharacterSheet['abilityScores'],
     skills,
     passivePerception,
-    initiative: dexMod,
     armorClass: { value: acValue, formula: acFormula },
     hitPoints: ((): { max: number; formula: string } => {
       const effects = exhaustionEffectsFor(character.exhaustion ?? 0);
