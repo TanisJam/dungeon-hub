@@ -123,7 +123,8 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     // Pattern from character-rests.test.ts L455 — raw insert to avoid HTTP flow.
     // Using TEST_SOURCE so afterAll cleanup is safe and scoped.
     const { db } = await import('../../src/infra/db/client.js');
-    const { compendiumItems, characters } = await import('../../src/infra/db/schema.js');
+    const { compendiumItems, characters, modifierDefinitions } = await import('../../src/infra/db/schema.js');
+    const { cloakOfProtectionRuleDoc } = await import('@dungeon-hub/domain/engine');
 
     await db.insert(compendiumItems).values({
       slug: 'cloak-of-protection',
@@ -132,6 +133,22 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
       type: null,
       data: { wondrous: true, reqAttune: true },
     });
+
+    // ── T6 (Slice 6 engine-catalog): seed Cloak modifier_definition row ──────────
+    // After the #513 refactor, loadModifierDefinitions() is the SOLE source of the
+    // item modifier map. Without this seed, the +1 assertion regresses to +0.
+    // Direct insert (NOT seed script) — process.exit in the script kills the vitest worker.
+    // onConflictDoNothing: safe to re-run if the row already exists from a prior seed run.
+    await db
+      .insert(modifierDefinitions)
+      .values({
+        slug: 'cloak-of-protection',
+        source: 'DMG 159',
+        name: 'Cloak of Protection',
+        kind: 'item',
+        ruleDoc: cloakOfProtectionRuleDoc,
+      })
+      .onConflictDoNothing();
 
     // ── Equip Cloak on char1 via direct DB update ──────────────────────────────
     // Direct DB update mirrors the rests-test pattern (avoids attunement-cap
