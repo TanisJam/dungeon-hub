@@ -72,7 +72,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 |---|---|---|---|---|---|
 | **AC** | `compute.ts:545` (`armorClass`) | `'ac'` ✅ | `dual-shadow (native)` ✅ | ✅ [`armor-class.test.ts`](../../packages/domain/src/engine/rules/armor-class.test.ts) | `engineAc` nativo en `/sheet` (base 0, `deriveArmorClassModifiers`). 9 arquetipos (PHB p.14/48/78/144/149). legacy-deleted blocked by formula-cliff → tracked fast-follow `engine-ac-authoritative`. |
 | **Attack roll** | `compute.ts:432` (`attackBonus` per skill/weapon) | `'attack-roll'` ✅ | `dual-shadow` | ❌ falta corpus | `engineStats.attackRoll` (`characters.ts:824`). Hoy base 0 + mods; legacy es `pb+mod`. Reconciliar base. |
-| **Saving throws** | `compute.ts:390-541` (`savingThrows`) | `'saving-throw'` ✅ | `dual-shadow` | ❌ falta corpus | `engineStats.savingThrow` (`characters.ts:825`). Cloak of Protection + Bless ya fluyen por engine. |
+| **Saving throws** | `compute.ts:386-394 (DELETED)` | `'saving-throw.*'` ✅ | `legacy-deleted` | ✅ [`saving-throws.test.ts`](../../packages/domain/src/engine/rules/saving-throws.test.ts) | Resilient+class overlap → 2\*pb (class(a) engine-más-correcto, write-blocked by PROFICIENCY_ALREADY_GRANTED, PHB p.168). `engineStats.savingThrow` flat field removed; per-ability array at `engineStats.savingThrows`. |
 | **Initiative** | `compute.ts:544` (`initiative` = dexMod) | `'initiative'` 🟡 | `legacy-only` | — | Engine TIENE la StatKey pero `resolveStat` no se llama para initiative. Cableado trivial (próximo candidato barato). |
 | **Speed** | `compute.ts:554` (`speed`, +encumbrance +exhaustion) | `'speed'` 🟡 | `legacy-only` | — | StatKey existe. Legacy aplica penalties (encumbrance/exhaustion) — el engine necesita esos como CondMod antes de poder shadowear con fidelidad. |
 | **Ability scores/mods** | `compute.ts` (abilityModifiers) | `'str'\|'dex'\|'con'\|'int'\|'wis'\|'cha'` ✅ | `dual-shadow (native)` ✅ | [`ability-scores.test.ts`](../../packages/domain/src/engine/rules/ability-scores.test.ts) | Wild Shape PHY stats: engine=beast (PHB p.66-67), legacy=druid raw. Intentional engine-más-correcto diff. Not a live sheet divergence (no Wild Shape persistence path wired). Domain composition proof only per ledger §2 taxonomy. |
@@ -82,7 +82,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 | **HP (max)** | `compute.ts:546` (`hitPoints`) | ❌ sin StatKey | `legacy-only` | — | Necesita StatKey `'hp-max'`. Form-switching (HP stacking del §4.3) depende de esto. |
 | **Spell save DC / attack** | (spellcasting module) | ❌ sin StatKey | `legacy-only` | — | Deriva de ability + pb. Migra junto con ability scores. |
 
-**Resumen al 2026-05-29 (post engine-ac-parity)**: 4 en `dual-shadow` (AC ✅, attack-roll, saving-throw, **ability-scores/mods** ✅) — AC y ability-scores TIENEN parity gate (9 arquetipos `armor-class.test.ts`, 7 arquetipos `ability-scores.test.ts`); attack-roll y saving-throw siguen sin corpus. 2 engine-capable sin cablear (initiative, speed). 5 `legacy-only` sin soporte engine.
+**Resumen al 2026-05-29 (post engine-saving-throw-parity)**: 3 en `dual-shadow` (AC ✅, attack-roll, **ability-scores/mods** ✅) — AC y ability-scores TIENEN parity gate; attack-roll sigue sin corpus. 1 `legacy-deleted` (**saving-throws** ✅ — PRIMER dominio en completar el ciclo completo). 2 engine-capable sin cablear (initiative, speed). 5 `legacy-only` sin soporte engine.
 
 ---
 

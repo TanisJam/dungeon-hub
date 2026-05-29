@@ -103,6 +103,7 @@ import {
   resolveStat,
   deriveAbilityScoreModifiers,
   deriveArmorClassModifiers,
+  deriveSavingThrowProficiencies,
   type EvaluationContext,
   type EntityId,
   type Breakdown,
@@ -873,13 +874,11 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // REQ-AC-NATIVE-01: base = 0, NOT sheet.armorClass.value (no legacy seeding).
     const engineAc = resolveStat(charId, 'ac', 0, ctx, registry);
-    // engineStats: new in Slice 5 — attack-roll + saving-throw (Bless scope).
+    // engineStats: new in Slice 5 — attack-roll only. savingThrow flat field REMOVED
+    // (REQ-SERVE-02). Per-ability array below replaces it.
     // Roll-value contract: value = numeric subtotal (dice contributions stay 0 in .value;
     // '1d4' appears in breakdown[].amount as a string for consumer rendering).
-    const engineStats = {
-      attackRoll: resolveStat(charId, 'attack-roll', 0, ctx, registry),
-      savingThrow: resolveStat(charId, 'saving-throw', 0, ctx, registry),
-    };
+    const engineStatsAttackRoll = resolveStat(charId, 'attack-roll', 0, ctx, registry);
 
     // engine-ability-scores: resolve each ability via native path.
     // REQ-AS-SHEET-01: additive dual-shadow alongside legacy abilityScores.
@@ -902,9 +901,44 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         )
       : undefined;
 
+    // engine-saving-throw-parity: resolve 6 per-ability saves natively.
+    // REQ-NATIVE-01: 6 resolveStat calls for 'saving-throw.<a>', base = engine ability mod.
+    // REQ-NATIVE-03: base is engineAbilityScores[a].modifier (post-ASI), not raw score.
+    // REQ-MULTI-01: PHB p.164 — only classes[0] grants save proficiencies.
+    // REQ-TOLREAD-01: ?? guards for legacy snapshots missing classes/savingThrows.
+    // REQ-PROF-01: proficient = primaryClassSaves.includes(a) — explicit, not breakdown inspection.
+    const rawClassesForSave = (data['classes'] as Array<{ savingThrows?: string[] }> | undefined) ?? [];
+    const primaryClassSaves = rawClassesForSave[0]?.savingThrows ?? []; // PHB p.164
+    const saveProfMods = deriveSavingThrowProficiencies(primaryClassSaves, charId);
+    for (const m of saveProfMods) registry.register(m);
+
+    const engineSavingThrows = ABILITY_KEYS.map((a) => {
+      // Base = engine-native ability modifier (post-ASI). Fallback to legacy for malformed rows.
+      const abilityModifier = engineAbilityScores?.[a]?.modifier ?? sheet.abilityScores[a].modifier;
+      const resolved = resolveStat(charId, `saving-throw.${a}`, abilityModifier, ctx, registry, sheet.proficiencyBonus);
+      const proficient = primaryClassSaves.includes(a); // REQ-PROF-01: explicit derivation
+      return {
+        ability: a,
+        modifier: resolved.value,
+        proficient,
+        breakdown: resolved.breakdown, // per-ability debug channel (REQ-SERVE-02 migration)
+      };
+    });
+
+    // Assemble full CharacterSheet: merge partialSheet (no savingThrows) + engine saves.
+    // REQ-SERVE-01: sheet.savingThrows assembled in route from engine output.
+    // REQ-LEGACY-01: computeCharacterSheet no longer emits savingThrows (Omit return type).
+    const fullSheet = { ...sheet, savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })) };
+
+    const engineStats = {
+      attackRoll: engineStatsAttackRoll,
+      // REQ-SERVE-02: savingThrow flat field REMOVED; per-ability array below.
+      savingThrows: engineSavingThrows, // per-ability array with breakdown for active-effects assertions
+    };
+
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
-      sheet,
+      sheet: fullSheet,
       currentHp,
       tempHp,
       statMethod,
