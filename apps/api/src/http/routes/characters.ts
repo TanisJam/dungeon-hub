@@ -92,6 +92,14 @@ import {
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
+import { deriveCharacterModifiers } from '../../use-cases/characters/derive-character-modifiers.js';
+import {
+  createInMemoryRegistry,
+  resolveStat,
+  type EvaluationContext,
+  type EntityId,
+  type Breakdown,
+} from '@dungeon-hub/domain/engine';
 
 /**
  * Enriched inventory item for the v3 list view.
@@ -759,6 +767,17 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       };
     });
 
+    // ── engineAc: additive engine-resolved AC (Slice 4 — engine-adapter) ────────
+    // Mirrors the inventoryEnriched precedent: computed post-sheet, reuses
+    // already-loaded inventory, zero new DB queries. Additive only — legacy
+    // sheet.armorClass is UNCHANGED. REQ-ENGINEAC-01/02/03.
+    const charId = character.id as EntityId;
+    const modifiers = deriveCharacterModifiers(inventory, charId);
+    const registry = createInMemoryRegistry();
+    for (const m of modifiers) registry.register(m);
+    const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
+    const engineAc = resolveStat(charId, 'ac', sheet.armorClass.value, ctx, registry);
+
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
@@ -767,6 +786,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       statMethod,
       inventory,
       inventoryEnriched,
+      engineAc,
     };
   });
 

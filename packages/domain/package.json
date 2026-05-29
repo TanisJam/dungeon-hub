@@ -30,7 +30,8 @@
     "./constraints": "./src/constraints/index.ts",
     "./calculations": "./src/calculations/index.ts",
     "./use-cases": "./src/use-cases/index.ts",
-    "./world": "./src/world/index.ts"
+    "./world": "./src/world/index.ts",
+    "./engine": "./src/engine/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
