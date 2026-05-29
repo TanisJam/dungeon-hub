@@ -215,3 +215,7 @@ export type { AbilityScoreModifierInput } from './adapter/derive-ability-score-m
 
 export { deriveArmorClassModifiers } from './adapter/derive-armor-class-modifiers.js';
 export type { ArmorClassModifierInput } from './adapter/derive-armor-class-modifiers.js';
+
+// ── Saving throw adapter (engine-saving-throw-parity) ─────────────────────────
+
+export { deriveSavingThrowProficiencies } from './adapter/derive-saving-throw-proficiencies.js';
