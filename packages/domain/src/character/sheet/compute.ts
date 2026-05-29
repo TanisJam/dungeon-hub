@@ -6,6 +6,7 @@ import {
 import type { AppliedAsi } from '../race/types.js';
 import {
   EMPTY_CURRENCY,
+  type AbilityScoreView,
   type CharacterSheet,
   type CharacterSnapshot,
   type RaceSheetData,
@@ -287,6 +288,24 @@ interface ComputeInput {
    * Absent → all ClassSpellSummary.spells default to empty arrays.
    */
   spellRefsBySlug?: ReadonlyMap<string, SpellSheetRef>;
+  /**
+   * Engine-resolved ability scores injected by the route (engine-authoritative path).
+   * When present, `effective` is sourced from these scores (.score field) rather than
+   * calling computeEffectiveScores.
+   * Absent → fall back to computeEffectiveScores (legacy rows missing baseStats, CLAUDE.md §11).
+   * REQ-AS-INJECT-01: uses `?:` (NOT `| undefined`) to satisfy exactOptionalPropertyTypes.
+   */
+  injectedAbilityScores?: Record<AbilityKey, AbilityScoreView>;
+}
+
+/**
+ * Build the internal `effective` (AbilityScores = Record<AbilityKey, number>) from
+ * engine-resolved AbilityScoreView records. Extracts `.score` from each entry.
+ * All 12 consumers call abilityModifier(effective[a]) themselves — zero changes downstream.
+ * ADR-2: private helper, one-liner, only used at the effective-construction branch.
+ */
+function buildEffectiveFromInjected(injected: Record<AbilityKey, AbilityScoreView>): AbilityScores {
+  return Object.fromEntries(ABILITY_KEYS.map((a) => [a, injected[a].score])) as AbilityScores;
 }
 
 // REQ-LEGACY-01: computeCharacterSheet no longer emits savingThrows.
@@ -314,7 +333,12 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
   const featAsis: AppliedAsi[] = (character.feats ?? []).flatMap((f) =>
     f.asisApplied.map((a) => ({ ability: a.ability, bonus: a.bonus, source: 'feat' as const })),
   );
-  const effective = computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
+  // ADR-3: injection ternary — engine-authoritative when present, legacy fallback for rows missing baseStats.
+  // REQ-AS-INJECT-02: when injectedAbilityScores is present, effective is sourced from injected .score values.
+  // REQ-AS-FALLBACK-01: when absent, fall back to computeEffectiveScores (CLAUDE.md §11 read-path tolerance).
+  const effective = input.injectedAbilityScores
+    ? buildEffectiveFromInjected(input.injectedAbilityScores)
+    : computeEffectiveScores(baseStats, [...racialAsis, ...levelUpAsis, ...featAsis]);
 
   // ---- Niveles y PB -----------------------------------------------------
   const classes = character.classes ?? [];

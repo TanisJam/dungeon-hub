@@ -6,7 +6,9 @@ import {
 import type {
   CharacterSnapshot,
   RaceSheetData,
+  AbilityScoreView,
 } from '../../../src/character/sheet/types.js';
+import { ABILITY_KEYS } from '../../../src/character/stats/types.js';
 
 describe('proficiencyBonus por nivel total', () => {
   it.each([
@@ -1441,5 +1443,119 @@ describe('computeCharacterSheet — levelUpHpRolls substitution', () => {
     const sheet = computeCharacterSheet({ character: charWithRolls });
     // L1: 12, L2: 12 (roll), L3: 12 (roll) → 36
     expect(sheet.hitPoints.max).toBe(36);
+  });
+});
+
+// ── REQ-AS-INJECT-01 / REQ-AS-INJECT-02: injectedAbilityScores (Gate B) ───────
+
+/** All-6 injected ability scores fixture: STR 18, DEX 14, CON 16, INT 10, WIS 12, CHA 8 */
+const INJECTED_ALL6: Record<string, AbilityScoreView> = {
+  str: { score: 18, modifier: 4 },
+  dex: { score: 14, modifier: 2 },
+  con: { score: 16, modifier: 3 },
+  int: { score: 10, modifier: 0 },
+  wis: { score: 12, modifier: 1 },
+  cha: { score: 8, modifier: -1 },
+} as Record<(typeof ABILITY_KEYS)[number], AbilityScoreView>;
+
+/** Minimal character snapshot for injection tests. baseStats differ from injected to confirm injection wins. */
+const INJECTION_CHAR: CharacterSnapshot = {
+  name: 'Injected Warrior',
+  baseStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, // all-10; injection overrides
+  asisApplied: [],
+  classes: [
+    {
+      slug: 'fighter',
+      source: 'PHB',
+      level: 1,
+      subclass: null,
+      hitDie: 'd10',
+      savingThrows: ['str', 'con'],
+      armorProficiencies: ['light', 'medium', 'heavy', 'shield'],
+      weaponProficiencies: ['simple', 'martial'],
+      toolProficiencies: [],
+      skillChoices: ['athletics', 'perception'],
+    },
+  ],
+  feats: [],
+};
+
+describe('computeCharacterSheet — injectedAbilityScores (REQ-AS-INJECT-01, REQ-AS-INJECT-02)', () => {
+  it('Scenario 1.1: injected STR 18 overrides baseStats all-10 → sheet.abilityScores.str.score === 18 (PHB p.13)', () => {
+    // PHB p.13: ability score + bonus = effective score; modifier = floor((score-10)/2)
+    // When injectedAbilityScores is provided, effective must come from injected .score values.
+    const sheet = computeCharacterSheet({
+      character: INJECTION_CHAR,
+      injectedAbilityScores: INJECTED_ALL6,
+    });
+    expect(sheet.abilityScores.str.score).toBe(18);
+    expect(sheet.abilityScores.str.modifier).toBe(4); // floor((18-10)/2) = 4
+  });
+
+  it('Scenario 1.4: all 6 injected scores propagate to sheet.abilityScores (PHB p.13)', () => {
+    const sheet = computeCharacterSheet({
+      character: INJECTION_CHAR,
+      injectedAbilityScores: INJECTED_ALL6,
+    });
+    expect(sheet.abilityScores.str.score).toBe(18);
+    expect(sheet.abilityScores.dex.score).toBe(14);
+    expect(sheet.abilityScores.con.score).toBe(16);
+    expect(sheet.abilityScores.int.score).toBe(10);
+    expect(sheet.abilityScores.wis.score).toBe(12);
+    expect(sheet.abilityScores.cha.score).toBe(8);
+  });
+
+  it('Scenario 1.5: CON 16 (modifier +3) propagates to HP calculation (PHB p.12 — Con mod applies per level)', () => {
+    // PHB p.12: "Roll that Hit Die, add your Constitution modifier to the roll..."
+    // Fighter L1 HP = d10 + conMod = 10 + 3 = 13 (max at L1)
+    const sheet = computeCharacterSheet({
+      character: INJECTION_CHAR,
+      injectedAbilityScores: INJECTED_ALL6,
+    });
+    expect(sheet.hitPoints.max).toBe(13); // 10 (max d10) + 3 (CON 16 mod)
+  });
+});
+
+describe('computeCharacterSheet — fallback when injectedAbilityScores absent (REQ-AS-FALLBACK-01)', () => {
+  it('Scenario 2.2: no injection → effective equals computeEffectiveScores output (PHB p.13)', () => {
+    // Without injection, the fallback path (computeEffectiveScores) must still produce valid results.
+    // baseStats all-10 + asisApplied STR+2 → effective.str = 12
+    const charWithAsi: CharacterSnapshot = {
+      ...INJECTION_CHAR,
+      asisApplied: [{ ability: 'str', bonus: 2, source: 'race' }],
+    };
+    const sheet = computeCharacterSheet({ character: charWithAsi });
+    // No injection → legacy fallback: str = 10+2 = 12
+    expect(sheet.abilityScores.str.score).toBe(12);
+    expect(sheet.abilityScores.str.modifier).toBe(1); // floor((12-10)/2) = 1
+  });
+
+  it('Scenario 2.1: legacy row without baseStats + no injection → no throw, valid sheet (CLAUDE.md §11 read-path tolerance)', () => {
+    // CLAUDE.md §11: "When adding a new write-time validation gate, legacy DB rows that
+    // predate the gate must still load via GET without erroring."
+    const legacyChar: CharacterSnapshot = {
+      name: 'Legacy Char',
+      // baseStats intentionally absent — simulates pre-stats wizard-step row
+      classes: [
+        {
+          slug: 'fighter',
+          source: 'PHB',
+          level: 1,
+          subclass: null,
+          hitDie: 'd10',
+          savingThrows: ['str', 'con'],
+          armorProficiencies: [],
+          weaponProficiencies: [],
+          toolProficiencies: [],
+          skillChoices: [],
+        },
+      ],
+      feats: [],
+    };
+    // No injectedAbilityScores, no baseStats → fallback to all-10 defaults
+    expect(() => computeCharacterSheet({ character: legacyChar })).not.toThrow();
+    const sheet = computeCharacterSheet({ character: legacyChar });
+    expect(sheet.abilityScores.str.score).toBe(10); // fallback all-10
+    expect(sheet.abilityScores.dex.score).toBe(10);
   });
 });
