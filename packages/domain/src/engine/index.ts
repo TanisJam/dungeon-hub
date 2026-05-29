@@ -199,6 +199,7 @@ export { buildFrightenedModifiers } from './rules/frightened.js';
 // ── Authored rule documents (Slice 6 — engine-catalog) ───────────────────────
 
 export { cloakOfProtectionRuleDoc } from './rules-authored/cloak-of-protection.js';
+export { blessRuleDoc } from './rules-authored/bless.js';
 
 // ── Inventory adapter (Slice 4) ───────────────────────────────────────────────
 
