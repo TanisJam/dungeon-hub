@@ -922,3 +922,81 @@ export const encounterCombatants = pgTable(
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],
 );
+
+// ---------------------------------------------------------------------------
+// modifier_definitions — DB-backed catalog of RuleDoc templates (Slice 6).
+//
+// Each row is ONE RuleDoc (the compile-time template for a modifier rule).
+// The `ruleDoc` column is a full JSONB blob; promoted columns (slug, source,
+// name, kind) are query handles.
+//
+// Design decisions (SDD sdd/engine-catalog/design #1142):
+//   D1: JSONB-polymorphic — ruleDoc is opaque; slug/source/name/kind are
+//       promoted for indexed lookups. NO FK to compendium_items (homebrew
+//       slugs must work without a compendium row, §1.2).
+//   D1: kind is OPEN text (no pg enum) — homebrew can introduce novel kinds
+//       without a schema migration.
+//   D2: seed via `pnpm seed-modifier-definitions` (idempotent upsert on slug).
+//
+// Unique constraint on slug (global for this slice; relaxed to slug+world_id
+// in Slice 8 when world-scoping lands).
+// ---------------------------------------------------------------------------
+export const modifierDefinitions = pgTable(
+  'modifier_definitions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(), // OPEN text, no enum (§1.2)
+    ruleDoc: jsonb('rule_doc').notNull(), // full RuleDoc blob
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_moddefs_slug').on(t.slug),
+    index('idx_moddefs_kind').on(t.kind),
+    index('idx_moddefs_source').on(t.source),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// modifier_instances — persisted live modifier instances (Slice 5: Bless).
+//
+// Each row represents ONE emitted ModifierInstance from the engine registry,
+// persisted so it survives across requests (stateful engine substrate).
+//
+// Design decisions (SDD sdd/engine-stateful/design #1131):
+//   D1: JSONB-polymorphic — def/scope/predicate/duration are opaque blobs;
+//       lifecycle columns (owner, target, concentrationToken) are promoted
+//       to real columns + indexed for efficient SQL DELETE/SELECT.
+//   D2: targetCharacterId NOT NULL this slice — Bless is always cross-entity
+//       (axis='entities'). Nullable relaxation deferred to Slice 6+ (self-axis).
+//   D3: One row per (target × stat) instance — buildBlessModifiers emits 2
+//       instances per target (attack-roll + saving-throw), each mapped 1:1.
+//
+// FKs cascade — deleting caster or ally drops their emitted/received rows.
+// ---------------------------------------------------------------------------
+export const modifierInstances = pgTable(
+  'modifier_instances',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    ownerCharacterId: uuid('owner_character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    targetCharacterId: uuid('target_character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }), // D2: NOT NULL this slice
+    concentrationToken: text('concentration_token'), // nullable — not all mods concentrate
+    def: jsonb('def').notNull(),
+    scope: jsonb('scope').notNull(),
+    predicate: jsonb('predicate'),
+    duration: jsonb('duration'),
+    label: text('label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_mi_owner').on(t.ownerCharacterId),
+    index('idx_mi_target').on(t.targetCharacterId),
+    index('idx_mi_conc_token').on(t.concentrationToken),
+  ],
+);

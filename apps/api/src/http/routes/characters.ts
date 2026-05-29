@@ -92,6 +92,18 @@ import {
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
+import { deriveCharacterModifiers } from '../../use-cases/characters/derive-character-modifiers.js';
+import { loadModifierDefinitions } from '../../use-cases/characters/load-modifier-definitions.js';
+import { loadPersistedModifiers } from '../../use-cases/characters/load-persisted-modifiers.js';
+import { castBless } from '../../use-cases/characters/cast-bless.js';
+import { removeByConcentrationToken } from '../../use-cases/characters/remove-by-concentration-token.js';
+import {
+  createInMemoryRegistry,
+  resolveStat,
+  type EvaluationContext,
+  type EntityId,
+  type Breakdown,
+} from '@dungeon-hub/domain/engine';
 
 /**
  * Enriched inventory item for the v3 list view.
@@ -217,6 +229,19 @@ const ConsumeSlotBody = z.object({
 });
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
+
+// ── Bless / concentration schemas (Slice 5 — engine-stateful) ─────────────────
+
+/** REQ-CASTBLESS-01: targetIds must have 1–3 entries (PHB 219 — "up to 3 creatures"). */
+const CastBlessBody = z.object({
+  targetIds: z.array(z.string().uuid()).min(1).max(3),
+  concentrationToken: z.string().min(1),
+});
+
+const ConcentrationTokenParams = z.object({
+  id: z.string().uuid(),
+  token: z.string().min(1),
+});
 
 const ResourceMutationBody = z.object({
   slug: z.string().min(1),
@@ -759,6 +784,37 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       };
     });
 
+    // ── engineAc + engineStats: additive engine-resolved fields ──────────────────
+    // Slice 4 (engine-adapter): engineAc — derive-on-read from equipped inventory.
+    // Slice 5 (engine-stateful): engineStats — derives from BOTH inventory mods AND
+    //   persisted modifier instances (Bless, etc.) loaded from DB.
+    // Additive only — legacy sheet.armorClass + engineAc are UNCHANGED.
+    // REQ-ENGINEAC-01/02/03, REQ-ENGINESTATS-01/02/03.
+    // Slice 6 (engine-catalog): load modifier definitions from DB catalog.
+    // Resolves #513: the hardcoded itemModifierMap literal is gone; map is built from
+    // modifier_definitions rows at request time. Malformed rows are warn-skipped (§11).
+    // TODO: module-level cache of compiled map (profile at 50+ rows). Seam = here.
+    const modifierCatalog = await loadModifierDefinitions();
+    const charId = character.id as EntityId;
+    const modifiers = deriveCharacterModifiers(inventory, charId, modifierCatalog);
+    // Slice 5: load persisted modifiers targeting this character (e.g. Bless).
+    // Indexed SELECT WHERE target_character_id — single query, fast.
+    const persisted = await loadPersistedModifiers(character.id);
+    const registry = createInMemoryRegistry();
+    for (const m of modifiers) registry.register(m);
+    for (const m of persisted) registry.register(m);
+    const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
+    // engineAc: UNCHANGED from Slice 4 — Bless targets attack-roll/saving-throw,
+    // never 'ac', so persisted Bless instances do not affect engineAc (provably safe).
+    const engineAc = resolveStat(charId, 'ac', sheet.armorClass.value, ctx, registry);
+    // engineStats: new in Slice 5 — attack-roll + saving-throw (Bless scope).
+    // Roll-value contract: value = numeric subtotal (dice contributions stay 0 in .value;
+    // '1d4' appears in breakdown[].amount as a string for consumer rendering).
+    const engineStats = {
+      attackRoll: resolveStat(charId, 'attack-roll', 0, ctx, registry),
+      savingThrow: resolveStat(charId, 'saving-throw', 0, ctx, registry),
+    };
+
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
       sheet,
@@ -767,8 +823,74 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       statMethod,
       inventory,
       inventoryEnriched,
+      engineAc,
+      engineStats,
     };
   });
+
+  // ---- POST /characters/:id/cast-bless ------------------------------------
+  // Owner-only: cast the Bless spell, persisting modifier instances for each
+  // target. The `:id` param is the CASTER character (must be owned by requester).
+  // REQ-CASTBLESS-01 (spec #1130). PHB 219 — up to 3 targets, concentration.
+  app.post(
+    '/characters/:id/cast-bless',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id: casterId } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      // Zod body validation first — cheap, no DB.
+      const bodyResult = CastBlessBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: bodyResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const { targetIds, concentrationToken } = bodyResult.data;
+
+      // Ownership check: caster character must exist and belong to requester.
+      const caster = await loadCharacter(casterId);
+      if (!caster) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(caster, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN' });
+      }
+
+      await castBless(casterId, targetIds, concentrationToken);
+      return reply.code(201).send();
+    },
+  );
+
+  // ---- DELETE /characters/:id/concentration/:token -------------------------
+  // Owner-only: drops the caster's concentration, removing all persisted modifier
+  // instances scoped to the given token. Idempotent — 204 even if 0 rows removed.
+  // REQ-CONCENTRATION-01 (spec #1130).
+  app.delete(
+    '/characters/:id/concentration/:token',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id: casterId, token } = ConcentrationTokenParams.parse(request.params);
+      const userId = request.user!.sub;
+
+      // Ownership check: caster character must exist and belong to requester.
+      const caster = await loadCharacter(casterId);
+      if (!caster) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(caster, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN' });
+      }
+
+      await removeByConcentrationToken(casterId, token);
+      return reply.code(204).send();
+    },
+  );
 
   // ---- PATCH /characters/:id ----------------------------------------------
   // Solo el owner puede editar (campaign members tienen read-only).
