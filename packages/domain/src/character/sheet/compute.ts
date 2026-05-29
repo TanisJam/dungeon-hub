@@ -33,7 +33,7 @@ import {
 } from '../spellcasting/index.js';
 import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
 import { deriveClassResources } from '../class-resources/derive.js';
-import { computeArmorClass, type ArmorClassWarningCode } from './armor-class.js';
+// REQ-AC-GATEB-01: computeArmorClass deleted; AC block removed from compute.ts.
 
 /**
  * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
@@ -320,7 +320,8 @@ function buildEffectiveFromInjected(injected: Record<AbilityKey, AbilityScoreVie
 // The route assembles sheet.skills natively via deriveSkillProficiencies + ALL_SKILLS.map(resolveStat).
 // REQ-LEGACY-04: computeCharacterSheet no longer emits passivePerception.
 // The route assembles sheet.passivePerception = 10 + engineSkills.perception.modifier (PHB p.177).
-export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative' | 'skills' | 'passivePerception'> {
+// REQ-AC-GATEB-01: 'armorClass' and 'warnings' omitted — route assembles them from engine path.
+export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative' | 'skills' | 'passivePerception' | 'armorClass' | 'warnings'> {
   const { character } = input;
   const raceData = input.raceData ?? null;
 
@@ -346,29 +347,11 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
   const pb = proficiencyBonus(totalLevel);
 
   // ---- AC ---------------------------------------------------------------
-  // Delegated to the pure helper `computeArmorClass` (REQ-CSD-AC-DELEGATION).
-  // PHB p.144 (Armor) + p.149 (Shield). All branching logic lives in the helper;
-  // here we only assemble the lookup, call it, and capture warnings.
+  // REQ-AC-GATEB-01: computeArmorClass deleted. AC is engine-authoritative.
+  // The route assembles sheet.armorClass and sheet.warnings from the engine path.
+  // dexMod and conMod retained here — used by HP calculations below.
   const dexMod = abilityModifier(effective.dex);
   const conMod = abilityModifier(effective.con);
-  const itemLitesById: Record<string, ItemCompendiumLite> = {};
-  for (const lite of input.itemWeights ?? []) {
-    itemLitesById[`${lite.slug}|${lite.source}`] = lite;
-  }
-  const acResult = computeArmorClass({
-    inventory: character.inventory ?? [],
-    itemLites: itemLitesById,
-    classes: classes.map((c) => ({ classSlug: c.slug, level: c.level })),
-    abilities: {
-      str: effective.str,
-      dex: effective.dex,
-      con: effective.con,
-      wis: effective.wis,
-    },
-  });
-  const acValue = acResult.ac;
-  const acFormula = acResult.formula;
-  const acWarnings: ArmorClassWarningCode[] = acResult.warnings;
 
   // ---- HP ---------------------------------------------------------------
   // L1 de la primera clase: max(hit die) + CON mod.
@@ -536,7 +519,7 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     abilityScores: Object.fromEntries(
       ABILITY_KEYS.map((a) => [a, { score: effective[a], modifier: abilityModifier(effective[a]) }]),
     ) as CharacterSheet['abilityScores'],
-    armorClass: { value: acValue, formula: acFormula },
+    // REQ-AC-GATEB-01: armorClass omitted — route assembles from engine path.
     hitPoints: ((): { max: number; formula: string } => {
       const effects = exhaustionEffectsFor(character.exhaustion ?? 0);
       if (effects.includes('hp-max-halved')) {
@@ -578,7 +561,7 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
         ABILITY_KEYS.map((a) => [a, abilityModifier(effective[a])]),
       ) as Record<AbilityKey, number>,
     ),
-    warnings: acWarnings,
+    // REQ-AC-GATEB-01: warnings omitted — route assembles from engine path (engineAcWarnings).
     spellSlots: ((): SpellSlotsView => {
       const r = computeSpellSlots(classes);
       // SP-05: thread persisted usage counts from CharacterSnapshot.

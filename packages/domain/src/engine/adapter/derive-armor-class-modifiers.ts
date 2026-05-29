@@ -33,6 +33,7 @@ import {
   findFirstEquipped,
   BODY_ARMOR_TYPES,
   SHIELD_TYPE,
+  type ArmorClassWarningCode,
 } from '../../character/sheet/armor-class.js';
 import type { EntityId } from '../types.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
@@ -50,6 +51,17 @@ export interface ArmorClassModifierInput {
   classes: Array<{ classSlug: string; level: number }>;
   /** Post-ASI integer ability modifiers. Caller converts scores → mods before calling. */
   resolvedMods: { str: number; dex: number; con: number; wis: number };
+  /**
+   * Resolved STR SCORE (post-ASI), for armorStrengthMin comparison (PHB p.144).
+   * armorStrengthMin is a SCORE threshold (e.g. plate min 15) — must compare score vs score.
+   * ADR-2: Do NOT compare resolvedMods.str (mod) vs armorStrengthMin (score).
+   */
+  strScore: number;
+}
+
+export interface ArmorClassModifierResult {
+  mods: ModifierInstance[];
+  warnings: ArmorClassWarningCode[];
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -81,22 +93,23 @@ function numMod(
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Derives a flat list of AC ModifierInstances from the character's equipped
+ * Derives AC ModifierInstances and STR-min warnings from the character's equipped
  * inventory, class features, and resolved integer ability modifiers.
  *
  * All NumMods use stat:'ac', op:'add', category:'untyped'.
  * Engine sums them on base 0 via resolveStat('ac', 0, ...).
  *
- * @param input  - Narrow slice: inventory, itemLites, classes, resolvedMods (integer mods).
+ * @param input  - Narrow slice: inventory, itemLites, classes, resolvedMods (integer mods), strScore (score).
  * @param charId - EntityId of the owning character.
- * @returns Flat array of ModifierInstances ready for registry.register().
+ * @returns { mods: ModifierInstance[], warnings: ArmorClassWarningCode[] }
  */
 export function deriveArmorClassModifiers(
   input: ArmorClassModifierInput,
   charId: EntityId,
-): ModifierInstance[] {
-  const { inventory, itemLites, classes, resolvedMods } = input;
+): ArmorClassModifierResult {
+  const { inventory, itemLites, classes, resolvedMods, strScore } = input;
   const { dex, con, wis } = resolvedMods;
+  const warnings: ArmorClassWarningCode[] = [];
 
   // ── Detect equipped body armor and shield ────────────────────────────────────
   const armorLiteVal = findFirstEquipped(inventory, itemLites, BODY_ARMOR_TYPES);
@@ -111,6 +124,13 @@ export function deriveArmorClassModifiers(
   if (armorLiteVal && typeof armorLiteVal.ac === 'number') {
     const armorAc = armorLiteVal.ac;
     const instances: ModifierInstance[] = [];
+
+    // PHB p.144 — STR requirement: penalty is speed reduction, NOT AC reduction.
+    // Warning is non-blocking; AC is still computed. Boundary: score == threshold → NO warning.
+    // ADR-2: compare STR SCORE vs armorStrengthMin (score), NOT resolvedMods.str (mod).
+    if (typeof armorLiteVal.armorStrengthMin === 'number' && strScore < armorLiteVal.armorStrengthMin) {
+      warnings.push('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+    }
 
     // Base NumMod: armor.ac from item lite (label uses item name from DB — §4b)
     instances.push(
@@ -146,7 +166,7 @@ export function deriveArmorClassModifiers(
       );
     }
 
-    return instances;
+    return { mods: instances, warnings };
   }
 
   // ── Unarmored branch ─────────────────────────────────────────────────────────
@@ -215,5 +235,5 @@ export function deriveArmorClassModifiers(
     );
   }
 
-  return instances;
+  return { mods: instances, warnings };
 }

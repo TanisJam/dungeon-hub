@@ -1,7 +1,11 @@
 /**
- * Parity gate corpus — engine AC resolution vs legacy computeArmorClass.
+ * Gate B corpus — engine-only AC resolution (9 archetypes).
  *
- * 9 archetypes covering all armor branches + Unarmored Defense + ASI ordering:
+ * Gate A (comparative parity) completed; engine values captured and locked.
+ * This gate asserts engine-only expected literals; no legacy comparisons.
+ * ADR-8: drop assertEngineAcEqualsLegacy; each archetype asserts resolveStat literal.
+ *
+ * Captured Gate A values (engine === legacy, confirmed):
  *   1. Unarmored fighter DEX +2 → 12 (PHB p.14)
  *   2. Barbarian UD DEX +2 CON +3 → 15 (PHB p.48)
  *   3. Monk UD DEX +3 WIS +2 no shield → 15 (PHB p.78)
@@ -9,19 +13,20 @@
  *   5. Medium armor — scale mail (ac 14, DEX +4 → capped +2) → 16 (PHB p.144)
  *   6. Heavy armor — chain mail (ac 16, any DEX) → 16 (PHB p.144)
  *   7. Medium armor + shield (scale mail ac 14, DEX +2, shield ac 2) → 18 (PHB p.144, p.149)
- *   8. STR below armorStrengthMin — plate (ac 18, STR 9) → 18 + legacy WARNING (PHB p.144)
- *   9. Non-trivial ASI ordering — Mountain Dwarf + scale mail, post-ASI DEX mod = +2 (PHB p.18)
+ *   8. STR below armorStrengthMin — plate (ac 18, STR score 9) → 18 + engine WARNING (PHB p.144)
+ *   9. Non-trivial ASI ordering — Mountain Dwarf + scale mail, post-ASI DEX mod = +2 → 16 (PHB p.18)
  *
- * REQ-AC-ADAPTER-01..09, REQ-AC-PARITY-01, REQ-AC-STR-WARN-01, REQ-AC-NATIVE-01
+ * REQ-AC-ADAPTER-01..09, REQ-AC-NATIVE-01, REQ-AC-WARN-01, REQ-AC-GATE-01, REQ-AC-GATEB-01
  */
 import { describe, it, expect } from 'vitest';
-import { computeArmorClass } from '../../character/sheet/armor-class.js';
 import { createInMemoryRegistry } from '../registry/query.js';
 import { resolveStat } from '../resolve/stat.js';
 import { deriveArmorClassModifiers } from '../adapter/derive-armor-class-modifiers.js';
+import { formulaFromBreakdown } from '../../character/sheet/armor-class.js';
 import type { EntityId } from '../types.js';
 import type { EvaluationContext } from '../context.js';
 import type { InventoryItem, ItemCompendiumLite } from '../../character/inventory/types.js';
+import type { Breakdown } from '../../engine/provenance.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,75 +78,40 @@ function shieldLite(slug: string, name: string, ac: number): ItemCompendiumLite 
   return { slug, source: 'PHB', name, type: 'S', weight: null, ac };
 }
 
-interface ArmorClassTestInput {
-  /** Resolved integer ability mods (post-ASI), NOT raw scores. */
-  resolvedMods: { str: number; dex: number; con: number; wis: number };
-  inventory: InventoryItem[];
-  itemLites: Record<string, ItemCompendiumLite>;
-  classes: Array<{ classSlug: string; level: number }>;
-  /** Raw ability scores (for legacy path only). */
-  abilities: { str: number; dex: number; con: number; wis: number };
-}
-
-/**
- * Assert that engine AC (base 0 + adapter NumMods) equals legacy computeArmorClass.ac.
- *
- * Engine path: deriveArmorClassModifiers(input, charId) → register → resolveStat('ac', 0)
- * Legacy path: computeArmorClass({inventory, itemLites, classes, abilities})
- *
- * Both paths are INDEPENDENT. This is the dual-shadow (native) parity gate.
- * REQ-AC-PARITY-01.
- */
-function assertEngineAcEqualsLegacy(charId: EntityId, input: ArmorClassTestInput): number {
-  // ── Legacy path ──────────────────────────────────────────────────────────────
-  const legacy = computeArmorClass({
-    inventory: input.inventory,
-    itemLites: input.itemLites,
-    classes: input.classes,
-    abilities: input.abilities,
-  });
-
-  // ── Engine path ──────────────────────────────────────────────────────────────
-  const registry = createInMemoryRegistry();
-  const ctx = makeCtx(charId);
-  const acMods = deriveArmorClassModifiers(
-    {
-      inventory: input.inventory,
-      itemLites: input.itemLites,
-      classes: input.classes,
-      resolvedMods: input.resolvedMods,
-    },
-    charId,
-  );
-  for (const m of acMods) registry.register(m);
-  const engineResult = resolveStat(charId, 'ac', 0, ctx, registry);
-
-  expect(engineResult.value).toBe(legacy.ac);
-  return engineResult.value;
-}
-
 // ── Archetype 1 — Unarmored fighter, DEX +2 (REQ-AC-ADAPTER-01) ──────────────
 
 describe('Archetype 1 — Unarmored fighter, DEX +2 (REQ-AC-ADAPTER-01)', () => {
   it('engine AC = 12; base 10 + DEX 2 (PHB p.14)', () => {
     // PHB p.14 — "Without armor, your Armor Class = 10 + your Dexterity modifier."
     const charId = eid('unarmored-fighter');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 },
-      inventory: [],
-      itemLites: {},
-      classes: [{ classSlug: 'fighter', level: 1 }],
-      abilities: { str: 10, dex: 14, con: 10, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(12);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [],
+        itemLites: {},
+        classes: [{ classSlug: 'fighter', level: 1 }],
+        resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(12);
   });
 
   it('adapter emits exactly 2 NumMods: base 10 + DEX +2', () => {
     // PHB p.14 — two additive contributions: base 10 and DEX mod
     const charId = eid('unarmored-fighter-2');
-    const mods = deriveArmorClassModifiers(
-      { inventory: [], itemLites: {}, classes: [], resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 } },
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [],
+        itemLites: {},
+        classes: [],
+        resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 },
+        strScore: 10,
+      },
       charId,
     );
     expect(mods).toHaveLength(2);
@@ -157,30 +127,42 @@ describe('Archetype 2 — Barbarian UD, DEX +2 CON +3 (REQ-AC-ADAPTER-06)', () =
     // PHB p.48 — "While you are not wearing any armor, your AC equals
     //             10 + your Dexterity modifier + your Constitution modifier."
     const charId = eid('barbarian-ud');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 2, con: 3, wis: 0 },
-      inventory: [],
-      itemLites: {},
-      classes: [{ classSlug: 'barbarian', level: 1 }],
-      abilities: { str: 10, dex: 14, con: 16, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(15);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [],
+        itemLites: {},
+        classes: [{ classSlug: 'barbarian', level: 1 }],
+        resolvedMods: { str: 0, dex: 2, con: 3, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(15);
   });
 
-  it('Barbarian wearing armor → UD suppressed, normal armor branch applies', () => {
+  it('Barbarian wearing armor → UD suppressed, normal armor branch applies (PHB p.48)', () => {
     // PHB p.48 — UD only while "not wearing any armor"
     const chainMail = armorLite('chain-mail', 'Chain Mail', 'HA', 16);
     const charId = eid('barbarian-armored');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 2, dex: 2, con: 3, wis: 0 },
-      inventory: [equippedItem('chain-mail', 'PHB')],
-      itemLites: { 'chain-mail|PHB': chainMail },
-      classes: [{ classSlug: 'barbarian', level: 1 }],
-      abilities: { str: 14, dex: 14, con: 16, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(16); // heavy armor, no DEX (PHB p.144)
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('chain-mail', 'PHB')],
+        itemLites: { 'chain-mail|PHB': chainMail },
+        classes: [{ classSlug: 'barbarian', level: 1 }],
+        resolvedMods: { str: 2, dex: 2, con: 3, wis: 0 },
+        strScore: 14,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(16); // heavy armor, no DEX (PHB p.144)
   });
 });
 
@@ -191,42 +173,45 @@ describe('Archetype 3 — Monk UD, DEX +3 WIS +2 no shield (REQ-AC-ADAPTER-07)',
     // PHB p.78 — "While you are not wearing any armor or wielding a shield,
     //             your AC equals 10 + your Dexterity modifier + your Wisdom modifier."
     const charId = eid('monk-ud');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 3, con: 0, wis: 2 },
-      inventory: [],
-      itemLites: {},
-      classes: [{ classSlug: 'monk', level: 1 }],
-      abilities: { str: 10, dex: 16, con: 10, wis: 14 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(15);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [],
+        itemLites: {},
+        classes: [{ classSlug: 'monk', level: 1 }],
+        resolvedMods: { str: 0, dex: 3, con: 0, wis: 2 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(15);
   });
 
   it('Monk with shield → UD suppressed, WIS not included (PHB p.78)', () => {
     // PHB p.78 — Monk UD is forbidden while "wielding a shield"
     const shield = shieldLite('shield', 'Shield', 2);
     const charId = eid('monk-with-shield');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 3, con: 0, wis: 2 },
-      inventory: [equippedItem('shield', 'PHB')],
-      itemLites: { 'shield|PHB': shield },
-      classes: [{ classSlug: 'monk', level: 1 }],
-      abilities: { str: 10, dex: 16, con: 10, wis: 14 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    // unarmored default 10+DEX(3) + shield(2) = 15 — same value, different formula
-    expect(value).toBe(15);
-
-    // Verify WIS is NOT in any mod
-    const mods = deriveArmorClassModifiers(
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
       {
-        inventory: input.inventory,
-        itemLites: input.itemLites,
-        classes: input.classes,
-        resolvedMods: input.resolvedMods,
+        inventory: [equippedItem('shield', 'PHB')],
+        itemLites: { 'shield|PHB': shield },
+        classes: [{ classSlug: 'monk', level: 1 }],
+        resolvedMods: { str: 0, dex: 3, con: 0, wis: 2 },
+        strScore: 10,
       },
       charId,
     );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    // unarmored default 10+DEX(3) + shield(2) = 15 — same value, different formula
+    expect(result.value).toBe(15);
+
+    // Verify WIS is NOT in any mod
     const labels = mods.map((m) => m.label ?? '');
     expect(labels.some((l) => l.includes('WIS'))).toBe(false);
   });
@@ -239,27 +224,34 @@ describe('Archetype 4 — Light armor, leather ac:11 DEX +3 (REQ-AC-ADAPTER-02)'
     // PHB p.144 — "Light Armor … you add your Dexterity modifier to the base number."
     const leather = armorLite('leather-armor', 'Leather Armor', 'LA', 11);
     const charId = eid('leather-dex3');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
-      inventory: [equippedItem('leather-armor', 'PHB')],
-      itemLites: { 'leather-armor|PHB': leather },
-      classes: [{ classSlug: 'fighter', level: 1 }],
-      abilities: { str: 10, dex: 16, con: 10, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(14);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('leather-armor', 'PHB')],
+        itemLites: { 'leather-armor|PHB': leather },
+        classes: [{ classSlug: 'fighter', level: 1 }],
+        resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(14);
   });
 
   it('armor-base NumMod label sourced from item lite name, not hardcoded (REQ-AC-ADAPTER-09)', () => {
     // REQ-AC-ADAPTER-09: label MUST use armorLite.name, not hardcoded string
     const leather = armorLite('leather-armor', 'Leather Armor', 'LA', 11);
     const charId = eid('leather-label');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('leather-armor', 'PHB')],
         itemLites: { 'leather-armor|PHB': leather },
         classes: [],
         resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -275,27 +267,34 @@ describe('Archetype 5 — Medium armor, scale mail ac:14 DEX +4 capped (REQ-AC-A
     // PHB p.144 — "Medium Armor … you add your Dexterity modifier, to a maximum of +2."
     const scale = armorLite('scale-mail', 'Scale Mail', 'MA', 14);
     const charId = eid('scale-dex4');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 4, con: 0, wis: 0 },
-      inventory: [equippedItem('scale-mail', 'PHB')],
-      itemLites: { 'scale-mail|PHB': scale },
-      classes: [{ classSlug: 'fighter', level: 1 }],
-      abilities: { str: 10, dex: 18, con: 10, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(16);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('scale-mail', 'PHB')],
+        itemLites: { 'scale-mail|PHB': scale },
+        classes: [{ classSlug: 'fighter', level: 1 }],
+        resolvedMods: { str: 0, dex: 4, con: 0, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(16);
   });
 
   it('DEX cap baked into NumMod value: DEX +4 emitted as +2', () => {
     // Design §3: cap baked in adapter — resolveStat never sees uncapped value
     const scale = armorLite('scale-mail', 'Scale Mail', 'MA', 14);
     const charId = eid('scale-cap-check');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('scale-mail', 'PHB')],
         itemLites: { 'scale-mail|PHB': scale },
         classes: [],
         resolvedMods: { str: 0, dex: 4, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -312,12 +311,13 @@ describe('Archetype 5 — Medium armor, scale mail ac:14 DEX +4 capped (REQ-AC-A
     // PHB p.144 — cap only reduces; sub-cap values pass through
     const scale = armorLite('scale-mail', 'Scale Mail', 'MA', 14);
     const charId = eid('scale-below-cap');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('scale-mail', 'PHB')],
         itemLites: { 'scale-mail|PHB': scale },
         classes: [],
         resolvedMods: { str: 0, dex: 1, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -333,27 +333,34 @@ describe('Archetype 6 — Heavy armor, chain mail ac:16 (REQ-AC-ADAPTER-04)', ()
     // PHB p.144 — "Heavy Armor … Your Dexterity modifier doesn't affect your Armor Class."
     const chain = armorLite('chain-mail', 'Chain Mail', 'HA', 16);
     const charId = eid('chain-dex3');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
-      inventory: [equippedItem('chain-mail', 'PHB')],
-      itemLites: { 'chain-mail|PHB': chain },
-      classes: [{ classSlug: 'fighter', level: 1 }],
-      abilities: { str: 10, dex: 16, con: 10, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(16);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('chain-mail', 'PHB')],
+        itemLites: { 'chain-mail|PHB': chain },
+        classes: [{ classSlug: 'fighter', level: 1 }],
+        resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(16);
   });
 
   it('heavy armor emits only 1 NumMod (no DEX mod)', () => {
     // PHB p.144 — DEX contribution absent for heavy armor
     const chain = armorLite('chain-mail', 'Chain Mail', 'HA', 16);
     const charId = eid('heavy-no-dex');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('chain-mail', 'PHB')],
         itemLites: { 'chain-mail|PHB': chain },
         classes: [],
         resolvedMods: { str: 0, dex: 3, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -371,15 +378,21 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
     const scale = armorLite('scale-mail', 'Scale Mail', 'MA', 14);
     const shield = shieldLite('shield', 'Shield', 2);
     const charId = eid('scale-shield-dex2');
-    const input: ArmorClassTestInput = {
-      resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 },
-      inventory: [equippedItem('scale-mail', 'PHB'), equippedItem('shield', 'PHB')],
-      itemLites: { 'scale-mail|PHB': scale, 'shield|PHB': shield },
-      classes: [{ classSlug: 'fighter', level: 1 }],
-      abilities: { str: 10, dex: 14, con: 10, wis: 10 },
-    };
-    const value = assertEngineAcEqualsLegacy(charId, input);
-    expect(value).toBe(18);
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    const { mods } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('scale-mail', 'PHB'), equippedItem('shield', 'PHB')],
+        itemLites: { 'scale-mail|PHB': scale, 'shield|PHB': shield },
+        classes: [{ classSlug: 'fighter', level: 1 }],
+        resolvedMods: { str: 0, dex: 2, con: 0, wis: 0 },
+        strScore: 10,
+      },
+      charId,
+    );
+    for (const m of mods) registry.register(m);
+    const result = resolveStat(charId, 'ac', 0, ctx, registry);
+    expect(result.value).toBe(18);
   });
 
   it('shield NumMod label sourced from shieldLite.name (REQ-AC-ADAPTER-09)', () => {
@@ -387,12 +400,13 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
     // Use DEX 0 so we can unambiguously identify shield mod by its value
     const shield = shieldLite('shield', 'Shield', 2);
     const charId = eid('shield-label');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('shield', 'PHB')],
         itemLites: { 'shield|PHB': shield },
         classes: [],
         resolvedMods: { str: 0, dex: 0, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -406,12 +420,13 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
     // REQ-AC-ADAPTER-05: shield value from item lite, not hardcoded
     const homebrewShield = shieldLite('heavy-shield', 'Heavy Shield', 3);
     const charId = eid('homebrew-shield');
-    const mods = deriveArmorClassModifiers(
+    const { mods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('heavy-shield', 'PHB')],
         itemLites: { 'heavy-shield|PHB': homebrewShield },
         classes: [],
         resolvedMods: { str: 0, dex: 0, con: 0, wis: 0 },
+        strScore: 10,
       },
       charId,
     );
@@ -420,37 +435,58 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
   });
 });
 
-// ── Archetype 8 — STR below armorStrengthMin, plate ac:18 (REQ-AC-STR-WARN-01) ─
+// ── Archetype 8 — STR below armorStrengthMin, plate ac:18 (REQ-AC-WARN-01, REQ-AC-GATE-01 Scenario 9.2) ─
 
-describe('Archetype 8 — Plate ac:18, STR 9 below min:15 (REQ-AC-STR-WARN-01)', () => {
-  it('engine AC = 18; legacy warning INSUFFICIENT_STRENGTH_FOR_ARMOR present (PHB p.144)', () => {
+describe('Archetype 8 — Plate ac:18, STR score 9 below min:15 (REQ-AC-WARN-01)', () => {
+  it('engine AC = 18; engine-path warning INSUFFICIENT_STRENGTH_FOR_ARMOR fires (PHB p.144)', () => {
     // PHB p.144 — STR requirement causes speed penalty, NOT AC reduction.
-    // The warning is legacy-owned this slice; engine value is unaffected.
+    // REQ-AC-WARN-01: warning detected inside deriveArmorClassModifiers via strScore comparison.
+    // ADR-2: compare STR SCORE (9) vs armorStrengthMin threshold (15) — not mod.
     const plate = armorLite('plate-armor', 'Plate Armor', 'HA', 18, { armorStrengthMin: 15 });
     const charId = eid('plate-low-str');
     const inventory = [equippedItem('plate-armor', 'PHB')];
     const itemLites = { 'plate-armor|PHB': plate };
 
-    // Engine path: AC = 18 (heavy, no DEX)
-    const registry = createInMemoryRegistry();
-    const ctx = makeCtx(charId);
-    const acMods = deriveArmorClassModifiers(
-      { inventory, itemLites, classes: [], resolvedMods: { str: -1, dex: 0, con: 0, wis: 0 } },
+    // STR score 9 → mod -1; min threshold = 15 (score) → warning fires
+    const result = deriveArmorClassModifiers(
+      {
+        inventory,
+        itemLites,
+        classes: [],
+        resolvedMods: { str: -1, dex: 0, con: 0, wis: 0 },
+        strScore: 9,
+      },
       charId,
     );
-    for (const m of acMods) registry.register(m);
+
+    // REQ-AC-WARN-01: warning must be present
+    expect(result.warnings).toContain('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+
+    // REQ-AC-GATE-01 Scenario 9.2: AC value still 18 (warning does not block)
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(charId);
+    for (const m of result.mods) registry.register(m);
     const engineResult = resolveStat(charId, 'ac', 0, ctx, registry);
     expect(engineResult.value).toBe(18);
+  });
 
-    // Legacy path: AC = 18, AND warning present
-    const legacyResult = computeArmorClass({
-      inventory,
-      itemLites,
-      classes: [],
-      abilities: { str: 9, dex: 10, con: 10, wis: 10 },
-    });
-    expect(legacyResult.ac).toBe(18);
-    expect(legacyResult.warnings).toContain('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+  it('STR score exactly at minimum (15 vs min 15) → no warning (PHB p.144: penalty BELOW minimum only)', () => {
+    // PHB p.144 — penalty only when STR is BELOW the minimum, not equal.
+    // Boundary: score == threshold → NO warning.
+    const plate = armorLite('plate-armor-exact', 'Plate Armor', 'HA', 18, { armorStrengthMin: 15 });
+    const charId = eid('plate-exact-str');
+    const { warnings } = deriveArmorClassModifiers(
+      {
+        inventory: [equippedItem('plate-armor-exact', 'PHB')],
+        itemLites: { 'plate-armor-exact|PHB': plate },
+        classes: [],
+        resolvedMods: { str: 2, dex: 0, con: 0, wis: 0 },
+        strScore: 15,
+      },
+      charId,
+    );
+    expect(warnings).not.toContain('INSUFFICIENT_STRENGTH_FOR_ARMOR');
+    expect(warnings).toHaveLength(0);
   });
 });
 
@@ -469,17 +505,18 @@ describe('Archetype 9 — Mountain Dwarf + scale mail, post-ASI DEX = 14 → mod
     // Simulate what the route does CORRECTLY: resolve post-ASI DEX score → integer mod
     // DEX base 12 + ASI feat +2 = 14; Math.floor((14-10)/2) = 2
     const postAsiDexMod = Math.floor((14 - 10) / 2); // +2
-    const preAsiDexMod = Math.floor((12 - 10) / 2);   // +1 — this is the WRONG input
+    const preAsiDexMod = Math.floor((12 - 10) / 2);  // +1 — this is the WRONG input
 
     // Engine with POST-ASI mods (correct — what the route should pass)
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(charId);
-    const acMods = deriveArmorClassModifiers(
+    const { mods: acMods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('scale-mail', 'PHB')],
         itemLites: { 'scale-mail|PHB': scale },
         classes: [{ classSlug: 'fighter', level: 4 }],
         resolvedMods: { str: 2, dex: postAsiDexMod, con: 2, wis: 0 },
+        strScore: 14,
       },
       charId,
     );
@@ -490,12 +527,13 @@ describe('Archetype 9 — Mountain Dwarf + scale mail, post-ASI DEX = 14 → mod
 
     // Verify pre-ASI would give WRONG result (14 + min(1,2) = 15) — this is the regression we catch
     const wrongRegistry = createInMemoryRegistry();
-    const wrongMods = deriveArmorClassModifiers(
+    const { mods: wrongMods } = deriveArmorClassModifiers(
       {
         inventory: [equippedItem('scale-mail', 'PHB')],
         itemLites: { 'scale-mail|PHB': scale },
         classes: [{ classSlug: 'fighter', level: 4 }],
         resolvedMods: { str: 2, dex: preAsiDexMod, con: 2, wis: 0 },
+        strScore: 12,
       },
       charId,
     );
@@ -503,5 +541,48 @@ describe('Archetype 9 — Mountain Dwarf + scale mail, post-ASI DEX = 14 → mod
     const wrongResult = resolveStat(charId, 'ac', 0, ctx, wrongRegistry);
     expect(wrongResult.value).toBe(15); // wrong pre-ASI result
     expect(engineResult.value).not.toBe(wrongResult.value); // confirms the difference matters
+  });
+});
+
+// ── formulaFromBreakdown — helper tests (REQ-AC-FORMULA-01, ADR-3/4) ─────────
+
+/** Minimal breakdown source for formula tests. Origin required by EntityRef — uses charId fixture. */
+function src(label: string, amount: number, type: 'untyped' | 'item' = 'untyped', charId: EntityId = eid('formula-test')) {
+  return { label, amount, type, origin: { id: charId, conditions: [] } };
+}
+
+describe('formulaFromBreakdown — formula helper (REQ-AC-FORMULA-01)', () => {
+  it('filters base-0 source and joins remaining labels with " + "', () => {
+    // ADR-4: drop sources with label==="base" && amount===0 (synthetic resolveStat base).
+    // REQ-AC-FORMULA-01: formula non-empty, derived from engine breakdown labels.
+    const breakdown: Breakdown = [
+      src('base', 0),
+      src('Leather Armor (base 11)', 11),
+      src('DEX +3', 3),
+    ];
+    expect(formulaFromBreakdown(breakdown)).toBe('Leather Armor (base 11) + DEX +3');
+  });
+
+  it('unarmored breakdown → correct formula string (non-empty)', () => {
+    // REQ-AC-FORMULA-01: formula non-empty for unarmored archetype.
+    const breakdown: Breakdown = [
+      src('base', 0),
+      src('Unarmored (base 10)', 10),
+      src('DEX +2', 2),
+    ];
+    expect(formulaFromBreakdown(breakdown)).toBe('Unarmored (base 10) + DEX +2');
+  });
+
+  it('item modifier in breakdown → item label appears in formula (Cloak of Protection)', () => {
+    // REQ-AC-CONTRACT-02 migration: item label is in formula string, not in a top-level field.
+    const breakdown: Breakdown = [
+      src('base', 0),
+      src('Unarmored (base 10)', 10),
+      src('DEX +2', 2),
+      src('Cloak of Protection', 1, 'item'),
+    ];
+    const formula = formulaFromBreakdown(breakdown);
+    expect(formula).toContain('Cloak of Protection');
+    expect(formula).toBe('Unarmored (base 10) + DEX +2 + Cloak of Protection');
   });
 });

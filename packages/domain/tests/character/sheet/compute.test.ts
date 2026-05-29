@@ -90,10 +90,8 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
   // skills/passivePerception (Omit<CharacterSheet,'skills'|'passivePerception'> return type).
   // Coverage moved to packages/domain/src/engine/rules/skills.test.ts (Gate A archetypes 1-4,9).
 
-  it('AC: unarmored 10 + DEX(3) = 13', () => {
-    expect(sheet.armorClass.value).toBe(13);
-    expect(sheet.armorClass.formula).toContain('DEX(3)');
-  });
+  // REQ-AC-GATEB-01: armorClass removed from computeCharacterSheet return.
+  // AC coverage moved to engine gate (packages/domain/src/engine/rules/armor-class.test.ts).
 
   it('HP: max d6 (6) + CON(2) = 8 al nivel 1', () => {
     expect(sheet.hitPoints.max).toBe(8);
@@ -151,10 +149,8 @@ describe('computeCharacterSheet — Barbarian Unarmored Defense', () => {
 
   const sheet = computeCharacterSheet({ character: BARB });
 
-  it('AC Unarmored Defense = 10 + DEX(2) + CON(3) = 15', () => {
-    expect(sheet.armorClass.value).toBe(15);
-    expect(sheet.armorClass.formula).toContain('Barbarian Unarmored Defense');
-  });
+  // REQ-AC-GATEB-01: armorClass removed from computeCharacterSheet return.
+  // Barbarian UD AC = 15 coverage: engine gate archetype 2.
 
   it('HP: d12 max (12) + CON(3) = 15', () => {
     expect(sheet.hitPoints.max).toBe(15);
