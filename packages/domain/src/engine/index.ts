@@ -195,3 +195,8 @@ export { buildResilientConModifiers } from './rules/resilient-con.js';
 export { buildCloakOfProtectionModifiers } from './rules/cloak-of-protection.js';
 export { buildGuidanceModifiers } from './rules/guidance.js';
 export { buildFrightenedModifiers } from './rules/frightened.js';
+
+// ── Inventory adapter (Slice 4) ───────────────────────────────────────────────
+
+export { deriveInventoryModifiers } from './adapter/derive-inventory-modifiers.js';
+export type { ItemModifierMap } from './adapter/derive-inventory-modifiers.js';
