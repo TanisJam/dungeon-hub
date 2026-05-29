@@ -56,7 +56,7 @@ import { ABILITY_KEYS, type AbilityKey, type AbilityScores } from '@dungeon-hub/
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { characters, compendiumSpells, sessionEvents, sessionParticipants, sessions, worldMembers } from '../../infra/db/schema.js';
+import { characters, compendiumSpells, encounters, sessionEvents, sessionParticipants, sessions, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
   getCharacterAccess,
@@ -98,6 +98,7 @@ import { loadPersistedModifiers } from '../../use-cases/characters/load-persiste
 import { castBless } from '../../use-cases/characters/cast-bless.js';
 import { applyActiveEffect } from '../../use-cases/characters/apply-active-effect.js';
 import { removeByConcentrationToken } from '../../use-cases/characters/remove-by-concentration-token.js';
+import { removeByEndCondition } from '../../use-cases/characters/remove-by-end-condition.js';
 import {
   createInMemoryRegistry,
   resolveStat,
@@ -224,6 +225,14 @@ const TransferItemBody = z.object({
 
 const RecentGrantsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+// engine-timeline-duration: optional encounterId querystring param for GET /sheet
+// and POST active-effects. When present, the route loads encounter.round and threads
+// it into ctx.encounterRound (evaluateDuration) / startRound (write path).
+// REQ-DUR-CONTRACT-01, REQ-DUR-STORE-01, ADR-4.
+const EncounterIdQuery = z.object({
+  encounterId: z.string().uuid().optional(),
 });
 
 // SP-05: consume a spell slot.
@@ -716,6 +725,23 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
     // -------------------------------------------------------------------------
 
+    // ── engine-timeline-duration: optional encounterId → ctx.encounterRound ────
+    // REQ-DUR-CONTRACT-01, ADR-4: additive opt-in param; absent → fallback active.
+    // Validates as UUID (Zod); then loads the active encounter's current round.
+    // Omits encounterRound from ctx when encounterId is absent or encounter not found.
+    // exactOptionalPropertyTypes: use conditional spread, never assign undefined.
+    const { encounterId: sheetEncounterId } = EncounterIdQuery.parse(request.query);
+    let sheetEncounterRound: number | undefined;
+    if (sheetEncounterId) {
+      const encounterRows = await db
+        .select({ round: encounters.round })
+        .from(encounters)
+        .where(and(eq(encounters.id, sheetEncounterId), eq(encounters.status, 'active')));
+      if (encounterRows.length > 0) {
+        sheetEncounterRound = encounterRows[0]!.round;
+      }
+    }
+
     // ── Engine pre-compute: registry + ASI mods + engineAbilityScores ─────────
     // HOISTED above computeCharacterSheet so engineAbilityScores is available
     // for injection as ComputeInput.injectedAbilityScores (REQ-AS-INJECT-02).
@@ -724,9 +750,20 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const modifierCatalog = await loadModifierDefinitions();
     const charId = character.id as EntityId;
     const modifiers = deriveCharacterModifiers(inventory, charId, modifierCatalog);
+
+    // Build ctx early — needed by loadPersistedModifiers for evaluateDuration filter.
+    // engine-timeline-duration: include encounterRound when available (ADR-4).
+    // exactOptionalPropertyTypes: conditional spread — never assign undefined explicitly.
+    const ctx: EvaluationContext = {
+      self: { id: charId, conditions: [] },
+      activeConditions: [],
+      ...(sheetEncounterRound !== undefined ? { encounterRound: sheetEncounterRound } : {}),
+    };
+
     // Slice 5: load persisted modifiers targeting this character (e.g. Bless).
     // Indexed SELECT WHERE target_character_id — single query, fast.
-    const persisted = await loadPersistedModifiers(character.id);
+    // engine-timeline-duration: passes ctx so evaluateDuration can filter expired instances.
+    const persisted = await loadPersistedModifiers(character.id, ctx);
     const registry = createInMemoryRegistry();
     for (const m of modifiers) registry.register(m);
     for (const m of persisted) registry.register(m);
@@ -749,8 +786,6 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     if (rawFeats !== undefined) asiModInput.feats = rawFeats;
     const asiMods = deriveAbilityScoreModifiers(asiModInput, charId);
     for (const m of asiMods) registry.register(m);
-
-    const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
 
     // engine-ability-scores: resolve each ability via native path.
     // REQ-AS-SHEET-01: engine-sourced; injected into computeCharacterSheet below.
@@ -1107,8 +1142,24 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN' });
       }
 
+      // engine-timeline-duration: optional ?encounterId= → startRound at cast time.
+      // When present, loads the active encounter's round and writes it as start_round.
+      // Absent → startRound undefined → NULL column → evaluateDuration fallback active.
+      // REQ-DUR-STORE-01, ADR-6.
+      const { encounterId: effectEncounterId } = EncounterIdQuery.parse(request.query);
+      let effectStartRound: number | undefined;
+      if (effectEncounterId) {
+        const encounterRows = await db
+          .select({ round: encounters.round })
+          .from(encounters)
+          .where(and(eq(encounters.id, effectEncounterId), eq(encounters.status, 'active')));
+        if (encounterRows.length > 0) {
+          effectStartRound = encounterRows[0]!.round;
+        }
+      }
+
       // Delegate to use-case (catalog lookup → parseRule → compile → persist).
-      const result = await applyActiveEffect(casterId, effectSlug, targetIds, concentrationToken);
+      const result = await applyActiveEffect(casterId, effectSlug, targetIds, concentrationToken, effectStartRound);
 
       if (!result.ok) {
         if (result.error === 'EFFECT_NOT_FOUND') {
@@ -3293,6 +3344,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .where(eq(characters.id, id))
       .returning();
 
+    // engine-timeline-duration: remove modifier instances that end on short rest.
+    // PHB p.186 — short rest removes 'short-rest' EndCondition effects.
+    // Long rest removes BOTH 'short-rest' AND 'long-rest' (see long-rest handler below).
+    // REQ-DUR-REST-01, ADR-5.
+    await removeByEndCondition(id, 'short-rest');
+
     await recordSessionEventForCharacter({
       characterId: id,
       actorUserId: userId,
@@ -3504,6 +3561,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .set({ data: nextData, inventory: rechargeResult.inventory, updatedAt: new Date() })
       .where(eq(characters.id, id))
       .returning();
+
+    // engine-timeline-duration: remove modifier instances that end on long OR short rest.
+    // PHB p.186 — a long rest satisfies short-rest-scoped effects too.
+    // Must remove BOTH 'short-rest' AND 'long-rest' EndCondition instances.
+    // REQ-DUR-REST-01, ADR-5.
+    await removeByEndCondition(id, 'short-rest');
+    await removeByEndCondition(id, 'long-rest');
 
     await recordSessionEventForCharacter({
       characterId: id,

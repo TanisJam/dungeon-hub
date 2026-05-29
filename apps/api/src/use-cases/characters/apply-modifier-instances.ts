@@ -19,7 +19,10 @@ import { modifierInstances } from '../../infra/db/schema.js';
  *
  * Design ref: sdd/engine-stateful/design #1131 — D3, D4.
  */
-export async function applyModifierInstances(instances: ModifierInstance[]): Promise<void> {
+export async function applyModifierInstances(
+  instances: ModifierInstance[],
+  startRound?: number,
+): Promise<void> {
   if (instances.length === 0) return;
 
   const rows = instances.map((instance) => {
@@ -38,6 +41,9 @@ export async function applyModifierInstances(instances: ModifierInstance[]): Pro
       predicate: instance.predicate ? (instance.predicate as object) : null,
       duration: instance.duration ? (instance.duration as object) : null,
       label: instance.label ?? null,
+      // engine-timeline-duration: lifecycle column for round-based expiry.
+      // NULL = non-encounter cast → evaluateDuration fallback active (ADR-1).
+      startRound: startRound ?? null,
     };
   });
 

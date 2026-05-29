@@ -51,6 +51,7 @@ export async function applyActiveEffect(
   effectSlug: string,
   targetIds: string[],
   concentrationToken: string,
+  startRound?: number,
 ): Promise<ApplyActiveEffectResult> {
   // Step 1 — catalog lookup (write-strict path, separate from item loader).
   const rows = await db
@@ -74,8 +75,8 @@ export async function applyActiveEffect(
   const compiled = compileRule(parseResult.rule);
   const instances = compiled.build({ casterId, targetIds, concentrationToken });
 
-  // Step 4 — persist.
-  await applyModifierInstances(instances);
+  // Step 4 — persist (engine-timeline-duration: pass startRound for round-based expiry).
+  await applyModifierInstances(instances, startRound);
 
   return { ok: true };
 }
