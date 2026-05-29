@@ -1,9 +1,9 @@
 /**
- * Parity gate corpus — engine skill resolution (Gate A: engine===legacy).
+ * Parity gate corpus — engine skill resolution (Gate B: engine-only literals).
  *
- * Gate A asserts engine.modifier === legacyMod (reproduced inline) for each archetype.
- * Legacy block compute.ts:394-417 still present while Gate A runs.
- * Gate B (Commit 3): comparative form replaced with captured literal values.
+ * Gate A (engine===legacy) was in Commit 1. Legacy block deleted in Commit 2.
+ * Gate B (this commit): comparative form replaced with captured literal values —
+ * the same values that passed Gate A, now the permanent engine regression suite.
  *
  * 9 archetypes:
  *   1. Non-proficient WIS 18 Perception → mod=+4, prof=false
@@ -11,12 +11,12 @@
  *   3. Background Athletics Fighter STR 16 PB 2 → mod=+5, prof=true
  *   4. Race skill Persuasion Half-Elf CHA 14 PB 2 → mod=+4, prof=true
  *   5. Dedup class+background Athletics STR 14 PB 2 → mod=+4 ONCE (single pb)
- *   6. WIS 18 no-Perception-prof PB 2 → mod=+4 (same as 1, different fixture)
+ *   6. WIS 18 no-Perception-prof PB 2 → mod=+4
  *   7. All five ability groups: STR/DEX/INT/WIS/CHA with space-keyed skill included
  *   8. Forward-compat NumMod on skill.athletics STR 14 prof PB 2 NumMod+3 → mod=+7
  *   9. Tolerate-read: raceSkillChoices=undefined, background=undefined → class skills only
  *
- * REQ-GATE-01, REQ-GATE-02, REQ-GATE-03, REQ-SKILL-NUMMOD-01
+ * REQ-GATE-02, REQ-GATE-03, REQ-SKILL-NUMMOD-01
  */
 import { describe, it, expect } from 'vitest';
 import { createInMemoryRegistry } from '../registry/query.js';
@@ -42,16 +42,6 @@ function makeCtx(selfId: EntityId): EvaluationContext {
 /** PHB p.13 — ability modifier formula */
 function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
-}
-
-/**
- * Legacy formula reproduced inline (mirrors compute.ts:403-413):
- *   mod = abilityMod(score) + (proficientSet.has(name) ? pb : 0)
- * Used for Gate A comparisons. When legacy block is deleted in Commit 2,
- * these comparisons become the captured literal values for Gate B.
- */
-function legacyMod(score: number, proficient: boolean, pb: number): number {
-  return abilityMod(score) + (proficient ? pb : 0);
 }
 
 interface SkillSetup {
@@ -83,7 +73,7 @@ function resolveSkill(
 
 // ── Archetype 1 — Non-proficient WIS 18 Perception ───────────────────────────
 
-describe('Archetype 1 — Non-proficient WIS 18 Perception (REQ-GATE-01 Scenario 9.1)', () => {
+describe('Archetype 1 — Non-proficient WIS 18 Perception (REQ-GATE-02 Scenario 9.1)', () => {
   // PHB p.173 — no proficiency = ability mod only
   // PHB p.13 — WIS 18: mod = floor((18-10)/2) = +4
   const setup: SkillSetup = {
@@ -93,25 +83,24 @@ describe('Archetype 1 — Non-proficient WIS 18 Perception (REQ-GATE-01 Scenario
   };
   const result = resolveSkill(setup, 'perception', 18);
 
-  it('modifier = +4 (WIS mod only, no pb — engine===legacy)', () => {
-    // Gate A: engine === legacy
-    expect(result.value).toBe(legacyMod(18, false, 2)); // +4
+  it('modifier = +4 (WIS mod only, no pb — PHB p.173)', () => {
+    expect(result.value).toBe(4); // WIS 18: mod +4, no proficiency
   });
 
   it('proficient = false (no proficiency source)', () => {
     expect(result.proficient).toBe(false);
   });
 
-  it('passive perception = 10 + engine perception modifier = 14 (REQ-GATE-03)', () => {
+  it('passive perception = 14 (10 + 4 — PHB p.177, REQ-GATE-03)', () => {
     // PHB p.177 — Passive Perception = 10 + Wisdom (Perception) modifier
     const passivePerception = 10 + result.value;
-    expect(passivePerception).toBe(10 + legacyMod(18, false, 2)); // 14
+    expect(passivePerception).toBe(14); // 10 + 4
   });
 });
 
 // ── Archetype 2 — Class skill: Rogue Stealth (DEX 16, PB 2) ─────────────────
 
-describe('Archetype 2 — Class skill Rogue Stealth DEX 16 PB 2 (REQ-GATE-01 Scenario 9.2)', () => {
+describe('Archetype 2 — Class skill Rogue Stealth DEX 16 PB 2 (REQ-GATE-02 Scenario 9.2)', () => {
   // PHB p.96 — Rogue skill proficiencies include Stealth
   // PHB p.174 — proficient: abilityMod + proficiencyBonus
   const setup: SkillSetup = {
@@ -121,25 +110,27 @@ describe('Archetype 2 — Class skill Rogue Stealth DEX 16 PB 2 (REQ-GATE-01 Sce
   };
   const result = resolveSkill(setup, 'stealth', 16);
 
-  it('modifier = +5 (DEX mod +3 + PB +2 — engine===legacy)', () => {
-    expect(result.value).toBe(legacyMod(16, true, 2)); // +5
+  it('modifier = +5 (DEX mod +3 + PB +2 — PHB p.96/p.174)', () => {
+    expect(result.value).toBe(5); // DEX 16: mod +3, PB +2
   });
 
   it('proficient = true', () => {
     expect(result.proficient).toBe(true);
   });
 
-  it('passive perception = 10 + engine perception modifier (REQ-GATE-03)', () => {
-    // Rogue with Perception proficient: WIS assumed 10 (mod 0) + PB 2 = 2 → passive = 12
+  it('passive perception = 14 with Perception proficient WIS 10 (REQ-GATE-03)', () => {
+    // Rogue with Perception proficient, WIS 10 (mod 0) + PB 2 = +2 → passive = 12
+    // Wait — WIS assumed 10, mod 0, proficient → 0 + 2 = +2 → passive = 12
+    // PHB p.177 — Passive Perception = 10 + Wisdom (Perception) check modifier
     const perceptionResult = resolveSkill(setup, 'perception', 10);
     const passivePerception = 10 + perceptionResult.value;
-    expect(passivePerception).toBe(10 + legacyMod(10, true, 2)); // 14 (10 + 2)
+    expect(passivePerception).toBe(12); // 10 + (0 WIS mod + 2 PB) = 12
   });
 });
 
 // ── Archetype 3 — Background skill: Soldier Athletics (STR 16, PB 2) ─────────
 
-describe('Archetype 3 — Background Athletics Fighter STR 16 PB 2 (REQ-GATE-01 Scenario 9.3)', () => {
+describe('Archetype 3 — Background Athletics Fighter STR 16 PB 2 (REQ-GATE-02 Scenario 9.3)', () => {
   // PHB p.138 — Soldier background grants Athletics and Intimidation proficiencies
   const setup: SkillSetup = {
     charId: eid('arch-3'),
@@ -148,8 +139,8 @@ describe('Archetype 3 — Background Athletics Fighter STR 16 PB 2 (REQ-GATE-01 
   };
   const result = resolveSkill(setup, 'athletics', 16);
 
-  it('modifier = +5 (STR mod +3 + PB +2 — engine===legacy)', () => {
-    expect(result.value).toBe(legacyMod(16, true, 2)); // +5
+  it('modifier = +5 (STR mod +3 + PB +2 — PHB p.138/p.174)', () => {
+    expect(result.value).toBe(5); // STR 16: mod +3, PB +2
   });
 
   it('proficient = true', () => {
@@ -159,7 +150,7 @@ describe('Archetype 3 — Background Athletics Fighter STR 16 PB 2 (REQ-GATE-01 
 
 // ── Archetype 4 — Race skill: Half-Elf Persuasion (CHA 14, PB 2) ─────────────
 
-describe('Archetype 4 — Race skill Half-Elf Persuasion CHA 14 PB 2 (REQ-GATE-01 Scenario 9.4)', () => {
+describe('Archetype 4 — Race skill Half-Elf Persuasion CHA 14 PB 2 (REQ-GATE-02 Scenario 9.4)', () => {
   // PHB p.39 — Half-Elf: two skill proficiencies of choice
   const setup: SkillSetup = {
     charId: eid('arch-4'),
@@ -168,8 +159,8 @@ describe('Archetype 4 — Race skill Half-Elf Persuasion CHA 14 PB 2 (REQ-GATE-0
   };
   const result = resolveSkill(setup, 'persuasion', 14);
 
-  it('modifier = +4 (CHA mod +2 + PB +2 — engine===legacy)', () => {
-    expect(result.value).toBe(legacyMod(14, true, 2)); // +4
+  it('modifier = +4 (CHA mod +2 + PB +2 — PHB p.39/p.174)', () => {
+    expect(result.value).toBe(4); // CHA 14: mod +2, PB +2
   });
 
   it('proficient = true', () => {
@@ -179,7 +170,7 @@ describe('Archetype 4 — Race skill Half-Elf Persuasion CHA 14 PB 2 (REQ-GATE-0
 
 // ── Archetype 5 — Dedup: class AND background both grant Athletics ─────────────
 
-describe('Archetype 5 — Dedup class+background Athletics STR 14 PB 2 (REQ-GATE-01 Scenario 9.5)', () => {
+describe('Archetype 5 — Dedup class+background Athletics STR 14 PB 2 (REQ-GATE-02 Scenario 9.5)', () => {
   // PHB p.173 — proficiency bonus CANNOT be added more than once.
   // This archetype asserts IDENTICAL behavior in engine and legacy (NOT a divergence).
   // Both engine and legacy use Set-dedup — engine resolves to abilityMod + pb ONCE.
@@ -200,9 +191,10 @@ describe('Archetype 5 — Dedup class+background Athletics STR 14 PB 2 (REQ-GATE
     expect(athleticsInstances).toHaveLength(1);
   });
 
-  it('modifier = +4 (STR mod +2 + PB +2 ONCE — engine===legacy)', () => {
+  it('modifier = +4 (STR mod +2 + PB +2 ONCE — PHB p.173: pb not added twice)', () => {
+    // STR 14: mod +2. Single proficiency: +2 pb. Total: +4. NOT +6 (double-counting pb is wrong).
     const result = resolveSkill(setup, 'athletics', 14);
-    expect(result.value).toBe(legacyMod(14, true, 2)); // +4, NOT +6 (2*pb would be wrong)
+    expect(result.value).toBe(4);
   });
 
   it('proficient = true', () => {
@@ -213,9 +205,9 @@ describe('Archetype 5 — Dedup class+background Athletics STR 14 PB 2 (REQ-GATE
 
 // ── Archetype 6 — High-ability, no proficiency: WIS 18 Perception ─────────────
 
-describe('Archetype 6 — WIS 18 no Perception proficiency PB 2 (REQ-GATE-01 Scenario 9.6)', () => {
+describe('Archetype 6 — WIS 18 no Perception proficiency PB 2 (REQ-GATE-02 Scenario 9.6)', () => {
   // PHB p.173 — without proficiency, only ability modifier applies
-  // (Different fixture from archetype 1 — verifies the no-prof path with explicit non-empty proficientSet)
+  // Different fixture from archetype 1 — verifies the no-prof path with non-empty proficientSet
   const setup: SkillSetup = {
     charId: eid('arch-6'),
     input: {
@@ -226,8 +218,8 @@ describe('Archetype 6 — WIS 18 no Perception proficiency PB 2 (REQ-GATE-01 Sce
   };
   const result = resolveSkill(setup, 'perception', 18);
 
-  it('modifier = +4 (WIS mod only, no pb — engine===legacy)', () => {
-    expect(result.value).toBe(legacyMod(18, false, 2)); // +4
+  it('modifier = +4 (WIS mod only, no pb — PHB p.173)', () => {
+    expect(result.value).toBe(4); // WIS 18: mod +4, no proficiency → +4
   });
 
   it('proficient = false', () => {
@@ -237,7 +229,7 @@ describe('Archetype 6 — WIS 18 no Perception proficiency PB 2 (REQ-GATE-01 Sce
 
 // ── Archetype 7 — All five ability groups + space-keyed skill ──────────────────
 
-describe('Archetype 7 — All five ability groups, mixed prof/no-prof (REQ-GATE-01 Scenario 9.7)', () => {
+describe('Archetype 7 — All five ability groups, mixed prof/no-prof (REQ-GATE-02 Scenario 9.7)', () => {
   // PHB p.173-179 — skills by ability group (normative mapping)
   // Includes 'animal handling' (WIS, space-keyed) to verify stat.ts:162 plain-string equality.
   // stat.ts:162: stat === `skill.${def.ref}` — spaces PRESERVED in ref (NOT stripped).
@@ -245,41 +237,41 @@ describe('Archetype 7 — All five ability groups, mixed prof/no-prof (REQ-GATE-
     charId: eid('arch-7'),
     input: {
       classes: [{ skillChoices: ['athletics', 'stealth', 'arcana'] }],
-      backgroundSkills: ['animal handling'], // WIS, space-keyed — PHB p.173 Animal Handling entry
+      backgroundSkills: ['animal handling'], // WIS, space-keyed — PHB p.178 Animal Handling (Wisdom)
     },
     pb: 2,
   };
 
-  it('STR: Athletics proficient — STR 16 → +5 (engine===legacy)', () => {
+  it('STR: Athletics proficient — STR 16 → +5 (PHB p.173/p.174)', () => {
     const result = resolveSkill(setup, 'athletics', 16);
-    expect(result.value).toBe(legacyMod(16, true, 2)); // +5
+    expect(result.value).toBe(5); // STR 16: mod +3, PB +2
     expect(result.proficient).toBe(true);
   });
 
-  it('DEX: Stealth proficient — DEX 14 → +4 (engine===legacy)', () => {
+  it('DEX: Stealth proficient — DEX 14 → +4 (PHB p.173/p.174)', () => {
     const result = resolveSkill(setup, 'stealth', 14);
-    expect(result.value).toBe(legacyMod(14, true, 2)); // +4
+    expect(result.value).toBe(4); // DEX 14: mod +2, PB +2
     expect(result.proficient).toBe(true);
   });
 
-  it('INT: Arcana proficient — INT 12 → +3 (engine===legacy)', () => {
+  it('INT: Arcana proficient — INT 12 → +3 (PHB p.173/p.174)', () => {
     const result = resolveSkill(setup, 'arcana', 12);
-    expect(result.value).toBe(legacyMod(12, true, 2)); // +3
+    expect(result.value).toBe(3); // INT 12: mod +1, PB +2
     expect(result.proficient).toBe(true);
   });
 
-  it('WIS: Animal Handling proficient (space-keyed ref!) — WIS 12 → +3 (engine===legacy)', () => {
+  it('WIS: Animal Handling proficient (space-keyed ref!) — WIS 12 → +3 (PHB p.178)', () => {
     // Space-keyed skill: 'animal handling' — ref contains a space.
     // stat.ts:162 resolves via plain equality `skill.animal handling` — works correctly.
     // PHB p.178 — Animal Handling is a Wisdom skill.
     const result = resolveSkill(setup, 'animal handling', 12);
-    expect(result.value).toBe(legacyMod(12, true, 2)); // +3
+    expect(result.value).toBe(3); // WIS 12: mod +1, PB +2
     expect(result.proficient).toBe(true);
   });
 
-  it('CHA: Deception not proficient — CHA 10 → 0 (engine===legacy)', () => {
+  it('CHA: Deception not proficient — CHA 10 → 0 (PHB p.173)', () => {
     const result = resolveSkill(setup, 'deception', 10);
-    expect(result.value).toBe(legacyMod(10, false, 2)); // 0
+    expect(result.value).toBe(0); // CHA 10: mod 0, no proficiency
     expect(result.proficient).toBe(false);
   });
 });
@@ -316,8 +308,8 @@ describe('Archetype 8 — Forward-compat NumMod on skill.athletics (REQ-SKILL-NU
   };
   const result = resolveSkill(setup, 'athletics', 14);
 
-  it('modifier = +7 (STR mod +2 + PB +2 + NumMod +3 — forward-compat)', () => {
-    // STR 14: mod = +2. Proficient: +2 pb. NumMod: +3. Total: +7.
+  it('modifier = +7 (STR mod +2 + PB +2 + NumMod +3)', () => {
+    // STR 14: mod +2. Proficient: +2 pb. NumMod: +3. Total: +7.
     expect(result.value).toBe(7);
   });
 
@@ -343,26 +335,26 @@ describe('Archetype 9 — Tolerate-read: missing raceSkillChoices + background (
 
   it('class skills are still proficient (no crash from missing fields)', () => {
     const stealth = resolveSkill(setup, 'stealth', 14);
-    expect(stealth.value).toBe(legacyMod(14, true, 2)); // +4
+    expect(stealth.value).toBe(4); // DEX 14: mod +2, PB +2
     expect(stealth.proficient).toBe(true);
 
     const athletics = resolveSkill(setup, 'athletics', 16);
-    expect(athletics.value).toBe(legacyMod(16, true, 2)); // +5
+    expect(athletics.value).toBe(5); // STR 16: mod +3, PB +2
     expect(athletics.proficient).toBe(true);
   });
 
-  it('non-proficient skill without sources → abilityMod only (engine===legacy)', () => {
+  it('non-proficient skill without sources → abilityMod only (PHB p.173)', () => {
     // No raceSkillChoices, no background → only class skills proficient
     const perception = resolveSkill(setup, 'perception', 12);
-    expect(perception.value).toBe(legacyMod(12, false, 2)); // +1
+    expect(perception.value).toBe(1); // WIS 12: mod +1, no proficiency
     expect(perception.proficient).toBe(false);
   });
 
-  it('passive perception from engine perception modifier (REQ-GATE-03)', () => {
+  it('passive perception = 11 from engine perception modifier (REQ-GATE-03, PHB p.177)', () => {
     // PHB p.177 — passivePerception = 10 + WIS (Perception) check modifier
     // Perception not proficient: WIS 12 (mod +1) → passivePerception = 11
     const perception = resolveSkill(setup, 'perception', 12);
     const passivePerception = 10 + perception.value;
-    expect(passivePerception).toBe(10 + legacyMod(12, false, 2)); // 11
+    expect(passivePerception).toBe(11); // 10 + 1
   });
 });
