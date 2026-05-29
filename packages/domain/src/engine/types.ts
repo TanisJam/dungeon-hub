@@ -101,7 +101,9 @@ export type EndCondition =
   | 'concentration-ends'
   | 'hp-reaches-zero'
   | 'duration-expires'
-  | 'turn-ends';
+  | 'turn-ends'
+  | 'short-rest'
+  | 'long-rest';
 
 // ── DurationSpec ──────────────────────────────────────────────────────────────
 

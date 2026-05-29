@@ -59,6 +59,14 @@ export interface ModifierInstance {
    * This keeps the ID unique in the registry while the label stays readable.
    */
   label?: string;
+  /**
+   * Encounter round at cast time. Absent = non-encounter cast (modifier was
+   * applied outside a tracked encounter) → never round-expires; evaluateDuration
+   * falls back to active.
+   *
+   * Design ref: sdd/engine-timeline-duration/design — ADR-1.
+   */
+  startRound?: number;
 }
 
 /** Branded string ID for a live modifier instance. */

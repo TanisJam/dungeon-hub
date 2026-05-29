@@ -60,6 +60,19 @@ export interface EvaluationContext {
    * Keyed by decision name; typed as unknown — callers narrow per use-case.
    */
   runtimeDecisions?: Record<string, unknown>;
+
+  /**
+   * Current encounter round. Absent = outside a tracked encounter or no
+   * encounter context was supplied to the route. When absent, evaluateDuration
+   * falls back to active (conservative fallback — cannot evaluate without a
+   * round reference).
+   *
+   * exactOptionalPropertyTypes: use conditional spread when populating.
+   * Never assign undefined explicitly — omit the key entirely.
+   *
+   * Design ref: sdd/engine-timeline-duration/design — REQ-DUR-CTX-01, ADR-4.
+   */
+  encounterRound?: number;
 }
 
 // ── WeaponInUse ───────────────────────────────────────────────────────────────

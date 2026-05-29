@@ -201,6 +201,10 @@ export { buildFrightenedModifiers } from './rules/frightened.js';
 export { cloakOfProtectionRuleDoc } from './rules-authored/cloak-of-protection.js';
 export { blessRuleDoc } from './rules-authored/bless.js';
 
+// ── Duration evaluator (engine-timeline-duration — Slice: Composable Modifier System 1) ──
+
+export { evaluateDuration, convertToRounds } from './duration/evaluate.js';
+
 // ── Inventory adapter (Slice 4) ───────────────────────────────────────────────
 
 export { deriveInventoryModifiers } from './adapter/derive-inventory-modifiers.js';

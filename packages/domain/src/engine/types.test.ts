@@ -8,7 +8,24 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isProficiencyMod } from './types.js';
-import type { Modifier } from './types.js';
+import type { Modifier, EndCondition } from './types.js';
+
+// ── EndCondition type tests (REQ-DUR-REST-01) ─────────────────────────────────
+// Compile-time assertions: EndCondition must accept 'short-rest' and 'long-rest'.
+// These are event-triggered removal conditions (not read-time evaluateDuration inputs).
+// ResetTrigger (types.ts:96) already has these for a DIFFERENT axis — EndCondition
+// gets its own copy. PHB p.186 — rest effects.
+describe('EndCondition union (REQ-DUR-REST-01)', () => {
+  it('accepts short-rest as a valid EndCondition', () => {
+    const cond: EndCondition = 'short-rest';
+    expect(cond).toBe('short-rest');
+  });
+
+  it('accepts long-rest as a valid EndCondition', () => {
+    const cond: EndCondition = 'long-rest';
+    expect(cond).toBe('long-rest');
+  });
+});
 
 describe('isProficiencyMod — type guard (REQ-PROF-01)', () => {
   it('returns true for a valid ProficiencyMod shape (homebrew ref)', () => {
