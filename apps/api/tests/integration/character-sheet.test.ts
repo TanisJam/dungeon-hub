@@ -721,20 +721,23 @@ describe('GET /characters/:id/sheet — STATMETHOD-API-01: statMethod field', ()
 });
 
 // ---------------------------------------------------------------------------
-// REQ-AS-SHEET-01..04, REQ-AS-TOLERATE-01
-// engine-ability-scores — native dual-shadow via deriveAbilityScoreModifiers
-// PHB p.13 (modifier formula), PHB p.18-20 (Elf racial ASIs), PHB p.165 (ASI stacking)
+// REQ-AS-CONTRACT-01: sheet.abilityScores shape unchanged (engine-authoritative post-injection)
+// REQ-AS-CONTRACT-02: engineAbilityScores top-level field removed; scores flow via sheet.abilityScores
+// PHB p.13 (modifier formula), PHB p.23 (Elf racial ASIs: +2 DEX, +1 INT)
 // ---------------------------------------------------------------------------
-describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-shadow', () => {
+describe('GET /characters/:id/sheet — REQ-AS-CONTRACT-01: sheet.abilityScores engine-authoritative', () => {
   /**
-   * Character: High Elf Wizard 1 with Sage background (same setup as first describe).
+   * Character: High Elf Wizard 1.
    * baseStats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 }
    * asisApplied from Elf/High-Elf:
    *   - { ability: 'dex', bonus: 2, source: 'subrace' }  (PHB p.23 Elf +2 DEX)
    *   - { ability: 'int', bonus: 1, source: 'subrace' }  (PHB p.23 High Elf +1 INT)
-   * Effective: DEX = 16, INT = 16; all others = base.
+   * Engine-authoritative effective: DEX = 16, INT = 16; all others = base.
    *
-   * Wild Shape API test is intentionally ABSENT (amendment #1).
+   * REQ-AS-CONTRACT-02: engineAbilityScores top-level field has been REMOVED from the
+   * route response. Engine-sourced scores are now served exclusively via sheet.abilityScores.
+   *
+   * Wild Shape API test is intentionally ABSENT.
    * No Wild Shape persistence path exists — archetype 7 is a domain proof only.
    */
   let user: TestUser;
@@ -817,7 +820,8 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
     await closeTestApp();
   });
 
-  it('REQ-AS-SHEET-01: GET /sheet returns engineAbilityScores top-level field (additive, alongside legacy abilityScores)', async () => {
+  it('REQ-AS-CONTRACT-01: GET /sheet returns sheet.abilityScores with engine-sourced values (PHB p.13)', async () => {
+    // REQ-AS-CONTRACT-02: engineAbilityScores top-level field is ABSENT; scores flow via sheet.abilityScores.
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -826,12 +830,15 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.engineAbilityScores).toBeDefined();
-    // Legacy abilityScores MUST still be present (tolerate-read guarantee)
+    // REQ-AS-CONTRACT-02: top-level field must be absent (removed from route return).
+    expect(body.engineAbilityScores).toBeUndefined();
+    // REQ-AS-CONTRACT-01: sheet.abilityScores MUST still be present.
     expect(body.sheet.abilityScores).toBeDefined();
   });
 
-  it('REQ-AS-SHEET-01 parity: engineAbilityScores[a].score === abilityScores[a].score for all 6 abilities', async () => {
+  it('REQ-AS-CONTRACT-01: sheet.abilityScores DEX = 16 (base 14 + Elf +2 racial, PHB p.23)', async () => {
+    // PHB p.23 — Elf: "Your Dexterity score increases by 2."
+    // Engine resolves: base 14 + ASI NumMod +2 = 16; modifier = floor((16-10)/2) = 3.
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -839,14 +846,14 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
       headers: { authorization: `Bearer ${user.accessToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const { engineAbilityScores, sheet } = res.json();
-    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-    for (const a of abilities) {
-      expect(engineAbilityScores[a].score).toBe(sheet.abilityScores[a].score);
-    }
+    const { sheet } = res.json();
+    expect(sheet.abilityScores.dex.score).toBe(16);
+    expect(sheet.abilityScores.dex.modifier).toBe(3); // floor((16-10)/2) = 3
   });
 
-  it('REQ-AS-SHEET-03: engineAbilityScores[a].modifier === floor((score - 10) / 2) (PHB p.13)', async () => {
+  it('REQ-AS-CONTRACT-01: sheet.abilityScores INT = 16 (base 15 + High Elf +1 subrace, PHB p.23)', async () => {
+    // PHB p.23 — High Elf subrace: "Your Intelligence score increases by 1."
+    // Engine resolves: base 15 + ASI NumMod +1 = 16; modifier = floor((16-10)/2) = 3.
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -854,15 +861,14 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
       headers: { authorization: `Bearer ${user.accessToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const { engineAbilityScores } = res.json();
-    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
-    for (const a of abilities) {
-      const expected = Math.floor((engineAbilityScores[a].score - 10) / 2);
-      expect(engineAbilityScores[a].modifier).toBe(expected);
-    }
+    const { sheet } = res.json();
+    expect(sheet.abilityScores.int.score).toBe(16);
+    expect(sheet.abilityScores.int.modifier).toBe(3); // floor((16-10)/2) = 3
   });
 
-  it('REQ-AS-SHEET-04: engineAbilityScores contains breakdown array for each ability', async () => {
+  it('REQ-AS-MOD-01: modifier = floor((score - 10) / 2) for all 6 abilities (PHB p.13)', async () => {
+    // PHB p.13: "To determine an ability modifier without consulting the table,
+    // subtract 10 from the ability score and then divide the total by 2 (round down)."
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -870,27 +876,12 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
       headers: { authorization: `Bearer ${user.accessToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const { engineAbilityScores } = res.json();
+    const { sheet } = res.json();
     const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
     for (const a of abilities) {
-      expect(Array.isArray(engineAbilityScores[a].breakdown)).toBe(true);
+      const expected = Math.floor((sheet.abilityScores[a].score - 10) / 2);
+      expect(sheet.abilityScores[a].modifier).toBe(expected);
     }
-  });
-
-  it('REQ-AS-SHEET-04 DEX: breakdown contains entry for +2 racial ASI on DEX (PHB p.23 Elf)', async () => {
-    // High Elf DEX: base 14 + racial +2 = 16. Engine breakdown must contain the ASI source.
-    const app = await getTestApp();
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/v1/characters/${characterId}/sheet`,
-      headers: { authorization: `Bearer ${user.accessToken}` },
-    });
-    expect(res.statusCode).toBe(200);
-    const { engineAbilityScores } = res.json();
-    // DEX must be 16 (14 base + 2 racial)
-    expect(engineAbilityScores.dex.score).toBe(16);
-    // breakdown must have at least 1 entry for the +2 bonus
-    expect(engineAbilityScores.dex.breakdown.length).toBeGreaterThan(0);
   });
 });
 
@@ -899,18 +890,21 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
 // A character created before the stats wizard step (data has no `baseStats`)
 // MUST load without crashing (HTTP 200, engineAbilityScores absent/undefined,
 // legacy abilityScores present with all-10 defaults from compute.ts §300).
+// REQ-AS-FALLBACK-01: computeEffectiveScores fallback activates when injection absent.
 // ---------------------------------------------------------------------------
 describe('GET /characters/:id/sheet — REQ-AS-TOLERATE-01: char without baseStats (pre-stats wizard)', () => {
   /**
-   * Tolerate-read guard: characters.ts:856
+   * Tolerate-read guard: characters.ts (pre-compute) —
    *   const engineAbilityScores = rawBaseStats ? Object.fromEntries(...) : undefined;
+   *   then ...(engineAbilityScores !== undefined && { injectedAbilityScores: engineAbilityScores })
    *
    * When a character row has no `baseStats` in `data` (freshly created, wizard
    * not yet started), the route MUST:
    *   1. Return HTTP 200 — not crash with 500.
-   *   2. Omit `engineAbilityScores` (undefined / absent in response body).
-   *   3. Include legacy `sheet.abilityScores` with all scores defaulting to 10
-   *      (compute.ts:300 — baseStats ?? { str:10, dex:10, con:10, int:10, wis:10, cha:10 }).
+   *   2. Omit `engineAbilityScores` from the response (removed per REQ-AS-CONTRACT-02;
+   *      also undefined → omitted from JSON serialization).
+   *   3. Include `sheet.abilityScores` with all scores defaulting to 10
+   *      (compute.ts fallback — baseStats ?? { str:10, ..., cha:10 }, REQ-AS-FALLBACK-01).
    *
    * No stats PUT is issued so `data['baseStats']` stays absent.
    * PHB §"Ability Scores" (PHB p.12): scores are defined at character creation,

@@ -13,7 +13,7 @@ import {
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
-import { computeCharacterSheet, type SpellSheetRef, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
+import { computeCharacterSheet, type SpellSheetRef, type AbilityScoreView, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
 import {
   addItemToInventory,
   consumeInventoryItem,
@@ -716,6 +716,65 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     }
     // -------------------------------------------------------------------------
 
+    // ── Engine pre-compute: registry + ASI mods + engineAbilityScores ─────────
+    // HOISTED above computeCharacterSheet so engineAbilityScores is available
+    // for injection as ComputeInput.injectedAbilityScores (REQ-AS-INJECT-02).
+    // ADR-4: registry/ctx/asiMods/engineAbilityScores needed before compute;
+    // AC-native block and saves/init/skills stay after (need sheet.proficiencyBonus).
+    const modifierCatalog = await loadModifierDefinitions();
+    const charId = character.id as EntityId;
+    const modifiers = deriveCharacterModifiers(inventory, charId, modifierCatalog);
+    // Slice 5: load persisted modifiers targeting this character (e.g. Bless).
+    // Indexed SELECT WHERE target_character_id — single query, fast.
+    const persisted = await loadPersistedModifiers(character.id);
+    const registry = createInMemoryRegistry();
+    for (const m of modifiers) registry.register(m);
+    for (const m of persisted) registry.register(m);
+
+    // engine-ability-scores: derive ASI NumMods from the three stored ASI arrays
+    // and register into the SAME registry BEFORE resolveStat calls.
+    // REQ-AS-SHEET-04: ASI mods must be registered so resolveStat picks them up.
+    // REQ-AS-SHEET-02: base = raw baseStats[ability], NOT legacy effective score.
+    // REQ-AS-TOLERATE-01: asisApplied/levelUpAsis/feats may be absent — adapter treats
+    // undefined as [] (design §5). If baseStats absent, skip engineAbilityScores.
+    const rawBaseStats = data['baseStats'] as AbilityScores | undefined;
+    // Build AbilityScoreModifierInput respecting exactOptionalPropertyTypes:
+    // only include the property when the value is actually present (not undefined).
+    const asiModInput: AbilityScoreModifierInput = {};
+    const rawAsisApplied = data['asisApplied'] as AppliedAsi[] | undefined;
+    const rawLevelUpAsis = data['levelUpAsis'] as AppliedAsi[] | undefined;
+    const rawFeats = data['feats'] as AppliedFeat[] | undefined;
+    if (rawAsisApplied !== undefined) asiModInput.asisApplied = rawAsisApplied;
+    if (rawLevelUpAsis !== undefined) asiModInput.levelUpAsis = rawLevelUpAsis;
+    if (rawFeats !== undefined) asiModInput.feats = rawFeats;
+    const asiMods = deriveAbilityScoreModifiers(asiModInput, charId);
+    for (const m of asiMods) registry.register(m);
+
+    const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
+
+    // engine-ability-scores: resolve each ability via native path.
+    // REQ-AS-SHEET-01: engine-sourced; injected into computeCharacterSheet below.
+    // REQ-AS-SHEET-02: base = raw baseStats[ability] ?? 10 (fallback for missing)
+    // REQ-AS-SHEET-03: modifier = floor((score - 10) / 2)  PHB p.13
+    // REQ-AS-TOLERATE-01: undefined when rawBaseStats absent (malformed legacy row).
+    // Type: Record<AbilityKey, AbilityScoreView & { breakdown }> cast to Record<AbilityKey, AbilityScoreView>
+    // for injection — extra `breakdown` field is structurally compatible (ADR-1).
+    const engineAbilityScores: Record<AbilityKey, AbilityScoreView & { breakdown: unknown }> | undefined = rawBaseStats
+      ? Object.fromEntries(
+          ABILITY_KEYS.map((a) => {
+            const resolved = resolveStat(charId, a, rawBaseStats[a] ?? 10, ctx, registry);
+            return [
+              a,
+              {
+                score: resolved.value,
+                modifier: Math.floor((resolved.value - 10) / 2), // PHB p.13
+                breakdown: resolved.breakdown,
+              },
+            ];
+          }),
+        ) as Record<AbilityKey, AbilityScoreView & { breakdown: unknown }>
+      : undefined;
+
     const sheet = computeCharacterSheet({
       character: {
         name: character.name,
@@ -747,6 +806,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       itemWeights,
       spellRefsBySlug,
       encumbranceVariant: campaign.rulesProfile.variantRules.encumbranceVariant,
+      // REQ-AS-INJECT-02: pass engine-resolved ability scores so compute.ts uses
+      // engine values for effective[] instead of computeEffectiveScores.
+      // exactOptionalPropertyTypes: field is only included when defined (no `| undefined` form).
+      // When rawBaseStats absent (legacy row), engineAbilityScores is undefined → field omitted
+      // → fallback path activates (REQ-AS-FALLBACK-01).
+      ...(engineAbilityScores !== undefined && { injectedAbilityScores: engineAbilityScores }),
     });
 
     // Augmented fields for sheet page (D.4):
@@ -805,40 +870,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     //   persisted modifier instances (Bless, etc.) loaded from DB.
     // Additive only — legacy sheet.armorClass + engineAc are UNCHANGED.
     // REQ-ENGINEAC-01/02/03, REQ-ENGINESTATS-01/02/03.
-    // Slice 6 (engine-catalog): load modifier definitions from DB catalog.
-    // Resolves #513: the hardcoded itemModifierMap literal is gone; map is built from
-    // modifier_definitions rows at request time. Malformed rows are warn-skipped (§11).
-    // TODO: module-level cache of compiled map (profile at 50+ rows). Seam = here.
-    const modifierCatalog = await loadModifierDefinitions();
-    const charId = character.id as EntityId;
-    const modifiers = deriveCharacterModifiers(inventory, charId, modifierCatalog);
-    // Slice 5: load persisted modifiers targeting this character (e.g. Bless).
-    // Indexed SELECT WHERE target_character_id — single query, fast.
-    const persisted = await loadPersistedModifiers(character.id);
-    const registry = createInMemoryRegistry();
-    for (const m of modifiers) registry.register(m);
-    for (const m of persisted) registry.register(m);
-
-    // engine-ability-scores: derive ASI NumMods from the three stored ASI arrays
-    // and register into the SAME registry BEFORE resolveStat calls.
-    // REQ-AS-SHEET-04: ASI mods must be registered so resolveStat picks them up.
-    // REQ-AS-SHEET-02: base = raw baseStats[ability], NOT legacy effective score.
-    // REQ-AS-TOLERATE-01: asisApplied/levelUpAsis/feats may be absent — adapter treats
-    // undefined as [] (design §5). If baseStats absent, skip engineAbilityScores.
-    const rawBaseStats = data['baseStats'] as AbilityScores | undefined;
-    // Build AbilityScoreModifierInput respecting exactOptionalPropertyTypes:
-    // only include the property when the value is actually present (not undefined).
-    const asiModInput: AbilityScoreModifierInput = {};
-    const rawAsisApplied = data['asisApplied'] as AppliedAsi[] | undefined;
-    const rawLevelUpAsis = data['levelUpAsis'] as AppliedAsi[] | undefined;
-    const rawFeats = data['feats'] as AppliedFeat[] | undefined;
-    if (rawAsisApplied !== undefined) asiModInput.asisApplied = rawAsisApplied;
-    if (rawLevelUpAsis !== undefined) asiModInput.levelUpAsis = rawLevelUpAsis;
-    if (rawFeats !== undefined) asiModInput.feats = rawFeats;
-    const asiMods = deriveAbilityScoreModifiers(asiModInput, charId);
-    for (const m of asiMods) registry.register(m);
-
-    const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
+    // registry + ctx + asiMods + engineAbilityScores hoisted above computeCharacterSheet
+    // for injection (REQ-AS-INJECT-02, ADR-4). AC-native block stays here (needs sheet context).
 
     // engine-ac-parity: resolve engineAc NATIVELY (base 0, no legacy seeding).
     // REQ-AC-NATIVE-01: base = 0; deriveArmorClassModifiers emits all structural AC NumMods.
@@ -881,27 +914,6 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // '1d4' appears in breakdown[].amount as a string for consumer rendering).
     const engineStatsAttackRoll = resolveStat(charId, 'attack-roll', 0, ctx, registry);
 
-    // engine-ability-scores: resolve each ability via native path.
-    // REQ-AS-SHEET-01: additive dual-shadow alongside legacy abilityScores.
-    // REQ-AS-SHEET-02: base = raw baseStats[ability] ?? 10 (fallback for missing)
-    // REQ-AS-SHEET-03: modifier = floor((score - 10) / 2)  PHB p.13
-    // REQ-AS-TOLERATE-01: skip if rawBaseStats absent (malformed legacy row).
-    const engineAbilityScores = rawBaseStats
-      ? Object.fromEntries(
-          ABILITY_KEYS.map((a) => {
-            const resolved = resolveStat(charId, a, rawBaseStats[a] ?? 10, ctx, registry);
-            return [
-              a,
-              {
-                score: resolved.value,
-                modifier: Math.floor((resolved.value - 10) / 2), // PHB p.13
-                breakdown: resolved.breakdown,
-              },
-            ];
-          }),
-        )
-      : undefined;
-
     // engine-saving-throw-parity: resolve 6 per-ability saves natively.
     // REQ-NATIVE-01: 6 resolveStat calls for 'saving-throw.<a>', base = engine ability mod.
     // REQ-NATIVE-03: base is engineAbilityScores[a].modifier (post-ASI), not raw score.
@@ -914,8 +926,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     for (const m of saveProfMods) registry.register(m);
 
     const engineSavingThrows = ABILITY_KEYS.map((a) => {
-      // Base = engine-native ability modifier (post-ASI). Fallback to legacy for malformed rows.
-      const abilityModifier = engineAbilityScores?.[a]?.modifier ?? sheet.abilityScores[a].modifier;
+      // REQ-AS-DEADCODE-01: ?? fallback removed — engineAbilityScores guaranteed present for rows
+      // with rawBaseStats (injected pre-compute). Legacy rows (no rawBaseStats) use 0 (all-10 default).
+      const abilityModifier = engineAbilityScores?.[a]?.modifier ?? 0;
       const resolved = resolveStat(charId, `saving-throw.${a}`, abilityModifier, ctx, registry, sheet.proficiencyBonus);
       const proficient = primaryClassSaves.includes(a); // REQ-PROF-01: explicit derivation
       return {
@@ -928,9 +941,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // engine-initiative-parity: resolve initiative natively via engine.
     // REQ-NATIVE-INIT-01: resolveStat('initiative', nativeDexMod). PHB p.177 — initiative = DEX mod.
-    // REQ-TOLREAD-INIT-01: tolerate-read guard for legacy DB rows missing engineAbilityScores.
+    // REQ-AS-DEADCODE-01: ?? fallback removed — engineAbilityScores guaranteed for rows with rawBaseStats;
+    // legacy rows (no rawBaseStats) use 0 (all-10 default; modifier = 0).
     // No proficiency, no adapter needed — initiative is pure DEX mod + optional NumMods.
-    const nativeDexMod = engineAbilityScores?.['dex']?.modifier ?? sheet.abilityScores.dex.modifier;
+    const nativeDexMod = engineAbilityScores?.['dex']?.modifier ?? 0;
     const resolvedInitiative = resolveStat(charId, 'initiative', nativeDexMod, ctx, registry);
 
     // engine-skill-parity: native 18-skill + passive perception resolution.
@@ -957,8 +971,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const engineSkills = ALL_SKILLS.map((name) => {
       const ability = SKILL_TO_ABILITY[name]!;
-      // Base = engine-native ability modifier (post-ASI, post-racial-bonus). ?? fallback for legacy rows.
-      const base = engineAbilityScores?.[ability]?.modifier ?? sheet.abilityScores[ability].modifier;
+      // REQ-AS-DEADCODE-01: ?? fallback removed — engineAbilityScores guaranteed for rows with rawBaseStats;
+      // legacy rows (no rawBaseStats) use 0 (all-10 default; modifier = 0).
+      const base = engineAbilityScores?.[ability]?.modifier ?? 0;
       const resolved = resolveStat(charId, `skill.${name}`, base, ctx, registry, sheet.proficiencyBonus);
       return {
         name,
@@ -1006,7 +1021,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       inventoryEnriched,
       engineAc,
       engineStats,
-      engineAbilityScores,
+      // REQ-AS-CONTRACT-02: engineAbilityScores top-level field removed.
+      // Engine-sourced scores now flow through sheet.abilityScores (injected into computeCharacterSheet).
     };
   });
 
