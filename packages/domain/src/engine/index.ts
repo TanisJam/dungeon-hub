@@ -210,3 +210,8 @@ export type { ItemModifierMap } from './adapter/derive-inventory-modifiers.js';
 
 export { deriveAbilityScoreModifiers } from './adapter/derive-ability-score-modifiers.js';
 export type { AbilityScoreModifierInput } from './adapter/derive-ability-score-modifiers.js';
+
+// ── AC adapter (engine-ac-parity) ─────────────────────────────────────────────
+
+export { deriveArmorClassModifiers } from './adapter/derive-armor-class-modifiers.js';
+export type { ArmorClassModifierInput } from './adapter/derive-armor-class-modifiers.js';
