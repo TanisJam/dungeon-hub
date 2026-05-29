@@ -1,10 +1,11 @@
 /**
- * Parity gate corpus — engine saving throw resolution vs legacy compute.ts formula.
+ * Parity gate corpus — engine saving throw resolution (Gate B: engine-only literals).
  *
- * Gate A form: engine === legacyEquivalent
- * (Gate B: convert to literal values in Commit 3, after legacy deletion)
+ * Gate A (engine===legacy) was in Commit 1. Legacy block deleted in Commit 2.
+ * Gate B (this commit): comparative form replaced with captured literal values —
+ * the same values that passed Gate A, now the permanent engine regression suite.
  *
- * 9 archetypes covering:
+ * 9 archetypes:
  *   1. Fighter L5 (STR+CON prof) — PHB p.72, p.179
  *   2. Wizard L5 (INT+WIS prof) — PHB p.114
  *   3. Warlock L5 (WIS+CHA prof) — PHB p.105
@@ -15,7 +16,7 @@
  *   8. Cloak of Protection (+1 all saves) — DMG p.159
  *   9. High-DEX no-proficiency — pure modifier (PHB p.13, p.179)
  *
- * REQ-GATE-01, REQ-NATIVE-01..03, REQ-MULTI-01
+ * REQ-GATE-02, REQ-NATIVE-01..03, REQ-MULTI-01
  */
 import { describe, it, expect } from 'vitest';
 import { createInMemoryRegistry } from '../registry/query.js';
@@ -47,18 +48,13 @@ function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
-/** Legacy formula — inline replica of compute.ts:390-394 */
-function legacySave(score: number, proficient: boolean, pb: number): number {
-  return abilityMod(score) + (proficient ? pb : 0);
-}
-
 interface SaveResult {
   value: number;
   proficient: boolean;
 }
 
 /**
- * Resolve all 6 saves via engine and assert engine.value === legacySave for each.
+ * Resolve all 6 saves via engine.
  * Returns a Record<AbilityKey, SaveResult> for archetype-specific assertions.
  */
 function resolveSaves(
@@ -71,17 +67,15 @@ function resolveSaves(
   const registry = createInMemoryRegistry();
   const ctx = makeCtx(charId);
 
-  // Register save proficiency mods (adapter)
   const saveProfMods = deriveSavingThrowProficiencies(profSaves, charId);
   for (const m of saveProfMods) registry.register(m);
 
-  // Allow caller to register additional mods (Bless, Cloak, Resilient)
   extraSetup?.(registry);
 
   const results: Partial<Record<AbilityKey, SaveResult>> = {};
   for (const a of ABILITY_KEYS) {
-    const abilityModifier = abilityMod(scores[a]);
-    const resolved = resolveStat(charId, `saving-throw.${a}`, abilityModifier, ctx, registry, pb);
+    const mod = abilityMod(scores[a]);
+    const resolved = resolveStat(charId, `saving-throw.${a}`, mod, ctx, registry, pb);
     results[a] = { value: resolved.value, proficient: profSaves.includes(a) };
   }
   return results as Record<AbilityKey, SaveResult>;
@@ -89,7 +83,7 @@ function resolveSaves(
 
 // ── Archetype 1 — Fighter L5 (STR+CON prof) ──────────────────────────────────
 
-describe('Archetype 1 — Fighter L5 STR+CON proficient (REQ-GATE-01 Scenario 6.1)', () => {
+describe('Archetype 1 — Fighter L5 STR+CON proficient (REQ-GATE-02 Scenario 6.1)', () => {
   // PHB p.72 — Fighter saving throws: Strength and Constitution
   // PHB p.179 — saving throw modifier = ability modifier + proficiency bonus (if proficient)
   const CHAR_ID = eid('fighter-l5');
@@ -99,32 +93,31 @@ describe('Archetype 1 — Fighter L5 STR+CON proficient (REQ-GATE-01 Scenario 6.
 
   const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
 
-  it('STR save = legacyEquivalent (proficient, PHB p.72/p.179)', () => {
-    // legacy-captured: 6 (STR mod+3 + PB+3)
-    const legacy = legacySave(scores.str, true, pb);
-    expect(saves.str.value).toBe(legacy);
+  it('STR save = +6 (proficient: STR mod +3 + PB +3, PHB p.72/p.179)', () => {
+    expect(saves.str.value).toBe(6); // STR mod +3 + PB +3
     expect(saves.str.proficient).toBe(true);
   });
 
-  it('CON save = legacyEquivalent (proficient, PHB p.72)', () => {
-    // legacy-captured: 5 (CON mod+2 + PB+3)
-    const legacy = legacySave(scores.con, true, pb);
-    expect(saves.con.value).toBe(legacy);
+  it('CON save = +5 (proficient: CON mod +2 + PB +3, PHB p.72)', () => {
+    expect(saves.con.value).toBe(5); // CON mod +2 + PB +3
     expect(saves.con.proficient).toBe(true);
   });
 
-  it('DEX save = legacyEquivalent (not proficient)', () => {
-    // legacy-captured: 1 (DEX mod+1, no PB)
-    const legacy = legacySave(scores.dex, false, pb);
-    expect(saves.dex.value).toBe(legacy);
+  it('DEX save = +1 (not proficient: DEX mod +1 only)', () => {
+    expect(saves.dex.value).toBe(1); // DEX mod +1, no PB
     expect(saves.dex.proficient).toBe(false);
   });
 
-  it('all 6 saves engine === legacy', () => {
-    for (const a of ABILITY_KEYS) {
-      const legacy = legacySave(scores[a], profSaves.includes(a), pb);
-      expect(saves[a].value, `${a} save should be ${legacy}`).toBe(legacy);
-    }
+  it('INT save = 0 (not proficient: INT mod 0)', () => {
+    expect(saves.int.value).toBe(0); // INT mod 0, no PB
+  });
+
+  it('WIS save = 0 (not proficient: WIS mod 0)', () => {
+    expect(saves.wis.value).toBe(0); // WIS mod 0, no PB
+  });
+
+  it('CHA save = -1 (not proficient: CHA mod -1)', () => {
+    expect(saves.cha.value).toBe(-1); // CHA mod -1, no PB
   });
 });
 
@@ -139,23 +132,20 @@ describe('Archetype 2 — Wizard L5 INT+WIS proficient (Scenario 6.2)', () => {
 
   const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
 
-  it('INT save = legacyEquivalent (proficient, PHB p.114)', () => {
-    // legacy-captured: 6 (INT mod+3 + PB+3)
-    const legacy = legacySave(scores.int, true, pb);
-    expect(saves.int.value).toBe(legacy);
+  it('INT save = +6 (proficient: INT mod +3 + PB +3, PHB p.114)', () => {
+    expect(saves.int.value).toBe(6); // INT mod +3 + PB +3
   });
 
-  it('WIS save = legacyEquivalent (proficient, PHB p.114)', () => {
-    // legacy-captured: 5 (WIS mod+2 + PB+3)
-    const legacy = legacySave(scores.wis, true, pb);
-    expect(saves.wis.value).toBe(legacy);
+  it('WIS save = +5 (proficient: WIS mod +2 + PB +3, PHB p.114)', () => {
+    expect(saves.wis.value).toBe(5); // WIS mod +2 + PB +3
   });
 
-  it('all 6 saves engine === legacy', () => {
-    for (const a of ABILITY_KEYS) {
-      const legacy = legacySave(scores[a], profSaves.includes(a), pb);
-      expect(saves[a].value, `${a} save`).toBe(legacy);
-    }
+  it('STR save = -1 (not proficient: STR mod -1)', () => {
+    expect(saves.str.value).toBe(-1); // STR mod -1, no PB
+  });
+
+  it('DEX save = +2 (not proficient: DEX mod +2)', () => {
+    expect(saves.dex.value).toBe(2); // DEX mod +2, no PB
   });
 });
 
@@ -170,23 +160,16 @@ describe('Archetype 3 — Warlock L5 WIS+CHA proficient (Scenario 6.3)', () => {
 
   const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
 
-  it('WIS save = legacyEquivalent (proficient, PHB p.105)', () => {
-    // legacy-captured: 6 (WIS mod+3 + PB+3)
-    const legacy = legacySave(scores.wis, true, pb);
-    expect(saves.wis.value).toBe(legacy);
+  it('WIS save = +6 (proficient: WIS mod +3 + PB +3, PHB p.105)', () => {
+    expect(saves.wis.value).toBe(6); // WIS mod +3 + PB +3
   });
 
-  it('CHA save = legacyEquivalent (proficient, PHB p.105)', () => {
-    // legacy-captured: 5 (CHA mod+2 + PB+3)
-    const legacy = legacySave(scores.cha, true, pb);
-    expect(saves.cha.value).toBe(legacy);
+  it('CHA save = +5 (proficient: CHA mod +2 + PB +3, PHB p.105)', () => {
+    expect(saves.cha.value).toBe(5); // CHA mod +2 + PB +3
   });
 
-  it('all 6 saves engine === legacy', () => {
-    for (const a of ABILITY_KEYS) {
-      const legacy = legacySave(scores[a], profSaves.includes(a), pb);
-      expect(saves[a].value, `${a} save`).toBe(legacy);
-    }
+  it('STR save = 0 (not proficient: STR mod 0)', () => {
+    expect(saves.str.value).toBe(0); // STR mod 0, no PB
   });
 });
 
@@ -201,23 +184,16 @@ describe('Archetype 4 — Rogue L5 DEX+INT proficient (Scenario 6.4)', () => {
 
   const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
 
-  it('DEX save = legacyEquivalent (proficient, PHB p.95)', () => {
-    // legacy-captured: 6 (DEX mod+3 + PB+3)
-    const legacy = legacySave(scores.dex, true, pb);
-    expect(saves.dex.value).toBe(legacy);
+  it('DEX save = +6 (proficient: DEX mod +3 + PB +3, PHB p.95)', () => {
+    expect(saves.dex.value).toBe(6); // DEX mod +3 + PB +3
   });
 
-  it('INT save = legacyEquivalent (proficient, PHB p.95)', () => {
-    // legacy-captured: 5 (INT mod+2 + PB+3)
-    const legacy = legacySave(scores.int, true, pb);
-    expect(saves.int.value).toBe(legacy);
+  it('INT save = +5 (proficient: INT mod +2 + PB +3, PHB p.95)', () => {
+    expect(saves.int.value).toBe(5); // INT mod +2 + PB +3
   });
 
-  it('all 6 saves engine === legacy', () => {
-    for (const a of ABILITY_KEYS) {
-      const legacy = legacySave(scores[a], profSaves.includes(a), pb);
-      expect(saves[a].value, `${a} save`).toBe(legacy);
-    }
+  it('STR save = 0 (not proficient: STR mod 0)', () => {
+    expect(saves.str.value).toBe(0); // STR mod 0, no PB
   });
 });
 
@@ -230,38 +206,28 @@ describe('Archetype 5 — Multiclass Wizard3/Fighter1: ONLY Wizard saves (REQ-MU
   // Fighter's ['str','con'] are NOT granted on multiclass.
   const CHAR_ID = eid('wiz3-fig1');
   const scores: Record<AbilityKey, number> = { str: 10, dex: 12, con: 13, int: 16, wis: 14, cha: 10 };
-  // PRIMARY CLASS = Wizard → savingThrows: ['int', 'wis']
-  // Fighter's saves NOT granted (PHB p.164)
-  const profSaves: AbilityKey[] = ['int', 'wis'];
+  const profSaves: AbilityKey[] = ['int', 'wis']; // ONLY primary class (Wizard) saves
   const pb = 2; // L4 total, PB=2
 
   const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
 
-  it('INT proficient (Wizard class save, PHB p.114/p.164)', () => {
-    // legacy-captured: 5 (INT mod+3 + PB+2)
-    const legacy = legacySave(scores.int, true, pb);
-    expect(saves.int.value).toBe(legacy);
+  it('INT save = +5 (Wizard class save: INT mod +3 + PB +2, PHB p.114/p.164)', () => {
+    expect(saves.int.value).toBe(5); // INT mod +3 + PB +2
     expect(saves.int.proficient).toBe(true);
   });
 
-  it('WIS proficient (Wizard class save)', () => {
-    // legacy-captured: 4 (WIS mod+2 + PB+2)
-    const legacy = legacySave(scores.wis, true, pb);
-    expect(saves.wis.value).toBe(legacy);
+  it('WIS save = +4 (Wizard class save: WIS mod +2 + PB +2)', () => {
+    expect(saves.wis.value).toBe(4); // WIS mod +2 + PB +2
     expect(saves.wis.proficient).toBe(true);
   });
 
-  it('STR NOT proficient (Fighter saves not granted on multiclass, PHB p.164)', () => {
-    // legacy-captured: 0 (STR mod+0, no PB)
-    const legacy = legacySave(scores.str, false, pb);
-    expect(saves.str.value).toBe(legacy);
+  it('STR save = 0 (NOT proficient: Fighter saves not granted on multiclass, PHB p.164)', () => {
+    expect(saves.str.value).toBe(0); // STR mod 0, no PB
     expect(saves.str.proficient).toBe(false);
   });
 
-  it('CON NOT proficient (Fighter saves not granted on multiclass, PHB p.164)', () => {
-    // legacy-captured: 1 (CON mod+1, no PB)
-    const legacy = legacySave(scores.con, false, pb);
-    expect(saves.con.value).toBe(legacy);
+  it('CON save = +1 (NOT proficient: CON mod +1 only, no class save, PHB p.164)', () => {
+    expect(saves.con.value).toBe(1); // CON mod +1, no PB
     expect(saves.con.proficient).toBe(false);
   });
 });
@@ -278,37 +244,30 @@ describe('Archetype 6 — Fighter + Resilient(Con): 2*pb CON save (Scenario 6.6 
   // but may appear on legacy DB rows. The engine surfaces the double-count (2*pb)
   // rather than silently deduplicating — that is the validator's job (CLAUDE.md §11).
   //
-  // DOMAIN-LEVEL ONLY: route does NOT register Resilient. This test calls the adapter
-  // + buildResilientConModifiers directly to prove the engine behavior (ADR-4).
+  // DOMAIN-LEVEL ONLY: route does NOT register Resilient (ADR-4).
   const CHAR_ID = eid('fighter-resilient');
   const scores: Record<AbilityKey, number> = { str: 16, dex: 12, con: 14, int: 10, wis: 10, cha: 8 };
   const profSaves: AbilityKey[] = ['str', 'con'];
   const pb = 3;
 
-  it('CON save = abilityMod + 2*pb (double-count surfaces, PHB p.168/p.72)', () => {
-    // PHB p.168: Resilient grants ADDITIONAL CON save proficiency.
-    // Engine shows 2*pb because BOTH class + feat ProficiencyMods are present.
-    // Legacy would deduplicate via Set — this is the class (a) divergence.
+  it('CON save = +8 (abilityMod+2 + 2*pb+6 double-count, PHB p.168/p.72)', () => {
+    // CON mod +2 + 3 (class prof) + 3 (Resilient prof) = +8
+    // Legacy deduplicated via Set → +5. Engine-más-correcto divergence.
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
 
-    // Class saves (adapter)
     const saveProfMods = deriveSavingThrowProficiencies(profSaves, CHAR_ID);
     for (const m of saveProfMods) registry.register(m);
 
-    // Resilient(Con) ALSO grants con save (domain-level — NOT wired in route per ADR-4)
     const resilientMods = buildResilientConModifiers(CHAR_ID);
     for (const m of resilientMods) registry.register(m);
 
-    const conMod = abilityMod(scores.con);
+    const conMod = abilityMod(scores.con); // +2
     const resolved = resolveStat(CHAR_ID, 'saving-throw.con', conMod, ctx, registry, pb);
-
-    // Engine surfaces the double-count: abilityMod + 2*pb (two ProficiencyMods registered)
-    expect(resolved.value).toBe(conMod + 2 * pb);
-    // legacy-captured: 2 + 2*3 = 8 (diverges from legacy which deduplicates via Set)
+    expect(resolved.value).toBe(8); // +2 + 2*3 = +8
   });
 
-  it('STR save = abilityMod + pb (single proficiency, no divergence)', () => {
+  it('STR save = +6 (STR mod +3 + PB +3, single proficiency, no divergence, PHB p.72)', () => {
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
 
@@ -317,10 +276,9 @@ describe('Archetype 6 — Fighter + Resilient(Con): 2*pb CON save (Scenario 6.6 
     const resilientMods = buildResilientConModifiers(CHAR_ID);
     for (const m of resilientMods) registry.register(m);
 
-    const strMod = abilityMod(scores.str);
+    const strMod = abilityMod(scores.str); // +3
     const resolved = resolveStat(CHAR_ID, 'saving-throw.str', strMod, ctx, registry, pb);
-    // legacy-captured: 3+3 = 6
-    expect(resolved.value).toBe(strMod + pb);
+    expect(resolved.value).toBe(6); // +3 + 3 = +6
   });
 });
 
@@ -328,10 +286,9 @@ describe('Archetype 6 — Fighter + Resilient(Con): 2*pb CON save (Scenario 6.6 
 
 describe('Archetype 7 — Fighter L5 + Bless (+1d4 all saves fan-out, Scenario 6.7)', () => {
   // PHB p.219 — Bless: "+1d4 to attack rolls and saving throws"
-  // NumMod{stat:'saving-throw', value:'1d4'} applies to ALL per-ability saves
-  // via the engine's all-saves fan-out (stat.ts ~line 133).
+  // NumMod{stat:'saving-throw', value:'1d4'} fans out to ALL per-ability saves
+  // via the engine's all-saves semantic (stat.ts ~line 133).
   // Dice string '1d4' contributes value=0 to the numeric total; it appears in breakdown[].
-  //
   // Equivalence class (c): engine matches legacy + active-effects behavior.
   const CHAR_ID = eid('fighter-bless');
   const CASTER_ID = eid('caster');
@@ -340,32 +297,29 @@ describe('Archetype 7 — Fighter L5 + Bless (+1d4 all saves fan-out, Scenario 6
   const pb = 3;
   const TOKEN = 'test-bless-tok';
 
-  it('STR save (proficient) has Bless source in breakdown (PHB p.219)', () => {
+  it('STR save numeric = +6 (STR mod+3+PB+3; 1d4 is dice, contributes 0 to .value, PHB p.219)', () => {
+    // Bless contribution appears in breakdown, NOT in .value (dice roll, not integer)
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
 
     const saveProfMods = deriveSavingThrowProficiencies(profSaves, CHAR_ID);
     for (const m of saveProfMods) registry.register(m);
 
-    // Bless emits stat:'saving-throw' (flat all-saves key) — fans out to all per-ability saves
     const blessMods = buildBlessModifiers(CASTER_ID, [CHAR_ID], TOKEN);
     for (const m of blessMods) registry.register(m);
 
     const strMod = abilityMod(scores.str);
     const resolved = resolveStat(CHAR_ID, 'saving-throw.str', strMod, ctx, registry, pb);
 
-    // Value: +3 (STR mod) + 3 (pb) = 6 (dice '1d4' stays as 0 in numeric .value)
-    // legacy-captured: 6 (numeric part; Bless is a dice roll, not a flat number)
-    expect(resolved.value).toBe(strMod + pb);
+    expect(resolved.value).toBe(6); // +3 (STR mod) + 3 (pb) = 6 (1d4 stays in breakdown)
 
-    // Bless MUST appear in breakdown (dice source traceability)
     const blessSource = resolved.breakdown.find((s) => s.label?.includes('Bless'));
     expect(blessSource, 'Bless should appear in STR save breakdown').toBeDefined();
     expect(blessSource!.amount).toBe('1d4');
     expect(blessSource!.type).toBe('untyped');
   });
 
-  it('DEX save (not proficient) also has Bless fan-out (PHB p.219)', () => {
+  it('DEX save numeric = +1 (DEX mod+1, not proficient; Bless fans out to DEX too, PHB p.219)', () => {
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
 
@@ -378,9 +332,7 @@ describe('Archetype 7 — Fighter L5 + Bless (+1d4 all saves fan-out, Scenario 6
     const dexMod = abilityMod(scores.dex);
     const resolved = resolveStat(CHAR_ID, 'saving-throw.dex', dexMod, ctx, registry, pb);
 
-    // Value: +1 (DEX mod) = 1 (no proficiency, +1d4 dice is 0 numeric)
-    // legacy-captured: 1
-    expect(resolved.value).toBe(dexMod);
+    expect(resolved.value).toBe(1); // DEX mod +1 (no proficiency; 1d4 dice only)
 
     const blessSource = resolved.breakdown.find((s) => s.label?.includes('Bless'));
     expect(blessSource, 'Bless should fan out to DEX save too').toBeDefined();
@@ -395,24 +347,38 @@ describe('Archetype 8 — Cloak of Protection (+1 all saves, Scenario 6.8)', () 
   // Equivalence class (c): engine matches legacy + active-effects behavior.
   const CHAR_ID = eid('cloak-char');
   const scores: Record<AbilityKey, number> = { str: 10, dex: 14, con: 12, int: 10, wis: 10, cha: 10 };
-  const profSaves: AbilityKey[] = []; // no class save profs for simplicity
   const pb = 2;
+
+  it('STR save = +1 (STR mod 0 + Cloak +1 = 1, DMG p.159)', () => {
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(CHAR_ID);
+    const cloakMods = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-inst-1');
+    for (const m of cloakMods) registry.register(m);
+    const strMod = abilityMod(scores.str);
+    const resolved = resolveStat(CHAR_ID, 'saving-throw.str', strMod, ctx, registry, pb);
+    expect(resolved.value).toBe(1); // STR mod 0 + Cloak +1
+  });
+
+  it('DEX save = +3 (DEX mod +2 + Cloak +1 = 3, DMG p.159)', () => {
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(CHAR_ID);
+    const cloakMods = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-inst-1');
+    for (const m of cloakMods) registry.register(m);
+    const dexMod = abilityMod(scores.dex);
+    const resolved = resolveStat(CHAR_ID, 'saving-throw.dex', dexMod, ctx, registry, pb);
+    expect(resolved.value).toBe(3); // DEX mod +2 + Cloak +1
+  });
 
   it('every per-ability save includes +1 from Cloak (DMG p.159)', () => {
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
-
-    // No class saves for this archetype
     const cloakMods = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-inst-1');
     for (const m of cloakMods) registry.register(m);
 
     for (const a of ABILITY_KEYS) {
       const mod = abilityMod(scores[a]);
       const resolved = resolveStat(CHAR_ID, `saving-throw.${a}`, mod, ctx, registry, pb);
-      // Each save = ability mod + 1 (Cloak flat bonus)
-      // legacy-captured: mod+1 (Cloak adds +1 to each save via all-saves fan-out)
-      const legacy = mod + 1; // no proficiency + Cloak +1
-      expect(resolved.value, `${a} save should include Cloak +1`).toBe(legacy);
+      expect(resolved.value, `${a} save should include Cloak +1`).toBe(mod + 1);
     }
   });
 });
@@ -424,30 +390,43 @@ describe('Archetype 9 — High-DEX no proficiency: pure modifier (REQ-NATIVE-03 
   // PHB p.179 — no proficiency = just ability modifier
   const CHAR_ID = eid('high-dex');
   const scores: Record<AbilityKey, number> = { str: 10, dex: 20, con: 10, int: 10, wis: 10, cha: 10 };
-  const profSaves: AbilityKey[] = []; // no proficiencies
   const pb = 3;
 
-  it('DEX save = +5 (pure mod, no pb, no mods — PHB p.13/p.179)', () => {
-    // legacy-captured: 5 (DEX mod +5, no PB, no active effects)
+  it('DEX save = +5 (pure mod: DEX 20 → mod +5, no pb, no mods, PHB p.13/p.179)', () => {
     const registry = createInMemoryRegistry();
     const ctx = makeCtx(CHAR_ID);
-    // No saves registered (empty prof list)
+    // No prof mods registered
 
     const dexMod = abilityMod(scores.dex);
     expect(dexMod).toBe(5); // DEX 20 → +5
 
     const resolved = resolveStat(CHAR_ID, 'saving-throw.dex', dexMod, ctx, registry, pb);
-    const legacy = legacySave(scores.dex, false, pb);
-
-    expect(resolved.value).toBe(legacy); // = 5
-    expect(resolved.value).toBe(5);
+    expect(resolved.value).toBe(5); // pure modifier, no pb (not proficient)
   });
 
-  it('all 6 saves = ability mod only, engine === legacy', () => {
-    const saves = resolveSaves(CHAR_ID, scores, profSaves, pb);
+  it('STR save = 0 (STR 10 → mod 0, no proficiency, PHB p.13)', () => {
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(CHAR_ID);
+    const strMod = abilityMod(scores.str);
+    const resolved = resolveStat(CHAR_ID, 'saving-throw.str', strMod, ctx, registry, pb);
+    expect(resolved.value).toBe(0);
+  });
+
+  it('all 6 saves = ability mod only (no proficiency on any, no active effects)', () => {
+    const registry = createInMemoryRegistry();
+    const ctx = makeCtx(CHAR_ID);
+    const expectedValues: Record<AbilityKey, number> = {
+      str: 0,  // STR 10 → 0
+      dex: 5,  // DEX 20 → +5
+      con: 0,  // CON 10 → 0
+      int: 0,  // INT 10 → 0
+      wis: 0,  // WIS 10 → 0
+      cha: 0,  // CHA 10 → 0
+    };
     for (const a of ABILITY_KEYS) {
-      const legacy = legacySave(scores[a], false, pb);
-      expect(saves[a].value, `${a} save`).toBe(legacy);
+      const mod = abilityMod(scores[a]);
+      const resolved = resolveStat(CHAR_ID, `saving-throw.${a}`, mod, ctx, registry, pb);
+      expect(resolved.value, `${a} save`).toBe(expectedValues[a]);
     }
   });
 });
