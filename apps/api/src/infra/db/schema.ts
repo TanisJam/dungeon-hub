@@ -922,3 +922,45 @@ export const encounterCombatants = pgTable(
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],
 );
+
+// ---------------------------------------------------------------------------
+// modifier_instances — persisted live modifier instances (Slice 5: Bless).
+//
+// Each row represents ONE emitted ModifierInstance from the engine registry,
+// persisted so it survives across requests (stateful engine substrate).
+//
+// Design decisions (SDD sdd/engine-stateful/design #1131):
+//   D1: JSONB-polymorphic — def/scope/predicate/duration are opaque blobs;
+//       lifecycle columns (owner, target, concentrationToken) are promoted
+//       to real columns + indexed for efficient SQL DELETE/SELECT.
+//   D2: targetCharacterId NOT NULL this slice — Bless is always cross-entity
+//       (axis='entities'). Nullable relaxation deferred to Slice 6+ (self-axis).
+//   D3: One row per (target × stat) instance — buildBlessModifiers emits 2
+//       instances per target (attack-roll + saving-throw), each mapped 1:1.
+//
+// FKs cascade — deleting caster or ally drops their emitted/received rows.
+// ---------------------------------------------------------------------------
+export const modifierInstances = pgTable(
+  'modifier_instances',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    ownerCharacterId: uuid('owner_character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    targetCharacterId: uuid('target_character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }), // D2: NOT NULL this slice
+    concentrationToken: text('concentration_token'), // nullable — not all mods concentrate
+    def: jsonb('def').notNull(),
+    scope: jsonb('scope').notNull(),
+    predicate: jsonb('predicate'),
+    duration: jsonb('duration'),
+    label: text('label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_mi_owner').on(t.ownerCharacterId),
+    index('idx_mi_target').on(t.targetCharacterId),
+    index('idx_mi_conc_token').on(t.concentrationToken),
+  ],
+);
