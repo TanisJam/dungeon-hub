@@ -893,3 +893,101 @@ describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-s
     expect(engineAbilityScores.dex.breakdown.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// REQ-AS-TOLERATE-01 — characterization/regression test
+// A character created before the stats wizard step (data has no `baseStats`)
+// MUST load without crashing (HTTP 200, engineAbilityScores absent/undefined,
+// legacy abilityScores present with all-10 defaults from compute.ts §300).
+// ---------------------------------------------------------------------------
+describe('GET /characters/:id/sheet — REQ-AS-TOLERATE-01: char without baseStats (pre-stats wizard)', () => {
+  /**
+   * Tolerate-read guard: characters.ts:856
+   *   const engineAbilityScores = rawBaseStats ? Object.fromEntries(...) : undefined;
+   *
+   * When a character row has no `baseStats` in `data` (freshly created, wizard
+   * not yet started), the route MUST:
+   *   1. Return HTTP 200 — not crash with 500.
+   *   2. Omit `engineAbilityScores` (undefined / absent in response body).
+   *   3. Include legacy `sheet.abilityScores` with all scores defaulting to 10
+   *      (compute.ts:300 — baseStats ?? { str:10, dex:10, con:10, int:10, wis:10, cha:10 }).
+   *
+   * No stats PUT is issued so `data['baseStats']` stays absent.
+   * PHB §"Ability Scores" (PHB p.12): scores are defined at character creation,
+   * but the route must be tolerant of incomplete wizard state.
+   */
+  let user: TestUser;
+  let noBaseStatsCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Tolerate-Read Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    // Create a character WITHOUT calling PUT /stats → data has no baseStats key.
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Pre-Stats Wizard Char' },
+      })
+      .then((r) => r.json());
+    noBaseStatsCharId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('REQ-AS-TOLERATE-01.1: GET /sheet returns HTTP 200 for character without baseStats (no 500)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('REQ-AS-TOLERATE-01.2: engineAbilityScores is absent/undefined in response when baseStats missing', async () => {
+    // Guard: characters.ts:856 — rawBaseStats ? ... : undefined
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // engineAbilityScores must be absent (undefined → omitted from JSON serialization)
+    expect(body.engineAbilityScores).toBeUndefined();
+  });
+
+  it('REQ-AS-TOLERATE-01.3: legacy sheet.abilityScores is present with all-10 defaults when baseStats missing', async () => {
+    // compute.ts:300 — baseStats ?? { str:10, dex:10, con:10, int:10, wis:10, cha:10 }
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.abilityScores).toBeDefined();
+    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    for (const a of abilities) {
+      // All scores default to 10 (PHB p.12 — baseline before any assignment)
+      expect(sheet.abilityScores[a].score).toBe(10);
+    }
+  });
+});
