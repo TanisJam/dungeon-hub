@@ -63,7 +63,7 @@ function makeSheet(overrides: Partial<CharacterSheet> = {}): CharacterSheet {
     skills: [],
     passivePerception: 10,
     initiative: 2,
-    armorClass: { value: 12, formula: '10 + DEX' },
+    armorClass: { value: 12, formula: 'Unarmored (base 10) + DEX +2' },
     hitPoints: { max: 10, formula: '1d10' },
     hitDice: { d10: 1 },
     speed: { walk: 30 },

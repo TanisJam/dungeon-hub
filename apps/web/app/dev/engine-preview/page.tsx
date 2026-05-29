@@ -6,8 +6,6 @@ import {
   buildBlessModifiers,
 } from '@dungeon-hub/domain';
 import type { EvaluationContext, EntityId } from '@dungeon-hub/domain';
-import { computeArmorClass } from '@dungeon-hub/domain/character/sheet';
-import type { ComputeArmorClassInput } from '@dungeon-hub/domain/character/sheet';
 import { Card } from '@/components/ui';
 import { BreakdownTree } from './_breakdown-tree';
 
@@ -16,8 +14,9 @@ import { BreakdownTree } from './_breakdown-tree';
  * REQ-FIXTURE-HONESTY-01). NODE_ENV-gated — returns 404 in production.
  *
  * Fixture: unarmored DEX-14 fighter + Cloak of Protection.
- * BEFORE: computeArmorClass → { ac: 12, formula: '10 + DEX(2)' }  (PHB p.144)
- * AFTER : resolveStat       → { value: 13, breakdown: [...] }      (DMG 159)
+ * engine-ac-authoritative Gate B (ADR-6): BEFORE panel removed.
+ * computeArmorClass is deleted; the engine path IS the only path.
+ * Page now shows engine resolveStat result only (AFTER + Bless panels).
  *
  * Side-by-side layout: stacked at 375px, md:grid-cols-2 on desktop.
  * Design ref: sdd/engine-integration/design #1112.
@@ -25,19 +24,9 @@ import { BreakdownTree } from './_breakdown-tree';
 export default function EnginePreviewPage() {
   if (process.env.NODE_ENV === 'production') notFound();
 
-  // ── BEFORE: legacy computeArmorClass ───────────────────────────────────────
-  // Unarmored, DEX 14 (+2). PHB p.144: no armor → 10 + DEX mod (2) = 12.
-  const acInput: ComputeArmorClassInput = {
-    inventory: [],
-    itemLites: {},
-    classes: [{ classSlug: 'fighter', level: 1 }],
-    abilities: { str: 10, dex: 14, con: 12, wis: 10 },
-  };
-  const before = computeArmorClass(acInput); // { ac: 12, formula: '10 + DEX(2)', warnings: [] }
-  const baseAc = before.ac;                  // 12
-
-  // ── AFTER: engine resolveStat ──────────────────────────────────────────────
-  // DMG 159: Cloak of Protection → +1 AC + +1 saving throws.
+  // ── Engine resolveStat — Cloak of Protection fixture ──────────────────────
+  // DEX 14 → mod +2. Unarmored: 10 + DEX +2 = 12 base. Cloak +1 = 13.
+  // base 0 (engine-native, no legacy seeding). Adapter emits: Unarmored(10) + DEX(+2).
   const charId = 'fixture-char' as EntityId;
   const itemId = 'fixture-cloak-1';
 
@@ -53,8 +42,10 @@ export default function EnginePreviewPage() {
     activeConditions: [],
   };
 
-  const after = resolveStat(charId, 'ac', baseAc, ctx, registry);
-  // after.value === 13 (12 base + 1 Cloak item mod)
+  // REQ-AC-NATIVE-01: base 0 — resolveStat sums all adapter NumMods.
+  // Engine result: value=13, breakdown=[base0, Unarmored(base10), DEX+2, Cloak+1]
+  // formulaFromBreakdown filters base-0 → formula="Unarmored (base 10) + DEX +2 + Cloak of Protection"
+  const engineAc = resolveStat(charId, 'ac', 0, ctx, registry);
 
   // ── BLESS: cross-entity stateful modifier (PHB 219) ───────────────────────
   // Fixture: cleric-fixture casts Bless on ally-fixture.
@@ -94,54 +85,27 @@ export default function EnginePreviewPage() {
           Unarmored DEX-14 fighter + Cloak of Protection.
           Proves <code className="font-mono text-ink-soft">resolveStat</code> connects
           end-to-end inside the web app (Option B direct import).
+          engine-ac-authoritative Gate B: BEFORE panel removed (computeArmorClass deleted).
         </p>
       </header>
 
-      {/* Side-by-side grid ────────────────────────────────────────────────── */}
-      {/* REQ-PREVIEW-02: stacked 375px → md:grid-cols-2 desktop              */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-        {/* LEFT — BEFORE: computeArmorClass (legacy flat) ───────────────── */}
-        <section className="space-y-2">
-          <h2 className="font-display text-lg font-semibold text-ink">
-            BEFORE — computeArmorClass
-          </h2>
-          <p className="text-xs text-ink-mute">
-            Flat formula, no provenance. PHB p.144 unarmored branch.
-          </p>
-          <Card variant="surface" className="p-4 space-y-3">
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-xs uppercase text-ink-mute">ac</span>
-              <span className="text-2xl font-bold text-ink tabular-nums">{before.ac}</span>
-            </div>
-            <div className="text-sm text-ink-soft font-mono">{before.formula}</div>
-          </Card>
-        </section>
-
-        {/* RIGHT — AFTER: resolveStat (engine with provenance) ─────────── */}
-        <section className="space-y-2">
-          <h2 className="font-display text-lg font-semibold text-ink">
-            AFTER — resolveStat
-          </h2>
-          <p className="text-xs text-ink-mute">
-            Engine provenance. Same AC, richer explanation.
-          </p>
-          <Card variant="surface" className="p-4">
-            <BreakdownTree
-              stat="ac"
-              value={after.value}
-              breakdown={after.breakdown}
-            />
-          </Card>
-        </section>
-      </div>
-
-      {/* Both sides must agree on AC ──────────────────────────────────────── */}
-      {before.ac !== after.value && (
-        <p className="text-sm text-red-600 font-semibold">
-          ⚠ Mismatch: computeArmorClass = {before.ac}, resolveStat = {after.value}
+      {/* Engine AC panel ─────────────────────────────────────────────────── */}
+      {/* REQ-PREVIEW-02: 375px single-column → md:wider on desktop          */}
+      <section className="space-y-2">
+        <h2 className="font-display text-lg font-semibold text-ink">
+          AC — resolveStat (engine-authoritative)
+        </h2>
+        <p className="text-xs text-ink-mute">
+          Base 0 + adapter NumMods (Unarmored 10 + DEX +2 + Cloak +1). PHB p.144, DMG 159.
         </p>
-      )}
+        <Card variant="surface" className="p-4">
+          <BreakdownTree
+            stat="ac"
+            value={engineAc.value}
+            breakdown={engineAc.breakdown}
+          />
+        </Card>
+      </section>
 
       {/* ── Bless panel ─────────────────────────────────────────────────────── */}
       {/* REQ-BLESS-01: cross-entity NumMod '1d4', concentration token, PHB 219. */}
