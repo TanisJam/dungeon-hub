@@ -241,4 +241,38 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     expect(Array.isArray(body.engineAc.breakdown)).toBe(true);
     expect(body.engineAc.breakdown.length).toBeGreaterThanOrEqual(1);
   });
+
+  // REQ-AC-NATIVE-01: engineAc is computed natively (base 0 + adapter NumMods).
+  // Proves native derivation by verifying breakdown has structural AC entries
+  // (base + DEX) alongside the Cloak item entry — NOT a single seeded-base entry.
+  // engine-ac-parity native breakdown shape change: [base, DEX, Cloak] instead of
+  // legacy-seeded [base, Cloak].
+  it('REQ-AC-NATIVE-01: Cloak char breakdown contains structural AC entries + Cloak (native derivation proof)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${charWithCloakId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    const legacyAc: number = body.sheet.armorClass.value;
+
+    // Value parity is preserved (REQ-AC-PARITY-01): engineAc.value = legacyAc + 1
+    expect(body.engineAc.value).toBe(legacyAc + 1);
+
+    // Native breakdown shape (engine-ac-parity): must have at least 3 entries
+    // for an unarmored char with Cloak: base(10) + DEX(+2) + Cloak(+1)
+    // This is the key difference from legacy-seeded (which only had 2: seeded-base + Cloak).
+    const breakdown: Array<{ label?: string; amount?: unknown }> = body.engineAc.breakdown;
+    expect(breakdown.length).toBeGreaterThanOrEqual(3); // native shape change (engine-ac-parity)
+
+    // Cloak entry must still appear in breakdown
+    const cloakEntry = breakdown.find(
+      (e) => typeof e.label === 'string' && e.label.toLowerCase().includes('cloak'),
+    );
+    expect(cloakEntry).toBeDefined();
+  });
 });

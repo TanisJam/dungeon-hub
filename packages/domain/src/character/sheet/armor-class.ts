@@ -31,9 +31,9 @@ export interface ComputeArmorClassOutput {
 const LIGHT_ARMOR_TYPE = 'LA';
 const MEDIUM_ARMOR_TYPE = 'MA';
 const HEAVY_ARMOR_TYPE = 'HA';
-const SHIELD_TYPE = 'S';
+export const SHIELD_TYPE = 'S';
 
-const BODY_ARMOR_TYPES: ReadonlySet<string> = new Set([
+export const BODY_ARMOR_TYPES: ReadonlySet<string> = new Set([
   LIGHT_ARMOR_TYPE,
   MEDIUM_ARMOR_TYPE,
   HEAVY_ARMOR_TYPE,
@@ -135,7 +135,7 @@ export function computeArmorClass(input: ComputeArmorClassInput): ComputeArmorCl
   };
 }
 
-function findFirstEquipped(
+export function findFirstEquipped(
   inventory: InventoryItem[],
   itemLites: Record<string, ItemCompendiumLite>,
   acceptedTypes: ReadonlySet<string>,

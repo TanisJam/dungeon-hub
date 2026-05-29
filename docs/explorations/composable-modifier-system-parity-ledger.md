@@ -70,7 +70,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 
 | Dominio | Legacy (file:line) | Engine StatKey | Estado | Parity gate | Notas / diffs PHB |
 |---|---|---|---|---|---|
-| **AC** | `compute.ts:545` (`armorClass`) | `'ac'` ✅ | `dual-shadow` | ❌ falta corpus | `engineAc` ya en `/sheet` (`characters.ts:819`). Legacy ya corregido para armor (inventory-foundation), así que se espera idéntico. |
+| **AC** | `compute.ts:545` (`armorClass`) | `'ac'` ✅ | `dual-shadow (native)` ✅ | ✅ [`armor-class.test.ts`](../../packages/domain/src/engine/rules/armor-class.test.ts) | `engineAc` nativo en `/sheet` (base 0, `deriveArmorClassModifiers`). 9 arquetipos (PHB p.14/48/78/144/149). legacy-deleted blocked by formula-cliff → tracked fast-follow `engine-ac-authoritative`. |
 | **Attack roll** | `compute.ts:432` (`attackBonus` per skill/weapon) | `'attack-roll'` ✅ | `dual-shadow` | ❌ falta corpus | `engineStats.attackRoll` (`characters.ts:824`). Hoy base 0 + mods; legacy es `pb+mod`. Reconciliar base. |
 | **Saving throws** | `compute.ts:390-541` (`savingThrows`) | `'saving-throw'` ✅ | `dual-shadow` | ❌ falta corpus | `engineStats.savingThrow` (`characters.ts:825`). Cloak of Protection + Bless ya fluyen por engine. |
 | **Initiative** | `compute.ts:544` (`initiative` = dexMod) | `'initiative'` 🟡 | `legacy-only` | — | Engine TIENE la StatKey pero `resolveStat` no se llama para initiative. Cableado trivial (próximo candidato barato). |
@@ -82,7 +82,7 @@ Recién entonces se borra el cómputo legacy + el parity gate test se reescribe 
 | **HP (max)** | `compute.ts:546` (`hitPoints`) | ❌ sin StatKey | `legacy-only` | — | Necesita StatKey `'hp-max'`. Form-switching (HP stacking del §4.3) depende de esto. |
 | **Spell save DC / attack** | (spellcasting module) | ❌ sin StatKey | `legacy-only` | — | Deriva de ability + pb. Migra junto con ability scores. |
 
-**Resumen al 2026-05-29 (post engine-ability-scores)**: 4 en `dual-shadow` (AC, attack-roll, saving-throw, **ability-scores/mods** ✅) — ability-scores TIENE parity gate (7 arquetipos, `ability-scores.test.ts`); los otros 3 siguen sin corpus. 2 engine-capable sin cablear (initiative, speed). 5 `legacy-only` sin soporte engine.
+**Resumen al 2026-05-29 (post engine-ac-parity)**: 4 en `dual-shadow` (AC ✅, attack-roll, saving-throw, **ability-scores/mods** ✅) — AC y ability-scores TIENEN parity gate (9 arquetipos `armor-class.test.ts`, 7 arquetipos `ability-scores.test.ts`); attack-roll y saving-throw siguen sin corpus. 2 engine-capable sin cablear (initiative, speed). 5 `legacy-only` sin soporte engine.
 
 ---
 
