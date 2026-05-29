@@ -102,6 +102,7 @@ import {
   createInMemoryRegistry,
   resolveStat,
   deriveAbilityScoreModifiers,
+  deriveArmorClassModifiers,
   type EvaluationContext,
   type EntityId,
   type Breakdown,
@@ -836,10 +837,42 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     for (const m of asiMods) registry.register(m);
 
     const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
-    // engineAc: UNCHANGED from Slice 4 — Bless targets attack-roll/saving-throw,
-    // never 'ac', so persisted Bless instances do not affect engineAc (provably safe).
-    // ASI mods only target ability StatKeys (str/dex/con/int/wis/cha) — non-interfering.
-    const engineAc = resolveStat(charId, 'ac', sheet.armorClass.value, ctx, registry);
+
+    // engine-ac-parity: resolve engineAc NATIVELY (base 0, no legacy seeding).
+    // REQ-AC-NATIVE-01: base = 0; deriveArmorClassModifiers emits all structural AC NumMods.
+    // REQ-AC-NATIVE-02: resolve DEX/CON/WIS/STR BEFORE calling adapter (post-ASI mods).
+    // Design §6: accept duplicate in-memory ability resolve (cheap; clarity over threading).
+    //
+    // Build itemLites Record from itemWeights (same data the legacy path uses in compute.ts).
+    const itemLites: Record<string, ItemCompendiumLite> = {};
+    for (const lite of itemWeights) {
+      itemLites[`${lite.slug}|${lite.source}`] = lite;
+    }
+    // classes for UD detection (Barbarian/Monk Unarmored Defense, PHB p.48/p.78)
+    const rawClassesForAc = (data['classes'] as Array<{ slug: string; level: number }> | undefined) ?? [];
+    const classesForAc = rawClassesForAc.map((c) => ({ classSlug: c.slug, level: c.level }));
+
+    // Resolve ability scores FIRST (REQ-AC-NATIVE-02) — reuse in-memory registry.
+    // baseFor helper mirrors the engineAbilityScores loop below.
+    const baseForAc = (a: string): number => (rawBaseStats as Record<string, number> | undefined)?.[a] ?? 10;
+    const resolvedDexScore = rawBaseStats ? resolveStat(charId, 'dex', baseForAc('dex'), ctx, registry).value : 10;
+    const resolvedConScore = rawBaseStats ? resolveStat(charId, 'con', baseForAc('con'), ctx, registry).value : 10;
+    const resolvedWisScore = rawBaseStats ? resolveStat(charId, 'wis', baseForAc('wis'), ctx, registry).value : 10;
+    const resolvedStrScore = rawBaseStats ? resolveStat(charId, 'str', baseForAc('str'), ctx, registry).value : 10;
+    const resolvedModsForAc = {
+      str: Math.floor((resolvedStrScore - 10) / 2),
+      dex: Math.floor((resolvedDexScore - 10) / 2),
+      con: Math.floor((resolvedConScore - 10) / 2),
+      wis: Math.floor((resolvedWisScore - 10) / 2),
+    };
+
+    // Derive AC NumMods and register into the SAME registry.
+    // Item mods (Cloak +1 on 'ac') are already registered above — they compose additively.
+    const acMods = deriveArmorClassModifiers({ inventory, itemLites, classes: classesForAc, resolvedMods: resolvedModsForAc }, charId);
+    for (const m of acMods) registry.register(m);
+
+    // REQ-AC-NATIVE-01: base = 0, NOT sheet.armorClass.value (no legacy seeding).
+    const engineAc = resolveStat(charId, 'ac', 0, ctx, registry);
     // engineStats: new in Slice 5 — attack-roll + saving-throw (Bless scope).
     // Roll-value contract: value = numeric subtotal (dice contributions stay 0 in .value;
     // '1d4' appears in breakdown[].amount as a string for consumer rendering).
