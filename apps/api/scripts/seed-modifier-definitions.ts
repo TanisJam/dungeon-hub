@@ -9,7 +9,7 @@
  * Uso: pnpm seed-modifier-definitions
  */
 
-import { cloakOfProtectionRuleDoc } from '@dungeon-hub/domain/engine';
+import { cloakOfProtectionRuleDoc, blessRuleDoc } from '@dungeon-hub/domain/engine';
 import { parseRule } from '@dungeon-hub/domain/engine';
 import { db } from '../src/infra/db/client.js';
 import { modifierDefinitions } from '../src/infra/db/schema.js';
@@ -29,6 +29,13 @@ const ENTRIES: SeedEntry[] = [
     name: 'Cloak of Protection',
     kind: 'item',
     ruleDoc: cloakOfProtectionRuleDoc,
+  },
+  {
+    slug: 'bless',
+    source: 'PHB 219',
+    name: 'Bless',
+    kind: 'spell',
+    ruleDoc: blessRuleDoc,
   },
 ];
 

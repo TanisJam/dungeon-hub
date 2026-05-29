@@ -96,6 +96,7 @@ import { deriveCharacterModifiers } from '../../use-cases/characters/derive-char
 import { loadModifierDefinitions } from '../../use-cases/characters/load-modifier-definitions.js';
 import { loadPersistedModifiers } from '../../use-cases/characters/load-persisted-modifiers.js';
 import { castBless } from '../../use-cases/characters/cast-bless.js';
+import { applyActiveEffect } from '../../use-cases/characters/apply-active-effect.js';
 import { removeByConcentrationToken } from '../../use-cases/characters/remove-by-concentration-token.js';
 import {
   createInMemoryRegistry,
@@ -235,6 +236,15 @@ const ParamsWithId = z.object({ id: z.string().uuid() });
 /** REQ-CASTBLESS-01: targetIds must have 1–3 entries (PHB 219 — "up to 3 creatures"). */
 const CastBlessBody = z.object({
   targetIds: z.array(z.string().uuid()).min(1).max(3),
+  concentrationToken: z.string().min(1),
+});
+
+// REQ-AE-05 — generic active-effect endpoint body validation (Slice 7).
+// No max on targetIds — spell-specific caps are enforced at the domain layer via RuleDoc testCases.
+// Bless's 3-target cap is a spell rule, not a generic endpoint constraint.
+const ActiveEffectBody = z.object({
+  effectSlug: z.string().min(1),
+  targetIds: z.array(z.string().uuid()).min(1),
   concentrationToken: z.string().min(1),
 });
 
@@ -863,6 +873,57 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       }
 
       await castBless(casterId, targetIds, concentrationToken);
+      return reply.code(201).send();
+    },
+  );
+
+  // ---- POST /characters/:id/active-effects ---------------------------------
+  // Owner-only: catalog-driven generic endpoint that looks up an effect by slug,
+  // validates its RuleDoc at write time, compiles it, and persists instances.
+  // Enables DM homebrew: seed a modifier_definitions row → apply with no redeploy.
+  // REQ-AE-01..AE-08 (spec sdd/engine-active-effects/spec #1152). PHB 219 — Bless.
+  app.post(
+    '/characters/:id/active-effects',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id: casterId } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      // Zod body validation — cheap, no DB.
+      const bodyResult = ActiveEffectBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: bodyResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const { effectSlug, targetIds, concentrationToken } = bodyResult.data;
+
+      // Ownership check: caster must exist and belong to requester.
+      const caster = await loadCharacter(casterId);
+      if (!caster) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(caster, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({ error: 'FORBIDDEN' });
+      }
+
+      // Delegate to use-case (catalog lookup → parseRule → compile → persist).
+      const result = await applyActiveEffect(casterId, effectSlug, targetIds, concentrationToken);
+
+      if (!result.ok) {
+        if (result.error === 'EFFECT_NOT_FOUND') {
+          return reply.code(400).send({ code: 'EFFECT_NOT_FOUND', expected: effectSlug });
+        }
+        if (result.error === 'INVALID_EFFECT_DEF') {
+          return reply.code(400).send({ code: 'INVALID_EFFECT_DEF', issues: result.issues });
+        }
+      }
+
       return reply.code(201).send();
     },
   );
