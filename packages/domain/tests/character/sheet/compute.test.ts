@@ -80,14 +80,9 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
     expect(sheet.abilityScores.str.modifier).toBe(-1);
   });
 
-  it('saves: INT y WIS proficient con +PB', () => {
-    const intSave = sheet.savingThrows.find((s) => s.ability === 'int')!;
-    expect(intSave.proficient).toBe(true);
-    expect(intSave.modifier).toBe(3 + 2); // mod + pb
-    const strSave = sheet.savingThrows.find((s) => s.ability === 'str')!;
-    expect(strSave.proficient).toBe(false);
-    expect(strSave.modifier).toBe(-1);
-  });
+  // REQ-LEGACY-02: legacy save assertions removed — computeCharacterSheet no longer
+  // emits savingThrows (Omit<CharacterSheet,'savingThrows'> return type). The 9-archetype
+  // gate in packages/domain/src/engine/rules/saving-throws.test.ts replaces these.
 
   it('skills: arcana proficient (class + background), history proficient (background)', () => {
     const arcana = sheet.skills.find((s) => s.name === 'arcana')!;
@@ -210,12 +205,9 @@ describe('computeCharacterSheet — multiclass HP y saves', () => {
     expect(sheet.proficiencyBonus).toBe(2);
   });
 
-  it('saves de Wizard (clase 1ª) presentes, los de Fighter (multiclass) ausentes', () => {
-    expect(sheet.savingThrows.find((s) => s.ability === 'int')?.proficient).toBe(true);
-    expect(sheet.savingThrows.find((s) => s.ability === 'wis')?.proficient).toBe(true);
-    expect(sheet.savingThrows.find((s) => s.ability === 'str')?.proficient).toBe(false);
-    expect(sheet.savingThrows.find((s) => s.ability === 'con')?.proficient).toBe(false);
-  });
+  // REQ-LEGACY-02: multiclass save assertion removed — computeCharacterSheet no longer
+  // emits savingThrows (Omit<CharacterSheet,'savingThrows'>). Route assembles saves natively.
+  // Multiclass rule (PHB p.164) is now tested in saving-throws.test.ts Archetype 5.
 
   it('HP: 6 + CON(2) [Wiz L1] + 2×(4+2) [Wiz L2-3] + 1×(6+2) [Fighter L1] = 28', () => {
     // 6+2 = 8 (L1 max wizard)

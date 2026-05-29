@@ -184,7 +184,9 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     // REQ-ENGINESTATS-01: engineStats present and has expected shape.
     expect(body.engineStats).toBeDefined();
     expect(body.engineStats.attackRoll).toBeDefined();
-    expect(body.engineStats.savingThrow).toBeDefined();
+    // REQ-SERVE-02 migration: savingThrow flat field removed; per-ability array present.
+    expect(body.engineStats.savingThrows, 'per-ability savingThrows array should exist').toBeDefined();
+    expect(body.engineStats.savingThrow, 'flat savingThrow field should be removed').toBeUndefined();
 
     // REQ-ENGINESTATS-01: Bless appears in attack-roll breakdown.
     const attackBreakdown: Array<{ label: string; amount: unknown; type: string }> =
@@ -194,17 +196,21 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     expect(blessAttack!.amount).toBe('1d4');
     expect(blessAttack!.type).toBe('untyped');
 
-    // REQ-ENGINESTATS-01: Bless appears in saving-throw breakdown.
-    const saveBreakdown: Array<{ label: string; amount: unknown; type: string }> =
-      body.engineStats.savingThrow.breakdown;
-    const blessSave = saveBreakdown.find((s) => s.label?.includes('Bless'));
-    expect(blessSave).toBeDefined();
+    // REQ-ENGINESTATS-01: Bless appears in saving-throw breakdown (per-ability, STR as example).
+    // Bless NumMod stat:'saving-throw' fans out to all per-ability saves (stat.ts all-saves rule).
+    const savingThrowsArr: Array<{ ability: string; breakdown: Array<{ label: string; amount: unknown; type: string }> }> =
+      body.engineStats.savingThrows;
+    const strSaveEntry = savingThrowsArr.find((s) => s.ability === 'str');
+    expect(strSaveEntry, 'str save entry should exist').toBeDefined();
+    const blessSave = strSaveEntry!.breakdown.find((s) => s.label?.includes('Bless'));
+    expect(blessSave, 'Bless should appear in STR save breakdown').toBeDefined();
     expect(blessSave!.amount).toBe('1d4');
     expect(blessSave!.type).toBe('untyped');
 
     // REQ-ENGINESTATS-02: roll-value contract — dice are NOT folded into .value.
     expect(body.engineStats.attackRoll.value).toBe(0);
-    expect(body.engineStats.savingThrow.value).toBe(0);
+    // Per-ability saves: STR save value = abilityMod + pb (numeric; dice stay 0 in .value)
+    expect(typeof strSaveEntry!.modifier).toBe('number');
 
     // REQ-ENGINESTATS-03: engineAc unchanged from baseline (Bless ≠ 'ac').
     const legacyAc: number = body.sheet.armorClass.value;
@@ -249,10 +255,14 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     const body = sheetRes.json();
 
     const attackBreakdown: Array<{ label?: string }> = body.engineStats.attackRoll.breakdown;
-    const saveBreakdown: Array<{ label?: string }> = body.engineStats.savingThrow.breakdown;
+    // REQ-SERVE-02 migration: per-ability array; check STR save no longer has Bless.
+    const savingThrowsAfter: Array<{ ability: string; breakdown: Array<{ label?: string }> }> =
+      body.engineStats.savingThrows;
+    const strAfter = savingThrowsAfter?.find((s) => s.ability === 'str');
+    const strBreakdownAfter = strAfter?.breakdown ?? [];
 
     expect(attackBreakdown.some((s) => s.label?.includes('Bless'))).toBe(false);
-    expect(saveBreakdown.some((s) => s.label?.includes('Bless'))).toBe(false);
+    expect(strBreakdownAfter.some((s) => s.label?.includes('Bless'))).toBe(false);
 
     // REQ-CONCENTRATION-01 Scenario B: second DELETE (idempotent) → still 204.
     const deleteAgain = await app.inject({

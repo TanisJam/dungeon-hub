@@ -224,10 +224,15 @@ describe('engine-active-effects (Slice 7)', () => {
     expect(blessAttack!.amount).toBe('1d4');
     expect(blessAttack!.type).toBe('untyped');
 
-    const saveBreakdown: Array<{ label?: string; amount?: unknown; type?: string }> =
-      body.engineStats.savingThrow.breakdown;
-    const blessSave = saveBreakdown.find((s) => s.label?.includes('Bless'));
-    expect(blessSave).toBeDefined();
+    // REQ-SERVE-02 migration: engineStats.savingThrow (flat) removed → use per-ability array.
+    // Assert Bless fans out to STR save breakdown (all-saves NumMod fan-out).
+    const savingThrowsArr: Array<{ ability: string; breakdown: Array<{ label?: string; amount?: unknown; type?: string }> }> =
+      body.engineStats.savingThrows;
+    expect(savingThrowsArr, 'engineStats.savingThrows per-ability array should be present').toBeDefined();
+    const strSave = savingThrowsArr.find((s) => s.ability === 'str');
+    expect(strSave, 'str save entry should exist in engineStats.savingThrows').toBeDefined();
+    const blessSave = strSave!.breakdown.find((s) => s.label?.includes('Bless'));
+    expect(blessSave, 'Bless should appear in STR save breakdown').toBeDefined();
     expect(blessSave!.amount).toBe('1d4');
     expect(blessSave!.type).toBe('untyped');
   });
@@ -288,9 +293,13 @@ describe('engine-active-effects (Slice 7)', () => {
     const body = sheetRes.json();
 
     const attackBreakdown: Array<{ label?: string }> = body.engineStats.attackRoll.breakdown;
-    const saveBreakdown: Array<{ label?: string }> = body.engineStats.savingThrow.breakdown;
+    // REQ-SERVE-02 migration: per-ability savingThrows array; check STR as representative.
+    const savingThrowsArr: Array<{ ability: string; breakdown: Array<{ label?: string }> }> =
+      body.engineStats.savingThrows;
+    const strSaveEntry = savingThrowsArr?.find((s) => s.ability === 'str');
+    const strSaveBreakdown = strSaveEntry?.breakdown ?? [];
     expect(attackBreakdown.some((s) => s.label?.includes('Bless'))).toBe(false);
-    expect(saveBreakdown.some((s) => s.label?.includes('Bless'))).toBe(false);
+    expect(strSaveBreakdown.some((s) => s.label?.includes('Bless'))).toBe(false);
   });
 
   // ── Case (d) ─────────────────────────────────────────────────────────────────

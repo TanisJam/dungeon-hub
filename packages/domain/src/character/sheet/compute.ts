@@ -292,7 +292,11 @@ interface ComputeInput {
   spellRefsBySlug?: ReadonlyMap<string, SpellSheetRef>;
 }
 
-export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
+// REQ-LEGACY-01: computeCharacterSheet no longer emits savingThrows.
+// The route assembles sheet.savingThrows natively via deriveSavingThrowProficiencies
+// + resolveStat('saving-throw.<a>'). Omit<CharacterSheet,'savingThrows'> makes the
+// contract honest: compute.ts is NOT the source of truth for saves anymore.
+export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows'> {
   const { character } = input;
   const raceData = input.raceData ?? null;
 
@@ -382,16 +386,6 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     }
   }
   const hpFormula = hpParts.join(' + ') || '0';
-
-  // ---- Saving throws ----------------------------------------------------
-  // Solo la primera clase otorga saves; multiclass NO da saves (PHB p.164).
-  const primaryClass = classes[0];
-  const proficientSaves = new Set<AbilityKey>(primaryClass?.savingThrows ?? []);
-  const savingThrows = ABILITY_KEYS.map((a) => {
-    const mod = abilityModifier(effective[a]);
-    const prof = proficientSaves.has(a);
-    return { ability: a, modifier: prof ? mod + pb : mod, proficient: prof };
-  });
 
   // ---- Skills -----------------------------------------------------------
   // Profs vienen de: class.skillChoices + background.skills + race.raceSkillChoices
@@ -538,7 +532,6 @@ export function computeCharacterSheet(input: ComputeInput): CharacterSheet {
     abilityScores: Object.fromEntries(
       ABILITY_KEYS.map((a) => [a, { score: effective[a], modifier: abilityModifier(effective[a]) }]),
     ) as CharacterSheet['abilityScores'],
-    savingThrows,
     skills,
     passivePerception,
     initiative: dexMod,
