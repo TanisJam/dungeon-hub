@@ -1,31 +1,25 @@
-import type { EntityId } from '@dungeon-hub/domain/engine';
-import { buildBlessModifiers } from '@dungeon-hub/domain/engine';
-import { applyModifierInstances } from './apply-modifier-instances.js';
+import { applyActiveEffect } from './apply-active-effect.js';
 
 /**
- * Casts the Bless spell: builds modifier instances for the caster's targets
- * and persists them to the DB.
+ * Casts the Bless spell: delegates to the generic applyActiveEffect use-case
+ * with slug='bless'. The RuleDoc is in modifier_definitions (seeded by
+ * seed-modifier-definitions.ts) and compileRule produces the same instances
+ * as the legacy buildBlessModifiers builder (REQ-AE-11 equivalence test).
  *
- * Bless-specific edge (D4 — "specific edge on top of generic substrate"):
- *   - Calls buildBlessModifiers (pure domain) to produce ModifierInstance[].
- *   - Delegates persistence to applyModifierInstances (generic trio, zero Bless knowledge).
- *   - This function is the ONLY place in the codebase that knows "Bless → trio".
- *     The second concentration effect will add its own thin edge without touching the trio.
+ * Bless-specific edge (D4 — Option A delegation):
+ *   - Delegates to applyActiveEffect('bless', ...) instead of calling
+ *     buildBlessModifiers directly. The cast-bless HTTP contract is UNCHANGED.
+ *   - buildBlessModifiers is no longer imported in the API layer (REQ-BC-01).
  *
  * PHB 219: up to 3 targets, +1d4 on attack rolls and saving throws, concentration.
- * REQ-CASTBLESS-01 (spec #1130).
+ * REQ-CASTBLESS-01 (spec #1130). REQ-BC-01 (sdd/engine-active-effects/spec #1152).
  *
- * Design ref: sdd/engine-stateful/design #1131 — D4; tasks #1132 — T5.
+ * Design ref: sdd/engine-active-effects/design #1153 — Option A.
  */
 export async function castBless(
   casterId: string,
   targetIds: string[],
   token: string,
 ): Promise<void> {
-  const instances = buildBlessModifiers(
-    casterId as EntityId,
-    targetIds as EntityId[],
-    token,
-  );
-  await applyModifierInstances(instances);
+  await applyActiveEffect(casterId, 'bless', targetIds, token);
 }
