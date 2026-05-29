@@ -219,3 +219,8 @@ export type { ArmorClassModifierInput } from './adapter/derive-armor-class-modif
 // ── Saving throw adapter (engine-saving-throw-parity) ─────────────────────────
 
 export { deriveSavingThrowProficiencies } from './adapter/derive-saving-throw-proficiencies.js';
+
+// ── Skill proficiency adapter (engine-skill-parity) ───────────────────────────
+
+export { deriveSkillProficiencies } from './adapter/derive-skill-proficiencies.js';
+export type { SkillProficiencyInput } from './adapter/derive-skill-proficiencies.js';
