@@ -273,6 +273,16 @@ export interface CharacterSheet {
    * Optional on the web type for read-path tolerance.
    */
   currency?: Currency;
+  /**
+   * Native engine dual-shadow of ability scores.
+   * Added by engine-ability-scores (parity ledger migration #1, state: dual-shadow).
+   * Optional on the web type for read-path tolerance — older API deploys and legacy
+   * fixtures before this change do not include this field (REQ-AS-TYPES-01,
+   * REQ-AS-TOLERATE-01). Web does not yet consume this field — the breakdown
+   * affordance ("where did my STR 17 come from?") is a deferred UI concern.
+   * exactOptionalPropertyTypes: declared as optional (?:), not | undefined.
+   */
+  engineAbilityScores?: Record<AbilityKey, { score: number; modifier: number; breakdown: unknown[] }>;
 }
 
 export interface InventoryItem {
