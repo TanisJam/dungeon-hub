@@ -196,6 +196,10 @@ export { buildCloakOfProtectionModifiers } from './rules/cloak-of-protection.js'
 export { buildGuidanceModifiers } from './rules/guidance.js';
 export { buildFrightenedModifiers } from './rules/frightened.js';
 
+// ── Authored rule documents (Slice 6 — engine-catalog) ───────────────────────
+
+export { cloakOfProtectionRuleDoc } from './rules-authored/cloak-of-protection.js';
+
 // ── Inventory adapter (Slice 4) ───────────────────────────────────────────────
 
 export { deriveInventoryModifiers } from './adapter/derive-inventory-modifiers.js';
