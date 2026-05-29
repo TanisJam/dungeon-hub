@@ -16,6 +16,7 @@
  * and confirmed as 404 failures against the unimplemented routes.
  */
 
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
@@ -297,5 +298,261 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
 
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toBe('FORBIDDEN');
+  });
+
+  // ── Case (f) ─────────────────────────────────────────────────────────────────
+  // REQ-CASTBLESS-01 Scenario D: casterId is a random UUID that doesn't exist in
+  // the DB → the route must return 404 NOT_FOUND.
+  it('(f) POST cast-bless with unknown casterId → 404 NOT_FOUND', async () => {
+    const app = await getTestApp();
+    const unknownId = randomUUID(); // guaranteed not in DB
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${unknownId}/cast-bless`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: { targetIds: [allyId], concentrationToken: 'tok-unknown' },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe('NOT_FOUND');
+  });
+
+  // ── Case (g) ─────────────────────────────────────────────────────────────────
+  // REQ-CONCENTRATION-01 Scenario C: U2 attempts to DELETE concentration on a
+  // caster owned by U1 → 403 FORBIDDEN.
+  it('(g) DELETE concentration by non-owner → 403 FORBIDDEN', async () => {
+    const app = await getTestApp();
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/characters/${casterId}/concentration/tok-any`,
+      headers: { authorization: `Bearer ${u2.accessToken}` }, // U2 does not own casterId
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error).toBe('FORBIDDEN');
+  });
+
+  // ── Case (h) ─────────────────────────────────────────────────────────────────
+  // REQ-MITABLE-01 Scenarios B/C: FK ON DELETE CASCADE verified at runtime.
+  // Uses an isolated caster/ally pair so deleting them doesn't affect shared fixtures.
+  //
+  // Scenario B: delete the OWNER (caster) character → its modifier_instances rows cascade.
+  // Scenario C: delete the TARGET (ally) character  → the row targeting it cascades.
+  it('(h) cascade delete — owner deletion removes rows (Scenario B); target deletion removes row (Scenario C)', async () => {
+    const app = await getTestApp();
+    const { db } = await import('../../src/infra/db/client.js');
+    const { modifierInstances } = await import('../../src/infra/db/schema.js');
+
+    // Reuse the campaign from beforeAll (worldId is on the campaign; create fresh chars
+    // belonging to U1 so teardown is automatic via deleteTestUser in afterAll).
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { name: 'Cascade Test Campaign' },
+      })
+      .then((r) => r.json());
+    const worldId: string = campaign.worldId;
+
+    // Caster B (isolated, owned by U1).
+    const casterBRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { worldId, name: 'Cascade Caster' },
+      })
+      .then((r) => r.json());
+    const casterBId: string = casterBRes.id;
+
+    // Ally B (isolated, owned by U1).
+    const allyBRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { worldId, name: 'Cascade Ally' },
+      })
+      .then((r) => r.json());
+    const allyBId: string = allyBRes.id;
+
+    // Cast Bless from casterB onto allyB — creates 2 rows.
+    const castRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${casterBId}/cast-bless`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: { targetIds: [allyBId], concentrationToken: 'tok-cascade' },
+    });
+    expect(castRes.statusCode).toBe(201);
+
+    // Confirm 2 rows exist before deletion.
+    const rowsBefore = await db
+      .select()
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, 'tok-cascade'));
+    expect(rowsBefore).toHaveLength(2);
+
+    // ── Scenario B: delete the OWNER character (casterB) via the route.
+    // FK ownerCharacterId ON DELETE CASCADE must remove rows owned by casterB.
+    const deleteCasterRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/characters/${casterBId}`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+    });
+    expect(deleteCasterRes.statusCode).toBe(204);
+
+    const rowsAfterOwnerDelete = await db
+      .select()
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, 'tok-cascade'));
+    // Cascade must have removed ALL rows owned by casterBId.
+    expect(rowsAfterOwnerDelete).toHaveLength(0);
+
+    // ── Scenario C: re-cast from a fresh caster onto allyB, then delete the TARGET.
+    // Re-create a fresh caster character for this sub-scenario (casterB was deleted above).
+    const casterCRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { worldId, name: 'Cascade Caster2' },
+      })
+      .then((r) => r.json());
+    const casterCId: string = casterCRes.id;
+
+    const castRes2 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${casterCId}/cast-bless`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: { targetIds: [allyBId], concentrationToken: 'tok-cascade-c' },
+    });
+    expect(castRes2.statusCode).toBe(201);
+
+    const rowsBefore2 = await db
+      .select()
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, 'tok-cascade-c'));
+    expect(rowsBefore2).toHaveLength(2);
+
+    // Delete the TARGET character (allyB) directly via the route.
+    // FK targetCharacterId ON DELETE CASCADE must remove rows targeting allyBId.
+    const deleteAllyRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/characters/${allyBId}`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+    });
+    expect(deleteAllyRes.statusCode).toBe(204);
+
+    const rowsAfterTargetDelete = await db
+      .select()
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, 'tok-cascade-c'));
+    // Cascade must have removed ALL rows targeting allyBId.
+    expect(rowsAfterTargetDelete).toHaveLength(0);
+  });
+
+  // ── Case (i) ─────────────────────────────────────────────────────────────────
+  // REQ-PERSIST-01 Scenario C: removeByConcentrationToken is CASTER-SCOPED.
+  // Two casters use the SAME concentrationToken; removing caster1's token must
+  // leave caster2's rows intact (WHERE token AND owner, not just WHERE token).
+  it('(i) DELETE concentration is caster-scoped — same token, two casters, only caster1 rows removed', async () => {
+    const app = await getTestApp();
+    const { db } = await import('../../src/infra/db/client.js');
+    const { modifierInstances } = await import('../../src/infra/db/schema.js');
+
+    // Create a second campaign/world so we can create fresh characters.
+    const campaign2 = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { name: 'Token Isolation Campaign' },
+      })
+      .then((r) => r.json());
+    const worldId2: string = campaign2.worldId;
+
+    // Caster1 (existing `casterId` from beforeAll — reuse it as caster1).
+    // Caster2: a new character owned by U1 in this isolated world.
+    const caster2Res = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { worldId: worldId2, name: 'Isolation Caster2' },
+      })
+      .then((r) => r.json());
+    const caster2Id: string = caster2Res.id;
+
+    // Ally for caster2 in the same world.
+    const ally2Res = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${u1.accessToken}` },
+        payload: { worldId: worldId2, name: 'Isolation Ally2' },
+      })
+      .then((r) => r.json());
+    const ally2Id: string = ally2Res.id;
+
+    const SHARED_TOKEN = 'tok-shared-isolation';
+
+    // Both casters cast with the SAME concentrationToken string.
+    // Caster1 (from beforeAll) targets allyId; Caster2 targets ally2Id.
+    const cast1Res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${casterId}/cast-bless`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: { targetIds: [allyId], concentrationToken: SHARED_TOKEN },
+    });
+    expect(cast1Res.statusCode).toBe(201);
+
+    const cast2Res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${caster2Id}/cast-bless`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: { targetIds: [ally2Id], concentrationToken: SHARED_TOKEN },
+    });
+    expect(cast2Res.statusCode).toBe(201);
+
+    // Sanity: 4 rows total for the shared token (2 per cast × 2 casters).
+    const allRows = await db
+      .select()
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, SHARED_TOKEN));
+    expect(allRows).toHaveLength(4);
+
+    // Remove caster1's concentration only.
+    const deleteRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/characters/${casterId}/concentration/${SHARED_TOKEN}`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+    });
+    expect(deleteRes.statusCode).toBe(204);
+
+    // Caster1's rows must be gone; caster2's rows must remain.
+    const caster1Rows = await db
+      .select()
+      .from(modifierInstances)
+      .where(
+        and(
+          eq(modifierInstances.concentrationToken, SHARED_TOKEN),
+          eq(modifierInstances.ownerCharacterId, casterId),
+        ),
+      );
+    expect(caster1Rows).toHaveLength(0);
+
+    const caster2Rows = await db
+      .select()
+      .from(modifierInstances)
+      .where(
+        and(
+          eq(modifierInstances.concentrationToken, SHARED_TOKEN),
+          eq(modifierInstances.ownerCharacterId, caster2Id),
+        ),
+      );
+    expect(caster2Rows).toHaveLength(2);
   });
 });
