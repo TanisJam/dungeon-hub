@@ -924,6 +924,42 @@ export const encounterCombatants = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// modifier_definitions — DB-backed catalog of RuleDoc templates (Slice 6).
+//
+// Each row is ONE RuleDoc (the compile-time template for a modifier rule).
+// The `ruleDoc` column is a full JSONB blob; promoted columns (slug, source,
+// name, kind) are query handles.
+//
+// Design decisions (SDD sdd/engine-catalog/design #1142):
+//   D1: JSONB-polymorphic — ruleDoc is opaque; slug/source/name/kind are
+//       promoted for indexed lookups. NO FK to compendium_items (homebrew
+//       slugs must work without a compendium row, §1.2).
+//   D1: kind is OPEN text (no pg enum) — homebrew can introduce novel kinds
+//       without a schema migration.
+//   D2: seed via `pnpm seed-modifier-definitions` (idempotent upsert on slug).
+//
+// Unique constraint on slug (global for this slice; relaxed to slug+world_id
+// in Slice 8 when world-scoping lands).
+// ---------------------------------------------------------------------------
+export const modifierDefinitions = pgTable(
+  'modifier_definitions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    slug: text('slug').notNull(),
+    source: text('source').notNull(),
+    name: text('name').notNull(),
+    kind: text('kind').notNull(), // OPEN text, no enum (§1.2)
+    ruleDoc: jsonb('rule_doc').notNull(), // full RuleDoc blob
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_moddefs_slug').on(t.slug),
+    index('idx_moddefs_kind').on(t.kind),
+    index('idx_moddefs_source').on(t.source),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // modifier_instances — persisted live modifier instances (Slice 5: Bless).
 //
 // Each row represents ONE emitted ModifierInstance from the engine registry,
