@@ -101,9 +101,11 @@ import { removeByConcentrationToken } from '../../use-cases/characters/remove-by
 import {
   createInMemoryRegistry,
   resolveStat,
+  deriveAbilityScoreModifiers,
   type EvaluationContext,
   type EntityId,
   type Breakdown,
+  type AbilityScoreModifierInput,
 } from '@dungeon-hub/domain/engine';
 
 /**
@@ -813,9 +815,30 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const registry = createInMemoryRegistry();
     for (const m of modifiers) registry.register(m);
     for (const m of persisted) registry.register(m);
+
+    // engine-ability-scores: derive ASI NumMods from the three stored ASI arrays
+    // and register into the SAME registry BEFORE resolveStat calls.
+    // REQ-AS-SHEET-04: ASI mods must be registered so resolveStat picks them up.
+    // REQ-AS-SHEET-02: base = raw baseStats[ability], NOT legacy effective score.
+    // REQ-AS-TOLERATE-01: asisApplied/levelUpAsis/feats may be absent — adapter treats
+    // undefined as [] (design §5). If baseStats absent, skip engineAbilityScores.
+    const rawBaseStats = data['baseStats'] as AbilityScores | undefined;
+    // Build AbilityScoreModifierInput respecting exactOptionalPropertyTypes:
+    // only include the property when the value is actually present (not undefined).
+    const asiModInput: AbilityScoreModifierInput = {};
+    const rawAsisApplied = data['asisApplied'] as AppliedAsi[] | undefined;
+    const rawLevelUpAsis = data['levelUpAsis'] as AppliedAsi[] | undefined;
+    const rawFeats = data['feats'] as AppliedFeat[] | undefined;
+    if (rawAsisApplied !== undefined) asiModInput.asisApplied = rawAsisApplied;
+    if (rawLevelUpAsis !== undefined) asiModInput.levelUpAsis = rawLevelUpAsis;
+    if (rawFeats !== undefined) asiModInput.feats = rawFeats;
+    const asiMods = deriveAbilityScoreModifiers(asiModInput, charId);
+    for (const m of asiMods) registry.register(m);
+
     const ctx: EvaluationContext = { self: { id: charId, conditions: [] }, activeConditions: [] };
     // engineAc: UNCHANGED from Slice 4 — Bless targets attack-roll/saving-throw,
     // never 'ac', so persisted Bless instances do not affect engineAc (provably safe).
+    // ASI mods only target ability StatKeys (str/dex/con/int/wis/cha) — non-interfering.
     const engineAc = resolveStat(charId, 'ac', sheet.armorClass.value, ctx, registry);
     // engineStats: new in Slice 5 — attack-roll + saving-throw (Bless scope).
     // Roll-value contract: value = numeric subtotal (dice contributions stay 0 in .value;
@@ -824,6 +847,27 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       attackRoll: resolveStat(charId, 'attack-roll', 0, ctx, registry),
       savingThrow: resolveStat(charId, 'saving-throw', 0, ctx, registry),
     };
+
+    // engine-ability-scores: resolve each ability via native path.
+    // REQ-AS-SHEET-01: additive dual-shadow alongside legacy abilityScores.
+    // REQ-AS-SHEET-02: base = raw baseStats[ability] ?? 10 (fallback for missing)
+    // REQ-AS-SHEET-03: modifier = floor((score - 10) / 2)  PHB p.13
+    // REQ-AS-TOLERATE-01: skip if rawBaseStats absent (malformed legacy row).
+    const engineAbilityScores = rawBaseStats
+      ? Object.fromEntries(
+          ABILITY_KEYS.map((a) => {
+            const resolved = resolveStat(charId, a, rawBaseStats[a] ?? 10, ctx, registry);
+            return [
+              a,
+              {
+                score: resolved.value,
+                modifier: Math.floor((resolved.value - 10) / 2), // PHB p.13
+                breakdown: resolved.breakdown,
+              },
+            ];
+          }),
+        )
+      : undefined;
 
     return {
       character: { id: character.id, userId: character.userId, worldId: character.worldId, status: character.status, xp: character.xp },
@@ -835,6 +879,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       inventoryEnriched,
       engineAc,
       engineStats,
+      engineAbilityScores,
     };
   });
 
