@@ -6,6 +6,12 @@
  *
  * Design ref: sdd/engine-timeline-duration/design — ADR-2, ADR-3, ADR-7.
  *
+ * DEFERRED (out of scope for this slice — do NOT add here without a new SDD):
+ * relative-turn-anchors ("until the end of your/target's next turn", PHB p.238),
+ * the 'turn-ends' evaluated variant, and the 'encounter-ends' sweep. These require
+ * `currentCombatantId` in EvaluationContext + a `turnAnchor` field on DurationSpec.
+ * See sdd/engine-timeline-duration/explore for the cut line.
+ *
  * IMPORTANT: exactOptionalPropertyTypes is active in this package.
  * startRound and encounterRound use `?:` — never assign undefined explicitly.
  */
