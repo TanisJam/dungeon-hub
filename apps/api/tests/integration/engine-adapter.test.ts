@@ -5,16 +5,17 @@ import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 
 /**
- * Integration test — engine-adapter (Slice 4).
+ * Integration test — engine-adapter (Slice 4 → Gate B migration).
  *
- * Verifies that GET /characters/:id/sheet returns an additive `engineAc` field
- * derived by the engine modifier pipeline:
- *   REQ-ENGINEAC-01: engineAc.value = sheet.armorClass.value + 1 for a char
- *                    with equipped+attuned Cloak of Protection (DMG 159: +1 AC).
- *   REQ-ENGINEAC-02: legacy armorClass field is UNCHANGED (additive, non-breaking).
- *   REQ-ENGINEAC-03: engineAc.value = sheet.armorClass.value for a char with NO Cloak.
+ * After engine-ac-authoritative Gate B, engineAc is no longer a top-level field.
+ * AC is now served via sheet.armorClass.{value,formula} (engine-authoritative).
+ *
+ * REQ-AC-NATIVE-01: sheet.armorClass.value = no-item-baseline + 1 for char with
+ *                   equipped+attuned Cloak of Protection (DMG 159: +1 AC).
+ * REQ-AC-CONTRACT-02: body.engineAc must be undefined (top-level field removed).
+ * REQ-AC-FORMULA-01: sheet.armorClass.formula contains the item label.
  */
-describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () => {
+describe('GET /characters/:id/sheet — engine-authoritative armorClass (Gate B)', () => {
   let user: TestUser;
   let charWithCloakId: string;
   let charNoCloakId: string;
@@ -120,8 +121,6 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     );
 
     // ── Seed Cloak of Protection compendium row (direct DB insert) ─────────────
-    // Pattern from character-rests.test.ts L455 — raw insert to avoid HTTP flow.
-    // Using TEST_SOURCE so afterAll cleanup is safe and scoped.
     const { db } = await import('../../src/infra/db/client.js');
     const { compendiumItems, characters, modifierDefinitions } = await import('../../src/infra/db/schema.js');
     const { cloakOfProtectionRuleDoc } = await import('@dungeon-hub/domain/engine');
@@ -134,11 +133,6 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
       data: { wondrous: true, reqAttune: true },
     });
 
-    // ── T6 (Slice 6 engine-catalog): seed Cloak modifier_definition row ──────────
-    // After the #513 refactor, loadModifierDefinitions() is the SOLE source of the
-    // item modifier map. Without this seed, the +1 assertion regresses to +0.
-    // Direct insert (NOT seed script) — process.exit in the script kills the vitest worker.
-    // onConflictDoNothing: safe to re-run if the row already exists from a prior seed run.
     await db
       .insert(modifierDefinitions)
       .values({
@@ -151,10 +145,6 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
       .onConflictDoNothing();
 
     // ── Equip Cloak on char1 via direct DB update ──────────────────────────────
-    // Direct DB update mirrors the rests-test pattern (avoids attunement-cap
-    // and HTTP validation noise when testing derive-on-read behavior).
-    // InventoryItem requires: instanceId, itemSlug, itemSource, quantity, state,
-    // attuned, customName, notes.
     const cloakInstanceId = randomUUID();
     await db
       .update(characters)
@@ -186,10 +176,22 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     await closeTestApp();
   });
 
-  // REQ-ENGINEAC-01: equipped+attuned Cloak → engineAc.value = armorClass.value + 1.
-  // REQ-ENGINEAC-02: legacy armorClass field present and unchanged (additive).
-  it('REQ-ENGINEAC-01/02: engineAc.value = armorClass.value + 1 for char with equipped+attuned Cloak', async () => {
+  // REQ-AC-NATIVE-01: engine-authoritative sheet.armorClass.value includes Cloak +1.
+  // REQ-AC-CONTRACT-02: body.engineAc must be absent (top-level field removed).
+  it('REQ-AC-NATIVE-01: sheet.armorClass.value = no-item-baseline + 1 for char with equipped+attuned Cloak', async () => {
     const app = await getTestApp();
+
+    // Capture no-item baseline from char2 (no Cloak, same stat block).
+    const baselineRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${charNoCloakId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(baselineRes.statusCode).toBe(200);
+    const baselineBody = baselineRes.json();
+    const noItemBaseline: number = baselineBody.sheet.armorClass.value;
+    expect(typeof noItemBaseline).toBe('number');
+
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/characters/${charWithCloakId}/sheet`,
@@ -199,28 +201,24 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    // Sanity: legacy armorClass present.
-    const legacyAc: number = body.sheet.armorClass.value;
-    expect(typeof legacyAc).toBe('number');
+    // REQ-AC-NATIVE-01: Cloak +1 now lives INSIDE sheet.armorClass.value.
+    expect(body.sheet.armorClass.value).toBe(noItemBaseline + 1);
 
-    // REQ-ENGINEAC-01: engine adds +1 from Cloak (DMG 159).
-    expect(body.engineAc.value).toBe(legacyAc + 1);
+    // REQ-AC-CONTRACT-02: top-level engineAc must be gone.
+    expect(body.engineAc).toBeUndefined();
 
-    // REQ-ENGINEAC-01: breakdown contains at least a base source and a Cloak source.
-    expect(Array.isArray(body.engineAc.breakdown)).toBe(true);
-    expect(body.engineAc.breakdown.length).toBeGreaterThanOrEqual(2);
+    // REQ-AC-FORMULA-01: item label appears in formula string.
+    expect(typeof body.sheet.armorClass.formula).toBe('string');
+    expect(body.sheet.armorClass.formula).toContain('Cloak of Protection');
 
-    // REQ-ENGINEAC-02: legacy armorClass is unchanged (additive field, not replaced).
-    expect(body.sheet.armorClass.value).toBe(legacyAc);
-
-    // REQ-ENGINEAC-02: other legacy fields still present.
+    // Contract: other legacy fields still present.
     expect(body.inventory).toBeDefined();
     expect(body.inventoryEnriched).toBeDefined();
     expect(body.character).toBeDefined();
   });
 
-  // REQ-ENGINEAC-03: no Cloak → engineAc.value = armorClass.value (empty modifier set).
-  it('REQ-ENGINEAC-03: engineAc.value = armorClass.value for char with no Cloak', async () => {
+  // REQ-AC-NATIVE-01: no-item char → sheet.armorClass.value is the unarmored baseline.
+  it('REQ-AC-NATIVE-01: no-Cloak char → sheet.armorClass.value is unarmored baseline (no engineAc)', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -231,48 +229,9 @@ describe('GET /characters/:id/sheet — engineAc (engine-adapter Slice 4)', () =
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    const legacyAc: number = body.sheet.armorClass.value;
-    expect(typeof legacyAc).toBe('number');
+    expect(typeof body.sheet.armorClass.value).toBe('number');
 
-    // REQ-ENGINEAC-03: no modifier registered → engine resolves to base AC.
-    expect(body.engineAc.value).toBe(legacyAc);
-
-    // At least a base source present in breakdown.
-    expect(Array.isArray(body.engineAc.breakdown)).toBe(true);
-    expect(body.engineAc.breakdown.length).toBeGreaterThanOrEqual(1);
-  });
-
-  // REQ-AC-NATIVE-01: engineAc is computed natively (base 0 + adapter NumMods).
-  // Proves native derivation by verifying breakdown has structural AC entries
-  // (base + DEX) alongside the Cloak item entry — NOT a single seeded-base entry.
-  // engine-ac-parity native breakdown shape change: [base, DEX, Cloak] instead of
-  // legacy-seeded [base, Cloak].
-  it('REQ-AC-NATIVE-01: Cloak char breakdown contains structural AC entries + Cloak (native derivation proof)', async () => {
-    const app = await getTestApp();
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/v1/characters/${charWithCloakId}/sheet`,
-      headers: { authorization: `Bearer ${user.accessToken}` },
-    });
-
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-
-    const legacyAc: number = body.sheet.armorClass.value;
-
-    // Value parity is preserved (REQ-AC-PARITY-01): engineAc.value = legacyAc + 1
-    expect(body.engineAc.value).toBe(legacyAc + 1);
-
-    // Native breakdown shape (engine-ac-parity): must have at least 3 entries
-    // for an unarmored char with Cloak: base(10) + DEX(+2) + Cloak(+1)
-    // This is the key difference from legacy-seeded (which only had 2: seeded-base + Cloak).
-    const breakdown: Array<{ label?: string; amount?: unknown }> = body.engineAc.breakdown;
-    expect(breakdown.length).toBeGreaterThanOrEqual(3); // native shape change (engine-ac-parity)
-
-    // Cloak entry must still appear in breakdown
-    const cloakEntry = breakdown.find(
-      (e) => typeof e.label === 'string' && e.label.toLowerCase().includes('cloak'),
-    );
-    expect(cloakEntry).toBeDefined();
+    // REQ-AC-CONTRACT-02: engineAc must be absent.
+    expect(body.engineAc).toBeUndefined();
   });
 });

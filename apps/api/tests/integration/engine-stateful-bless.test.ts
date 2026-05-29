@@ -212,10 +212,12 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     // Per-ability saves: STR save value = abilityMod + pb (numeric; dice stay 0 in .value)
     expect(typeof strSaveEntry!.modifier).toBe('number');
 
-    // REQ-ENGINESTATS-03: engineAc unchanged from baseline (Bless ≠ 'ac').
-    const legacyAc: number = body.sheet.armorClass.value;
-    expect(typeof legacyAc).toBe('number');
-    expect(body.engineAc.value).toBe(legacyAc);
+    // REQ-AC-NATIVE-01 + REQ-ENGINESTATS-03: Bless does NOT affect AC (stat='attack-roll'/'saving-throw').
+    // engine-ac-authoritative Gate B: engineAc top-level field removed (REQ-AC-CONTRACT-02).
+    // sheet.armorClass.value is engine-authoritative; Bless does not touch it.
+    const engineAc: number = body.sheet.armorClass.value;
+    expect(typeof engineAc).toBe('number');
+    expect(body.engineAc).toBeUndefined(); // REQ-AC-CONTRACT-02: top-level field gone
 
     // REQ-ENGINESTATS-03: legacy sheet fields present and untouched.
     expect(body.sheet).toBeDefined();

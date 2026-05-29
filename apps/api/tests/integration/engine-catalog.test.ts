@@ -1,15 +1,15 @@
 /**
- * Integration test — engine-catalog (Slice 6).
+ * Integration test — engine-catalog (Slice 6 → Gate B migration).
  *
- * Verifies that modifier_definitions is the runtime source for the item modifier map,
- * proving §1.2: a DM inserts a homebrew row → next GET /sheet reflects it, NO code change.
+ * After engine-ac-authoritative Gate B, item modifier AC contributions are
+ * folded into sheet.armorClass.value (engine-authoritative). No top-level engineAc.
  *
- *   REQ-MDREFACTOR-01: Cloak equipped+attuned → engineAc.value = legacyAc + 1 (via DB catalog).
+ *   REQ-MDREFACTOR-01: Cloak equipped+attuned → sheet.armorClass.value = baseline + 1.
  *   REQ-CATALOG-HOMEBREW-01 (§1.2 proof): homebrew amulet row inserted directly →
- *     engineAc.value = legacyAc + 2, with NO code change. Sentinel = +2 (slug-miss → +0 = fail).
- *   REQ-MDLOAD-01 tolerate-read: malformed modifier_definitions row → GET /sheet 200, no crash,
- *     valid entries still resolve.
- *   REQ-CATALOG-REGRESSION-01 Scenario B: Cloak def seeded in beforeAll → +1 holds.
+ *     sheet.armorClass.value = baseline + 2. NO code change. Sentinel = +2.
+ *   REQ-MDLOAD-01 tolerate-read: malformed modifier_definitions row → GET /sheet 200,
+ *     sheet.armorClass.value is a number (valid entries still resolve).
+ *   REQ-AC-CONTRACT-02: body.engineAc must be undefined (top-level field removed).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -18,11 +18,12 @@ import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 
-describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () => {
+describe('engine-catalog (Slice 6) — modifier_definitions runtime source (Gate B)', () => {
   let user: TestUser;
   let charCloakId: string;
   let charAmuletId: string;
   let charMalformedId: string;
+  let charBaselineId: string; // no items — baseline AC
 
   // Scoped source tag for safe afterAll cleanup.
   const TEST_SOURCE = 'TEST_ENGCAT';
@@ -91,6 +92,7 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     charCloakId = await makeChar('Catalog Cloak Wearer');
     charAmuletId = await makeChar('Catalog Amulet Wearer');
     charMalformedId = await makeChar('Catalog Malformed Row Char');
+    charBaselineId = await makeChar('Catalog Baseline (no items)');
 
     // ── Direct DB seeding ─────────────────────────────────────────────────────
     const { db } = await import('../../src/infra/db/client.js');
@@ -99,10 +101,7 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     );
     const { cloakOfProtectionRuleDoc } = await import('@dungeon-hub/domain/engine');
 
-    // ── 1. Seed Cloak modifier_definition row (regression guard — T6 pattern) ─
-    // Without this, loadModifierDefinitions() returns an empty map → +0.
-    // Direct insert (NOT seed script) — seed script calls process.exit(0/1),
-    // which kills the vitest worker.
+    // ── 1. Seed Cloak modifier_definition row ─────────────────────────────────
     await db
       .insert(modifierDefinitions)
       .values({
@@ -115,8 +114,6 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
       .onConflictDoNothing();
 
     // ── 2. Seed homebrew amulet-of-test modifier_definition row (§1.2 proof) ──
-    // +2 AC sentinel. Slug-miss → +0 → test fails, proving the catalog is live.
-    // RuleDoc emits a single num+add+2/ac/item modifier with always/self trigger.
     const amuletRuleDoc = {
       id: 'amulet-of-test',
       source: 'homebrew',
@@ -147,7 +144,7 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
       })
       .onConflictDoNothing();
 
-    // ── 3. Seed compendium_items rows for both items ───────────────────────────
+    // ── 3. Seed compendium_items rows ─────────────────────────────────────────
     await db.insert(compendiumItems).values([
       {
         slug: 'cloak-of-protection',
@@ -219,11 +216,24 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     await closeTestApp();
   });
 
-  // ── Case (a): REQ-MDREFACTOR-01 ──────────────────────────────────────────────
-  // Cloak equipped+attuned → engineAc.value = legacyAc + 1 (sourced from DB catalog).
-  // The hardcoded itemModifierMap literal is gone; proof = the +1 comes from the DB row.
-  it('(a) REQ-MDREFACTOR-01: Cloak from DB catalog → engineAc = legacyAc + 1', async () => {
+  // Helper: capture baseline AC for a no-item char.
+  async function captureBaseline(): Promise<number> {
     const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${charBaselineId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    return res.json().sheet.armorClass.value as number;
+  }
+
+  // ── Case (a): REQ-MDREFACTOR-01 ──────────────────────────────────────────────
+  // Cloak equipped+attuned → sheet.armorClass.value = baseline + 1 (via DB catalog).
+  it('(a) REQ-MDREFACTOR-01: Cloak from DB catalog → sheet.armorClass.value = baseline + 1', async () => {
+    const app = await getTestApp();
+    const baseline = await captureBaseline();
+
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/characters/${charCloakId}/sheet`,
@@ -233,25 +243,22 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    const legacyAc: number = body.sheet.armorClass.value;
-    expect(typeof legacyAc).toBe('number');
+    // REQ-MDREFACTOR-01: Cloak +1 comes from the DB catalog, now inside sheet.armorClass.value.
+    expect(body.sheet.armorClass.value).toBe(baseline + 1);
 
-    // REQ-MDREFACTOR-01: Cloak +1 comes from the DB catalog, not a hardcoded map.
-    expect(body.engineAc.value).toBe(legacyAc + 1);
+    // REQ-AC-FORMULA-01: formula contains the Cloak label.
+    expect(body.sheet.armorClass.formula).toContain('Cloak of Protection');
 
-    // Breakdown must contain a Cloak entry.
-    const breakdown: Array<{ label?: string; amount?: unknown }> = body.engineAc.breakdown;
-    const cloakEntry = breakdown.find((b) => b.label === 'Cloak of Protection');
-    expect(cloakEntry).toBeDefined();
-    expect(cloakEntry!.amount).toBe(1);
+    // REQ-AC-CONTRACT-02: engineAc must be gone.
+    expect(body.engineAc).toBeUndefined();
   });
 
   // ── Case (b): REQ-CATALOG-HOMEBREW-01 (§1.2 proof) ───────────────────────────
-  // Homebrew amulet-of-test row inserted directly into DB → engineAc = legacyAc + 2.
-  // NO code change was made between the row insert (beforeAll) and this assertion.
-  // That IS the §1.2 proof: DB = runtime source of truth, DM adds homebrew without redeploy.
+  // Homebrew amulet-of-test row inserted directly → sheet.armorClass.value = baseline + 2.
   it('(b) REQ-CATALOG-HOMEBREW-01: homebrew amulet +2 — §1.2 proof, NO code change', async () => {
     const app = await getTestApp();
+    const baseline = await captureBaseline();
+
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/characters/${charAmuletId}/sheet`,
@@ -261,35 +268,28 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    const legacyAc: number = body.sheet.armorClass.value;
-    expect(typeof legacyAc).toBe('number');
-
     // §1.2 sentinel: +2. Slug-miss → +0 → test fails → proves catalog is live.
-    // This passes WITHOUT any code change — the row insertion is the sole intervention.
-    expect(body.engineAc.value).toBe(legacyAc + 2);
+    expect(body.sheet.armorClass.value).toBe(baseline + 2);
 
-    // Breakdown must contain the homebrew amulet entry (label from ruleDoc).
-    const breakdown: Array<{ label?: string; amount?: unknown }> = body.engineAc.breakdown;
-    const amuletEntry = breakdown.find((b) => b.label === 'Amulet of Test');
-    expect(amuletEntry).toBeDefined();
-    expect(amuletEntry!.amount).toBe(2);
+    // REQ-AC-FORMULA-01: formula contains the amulet label.
+    expect(body.sheet.armorClass.formula).toContain('Amulet of Test');
+
+    // REQ-AC-CONTRACT-02: engineAc must be gone.
+    expect(body.engineAc).toBeUndefined();
   });
 
   // ── Case (c): REQ-MDLOAD-01 tolerate-read ────────────────────────────────────
-  // A malformed modifier_definitions row (kind='item', broken ruleDoc) must NEVER
-  // crash GET /sheet. The loader warns+skips; the sheet still loads; valid entries resolve.
-  it('(c) REQ-MDLOAD-01: malformed ruleDoc row → GET /sheet 200, loader skips it gracefully', async () => {
+  // A malformed modifier_definitions row must NEVER crash GET /sheet.
+  it('(c) REQ-MDLOAD-01: malformed ruleDoc row → GET /sheet 200, sheet.armorClass.value is a number', async () => {
     const { db } = await import('../../src/infra/db/client.js');
     const { modifierDefinitions } = await import('../../src/infra/db/schema.js');
 
-    // Insert a clearly invalid ruleDoc (fails parseRule — unknown kind, no source, etc.).
     const malformedSlug = `broken-def-${randomUUID()}`;
     await db.insert(modifierDefinitions).values({
       slug: malformedSlug,
       source: 'homebrew',
       name: 'Broken Definition',
       kind: 'item',
-      // Malformed: emits with an unknown kind — fails UNKNOWN_PRIMITIVE_KIND.
       ruleDoc: {
         id: malformedSlug,
         source: 'homebrew',
@@ -310,7 +310,6 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
-      // charMalformedId has no items — tests that the sheet loads even with a broken catalog row.
       url: `/api/v1/characters/${charMalformedId}/sheet`,
       headers: { authorization: `Bearer ${user.accessToken}` },
     });
@@ -319,16 +318,15 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    // Sheet must still be present and computable.
+    // Sheet must be present and armorClass is a number.
     expect(body.sheet).toBeDefined();
-    expect(body.engineAc).toBeDefined();
-    expect(typeof body.engineAc.value).toBe('number');
+    expect(typeof body.sheet.armorClass.value).toBe('number');
 
-    // The malformed slug must NOT appear in the Cloak/amulet character breakdowns.
-    // (This character has no items, so the breakdown is just the base entry.)
-    expect(Array.isArray(body.engineAc.breakdown)).toBe(true);
+    // REQ-AC-CONTRACT-02: engineAc must be gone.
+    expect(body.engineAc).toBeUndefined();
 
     // Cloak character still resolves correctly after the malformed row was inserted.
+    const baseline = await captureBaseline();
     const cloakRes = await app.inject({
       method: 'GET',
       url: `/api/v1/characters/${charCloakId}/sheet`,
@@ -336,7 +334,7 @@ describe('engine-catalog (Slice 6) — modifier_definitions runtime source', () 
     });
     expect(cloakRes.statusCode).toBe(200);
     const cloakBody = cloakRes.json();
-    // The +1 must still hold — malformed rows don't affect valid entries.
-    expect(cloakBody.engineAc.value).toBe(cloakBody.sheet.armorClass.value + 1);
+    // The +1 must still hold after malformed row insertion.
+    expect(cloakBody.sheet.armorClass.value).toBe(baseline + 1);
   });
 });

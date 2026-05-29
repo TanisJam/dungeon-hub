@@ -13,7 +13,7 @@ import {
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
-import { computeCharacterSheet, type SpellSheetRef, type AbilityScoreView, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
+import { computeCharacterSheet, formulaFromBreakdown, type SpellSheetRef, type AbilityScoreView, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
 import {
   addItemToInventory,
   consumeInventoryItem,
@@ -864,16 +864,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       };
     });
 
-    // ── engineAc + engineStats: additive engine-resolved fields ──────────────────
-    // Slice 4 (engine-adapter): engineAc — derive-on-read from equipped inventory.
+    // ── Engine-authoritative AC + engineStats ─────────────────────────────────────
     // Slice 5 (engine-stateful): engineStats — derives from BOTH inventory mods AND
     //   persisted modifier instances (Bless, etc.) loaded from DB.
-    // Additive only — legacy sheet.armorClass + engineAc are UNCHANGED.
-    // REQ-ENGINEAC-01/02/03, REQ-ENGINESTATS-01/02/03.
+    // REQ-AC-NATIVE-01 (Gate B): sheet.armorClass is engine-authoritative.
     // registry + ctx + asiMods + engineAbilityScores hoisted above computeCharacterSheet
     // for injection (REQ-AS-INJECT-02, ADR-4). AC-native block stays here (needs sheet context).
 
-    // engine-ac-parity: resolve engineAc NATIVELY (base 0, no legacy seeding).
     // REQ-AC-NATIVE-01: base = 0; deriveArmorClassModifiers emits all structural AC NumMods.
     // REQ-AC-NATIVE-02: resolve DEX/CON/WIS/STR BEFORE calling adapter (post-ASI mods).
     // Design §6: accept duplicate in-memory ability resolve (cheap; clarity over threading).
@@ -901,9 +898,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       wis: Math.floor((resolvedWisScore - 10) / 2),
     };
 
-    // Derive AC NumMods and register into the SAME registry.
+    // Derive AC NumMods + STR-min warning and register into the SAME registry.
     // Item mods (Cloak +1 on 'ac') are already registered above — they compose additively.
-    const acMods = deriveArmorClassModifiers({ inventory, itemLites, classes: classesForAc, resolvedMods: resolvedModsForAc }, charId);
+    // ADR-2: pass resolvedStrScore (score, not mod) for armorStrengthMin comparison (PHB p.144).
+    const { mods: acMods, warnings: engineAcWarnings } = deriveArmorClassModifiers(
+      { inventory, itemLites, classes: classesForAc, resolvedMods: resolvedModsForAc, strScore: resolvedStrScore },
+      charId,
+    );
     for (const m of acMods) registry.register(m);
 
     // REQ-AC-NATIVE-01: base = 0, NOT sheet.armorClass.value (no legacy seeding).
@@ -997,12 +998,17 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // REQ-LEGACY-03: computeCharacterSheet no longer emits skills (Omit return type extended).
     // REQ-ROUTE-02: sheet.passivePerception assembled in route from engine output.
     // REQ-LEGACY-04: computeCharacterSheet no longer emits passivePerception (Omit return type extended).
+    // REQ-AC-NATIVE-01: sheet.armorClass is engine-authoritative (Gate B).
+    // REQ-AC-FORMULA-01: formula derived from engine breakdown via formulaFromBreakdown.
+    // REQ-AC-WARN-01: warnings include STR-min warning if applicable (from adapter).
     const fullSheet = {
       ...sheet,
       savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })),
       initiative: resolvedInitiative.value,
       skills: engineSkills,
       passivePerception: enginePassivePerception,
+      armorClass: { value: engineAc.value, formula: formulaFromBreakdown(engineAc.breakdown) },
+      warnings: engineAcWarnings,
     };
 
     const engineStats = {
@@ -1019,7 +1025,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       statMethod,
       inventory,
       inventoryEnriched,
-      engineAc,
+      // REQ-AC-CONTRACT-02: engineAc top-level field removed (Gate B).
+      // AC now served via sheet.armorClass.{value,formula} (engine-authoritative).
       engineStats,
       // REQ-AS-CONTRACT-02: engineAbilityScores top-level field removed.
       // Engine-sourced scores now flow through sheet.abilityScores (injected into computeCharacterSheet).
