@@ -719,3 +719,275 @@ describe('GET /characters/:id/sheet — STATMETHOD-API-01: statMethod field', ()
     expect(body.statMethod).toBe('standard-array');
   });
 });
+
+// ---------------------------------------------------------------------------
+// REQ-AS-SHEET-01..04, REQ-AS-TOLERATE-01
+// engine-ability-scores — native dual-shadow via deriveAbilityScoreModifiers
+// PHB p.13 (modifier formula), PHB p.18-20 (Elf racial ASIs), PHB p.165 (ASI stacking)
+// ---------------------------------------------------------------------------
+describe('GET /characters/:id/sheet — REQ-AS-SHEET: engineAbilityScores dual-shadow', () => {
+  /**
+   * Character: High Elf Wizard 1 with Sage background (same setup as first describe).
+   * baseStats: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 }
+   * asisApplied from Elf/High-Elf:
+   *   - { ability: 'dex', bonus: 2, source: 'subrace' }  (PHB p.23 Elf +2 DEX)
+   *   - { ability: 'int', bonus: 1, source: 'subrace' }  (PHB p.23 High Elf +1 INT)
+   * Effective: DEX = 16, INT = 16; all others = base.
+   *
+   * Wild Shape API test is intentionally ABSENT (amendment #1).
+   * No Wild Shape persistence path exists — archetype 7 is a domain proof only.
+   */
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Engine AS Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Engine AS Test Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+
+    const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+      if (res.statusCode !== 200 && res.statusCode !== 201) {
+        throw new Error(`${label}: ${res.statusCode} ${res.body}`);
+      }
+    };
+
+    await expectOk(
+      'stats',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/stats`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          method: 'point-buy',
+          scores: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+        },
+      }),
+    );
+
+    // High Elf: +2 DEX (Elf race, PHB p.23) + +1 INT (High Elf subrace, PHB p.23)
+    await expectOk(
+      'race',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/race`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          race: { slug: 'elf', source: 'PHB' },
+          subrace: { slug: 'elf--high', source: 'PHB' },
+          languageChoices: ['draconic'],
+        },
+      }),
+    );
+
+    await expectOk(
+      'class',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/class`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          class: { slug: 'wizard', source: 'PHB' },
+          level: 1,
+          skillChoices: ['investigation', 'religion'],
+        },
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('REQ-AS-SHEET-01: GET /sheet returns engineAbilityScores top-level field (additive, alongside legacy abilityScores)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.engineAbilityScores).toBeDefined();
+    // Legacy abilityScores MUST still be present (tolerate-read guarantee)
+    expect(body.sheet.abilityScores).toBeDefined();
+  });
+
+  it('REQ-AS-SHEET-01 parity: engineAbilityScores[a].score === abilityScores[a].score for all 6 abilities', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { engineAbilityScores, sheet } = res.json();
+    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    for (const a of abilities) {
+      expect(engineAbilityScores[a].score).toBe(sheet.abilityScores[a].score);
+    }
+  });
+
+  it('REQ-AS-SHEET-03: engineAbilityScores[a].modifier === floor((score - 10) / 2) (PHB p.13)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { engineAbilityScores } = res.json();
+    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    for (const a of abilities) {
+      const expected = Math.floor((engineAbilityScores[a].score - 10) / 2);
+      expect(engineAbilityScores[a].modifier).toBe(expected);
+    }
+  });
+
+  it('REQ-AS-SHEET-04: engineAbilityScores contains breakdown array for each ability', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { engineAbilityScores } = res.json();
+    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    for (const a of abilities) {
+      expect(Array.isArray(engineAbilityScores[a].breakdown)).toBe(true);
+    }
+  });
+
+  it('REQ-AS-SHEET-04 DEX: breakdown contains entry for +2 racial ASI on DEX (PHB p.23 Elf)', async () => {
+    // High Elf DEX: base 14 + racial +2 = 16. Engine breakdown must contain the ASI source.
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${characterId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { engineAbilityScores } = res.json();
+    // DEX must be 16 (14 base + 2 racial)
+    expect(engineAbilityScores.dex.score).toBe(16);
+    // breakdown must have at least 1 entry for the +2 bonus
+    expect(engineAbilityScores.dex.breakdown.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// REQ-AS-TOLERATE-01 — characterization/regression test
+// A character created before the stats wizard step (data has no `baseStats`)
+// MUST load without crashing (HTTP 200, engineAbilityScores absent/undefined,
+// legacy abilityScores present with all-10 defaults from compute.ts §300).
+// ---------------------------------------------------------------------------
+describe('GET /characters/:id/sheet — REQ-AS-TOLERATE-01: char without baseStats (pre-stats wizard)', () => {
+  /**
+   * Tolerate-read guard: characters.ts:856
+   *   const engineAbilityScores = rawBaseStats ? Object.fromEntries(...) : undefined;
+   *
+   * When a character row has no `baseStats` in `data` (freshly created, wizard
+   * not yet started), the route MUST:
+   *   1. Return HTTP 200 — not crash with 500.
+   *   2. Omit `engineAbilityScores` (undefined / absent in response body).
+   *   3. Include legacy `sheet.abilityScores` with all scores defaulting to 10
+   *      (compute.ts:300 — baseStats ?? { str:10, dex:10, con:10, int:10, wis:10, cha:10 }).
+   *
+   * No stats PUT is issued so `data['baseStats']` stays absent.
+   * PHB §"Ability Scores" (PHB p.12): scores are defined at character creation,
+   * but the route must be tolerant of incomplete wizard state.
+   */
+  let user: TestUser;
+  let noBaseStatsCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Tolerate-Read Test Campaign' },
+      })
+      .then((r) => r.json());
+
+    // Create a character WITHOUT calling PUT /stats → data has no baseStats key.
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Pre-Stats Wizard Char' },
+      })
+      .then((r) => r.json());
+    noBaseStatsCharId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('REQ-AS-TOLERATE-01.1: GET /sheet returns HTTP 200 for character without baseStats (no 500)', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('REQ-AS-TOLERATE-01.2: engineAbilityScores is absent/undefined in response when baseStats missing', async () => {
+    // Guard: characters.ts:856 — rawBaseStats ? ... : undefined
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    // engineAbilityScores must be absent (undefined → omitted from JSON serialization)
+    expect(body.engineAbilityScores).toBeUndefined();
+  });
+
+  it('REQ-AS-TOLERATE-01.3: legacy sheet.abilityScores is present with all-10 defaults when baseStats missing', async () => {
+    // compute.ts:300 — baseStats ?? { str:10, dex:10, con:10, int:10, wis:10, cha:10 }
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${noBaseStatsCharId}/sheet`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { sheet } = res.json();
+    expect(sheet.abilityScores).toBeDefined();
+    const abilities = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
+    for (const a of abilities) {
+      // All scores default to 10 (PHB p.12 — baseline before any assignment)
+      expect(sheet.abilityScores[a].score).toBe(10);
+    }
+  });
+});
