@@ -925,10 +925,23 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       };
     });
 
-    // Assemble full CharacterSheet: merge partialSheet (no savingThrows) + engine saves.
+    // engine-initiative-parity: resolve initiative natively via engine.
+    // REQ-NATIVE-INIT-01: resolveStat('initiative', nativeDexMod). PHB p.177 — initiative = DEX mod.
+    // REQ-TOLREAD-INIT-01: tolerate-read guard for legacy DB rows missing engineAbilityScores.
+    // No proficiency, no adapter needed — initiative is pure DEX mod + optional NumMods.
+    const nativeDexMod = engineAbilityScores?.['dex']?.modifier ?? sheet.abilityScores.dex.modifier;
+    const resolvedInitiative = resolveStat(charId, 'initiative', nativeDexMod, ctx, registry);
+
+    // Assemble full CharacterSheet: merge partialSheet (no savingThrows, no initiative) + engine values.
     // REQ-SERVE-01: sheet.savingThrows assembled in route from engine output.
     // REQ-LEGACY-01: computeCharacterSheet no longer emits savingThrows (Omit return type).
-    const fullSheet = { ...sheet, savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })) };
+    // REQ-SERVE-INIT-01: sheet.initiative assembled in route from engine output.
+    // REQ-LEGACY-02: computeCharacterSheet no longer emits initiative (Omit return type extended).
+    const fullSheet = {
+      ...sheet,
+      savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })),
+      initiative: resolvedInitiative.value,
+    };
 
     const engineStats = {
       attackRoll: engineStatsAttackRoll,
