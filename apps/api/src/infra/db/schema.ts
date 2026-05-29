@@ -992,6 +992,9 @@ export const modifierInstances = pgTable(
     predicate: jsonb('predicate'),
     duration: jsonb('duration'),
     label: text('label'),
+    /** Encounter round at cast time. NULL = non-encounter cast or legacy row → never round-expires.
+     *  Design ref: sdd/engine-timeline-duration/design — ADR-1 (lifecycle column promotion). */
+    startRound: integer('start_round'), // nullable; no DEFAULT — legacy rows stay NULL
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
