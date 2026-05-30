@@ -123,6 +123,9 @@ export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
 export { advancePhase } from './pipeline/state-machine.js';
 export type { PipelineSignal, AdvanceResult } from './pipeline/state-machine.js';
 
+export { resolveWeaponAttack } from './attack/resolve-weapon-attack.js';
+export type { WeaponAttackInput, WeaponAttackResult } from './attack/resolve-weapon-attack.js';
+
 // ── Form-switching subsystem ──────────────────────────────────────────────────
 
 export { applyFormSwitch } from './form-switching/substitute.js';
