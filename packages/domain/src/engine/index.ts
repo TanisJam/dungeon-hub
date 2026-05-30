@@ -92,6 +92,8 @@ export {
   hasRollMode,
   runtimeDecision,
   hasWeaponProperty,
+  // Slice 3a — always-true predicate for unconditional grants (Stunned advantage, ADR-6 R2)
+  alwaysTrue,
 } from './predicate/ast.js';
 
 // Evaluator
@@ -126,6 +128,12 @@ export type { RollModeResult } from './resolve/roll-mode.js';
 export { rollDamageBreakdown } from './dice/roll.js';
 export type { RngFn, RollResult, PerDieEntry } from './dice/roll.js';
 
+// ── Saving throw ─────────────────────────────────────────────────────────────
+
+// Slice 3a — rollSavingThrow pure function
+export { rollSavingThrow } from './save/roll-saving-throw.js';
+export type { RollSavingThrowResult } from './save/roll-saving-throw.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
@@ -153,6 +161,10 @@ export type {
 
 export { PRONE_CONDITION_DEF } from './conditions/prone.js';
 export type { ConditionDefinition } from './conditions/prone.js';
+
+// Slice 3a — Stunned + Incapacitated condition definitions
+export { STUNNED_CONDITION_DEF } from './conditions/stunned.js';
+export { INCAPACITATED_CONDITION_DEF } from './conditions/incapacitated.js';
 
 // ── Authoring DSL ─────────────────────────────────────────────────────────────
 
@@ -186,6 +198,10 @@ export type {
   BuildProneResult,
   ConditionNotFoundIssue,
 } from './rules/prone.js';
+
+// Slice 3a — Stunned rule builder (lights up attackers-of production path)
+export { buildStunnedModifiers } from './rules/stunned.js';
+export type { BuildStunnedResult } from './rules/stunned.js';
 
 export { buildCounterspellReaction } from './rules/counterspell.js';
 export type {

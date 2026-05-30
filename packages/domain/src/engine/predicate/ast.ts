@@ -89,3 +89,16 @@ export function runtimeDecision(key: string, equals: unknown): Predicate {
 export function hasWeaponProperty(property: string): Predicate {
   return query({ kind: 'hasWeaponProperty', property });
 }
+
+/**
+ * A trivially-true predicate (empty AND — vacuous truth).
+ *
+ * Used for unconditional modifiers such as Stunned's advantage grant
+ * (PHB p.292 — ALL attackers get advantage, no range/weapon predicate).
+ *
+ * Design ref: sdd/engine-forced-check-3a/design — ADR-6 (R2: always-true predicate).
+ * Note: `and([])` evaluates true by short-circuit vacuous truth in evaluatePredicate.
+ */
+export function alwaysTrue(): Predicate {
+  return { op: 'and', nodes: [] };
+}
