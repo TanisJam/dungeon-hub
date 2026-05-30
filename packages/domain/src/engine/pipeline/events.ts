@@ -23,6 +23,23 @@ export interface CastEvent {
   targetDistance: number;
 }
 
+// ── AttackEvent ───────────────────────────────────────────────────────────────
+
+/**
+ * Emitted when an attack is resolved (to-hit known, before damage commit).
+ * Carries enough information for reaction predicates (Shield AC check, etc.)
+ *
+ * REQ-ERB-TYPES-01: additive alongside CastEvent — CastEvent is NOT modified.
+ * ADR-2: engine-reaction-bus design — discriminated union widening, non-breaking.
+ */
+export interface AttackEvent {
+  kind: 'attacked';
+  actionId: string;
+  toHitTotal: number;
+  attackerId: EntityId;
+  targetId: EntityId;
+}
+
 // ── EventKind re-export ───────────────────────────────────────────────────────
 
 export type { EventKind } from '../types.js';

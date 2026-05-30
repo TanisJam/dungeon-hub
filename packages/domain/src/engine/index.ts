@@ -148,11 +148,18 @@ export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
 export { advancePhase } from './pipeline/state-machine.js';
 export type { PipelineSignal, AdvanceResult } from './pipeline/state-machine.js';
 
+// Pipeline events (CastEvent + AttackEvent — REQ-ERB-TYPES-01)
+export type { CastEvent, AttackEvent } from './pipeline/events.js';
+
 export { resolveWeaponAttack } from './attack/resolve-weapon-attack.js';
 export type { WeaponAttackInput, WeaponAttackResult } from './attack/resolve-weapon-attack.js';
 
 export { rollToHit } from './attack/roll-to-hit.js';
 export type { RollToHitResult, RollMode } from './attack/roll-to-hit.js';
+
+// Shield reaction window predicate (engine-reaction-bus — REQ-ERB-TYPES-01)
+export { isShieldableHit } from './attack/shieldable-hit.js';
+export type { ShieldableHitParams } from './attack/shieldable-hit.js';
 
 // ── Form-switching subsystem ──────────────────────────────────────────────────
 

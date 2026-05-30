@@ -90,7 +90,9 @@ export type Trigger =
   | 'on-cast'
   | 'on-attacked'
   | 'on-hit'
-  | 'on-damage';
+  | 'on-damage'
+  /** REQ-ERB-TYPES-02: reaction fires when this entity is the TARGET of an incoming attack. */
+  | 'on-incoming-attack';
 
 // ── ResetTrigger ──────────────────────────────────────────────────────────────
 
@@ -127,7 +129,19 @@ export interface DurationSpec {
 
 export type EventKind = 'cast' | 'attacked' | 'damaged';
 
-export type ReactionEffect = { kind: 'counter'; autoIfSlotGe: number };
+/**
+ * ReactionEffect — what happens when a reaction fires.
+ *
+ * counter: cancel the triggering cast (Counterspell — PHB p.228).
+ * ac-bonus: grant a numeric AC bonus to the reacting entity for this attack
+ *   (Shield +5 AC — PHB p.275, additive circumstance mod, transient).
+ *
+ * REQ-ERB-TYPES-03: ac-bonus variant added (ADR-2, engine-reaction-bus). Additive —
+ *   counter arm unchanged; existing exhaustive switches remain valid.
+ */
+export type ReactionEffect =
+  | { kind: 'counter'; autoIfSlotGe: number }
+  | { kind: 'ac-bonus'; value: number };
 
 // ── Modifier discriminated union (10 kinds, closed) ───────────────────────────
 
