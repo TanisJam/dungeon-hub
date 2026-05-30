@@ -18,6 +18,7 @@ import { advanceEncounterTurn } from '../../use-cases/encounters/advance-encount
 import { patchCombatant } from '../../use-cases/encounters/patch-combatant.js';
 import { performWeaponAttack } from '../../use-cases/encounters/perform-weapon-attack.js';
 import { performWeaponAttackApply } from '../../use-cases/encounters/perform-weapon-attack-apply.js';
+import { performForcedCheck } from '../../use-cases/encounters/perform-forced-check.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -347,6 +348,106 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         perDie: result.perDie,
         newHp: result.newHp,
         damageType: result.damageType,
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/forced-check --------------------------
+  // Engine saving throw + condition apply (engine-forced-check-3a).
+  // GM-only. Server-authoritative: rolls save, applies conditions on fail.
+  // REQ-API-01: thin route — Zod body → performForcedCheck → response.
+  // NO encounters.version required/bumped (ADR-5 — append-only child table).
+  const ForcedCheckBody = z.object({
+    targetCombatantId: z.string().uuid(),
+    ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+    dc: z.number().int().min(1).max(30),
+    conditionOnFail: z.string().min(1),
+    npcSaveMod: z.number().optional(),
+    rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
+  });
+
+  app.post(
+    '/encounters/:id/actions/forced-check',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod body validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = ForcedCheckBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { targetCombatantId, ability, dc, conditionOnFail, npcSaveMod, rollMode } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for campaign membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ATK-AUTH-01 pattern).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await performForcedCheck({
+        encounterId: id,
+        targetCombatantId,
+        ability,
+        dc,
+        conditionOnFail,
+        npcSaveMod: npcSaveMod ?? null,
+        rollMode,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          case 'NO_TARGET_SAVE':
+            // CLAUDE.md §6: NO_TARGET_SAVE → 400 VALIDATION_FAILED with issues[].
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_TARGET_SAVE' }],
+            });
+          case 'UNKNOWN_CONDITION':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'UNKNOWN_CONDITION', condition: result.condition }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // Return discriminated response by outcome.
+      if (result.outcome === 'autoFail') {
+        return reply.code(200).send({
+          outcome: 'autoFail',
+          reason: result.reason,
+          applied: result.applied,
+        });
+      }
+
+      if (result.outcome === 'fail') {
+        return reply.code(200).send({
+          outcome: 'fail',
+          save: result.save,
+          applied: result.applied,
+        });
+      }
+
+      // outcome === 'save'
+      return reply.code(200).send({
+        outcome: 'save',
+        save: result.save,
+        applied: result.applied,
       });
     },
   );
