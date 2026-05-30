@@ -23,7 +23,24 @@ export type WorldQuery =
   /** Can the resolving entity see the caster? (Counterspell range/visibility) */
   | { kind: 'canSee'; entity: 'self'; of: 'caster' }
   /** Is the in-flight spell at most N levels? */
-  | { kind: 'spellLevelAtMost'; n: number };
+  | { kind: 'spellLevelAtMost'; n: number }
+  /**
+   * Does the current attack have the specified roll mode?
+   * Requires ctx.resolvedRollMode (populated by enrichedCtx at ON_HIT phase).
+   * Returns false (NOT throws) when ctx.resolvedRollMode is absent — REQ-SA-WQ-01.1.
+   */
+  | { kind: 'hasRollMode'; mode: 'advantage' | 'disadvantage' | 'normal' }
+  /**
+   * Does the caller assert the named runtime decision?
+   * Caller-asserted opt-in (Sneak Attack once-per-turn, spatial ally, etc.).
+   * Returns false when ctx.runtimeDecisions is absent or key is missing — REQ-SA-WQ-01.2.
+   */
+  | { kind: 'runtimeDecision'; key: string; equals: unknown }
+  /**
+   * Does the weapon in use have the named property?
+   * Returns false (NOT throws) when ctx.weaponInUse is absent — REQ-SA-WQ-01.3.
+   */
+  | { kind: 'hasWeaponProperty'; property: string };
 
 // ── Predicate AST ─────────────────────────────────────────────────────────────
 

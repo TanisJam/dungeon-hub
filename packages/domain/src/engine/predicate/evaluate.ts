@@ -111,6 +111,37 @@ function evaluateWorldQuery(q: WorldQuery, ctx: EvaluationContext): boolean {
       if (level === undefined) return false;
       return level <= q.n;
     }
+
+    case 'hasRollMode': {
+      // resolvedRollMode absent pre-ON_HIT → false (not an error).
+      // Returns false when ctx.resolvedRollMode absent — REQ-SA-WQ-01.1.
+      // PHB p.173 — advantage/disadvantage roll mode.
+      if (ctx.resolvedRollMode === undefined) return false;
+      return ctx.resolvedRollMode === q.mode;
+    }
+
+    case 'runtimeDecision': {
+      // Caller-asserted opt-in; absent runtimeDecisions or missing key → false.
+      // Returns false when ctx.runtimeDecisions absent — REQ-SA-WQ-01.2.
+      // PHB p.96 — Sneak Attack once-per-turn and spatial-ally (caller-asserted).
+      return ctx.runtimeDecisions?.[q.key] === q.equals;
+    }
+
+    case 'hasWeaponProperty': {
+      // weaponInUse absent → no weapon → property check fails (not an error).
+      // Returns false when ctx.weaponInUse absent — REQ-SA-WQ-01.3.
+      // PHB p.147 — finesse; PHB p.96 — Sneak Attack weapon gate.
+      const props = ctx.weaponInUse?.properties;
+      if (props === undefined) return false;
+      return props.includes(q.property);
+    }
+
+    default: {
+      // Exhaustiveness guard — future WorldQuery leaves added without a case
+      // will cause a compile-time error here. REQ-SA-WQ-01.4.
+      const _exhaustive: never = q;
+      return _exhaustive;
+    }
   }
 }
 

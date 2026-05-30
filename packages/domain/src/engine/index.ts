@@ -88,6 +88,10 @@ export {
   hasCondition,
   canSee,
   spellLevelAtMost,
+  // Slice 2b — Sneak Attack conditional on-hit rider leaves
+  hasRollMode,
+  runtimeDecision,
+  hasWeaponProperty,
 } from './predicate/ast.js';
 
 // Evaluator
@@ -166,6 +170,7 @@ export type {
 
 export { buildBlessModifiers } from './rules/bless.js';
 export { buildOnHitDamageRider } from './rules/on-hit-damage-rider.js';
+export { buildSneakAttackRider } from './rules/sneak-attack.js';
 
 export { buildProneModifiers } from './rules/prone.js';
 export type {

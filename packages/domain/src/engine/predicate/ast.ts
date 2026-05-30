@@ -59,3 +59,33 @@ export function canSee(of: 'caster'): Predicate {
 export function spellLevelAtMost(n: number): Predicate {
   return query({ kind: 'spellLevelAtMost', n });
 }
+
+/**
+ * Does the current attack have the specified roll mode?
+ * Requires ctx.resolvedRollMode (set by enrichedCtx in ON_HIT phase).
+ * Returns false when ctx.resolvedRollMode is absent — REQ-SA-WQ-01.1.
+ * PHB p.173 — advantage/disadvantage mechanics.
+ */
+export function hasRollMode(mode: 'advantage' | 'disadvantage' | 'normal'): Predicate {
+  return query({ kind: 'hasRollMode', mode });
+}
+
+/**
+ * Does the caller assert the named runtime decision as the given value?
+ * Caller-asserted opt-in for conditions the engine cannot verify (ally adjacency,
+ * once-per-turn state, etc.). Returns false when runtimeDecisions is absent or
+ * the key is not present — REQ-SA-WQ-01.2.
+ * PHB p.96 — Sneak Attack once-per-turn and spatial-ally branch.
+ */
+export function runtimeDecision(key: string, equals: unknown): Predicate {
+  return query({ kind: 'runtimeDecision', key, equals });
+}
+
+/**
+ * Does the weapon in use have the named property string?
+ * Returns false (NOT throws) when ctx.weaponInUse is absent — REQ-SA-WQ-01.3.
+ * PHB p.147 — finesse property; PHB p.96 — Sneak Attack weapon gate.
+ */
+export function hasWeaponProperty(property: string): Predicate {
+  return query({ kind: 'hasWeaponProperty', property });
+}

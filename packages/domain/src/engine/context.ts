@@ -62,6 +62,17 @@ export interface EvaluationContext {
   runtimeDecisions?: Record<string, unknown>;
 
   /**
+   * Resolved roll mode for the current attack, threaded into the ON_HIT predicate
+   * context via enrichedCtx (Option A1 — Sneak Attack, slice 2b).
+   * Absent pre-TO_HIT and in any non-attack context.
+   * PHB p.96 — Sneak Attack advantage branch; PHB p.173 — roll mode mechanics.
+   *
+   * exactOptionalPropertyTypes: absent means the field is not present at all
+   * (not undefined-assigned). Use enrichedCtx spread; never assign undefined.
+   */
+  resolvedRollMode?: 'advantage' | 'disadvantage' | 'normal';
+
+  /**
    * Current encounter round. Absent = outside a tracked encounter or no
    * encounter context was supplied to the route. When absent, evaluateDuration
    * falls back to active (conservative fallback — cannot evaluate without a

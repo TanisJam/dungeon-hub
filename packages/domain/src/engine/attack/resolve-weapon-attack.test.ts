@@ -11,7 +11,9 @@ import { resolveWeaponAttack, type WeaponAttackInput } from './resolve-weapon-at
 import { createInMemoryRegistry } from '../registry/query.js';
 import { buildBlessModifiers } from '../rules/bless.js';
 import { buildOnHitDamageRider } from '../rules/on-hit-damage-rider.js';
+import { hasRollMode } from '../predicate/ast.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
+import type { EvaluationContext } from '../context.js';
 import type { EntityId } from '../types.js';
 
 // ── Shared test helpers ───────────────────────────────────────────────────────
@@ -646,6 +648,121 @@ describe('resolveWeaponAttack — Scenario ONHIT-6: damage_structured_not_rolled
       expect(riderSource).toBeDefined();
       expect(typeof riderSource!.amount).toBe('string');
       expect(riderSource!.amount).toBe('1d6');
+    },
+  );
+});
+
+// ── Scenario SA-CTX-01: enriched_ctx_resolvedRollMode_present_at_on_hit ─────────
+// REQ-SA-ROLLMODE-CTX-01.1 — enrichedCtx wiring
+
+describe('resolveWeaponAttack — Scenario SA-CTX-01: enriched_ctx_resolvedRollMode_present_at_on_hit', () => {
+  it(
+    'Rider with hasRollMode("advantage") predicate is INCLUDED when attack has advantage — REQ-SA-ROLLMODE-CTX-01.1',
+    () => {
+      // This test is the load-bearing RED → GREEN for the enrichedCtx change.
+      // WITHOUT the enrichedCtx fix: resolvedRollMode is absent in ctx passed to ON_HIT
+      // → hasRollMode returns false → rider excluded → test FAILS.
+      // WITH the enrichedCtx fix: resolvedRollMode = 'advantage' in ON_HIT ctx → rider included.
+      //
+      // Setup: register an on-hit rider with a hasRollMode('advantage') predicate.
+      // Give the attacker an AdvantageMod so rollMode resolves to 'advantage'.
+      // After resolveWeaponAttack, the rider's Source must appear in damage.breakdown.
+      // PHB p.173 — advantage roll mode; PHB p.96 — Sneak Attack advantage branch.
+      const registry = createInMemoryRegistry();
+
+      // AdvantageMod → rollMode = 'advantage'
+      const advInstance: ModifierInstance = {
+        id: iid('adv-mod-1'),
+        label: 'Test Advantage',
+        def: { kind: 'advantage', mode: 'grant', rollType: 'attack' },
+        scope: {
+          owner: ROGUE_ID,
+          target: { axis: 'self' },
+          trigger: 'on-attack-roll',
+        },
+      };
+      registry.register(advInstance);
+
+      // On-hit rider gated on hasRollMode('advantage')
+      const rider: ModifierInstance = {
+        id: iid('advantage-gated-rider'),
+        label: 'Advantage Gated Rider',
+        def: { kind: 'num', op: 'add', value: '2d6', stat: 'damage', category: 'untyped' },
+        scope: {
+          owner: ROGUE_ID,
+          target: { axis: 'entities', ids: [ROGUE_ID] },
+          trigger: 'on-hit',
+        },
+        predicate: hasRollMode('advantage'),
+      };
+      registry.register(rider);
+
+      const ctx = makeCtx(ROGUE_ID);
+      const input: WeaponAttackInput = {
+        self: ROGUE_ID,
+        ctx,
+        registry,
+        strMod: 0,
+        dexMod: 3,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: RAPIER,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // rollMode must be 'advantage'
+      expect(result.rollMode.mode).toBe('advantage');
+
+      // Rider Source MUST appear in breakdown (only passes with enrichedCtx)
+      const riderSource = result.damage.breakdown.find((s) => s.label === 'Advantage Gated Rider');
+      expect(riderSource).toBeDefined();
+      expect(riderSource!.amount).toBe('2d6');
+    },
+  );
+});
+
+// ── Scenario SA-CTX-02: original_ctx_not_mutated ─────────────────────────────
+// REQ-SA-ROLLMODE-CTX-01.2 — enrichedCtx does NOT mutate the input ctx
+
+describe('resolveWeaponAttack — Scenario SA-CTX-02: original_ctx_not_mutated', () => {
+  it(
+    'Input ctx does NOT gain resolvedRollMode after resolveWeaponAttack — REQ-SA-ROLLMODE-CTX-01.2',
+    () => {
+      // The enrichedCtx is a COPY (plain spread). The input ctx must remain unchanged.
+      // If ctx is mutated in-place, this test fails.
+      const registry = createInMemoryRegistry();
+
+      // AdvantageMod to produce a non-normal rollMode (so enrichedCtx has content)
+      const advInstance: ModifierInstance = {
+        id: iid('adv-mod-2'),
+        label: 'Test Advantage 2',
+        def: { kind: 'advantage', mode: 'grant', rollType: 'attack' },
+        scope: {
+          owner: FIGHTER_ID,
+          target: { axis: 'self' },
+          trigger: 'on-attack-roll',
+        },
+      };
+      registry.register(advInstance);
+
+      const ctx: EvaluationContext = makeCtx(FIGHTER_ID);
+
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      resolveWeaponAttack(input);
+
+      // ctx must NOT have resolvedRollMode after the call
+      expect('resolvedRollMode' in ctx).toBe(false);
     },
   );
 });

@@ -198,6 +198,15 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
   });
   const rollMode = resolveRollMode(rollModeMods, ctx);
 
+  // ── enrichedCtx: copy of ctx with resolvedRollMode threaded in (Option A1) ────
+  // Build AFTER rollMode resolution — rollMode.mode is always 'advantage'|'disadvantage'|'normal'
+  // (never undefined), so a plain spread is exactOptionalPropertyTypes-safe.
+  // Used ONLY for the ON_HIT query so conditional on-hit predicates (e.g. Sneak Attack
+  // hasRollMode gate) can see the resolved roll mode.
+  // The input `ctx` is NOT mutated. REQ-SA-ROLLMODE-CTX-01.
+  // PHB p.96 — Sneak Attack advantage branch; PHB p.173 — advantage/disadvantage.
+  const enrichedCtx: EvaluationContext = { ...ctx, resolvedRollMode: rollMode.mode };
+
   // ── Phase sweep: TO_HIT → ON_HIT ─────────────────────────────────────────────
   actionResult = advancePhase(action, 'advance');
   if (!actionResult.ok) throw new Error('[resolveWeaponAttack] Phase advance failed: TO_HIT→ON_HIT');
@@ -212,7 +221,10 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
   // query.ts does NOT filter by stat; only trigger+axis. Mirrors stat.ts:128-135.
   // This is the stat-filter gate: an on-hit NumMod with a different stat (e.g.
   // 'attack-roll') must NOT leak into damage.breakdown.
-  const onHitInstances = registry.query({ stat: 'damage', trigger: 'on-hit', self, ctx });
+  //
+  // enrichedCtx (not ctx) — carries resolvedRollMode so conditional predicates
+  // (e.g. Sneak Attack hasRollMode gate) can evaluate correctly. REQ-SA-ROLLMODE-CTX-01.1.
+  const onHitInstances = registry.query({ stat: 'damage', trigger: 'on-hit', self, ctx: enrichedCtx });
   // Explicit stat filter — critical correctness guard (design ADR stat-filter):
   const onHitDamageInstances = onHitInstances.filter(
     (inst) => inst.def.kind === 'num' && inst.def.stat === 'damage',
