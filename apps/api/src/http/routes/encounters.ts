@@ -4,6 +4,7 @@
  * Gating:
  *   - POST / PATCH / advance-turn: caller MUST be GM (campaign_members.role='gm').
  *   - GET endpoints: caller MUST be a member of the campaign (gm or player).
+ *   - POST /:id/actions/attack: caller MUST own the attacker character (or be GM).
  */
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ import { listCampaignEncounters } from '../../use-cases/encounters/list-campaign
 import { loadEncounter } from '../../use-cases/encounters/load-encounter.js';
 import { advanceEncounterTurn } from '../../use-cases/encounters/advance-encounter-turn.js';
 import { patchCombatant } from '../../use-cases/encounters/patch-combatant.js';
+import { performWeaponAttack } from '../../use-cases/encounters/perform-weapon-attack.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -42,6 +44,19 @@ const ParamsWithIdAndCid = z.object({
 });
 const AdvanceBody = z.object({ version: z.number().int().nonnegative() });
 const PatchCombatantBody = z.object({ hpCurrent: z.number().int().nonnegative() });
+
+/**
+ * POST /encounters/:id/actions/attack — engine action pipeline Slice 1 (read-only).
+ *
+ * REQ-ATK-READONLY-01: no DB writes. Returns {toHit, damage, rollMode}.
+ * REQ-ATK-NULLSAFE-01: Zod validates required fields (CLAUDE.md §6).
+ */
+const AttackActionBodySchema = z.object({
+  attackerId: z.string().uuid(),
+  targetId: z.string().uuid(),
+  weaponInstanceId: z.string().uuid(),
+  activeConditions: z.array(z.string()).optional(),
+});
 
 async function memberRole(
   campaignId: string,
@@ -128,6 +143,68 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(409).send({ error: 'VERSION_CONFLICT' });
       }
       return result.encounter;
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/attack --------------------------------
+  // Engine action pipeline Slice 1 — read-only; see design ADR-8/ADR-9.
+  app.post(
+    '/encounters/:id/actions/attack',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Parse body — Zod validation failure → 400 VALIDATION_FAILED (CLAUDE.md §6).
+      const bodyResult = AttackActionBodySchema.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { attackerId, targetId, weaponInstanceId, activeConditions } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter to check campaign membership for the GM/player gate.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      // Delegate to use-case (ownership + turn + active guards are inside).
+      const result = await performWeaponAttack({
+        encounterId: id,
+        attackerId,
+        targetId,
+        weaponInstanceId,
+        ...(activeConditions !== undefined ? { activeConditions } : {}),
+        callerId: userId,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
+          case 'NOT_YOUR_TURN':
+            return reply.code(409).send({ error: 'NOT_YOUR_TURN' });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({
+        toHit: result.toHit,
+        damage: result.damage,
+        rollMode: result.rollMode,
+      });
     },
   );
 
