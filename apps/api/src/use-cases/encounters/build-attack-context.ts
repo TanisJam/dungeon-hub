@@ -59,6 +59,8 @@ export type BuildAttackContextResult =
       ok: true;
       /** Resolved character EntityId (branded). */
       charId: EntityId;
+      /** Attacker's character UUID as a plain string (for SQL WHERE clarity). */
+      attackerCharacterId: string;
       /** Built EvaluationContext. */
       ctx: EvaluationContext;
       /** Built ModifierRegistry (with inventory + persisted + sneak attack rider). */
@@ -67,10 +69,23 @@ export type BuildAttackContextResult =
       strMod: number;
       /** Attacker's DEX modifier. */
       dexMod: number;
+      /** Attacker's Wisdom modifier (for Monk ki save DC — ADR-1). */
+      wisMod: number;
       /** Attacker's proficiency bonus. */
       proficiencyBonus: number;
       /** Whether the attacker is proficient with this weapon. */
       isProficient: boolean;
+      /**
+       * Monk class level (0 if not a Monk). Used to compute ki pool max.
+       * PHB p.78: ki pool size = Monk level.
+       * Slice 3b-ii — ADR-1.
+       */
+      monkLevel: number;
+      /**
+       * Ki points used before this attack (from classResourcesUsed['monk:ki-points']).
+       * Slice 3b-ii — ADR-1. 0 for non-Monks or if no ki has been spent yet.
+       */
+      kiUsedBefore: number;
       /** Weapon stats for resolveWeaponAttack. */
       weapon: {
         kind: 'melee' | 'ranged';
@@ -273,8 +288,21 @@ export async function buildAttackContext(
   // ── Step 12: Resolve ability mods ─────────────────────────────────────────────
   const strScore = sheet.abilityScores.str?.score ?? 10;
   const dexScore = sheet.abilityScores.dex?.score ?? 10;
+  const wisScore = sheet.abilityScores.wis?.score ?? 10;
   const strMod = abilityModifier(strScore);
   const dexMod = abilityModifier(dexScore);
+  const wisMod = abilityModifier(wisScore);
+
+  // ── Step 12b: Monk-specific context (Slice 3b-ii — ADR-1) ────────────────────
+  // monkLevel: mirrors rogueLevel pattern (L243-245). 0 for non-Monks.
+  // PHB p.78: ki pool max = Monk level (for L≥2; handled by MONK_KI_POINTS registry).
+  const monkLevel = ((charData['classes'] as AppliedClass[] | undefined) ?? [])
+    .filter((c) => c.slug === 'monk')
+    .reduce((sum, c) => sum + c.level, 0);
+
+  // kiUsedBefore: from already-loaded charData — NO new DB query.
+  const classResourcesUsed = charData['classResourcesUsed'] as Record<string, number> | undefined;
+  const kiUsedBefore: number = classResourcesUsed?.['monk:ki-points'] ?? 0;
 
   // ── Step 13: Weapon shape for resolveWeaponAttack ────────────────────────────
   const weapon = {
@@ -290,12 +318,16 @@ export async function buildAttackContext(
   return {
     ok: true,
     charId,
+    attackerCharacterId: characterId,
     ctx,
     registry,
     strMod,
     dexMod,
+    wisMod,
     proficiencyBonus,
     isProficient,
+    monkLevel,
+    kiUsedBefore,
     weapon,
   };
 }

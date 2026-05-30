@@ -99,8 +99,21 @@ const AttackApplyBody = z.object({
   attackerId: z.string().uuid(),
   targetId: z.string().uuid(),
   weaponInstanceId: z.string().uuid(),
-  /** Caller-asserted runtime decisions (for Sneak Attack predicates, etc.). */
+  /**
+   * Caller-asserted runtime decisions — open boolean map (ADR-7: no per-key Zod, open record).
+   * Known keys (Slice 2b+):
+   *   sneakAttackFirstThisTurn: boolean — Rogue Sneak Attack eligible this turn
+   *   stunningStrikeSpend: boolean     — Slice 3b-ii: Monk Stunning Strike ki spend
+   */
   runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
+  /**
+   * GM-supplied CON save modifier for an NPC target (mirrors npcSaveMod in ForcedCheckBody).
+   * Required when stunningStrikeSpend=true AND the target is an NPC.
+   * Omitting it returns 400 NO_TARGET_SAVE (pre-roll, nothing committed, no ki wasted).
+   * PC targets ignore this field — server derives save mod from the character sheet.
+   * Slice 3b-ii NPC fix (REQ-SS-NPC-01).
+   */
+  targetNpcSaveMod: z.number().int().optional(),
   /** Client's known encounter version — must match DB version for CAS. */
   version: z.number().int().nonnegative(),
 });
@@ -278,7 +291,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { attackerId, targetId, weaponInstanceId, runtimeDecisions, version } = bodyResult.data;
+      const { attackerId, targetId, weaponInstanceId, runtimeDecisions, targetNpcSaveMod, version } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter for campaign membership check.
@@ -299,6 +312,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         targetId,
         weaponInstanceId,
         ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
+        // exactOptionalPropertyTypes: only spread when defined (avoids passing undefined).
+        ...(targetNpcSaveMod !== undefined ? { targetNpcSaveMod } : {}),
         version,
       });
 
@@ -318,6 +333,26 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'NO_TARGET_AC' }],
             });
+          // Slice 3b-ii pre-roll guards — FAIL-FAST before any roll or mutation.
+          // CLAUDE.md §6: 400 VALIDATION_FAILED with issues[{ code }].
+          // Mirrors RESOURCE_OVER_LIMIT at characters.ts:3713.
+          case 'STUNNING_STRIKE_NOT_MELEE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'STUNNING_STRIKE_NOT_MELEE' }],
+            });
+          case 'KI_EXHAUSTED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'KI_EXHAUSTED' }],
+            });
+          // NPC target + stunningStrikeSpend + missing targetNpcSaveMod (REQ-SS-NPC-01).
+          // Pre-roll: nothing rolled, nothing committed, no ki wasted. GM must supply CON save mod.
+          case 'NO_TARGET_SAVE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_TARGET_SAVE' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -336,6 +371,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       // REQ-ROUTE-BODY-03: hit response — includes all to-hit + damage fields.
+      // Slice 3b-ii: stunningStrike block forwarded when present (omitted on non-spend — backward-compat).
       return reply.code(200).send({
         hit: true,
         crit: result.crit,
@@ -348,6 +384,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         perDie: result.perDie,
         newHp: result.newHp,
         damageType: result.damageType,
+        ...(result.stunningStrike !== undefined ? { stunningStrike: result.stunningStrike } : {}),
       });
     },
   );
@@ -368,6 +405,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
     turnAnchorEntityId: z.string().uuid().optional(),
     turnAnchorBoundary: z.enum(['start', 'end']).optional(),
     turnsRemaining: z.number().int().min(0).optional(),
+    /**
+     * Slice 3b-ii ADR-4: when true AND turnAnchorEntityId provided, refreshes
+     * turn-anchor fields on an already-present condition instead of silently skipping.
+     * Defaults to false (undefined = no refresh — preserves 3a idempotency behavior).
+     */
+    refreshAnchorOnExisting: z.boolean().optional(),
   });
 
   app.post(
@@ -393,6 +436,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         turnAnchorEntityId,
         turnAnchorBoundary,
         turnsRemaining,
+        refreshAnchorOnExisting,
       } = bodyResult.data;
       const userId = request.user!.sub;
 
@@ -420,6 +464,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         // exactOptionalPropertyTypes: omit the key entirely when undefined (not pass undefined).
         ...(turnAnchorBoundary !== undefined ? { turnAnchorBoundary } : {}),
         turnsRemaining: turnsRemaining ?? null,
+        // Slice 3b-ii ADR-4: optional refresh for re-stun (default false → 3a behavior preserved).
+        ...(refreshAnchorOnExisting !== undefined ? { refreshAnchorOnExisting } : {}),
       });
 
       if (!result.ok) {

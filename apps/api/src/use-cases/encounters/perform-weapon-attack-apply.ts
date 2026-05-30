@@ -21,17 +21,19 @@
 
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters, encounterCombatants } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
 import {
   resolveWeaponAttack,
   rollDamageBreakdown,
   rollToHit,
+  computeKiSaveDc,
   type RngFn,
   type RollResult,
 } from '@dungeon-hub/domain/engine';
 import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { buildAttackContext } from './build-attack-context.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
+import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
 
 // ── Crypto RNG (ADR-5) ─────────────────────────────────────────────────────────
 
@@ -58,9 +60,48 @@ export interface PerformWeaponAttackApplyInput {
   weaponInstanceId: string;    // inventory instance UUID
   /** Caller-asserted runtime decisions (for Sneak Attack predicates, etc.). */
   runtimeDecisions?: Record<string, boolean>;
+  /**
+   * GM-supplied CON save modifier for an NPC target (mirrors npcSaveMod in ForcedCheckBody).
+   * Required when stunningStrikeSpend=true AND the target is an NPC — omitting it returns
+   * 400 NO_TARGET_SAVE (pre-roll, nothing committed). PC targets ignore this field.
+   * Slice 3b-ii NPC fix (REQ-SS-NPC-01).
+   */
+  targetNpcSaveMod?: number;
   /** Client's known version — must match encounters.version for CAS. */
   version: number;
 }
+
+/** Stunning Strike result block (Slice 3b-ii, REQ-SS-RESPONSE-01). */
+export type StunningStrikeBlock =
+  // Save rolled — success: ki spent, no Stunned.
+  | {
+      spent: true;
+      saveDc: number;
+      save: { d20: number; total: number; saveMod: number; success: true };
+      applied: string[];
+    }
+  // Save rolled — fail: ki spent, Stunned + Incapacitated applied.
+  | {
+      spent: true;
+      saveDc: number;
+      save: { d20: number; total: number; saveMod: number; success: false };
+      applied: string[];
+    }
+  // Auto-fail (STR/DEX — future; CON does not auto-fail): ki spent, applied.
+  | {
+      spent: true;
+      saveDc: number;
+      autoFail: true;
+      applied: string[];
+    }
+  // NPC target with no CON save mod (NO_TARGET_SAVE): ki spent, no save possible.
+  | {
+      spent: true;
+      saveDc: number;
+      save: null;
+      reason: 'no-target-save';
+      applied: string[];
+    };
 
 export type PerformWeaponAttackApplyResult =
   // MISS: no damage rolled, no HP mutation, no CAS bump (REQ-APPLY-FLOW-02).
@@ -91,13 +132,26 @@ export type PerformWeaponAttackApplyResult =
       newHp: number;
       /** Weapon's damage type. */
       damageType: string;
+      /**
+       * Stunning Strike result block (Slice 3b-ii, REQ-SS-RESPONSE-01).
+       * Present only when stunningStrikeSpend=true was in runtimeDecisions AND attack hit.
+       * Absent (key omitted) for backward-compat when stunningStrikeSpend absent/false.
+       */
+      stunningStrike?: StunningStrikeBlock;
     }
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'weapon' | 'character' }
   | { ok: false; code: 'NOT_YOUR_TURN' }
   | { ok: false; code: 'VERSION_CONFLICT' }
   | { ok: false; code: 'NO_TARGET_AC' }     // NPC with null ac (legacy/unset)
-  | { ok: false; code: 'FORBIDDEN' };
+  | { ok: false; code: 'FORBIDDEN' }
+  // Stunning Strike pre-roll 400 guards (Slice 3b-ii, FAIL-FAST — REQ-SS-MELEE-01, REQ-SS-KI-EXHAUSTED-01, REQ-SS-NPC-01).
+  // NOTHING committed (no to-hit roll, no HP change, no ki change) — pure pre-validation.
+  | { ok: false; code: 'STUNNING_STRIKE_NOT_MELEE' }
+  | { ok: false; code: 'KI_EXHAUSTED' }
+  // NPC target + stunningStrikeSpend + missing targetNpcSaveMod → 400 pre-roll (REQ-SS-NPC-01).
+  // Mirrors NO_TARGET_AC / NO_TARGET_SAVE: GM must supply the monster's CON save mod.
+  | { ok: false; code: 'NO_TARGET_SAVE' };
 
 // ── perform-weapon-attack-apply ────────────────────────────────────────────────
 
@@ -129,6 +183,7 @@ export async function performWeaponAttackApply(
     targetId,
     weaponInstanceId,
     runtimeDecisions,
+    targetNpcSaveMod,
     version,
   } = input;
 
@@ -204,7 +259,44 @@ export async function performWeaponAttackApply(
     return { ok: false, code: 'NOT_FOUND', target: ctxResult.target };
   }
 
-  const { charId, ctx, registry, strMod, dexMod, proficiencyBonus, isProficient, weapon } = ctxResult;
+  const {
+    charId,
+    attackerCharacterId,
+    ctx,
+    registry,
+    strMod,
+    dexMod,
+    wisMod,
+    proficiencyBonus,
+    isProficient,
+    monkLevel,
+    kiUsedBefore,
+    weapon,
+  } = ctxResult;
+
+  // ── Step 6b: Stunning Strike pre-roll validation (FAIL-FAST — Slice 3b-ii) ────
+  // Per the reconciled flow (LOCKED by Mauricio): ALL validation fires BEFORE rollToHit
+  // and BEFORE any mutation. Nothing is rolled or committed on these 400s.
+  // PHB p.85: Stunning Strike requires a melee weapon attack and costs ki.
+  const stunningStrikeSpend = runtimeDecisions?.['stunningStrikeSpend'] === true;
+  if (stunningStrikeSpend) {
+    // Guard 1: melee-only (PHB p.85 — "when you hit another creature with a melee weapon attack").
+    if (weapon.kind === 'ranged') {
+      return { ok: false, code: 'STUNNING_STRIKE_NOT_MELEE' };
+    }
+    // Guard 2: ki availability (PHB p.78 — ki pool max = Monk level; 0 remaining = exhausted).
+    // kiUsedBefore + 1 > monkLevel means no ki remaining.
+    if (kiUsedBefore + 1 > monkLevel) {
+      return { ok: false, code: 'KI_EXHAUSTED' };
+    }
+    // Guard 3: NPC target without CON save mod → reject PRE-ROLL (REQ-SS-NPC-01).
+    // Mirrors NO_TARGET_AC: GM must supply the monster's CON save modifier (npcSaveMod pattern).
+    // PC targets always resolve via resolveStat server-side; they never need targetNpcSaveMod.
+    // Firing PRE-ROLL (same place as melee/ki guards) ensures NO ki is spent, NO damage rolled.
+    if (targetCombatant.kind === 'npc' && (targetNpcSaveMod === undefined || targetNpcSaveMod === null)) {
+      return { ok: false, code: 'NO_TARGET_SAVE' };
+    }
+  }
 
   // ── Step 7: resolveWeaponAttack → damage expression + toHit + rollMode ────────
   // REQ-ATK-APPLY-02: server derives authoritative DiceExpr — client never supplies it.
@@ -247,6 +339,7 @@ export async function performWeaponAttackApply(
   // ── Step 10: Early-return on miss ─────────────────────────────────────────────
   // REQ-APPLY-FLOW-02: miss → no rollDamageBreakdown, no applyDamage, no transaction.
   // No HP mutation; no version bump; miss is a no-op mutation.
+  // PHB p.85: ki is only spent on a HIT — no ki decrement on miss (REQ-SS-MISS-01).
   if (!toHitResult.hit) {
     return {
       ok: true,
@@ -272,6 +365,8 @@ export async function performWeaponAttackApply(
 
   // Transaction: UPDATE target HP + CAS version bump (ADR-10).
   // UPDATE encounters WHERE id=$id AND version=$incoming → 0 rows = VERSION_CONFLICT.
+  // On stunningStrikeSpend=true: ALSO decrement ki via jsonb_set INSIDE this tx
+  // so that HP + version + ki are atomic (REQ-SS-ATOMICITY-01, ADR-2).
   const txResult = await db.transaction(async (tx) => {
     await tx
       .update(encounterCombatants)
@@ -292,11 +387,93 @@ export async function performWeaponAttackApply(
       .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
       .returning({ version: encounters.version });
 
-    return updated.length > 0;
+    if (updated.length === 0) {
+      // CAS conflict — rollback entire tx (ki NOT decremented).
+      return false;
+    }
+
+    // ── Step 12b: Ki decrement (Slice 3b-ii, REQ-SS-ATOMICITY-01) ────────────────
+    // jsonb_set: atomic server-side mutation of only the ki path.
+    // PHB p.85: ki is spent on HIT regardless of save outcome.
+    // jsonb_set path '{classResourcesUsed,monk:ki-points}': colon in key is safe in PG
+    // path-array literals (only commas, braces, and quotes are structural).
+    // WHY jsonb_set (not whole-data overwrite): avoids read-modify-write race — only the
+    // ki path is mutated; other data fields are untouched (ADR-2).
+    if (stunningStrikeSpend) {
+      await tx
+        .update(characters)
+        .set({
+          data: sql`jsonb_set(
+            data,
+            '{classResourcesUsed,monk:ki-points}',
+            to_jsonb((COALESCE((data#>>'{classResourcesUsed,monk:ki-points}')::int, 0) + 1)),
+            true
+          )`,
+        })
+        .where(eq(characters.id, attackerCharacterId));
+    }
+
+    return true;
   });
 
   if (!txResult) {
     return { ok: false, code: 'VERSION_CONFLICT' };
+  }
+
+  // ── Step 12c: Stunning Strike post-tx (Slice 3b-ii, REQ-SS-CONDITION-01) ──────
+  // performForcedCheck runs OUTSIDE the CAS tx (append-only, its own connection).
+  // Ki+HP are committed; Stunned insert follows as a near-atomic append.
+  // TODO saga: ki+HP commit and Stunned insert are not one atomic unit (cross-entity:
+  // characters JSONB vs encounter_combatant_conditions). Crash between leaves ki spent
+  // w/o stun. Accept for V1; future event-sourcing/compensating-tx slice.
+  // TODO perf: performForcedCheck re-loads encounter+target+conditions already in scope
+  // here; accept 3 redundant selects for V1, optimize via shared loaded-context handle
+  // if profiling flags it.
+  let stunningStrike: StunningStrikeBlock | undefined;
+
+  if (stunningStrikeSpend) {
+    const kiSaveDc = computeKiSaveDc(proficiencyBonus, wisMod);
+
+    const fc: PerformForcedCheckResult = await performForcedCheck({
+      encounterId,
+      targetCombatantId: targetId,
+      ability: 'con',
+      dc: kiSaveDc,
+      conditionOnFail: 'Stunned',
+      // NPC: targetNpcSaveMod is guaranteed non-null here (pre-roll guard above fires otherwise).
+      // PC: targetNpcSaveMod is undefined; resolveTargetSave derives CON mod server-side.
+      // exactOptionalPropertyTypes: spread conditionally to avoid passing undefined.
+      ...(targetNpcSaveMod !== undefined ? { npcSaveMod: targetNpcSaveMod } : {}),
+      appliedByCombatantId: attackerId,
+      turnAnchorEntityId: attackerId,      // anchor = monk combatant (PHB p.85: "YOUR next turn")
+      turnAnchorBoundary: 'end',           // PHB p.85: "until END of your next turn"
+      turnsRemaining: 1,
+      refreshAnchorOnExisting: true,       // re-stun refreshes existing anchor (ADR-4)
+    });
+
+    // Map performForcedCheck result to stunningStrike response block (ADR-6).
+    if (!fc.ok) {
+      // NO_TARGET_SAVE: NPC with no CON save → ki was spent, no save possible.
+      // RAW: ki is spent on the attempt regardless (PHB p.85).
+      stunningStrike = { spent: true, saveDc: kiSaveDc, save: null, reason: 'no-target-save', applied: [] };
+    } else if (fc.outcome === 'save') {
+      stunningStrike = {
+        spent: true,
+        saveDc: kiSaveDc,
+        save: { d20: fc.save.d20, total: fc.save.total, saveMod: fc.save.saveMod, success: true },
+        applied: fc.applied,
+      };
+    } else if (fc.outcome === 'fail') {
+      stunningStrike = {
+        spent: true,
+        saveDc: kiSaveDc,
+        save: { d20: fc.save.d20, total: fc.save.total, saveMod: fc.save.saveMod, success: false },
+        applied: fc.applied,
+      };
+    } else {
+      // autoFail (STR/DEX — CON does not normally auto-fail; defensive forwarding).
+      stunningStrike = { spent: true, saveDc: kiSaveDc, autoFail: true, applied: fc.applied };
+    }
   }
 
   return {
@@ -312,5 +489,6 @@ export async function performWeaponAttackApply(
     perDie,
     newHp,
     damageType: weapon.damageType,
+    ...(stunningStrike !== undefined ? { stunningStrike } : {}),
   };
 }

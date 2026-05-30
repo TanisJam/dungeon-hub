@@ -73,6 +73,22 @@ export interface PerformForcedCheckInput {
   turnAnchorEntityId?: string | null;
   turnAnchorBoundary?: 'start' | 'end';
   turnsRemaining?: number | null;
+  /**
+   * When true AND turnAnchorEntityId is provided, an already-present condition row will
+   * have its turn-anchor fields refreshed instead of being silently skipped.
+   *
+   * Used by Stunning Strike (Slice 3b-ii, ADR-4) to implement re-stun refresh semantics:
+   * "until end of your next turn" restarts from the new Monk turn on a fresh Stunning Strike.
+   *
+   * BACKWARD-COMPAT INVARIANTS (double-gate — both must pass):
+   *   (a) refreshAnchorOnExisting must be true
+   *   (b) turnAnchorEntityId must be non-null
+   * Standalone forced-check route passes neither → double-gate fails → continue/no-op as before.
+   * NULL-anchor permanent conditions: flag true but anchor null → gate (b) fails → no-op.
+   *
+   * Default: false (undefined treated as false).
+   */
+  refreshAnchorOnExisting?: boolean;
 }
 
 export type PerformForcedCheckResult =
@@ -142,6 +158,7 @@ export async function performForcedCheck(
     turnAnchorEntityId = null,
     turnAnchorBoundary,       // undefined when omitted → maps to null in INSERT
     turnsRemaining = null,
+    refreshAnchorOnExisting = false,
   } = input;
 
   // ── Step 1: Load encounter + active guard ─────────────────────────────────────
@@ -201,6 +218,7 @@ export async function performForcedCheck(
       turnAnchorEntityId,
       turnAnchorBoundary,
       turnsRemaining,
+      refreshAnchorOnExisting,
     });
     return {
       ok: true,
@@ -242,6 +260,7 @@ export async function performForcedCheck(
       turnAnchorEntityId,
       turnAnchorBoundary,
       turnsRemaining,
+      refreshAnchorOnExisting,
     });
 
     return {
@@ -280,13 +299,21 @@ export async function performForcedCheck(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
- * Idempotently inserts condition rows on fail (ADR-3, ADR-4).
+ * Idempotently inserts (or refreshes) condition rows on fail (ADR-3, ADR-4).
  *
  * For conditionOnFail='Stunned': also inserts Incapacitated (PHB p.292 implication).
  * Each condition checked independently:
- *   - If already present → skip insert (no-op).
  *   - If absent → insert.
- * Returns list of newly-inserted condition names.
+ *   - If already present + refreshAnchorOnExisting=true + turnAnchorEntityId≠null
+ *     → UPDATE turn-anchor fields (re-stun refresh, Slice 3b-ii ADR-4).
+ *   - Otherwise → skip insert/update (no-op).
+ *
+ * BACKWARD-COMPAT double-gate for refresh:
+ *   Both (a) refreshAnchorOnExisting===true AND (b) turnAnchorEntityId!==null
+ *   must hold. Standalone forced-check (no anchor, no flag) satisfies neither → no-op.
+ *   NULL-anchor permanent conditions: flag true but anchor null → gate (b) fails → no-op.
+ *
+ * Returns list of newly-inserted condition names (refreshes NOT added to `applied`).
  */
 async function applyConditions(opts: {
   targetCombatantId: string;
@@ -296,6 +323,7 @@ async function applyConditions(opts: {
   turnAnchorEntityId: string | null;
   turnAnchorBoundary: 'start' | 'end' | undefined;
   turnsRemaining: number | null;
+  refreshAnchorOnExisting: boolean;
 }): Promise<string[]> {
   const {
     targetCombatantId,
@@ -305,6 +333,7 @@ async function applyConditions(opts: {
     turnAnchorEntityId,
     turnAnchorBoundary,
     turnsRemaining,
+    refreshAnchorOnExisting,
   } = opts;
   const applied: string[] = [];
 
@@ -316,9 +345,33 @@ async function applyConditions(opts: {
   }
 
   for (const conditionName of conditionsToApply) {
-    // ADR-3: App-level idempotency — skip if already present.
+    // ADR-3: App-level idempotency — skip if already present (with optional refresh).
     if (existingConditionNames.has(conditionName)) {
-      continue;
+      // REFRESH path (Slice 3b-ii ADR-4): update turn-anchor on existing row when:
+      //   (a) caller opts in via refreshAnchorOnExisting=true
+      //   (b) a turn-anchor entity is supplied (not null)
+      // Double-gate ensures standalone forced-check and NULL-anchor permanent conditions
+      // are never refreshed — their existing behavior (continue/no-op) is preserved.
+      // Dual-pair (Stunned+Incapacitated): loop runs per conditionName → both rows
+      // get the same new anchor → 3b-i sweep still removes them as a pair (REQ-TAS-05).
+      if (refreshAnchorOnExisting && turnAnchorEntityId != null) {
+        await db
+          .update(encounterCombatantConditions)
+          .set({
+            turnAnchorEntityId,
+            turnAnchorBoundary: turnAnchorBoundary ?? null,
+            turnsRemaining: turnsRemaining ?? null,
+            appliedByCombatantId: appliedByCombatantId ?? null,
+          })
+          .where(
+            and(
+              eq(encounterCombatantConditions.combatantId, targetCombatantId),
+              eq(encounterCombatantConditions.conditionName, conditionName),
+            ),
+          );
+        // NOT pushed to `applied` (already applied; tracked separately as refresh if needed).
+      }
+      continue; // never double-insert regardless of refresh path
     }
 
     // INSERT into encounter_combatant_conditions (plain INSERT, no CAS — ADR-5).
