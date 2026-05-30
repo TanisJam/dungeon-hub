@@ -48,22 +48,43 @@ function hasShield(profs: string[]): boolean {
 }
 
 /**
- * Una weapon prof matchea si:
- *   - el char tiene blanket prof: 5etools la guarda como "simple" / "martial" (singular,
- *     sin sufijo); también aceptamos "simple weapons" / "martial weapons" por si algún
- *     otro source la guarda con sufijo.
- *   - el char nombra el ítem específicamente: prof === item.name o prof === item.slug.
+ * Core weapon proficiency check — exported pure helper.
  *
- * Distinguir simple vs martial requiere `weaponCategory` del compendio, que no traemos en el
- * lite. Permisivo: cualquier blanket weapon prof cubre cualquier arma. Refinar si hace falta.
+ * ADR-5 (engine-action-pipeline): extracted from the previously-private
+ * `hasWeaponProficiency` so that use-cases can call it with the lean
+ * `{name, slug}` shape (no full ItemCompendiumLite needed).
+ *
+ * A weapon prof matches when:
+ *   - The character has a blanket category: 5etools stores "simple" / "martial"
+ *     (singular, no suffix); also accepts "simple weapons" / "martial weapons"
+ *     for alternative storage conventions.
+ *   - The character names the item specifically: prof === item.name or prof === item.slug.
+ *
+ * Distinguishing simple vs. martial requires `weaponCategory` from the compendium,
+ * which is not available here. Permissive: any blanket weapon prof covers any weapon.
+ * Refine in a future slice if category discrimination is needed.
+ *
+ * PHB p.146-149 — Proficiencies: characters proficient in a weapon add proficiency
+ * bonus to attack rolls; non-proficient characters do not.
  */
-function hasWeaponProficiency(profs: string[], item: ItemCompendiumLite): boolean {
-  const normalizedProfs = profs.map(normalize);
+export function isWeaponProficient(
+  weaponProfs: string[],
+  weapon: { name: string; slug: string },
+): boolean {
+  const normalizedProfs = weaponProfs.map(normalize);
   const blanket = new Set(['simple', 'martial', 'simple weapons', 'martial weapons']);
   if (normalizedProfs.some((p) => blanket.has(p))) return true;
-  const itemName = item.name.toLowerCase().trim();
-  const itemSlug = item.slug.toLowerCase().trim();
+  const itemName = weapon.name.toLowerCase().trim();
+  const itemSlug = weapon.slug.toLowerCase().trim();
   return normalizedProfs.some((p) => p === itemName || p === itemSlug);
+}
+
+/**
+ * Internal wrapper kept for backward compat with checkEquippedProficiency.
+ * Delegates to the exported isWeaponProficient.
+ */
+function hasWeaponProficiency(profs: string[], item: ItemCompendiumLite): boolean {
+  return isWeaponProficient(profs, { name: item.name, slug: item.slug });
 }
 
 export interface ProficiencyCheck {

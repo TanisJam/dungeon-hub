@@ -11,6 +11,7 @@ export {
 export {
   classifyItem,
   checkEquippedProficiency,
+  isWeaponProficient,
   stripFiveeToolsTag,
   type ItemKind,
   type ProficiencyCheck,

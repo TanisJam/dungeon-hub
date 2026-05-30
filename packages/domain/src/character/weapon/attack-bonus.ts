@@ -29,33 +29,51 @@ export interface WeaponAttackBonusInput {
 }
 
 /**
+ * Selects the ability modifier to use for a weapon attack roll.
+ *
+ * ADR-4 (engine-action-pipeline): extracted from computeWeaponAttackBonus so that
+ * resolveWeaponAttack can call the same logic without duplicating the rule.
+ *
+ * PHB p.194 — Making an Attack: melee → STR, ranged → DEX.
+ * PHB p.147 — Finesse: use the higher of STR or DEX (Slice B: favorable max default).
+ * PHB p.195 — Thrown: melee default (STR) carried to thrown attacks.
+ *
+ * Accepts both 5etools property codes ('F', 'T') and spelled-out strings
+ * ('finesse', 'thrown') — the same set computeWeaponAttackBonus previously handled.
+ */
+export function selectAttackAbility(
+  strMod: number,
+  dexMod: number,
+  kind: 'melee' | 'ranged',
+  properties: ReadonlyArray<string>,
+): number {
+  const hasFinesse = properties.includes('finesse') || properties.includes('F');
+  const hasThrown = properties.includes('thrown') || properties.includes('T');
+
+  if (hasFinesse || hasThrown) {
+    // PHB p.147: player picks; Slice B defaults to the favorable max.
+    return Math.max(strMod, dexMod);
+  }
+  if (kind === 'ranged') {
+    // PHB p.194: ranged attack uses DEX.
+    return dexMod;
+  }
+  // PHB p.194: melee attack uses STR by default.
+  return strMod;
+}
+
+/**
  * Computes the weapon attack bonus for a character wielding a specific weapon.
  *
  * Formula (PHB p.194 + p.147):
- *   1. Pick abilityMod:
- *      - ranged + NOT thrown → DEX
- *      - melee + NOT finesse → STR
- *      - finesse OR thrown   → max(STR, DEX)
+ *   1. Pick abilityMod via selectAttackAbility (ADR-4: extracted helper).
  *   2. result = abilityMod + (isProficient ? proficiencyBonus : 0) + magicBonus
  */
 export function computeWeaponAttackBonus(input: WeaponAttackBonusInput): number {
   const { strMod, dexMod, proficiencyBonus, isProficient, weaponCategory, properties, magicBonus } =
     input;
 
-  const hasFinesse = properties.includes('finesse') || properties.includes('F');
-  const hasThrown = properties.includes('thrown') || properties.includes('T');
-
-  let abilityMod: number;
-  if (hasFinesse || hasThrown) {
-    // PHB p.147: player picks; Slice B defaults to the favorable max.
-    abilityMod = Math.max(strMod, dexMod);
-  } else if (weaponCategory === 'ranged') {
-    // PHB p.194: ranged attack uses DEX.
-    abilityMod = dexMod;
-  } else {
-    // PHB p.194: melee attack uses STR by default.
-    abilityMod = strMod;
-  }
+  const abilityMod = selectAttackAbility(strMod, dexMod, weaponCategory, properties);
 
   return abilityMod + (isProficient ? proficiencyBonus : 0) + magicBonus;
 }
