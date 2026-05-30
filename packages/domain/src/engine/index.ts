@@ -137,6 +137,9 @@ export type { RollSavingThrowResult } from './save/roll-saving-throw.js';
 // Slice 3b-ii — Stunning Strike ki save DC (PHB p.78)
 export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
 
+// Divine Smite damage helper (engine-divine-smite — PHB p.85)
+export { computeDivineSmiteDice } from './damage/compute-divine-smite-dice.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
