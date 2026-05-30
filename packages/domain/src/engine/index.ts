@@ -174,6 +174,11 @@ export type { ConditionDefinition } from './conditions/prone.js';
 export { STUNNED_CONDITION_DEF } from './conditions/stunned.js';
 export { INCAPACITATED_CONDITION_DEF } from './conditions/incapacitated.js';
 
+// conditions-catalog Slice 1 — Blinded, Invisible, Poisoned condition definitions
+export { BLINDED_CONDITION_DEF } from './conditions/blinded.js';
+export { INVISIBLE_CONDITION_DEF } from './conditions/invisible.js';
+export { POISONED_CONDITION_DEF } from './conditions/poisoned.js';
+
 // ── Authoring DSL ─────────────────────────────────────────────────────────────
 
 export { parseRule } from './authoring/parse.js';
@@ -211,6 +216,16 @@ export type {
 // Slice 3a — Stunned rule builder (lights up attackers-of production path)
 export { buildStunnedModifiers } from './rules/stunned.js';
 export type { BuildStunnedResult } from './rules/stunned.js';
+
+// conditions-catalog Slice 1 — Blinded, Invisible, Poisoned rule builders
+export { buildBlindedModifiers } from './rules/blinded.js';
+export type { BuildBlindedResult } from './rules/blinded.js';
+
+export { buildInvisibleModifiers } from './rules/invisible.js';
+export type { BuildInvisibleResult } from './rules/invisible.js';
+
+export { buildPoisonedModifiers } from './rules/poisoned.js';
+export type { BuildPoisonedResult } from './rules/poisoned.js';
 
 export { buildCounterspellReaction } from './rules/counterspell.js';
 export type {
