@@ -27,9 +27,13 @@ import {
   rollDamageBreakdown,
   rollToHit,
   computeKiSaveDc,
+  computeDivineSmiteDice,
   type RngFn,
   type RollResult,
+  type Source,
+  type DiceExpr,
 } from '@dungeon-hub/domain/engine';
+import { consumeSpellSlot } from '@dungeon-hub/domain/character/spellcasting';
 import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { buildAttackContext } from './build-attack-context.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
@@ -67,9 +71,35 @@ export interface PerformWeaponAttackApplyInput {
    * Slice 3b-ii NPC fix (REQ-SS-NPC-01).
    */
   targetNpcSaveMod?: number;
+  /**
+   * Spell slot level to expend for Divine Smite (1..5).
+   * Required when runtimeDecisions.divineSmiteSpend=true.
+   * engine-divine-smite — REQ-DS-PREROLL-SLOT-01.
+   */
+  divineSmiteSlotLevel?: number;
+  /**
+   * Whether the target is an undead or fiend (caller-asserted).
+   * Grants +1d8 smite dice when true (PHB p.85).
+   * engine-divine-smite — REQ-DS-UNDEAD-01.
+   */
+  divineSmiteUndead?: boolean;
   /** Client's known version — must match encounters.version for CAS. */
   version: number;
 }
+
+/**
+ * Divine Smite result block (engine-divine-smite, REQ-DS-RESPONSE-01).
+ * Present on hit+spend only; key omitted (not null) on miss or no spend — backward-compat.
+ */
+export type DivineSmiteBlock = {
+  spent: true;
+  /** Slot level expended (echoed from divineSmiteSlotLevel). */
+  slotLevel: number;
+  /** Dice expression rolled, e.g. '3d8' (PHB p.85). */
+  dice: DiceExpr;
+  /** Total radiant damage rolled (post-crit — crit doubles via rollDamageBreakdown). */
+  radiantDamage: number;
+};
 
 /** Stunning Strike result block (Slice 3b-ii, REQ-SS-RESPONSE-01). */
 export type StunningStrikeBlock =
@@ -138,6 +168,12 @@ export type PerformWeaponAttackApplyResult =
        * Absent (key omitted) for backward-compat when stunningStrikeSpend absent/false.
        */
       stunningStrike?: StunningStrikeBlock;
+      /**
+       * Divine Smite result block (engine-divine-smite, REQ-DS-RESPONSE-01).
+       * Present only when divineSmiteSpend=true AND attack hits.
+       * Absent (key omitted) for backward-compat when divineSmiteSpend absent/false — REQ-DS-COMPAT-01.
+       */
+      divineSmite?: DivineSmiteBlock;
     }
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'weapon' | 'character' }
@@ -151,7 +187,12 @@ export type PerformWeaponAttackApplyResult =
   | { ok: false; code: 'KI_EXHAUSTED' }
   // NPC target + stunningStrikeSpend + missing targetNpcSaveMod → 400 pre-roll (REQ-SS-NPC-01).
   // Mirrors NO_TARGET_AC / NO_TARGET_SAVE: GM must supply the monster's CON save mod.
-  | { ok: false; code: 'NO_TARGET_SAVE' };
+  | { ok: false; code: 'NO_TARGET_SAVE' }
+  // Divine Smite pre-roll guards (engine-divine-smite, FAIL-FAST — PHB p.85).
+  // NOTHING committed (no to-hit roll, no HP change, no slot change) — pure pre-validation.
+  | { ok: false; code: 'DIVINE_SMITE_NOT_AVAILABLE' }    // not a Paladin L≥2 (PHB p.85)
+  | { ok: false; code: 'DIVINE_SMITE_NOT_MELEE' }        // ranged weapon (PHB p.85: melee only)
+  | { ok: false; code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' }; // slot exhausted / level too high
 
 // ── perform-weapon-attack-apply ────────────────────────────────────────────────
 
@@ -184,6 +225,8 @@ export async function performWeaponAttackApply(
     weaponInstanceId,
     runtimeDecisions,
     targetNpcSaveMod,
+    divineSmiteSlotLevel,
+    divineSmiteUndead,
     version,
   } = input;
 
@@ -271,6 +314,9 @@ export async function performWeaponAttackApply(
     isProficient,
     monkLevel,
     kiUsedBefore,
+    paladinLevel,
+    attackerSlotsMax,
+    attackerSlotsUsed,
     weapon,
   } = ctxResult;
 
@@ -296,6 +342,40 @@ export async function performWeaponAttackApply(
     if (targetCombatant.kind === 'npc' && (targetNpcSaveMod === undefined || targetNpcSaveMod === null)) {
       return { ok: false, code: 'NO_TARGET_SAVE' };
     }
+  }
+
+  // ── Step 6c: Divine Smite pre-roll validation (FAIL-FAST — engine-divine-smite) ─
+  // ALL three guards fire BEFORE resolveWeaponAttack, BEFORE rollToHit, BEFORE any mutation.
+  // Nothing rolled, nothing committed on any of these 400s (REQ-DS-PREROLL-*).
+  const divineSmiteSpend = runtimeDecisions?.['divineSmiteSpend'] === true;
+  let nextSlotsUsed: readonly number[] | undefined;
+
+  if (divineSmiteSpend) {
+    // Guard 1: Paladin L≥2 (PHB p.85 — "Starting at 2nd level").
+    if (paladinLevel < 2) {
+      return { ok: false, code: 'DIVINE_SMITE_NOT_AVAILABLE' };
+    }
+    // Guard 2: melee-only (PHB p.85 — "melee weapon attack").
+    if (weapon.kind === 'ranged') {
+      return { ok: false, code: 'DIVINE_SMITE_NOT_MELEE' };
+    }
+    // Guard 3: slot level provided + slot available (PHB p.201 — slot must exist to expend).
+    if (divineSmiteSlotLevel === undefined) {
+      return { ok: false, code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' };
+    }
+    const slotResult = consumeSpellSlot({
+      slotsMax: attackerSlotsMax,
+      slotsUsed: attackerSlotsUsed,
+      pactMagic: null,
+      pactSlotsUsed: 0,
+      level: divineSmiteSlotLevel,
+      slotType: 'regular',
+    });
+    if (!slotResult.ok) {
+      return { ok: false, code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' };
+    }
+    // Store result for use in CAS tx — avoids double-decrement (ADR-4).
+    nextSlotsUsed = slotResult.slotsUsed;
   }
 
   // ── Step 7: resolveWeaponAttack → damage expression + toHit + rollMode ────────
@@ -353,11 +433,35 @@ export async function performWeaponAttackApply(
   }
 
   // ── Step 11: rollDamageBreakdown (crit SERVER-DERIVED — REQ-TOHIT-CRIT-01) ────
-  // Pass (dice, breakdown) — NOT flatMods. flatMods is a SUBSET already inside
+  // Divine Smite Source injection: BEFORE rollDamageBreakdown so crit-doubling flows through
+  // automatically (PHB p.196 — "roll all of the attack's damage dice twice"). ADR-3.
+  // Inject into a LOCAL copy of breakdown — never mutate damage.breakdown directly (shared ref risk).
+  let smiteDice: DiceExpr | undefined;
+  const breakdownWithSmite = (() => {
+    if (!divineSmiteSpend || divineSmiteSlotLevel === undefined) return damage.breakdown;
+    smiteDice = computeDivineSmiteDice(divineSmiteSlotLevel, divineSmiteUndead ?? false);
+    const smiteSource: Source = {
+      label: 'Divine Smite',
+      amount: smiteDice,
+      type: 'untyped',
+      origin: { id: charId, conditions: [] },
+    };
+    return [...damage.breakdown, smiteSource];
+  })();
+
+  // Pass (dice, breakdownWithSmite) — NOT flatMods. flatMods is a SUBSET already inside
   // breakdown (ability mod is in both). Passing flatMods separately double-counts.
   // crit from rollToHit.crit doubles dice count per NdM source (PHB p.196).
-  const rollResult = rollDamageBreakdown(damage.dice, damage.breakdown, toHitResult.crit, cryptoRng);
+  const rollResult = rollDamageBreakdown(damage.dice, breakdownWithSmite, toHitResult.crit, cryptoRng);
   const { total: rolledDamage, perDie } = rollResult;
+
+  // Capture smite radiant contribution for the response block (ADR-3).
+  // perDie carries per-source roll breakdowns after rollDamageBreakdown.
+  let radiantDamage = 0;
+  if (divineSmiteSpend && smiteDice !== undefined) {
+    const smiteEntry = perDie.find((e) => e.label === 'Divine Smite');
+    radiantDamage = smiteEntry?.rolls?.reduce((a, b) => a + b, 0) ?? 0;
+  }
 
   // ── Step 12: applyDamage + transaction ───────────────────────────────────────
   // applyDamage → newHp (PHB p.197 clamp at 0).
@@ -409,6 +513,20 @@ export async function performWeaponAttackApply(
             to_jsonb((COALESCE((data#>>'{classResourcesUsed,monk:ki-points}')::int, 0) + 1)),
             true
           )`,
+        })
+        .where(eq(characters.id, attackerCharacterId));
+    }
+
+    // ── Step 12b-ii: Divine Smite slot persist (engine-divine-smite — ADR-4) ────
+    // Write the full 9-tuple to {spellSlotsUsed} — atomic with HP + version bump.
+    // On CAS conflict (updated.length===0 → return false) the tx rolls back →
+    // no slot is consumed (mirrors the ki rollback comment above).
+    // PHB p.85: slot is spent ON HIT — only fires post-miss-early-return (ADR-1).
+    if (divineSmiteSpend && nextSlotsUsed !== undefined) {
+      await tx
+        .update(characters)
+        .set({
+          data: sql`jsonb_set(data, '{spellSlotsUsed}', ${JSON.stringify([...nextSlotsUsed])}::jsonb, true)`,
         })
         .where(eq(characters.id, attackerCharacterId));
     }
@@ -476,6 +594,13 @@ export async function performWeaponAttackApply(
     }
   }
 
+  // ── Step 12d: Divine Smite response block (engine-divine-smite — ADR-8) ────────
+  // Key OMITTED (not null) when divineSmiteSpend absent/false — backward-compat (REQ-DS-COMPAT-01).
+  const divineSmiteResult: DivineSmiteBlock | undefined =
+    divineSmiteSpend && smiteDice !== undefined
+      ? { spent: true, slotLevel: divineSmiteSlotLevel!, dice: smiteDice, radiantDamage }
+      : undefined;
+
   return {
     ok: true,
     hit: true,
@@ -490,5 +615,6 @@ export async function performWeaponAttackApply(
     newHp,
     damageType: weapon.damageType,
     ...(stunningStrike !== undefined ? { stunningStrike } : {}),
+    ...(divineSmiteResult !== undefined ? { divineSmite: divineSmiteResult } : {}),
   };
 }

@@ -30,6 +30,8 @@ import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { isWeaponProficient } from '@dungeon-hub/domain/character/inventory';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
+import { computeSpellSlots } from '@dungeon-hub/domain/character/spellcasting';
+import type { SpellSlots } from '@dungeon-hub/domain/character/spellcasting';
 import type { EntityId } from '@dungeon-hub/domain/engine';
 import { deriveCharacterModifiers } from '../characters/derive-character-modifiers.js';
 import { loadPersistedModifiers } from '../characters/load-persisted-modifiers.js';
@@ -86,6 +88,23 @@ export type BuildAttackContextResult =
        * Slice 3b-ii — ADR-1. 0 for non-Monks or if no ki has been spent yet.
        */
       kiUsedBefore: number;
+      /**
+       * Paladin class level (0 if not a Paladin).
+       * PHB p.85: Divine Smite is available "Starting at 2nd level".
+       * engine-divine-smite — ADR-5.
+       */
+      paladinLevel: number;
+      /**
+       * Max spell slots per level (9-tuple from computeSpellSlots).
+       * Server-derived — no client trust for slot ceiling. engine-divine-smite — ADR-5.
+       */
+      attackerSlotsMax: SpellSlots;
+      /**
+       * Spell slots already used per level (9-tuple, index 0 = level 1).
+       * Read-tolerance: absent in legacy rows → defaults to all-zeros (CLAUDE.md §11).
+       * engine-divine-smite — ADR-5.
+       */
+      attackerSlotsUsed: readonly number[];
       /** Weapon stats for resolveWeaponAttack. */
       weapon: {
         kind: 'melee' | 'ranged';
@@ -304,6 +323,24 @@ export async function buildAttackContext(
   const classResourcesUsed = charData['classResourcesUsed'] as Record<string, number> | undefined;
   const kiUsedBefore: number = classResourcesUsed?.['monk:ki-points'] ?? 0;
 
+  // ── Step 12c: Paladin-specific context (engine-divine-smite — ADR-5) ─────────
+  // paladinLevel: mirrors monkLevel pattern. 0 for non-Paladins.
+  // PHB p.85: Divine Smite available "Starting at 2nd level".
+  const paladinLevel = ((charData['classes'] as AppliedClass[] | undefined) ?? [])
+    .filter((c) => c.slug === 'paladin')
+    .reduce((sum, c) => sum + c.level, 0);
+
+  // attackerSlotsMax: derived from computeSpellSlots (pure, no IO — classes already loaded).
+  // Server-side ceiling — no client trust for the slot ceiling (ADR-5, CLAUDE.md §1.2).
+  const attackerSlotsMax: SpellSlots = computeSpellSlots(
+    (charData['classes'] as AppliedClass[]) ?? [],
+  ).slots;
+
+  // attackerSlotsUsed: from already-loaded charData — NO new DB query.
+  // Read-tolerance: absent in legacy rows → default to all-zeros (CLAUDE.md §11).
+  const attackerSlotsUsed: readonly number[] =
+    (charData['spellSlotsUsed'] as number[] | undefined) ?? [0, 0, 0, 0, 0, 0, 0, 0, 0];
+
   // ── Step 13: Weapon shape for resolveWeaponAttack ────────────────────────────
   const weapon = {
     kind: (weaponDetail.type === 'R' ? 'ranged' : 'melee') as 'melee' | 'ranged',
@@ -328,6 +365,9 @@ export async function buildAttackContext(
     isProficient,
     monkLevel,
     kiUsedBefore,
+    paladinLevel,
+    attackerSlotsMax,
+    attackerSlotsUsed,
     weapon,
   };
 }

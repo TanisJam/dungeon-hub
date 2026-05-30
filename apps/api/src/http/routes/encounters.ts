@@ -95,28 +95,45 @@ const AttackActionBodySchema = z.object({
  * REQ-ATK-VERSION-01: optimistic CAS — version mismatch → 409 VERSION_CONFLICT.
  * REQ-ATK-AUTH-01: GM-only (memberRole check).
  */
-const AttackApplyBody = z.object({
-  attackerId: z.string().uuid(),
-  targetId: z.string().uuid(),
-  weaponInstanceId: z.string().uuid(),
-  /**
-   * Caller-asserted runtime decisions — open boolean map (ADR-7: no per-key Zod, open record).
-   * Known keys (Slice 2b+):
-   *   sneakAttackFirstThisTurn: boolean — Rogue Sneak Attack eligible this turn
-   *   stunningStrikeSpend: boolean     — Slice 3b-ii: Monk Stunning Strike ki spend
-   */
-  runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
-  /**
-   * GM-supplied CON save modifier for an NPC target (mirrors npcSaveMod in ForcedCheckBody).
-   * Required when stunningStrikeSpend=true AND the target is an NPC.
-   * Omitting it returns 400 NO_TARGET_SAVE (pre-roll, nothing committed, no ki wasted).
-   * PC targets ignore this field — server derives save mod from the character sheet.
-   * Slice 3b-ii NPC fix (REQ-SS-NPC-01).
-   */
-  targetNpcSaveMod: z.number().int().optional(),
-  /** Client's known encounter version — must match DB version for CAS. */
-  version: z.number().int().nonnegative(),
-});
+const AttackApplyBody = z
+  .object({
+    attackerId: z.string().uuid(),
+    targetId: z.string().uuid(),
+    weaponInstanceId: z.string().uuid(),
+    /**
+     * Caller-asserted runtime decisions — open boolean map (ADR-7: no per-key Zod, open record).
+     * Known keys (Slice 2b+):
+     *   sneakAttackFirstThisTurn: boolean — Rogue Sneak Attack eligible this turn
+     *   stunningStrikeSpend: boolean     — Slice 3b-ii: Monk Stunning Strike ki spend
+     *   divineSmiteSpend: boolean        — engine-divine-smite: Paladin Divine Smite slot spend
+     */
+    runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
+    /**
+     * GM-supplied CON save modifier for an NPC target (mirrors npcSaveMod in ForcedCheckBody).
+     * Required when stunningStrikeSpend=true AND the target is an NPC.
+     * Omitting it returns 400 NO_TARGET_SAVE (pre-roll, nothing committed, no ki wasted).
+     * PC targets ignore this field — server derives save mod from the character sheet.
+     * Slice 3b-ii NPC fix (REQ-SS-NPC-01).
+     */
+    targetNpcSaveMod: z.number().int().optional(),
+    /**
+     * PHB p.85 — Divine Smite slot level (1-5). Required when divineSmiteSpend=true.
+     * Top-level typed field (runtimeDecisions is boolean-only — ADR-7).
+     * engine-divine-smite — REQ-DS-SCHEMA-01.
+     */
+    divineSmiteSlotLevel: z.number().int().min(1).max(5).optional(),
+    /**
+     * PHB p.85 — caller-asserted undead/fiend target for +1d8 bonus.
+     * engine-divine-smite — REQ-DS-UNDEAD-01.
+     */
+    divineSmiteUndead: z.boolean().optional(),
+    /** Client's known encounter version — must match DB version for CAS. */
+    version: z.number().int().nonnegative(),
+  })
+  .refine(
+    (b) => !(b.runtimeDecisions?.['divineSmiteSpend'] === true && b.divineSmiteSlotLevel === undefined),
+    { message: 'divineSmiteSlotLevel required when divineSmiteSpend=true (PHB p.85 — slot must be specified)' },
+  );
 
 async function memberRole(
   campaignId: string,
@@ -291,7 +308,16 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { attackerId, targetId, weaponInstanceId, runtimeDecisions, targetNpcSaveMod, version } = bodyResult.data;
+      const {
+        attackerId,
+        targetId,
+        weaponInstanceId,
+        runtimeDecisions,
+        targetNpcSaveMod,
+        divineSmiteSlotLevel,
+        divineSmiteUndead,
+        version,
+      } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter for campaign membership check.
@@ -314,6 +340,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
         // exactOptionalPropertyTypes: only spread when defined (avoids passing undefined).
         ...(targetNpcSaveMod !== undefined ? { targetNpcSaveMod } : {}),
+        ...(divineSmiteSlotLevel !== undefined ? { divineSmiteSlotLevel } : {}),
+        ...(divineSmiteUndead !== undefined ? { divineSmiteUndead } : {}),
         version,
       });
 
@@ -353,6 +381,23 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'NO_TARGET_SAVE' }],
             });
+          // Divine Smite pre-roll guards (engine-divine-smite, FAIL-FAST — PHB p.85).
+          // CLAUDE.md §6: 400 VALIDATION_FAILED with issues[{ code }].
+          case 'DIVINE_SMITE_NOT_AVAILABLE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'DIVINE_SMITE_NOT_AVAILABLE' }],
+            });
+          case 'DIVINE_SMITE_NOT_MELEE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'DIVINE_SMITE_NOT_MELEE' }],
+            });
+          case 'DIVINE_SMITE_SLOT_NOT_AVAILABLE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -372,6 +417,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
 
       // REQ-ROUTE-BODY-03: hit response — includes all to-hit + damage fields.
       // Slice 3b-ii: stunningStrike block forwarded when present (omitted on non-spend — backward-compat).
+      // engine-divine-smite: divineSmite block forwarded when present (omitted on non-spend — REQ-DS-COMPAT-01).
       return reply.code(200).send({
         hit: true,
         crit: result.crit,
@@ -385,6 +431,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         newHp: result.newHp,
         damageType: result.damageType,
         ...(result.stunningStrike !== undefined ? { stunningStrike: result.stunningStrike } : {}),
+        ...(result.divineSmite !== undefined ? { divineSmite: result.divineSmite } : {}),
       });
     },
   );
