@@ -6,3 +6,4 @@ export {
 } from './advance-turn.js';
 
 export { applyDamage } from './apply-damage.js';
+export { applyHealing } from './apply-healing.js';
