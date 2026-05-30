@@ -121,6 +121,11 @@ export { resolveStat } from './resolve/stat.js';
 export { resolveRollMode } from './resolve/roll-mode.js';
 export type { RollModeResult } from './resolve/roll-mode.js';
 
+// ── Dice roller (engine-attack-apply-damage) ──────────────────────────────────
+
+export { rollDamageBreakdown } from './dice/roll.js';
+export type { RngFn, RollResult, PerDieEntry } from './dice/roll.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';

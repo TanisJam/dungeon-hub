@@ -4,3 +4,5 @@ export {
   type AdvanceTurnInput,
   type AdvanceTurnResult,
 } from './advance-turn.js';
+
+export { applyDamage } from './apply-damage.js';
