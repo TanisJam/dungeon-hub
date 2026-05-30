@@ -925,6 +925,44 @@ export const encounterCombatants = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// encounter_combatant_conditions — active conditions on encounter combatants.
+//
+// One row per condition instance applied to a combatant. Append-only in 3a
+// (no removal; turn-anchor expiry sweep lands in 3b).
+//
+// Idempotency is APP-LEVEL (no DB unique constraint) — performForcedCheck
+// queries existing rows before insert and skips if already present.
+// A partial unique on (combatant_id, condition_name) would block future
+// stacking from different sources (3b+), so the constraint is intentionally absent.
+//
+// Turn-anchor columns (turn_anchor_entity_id, turn_anchor_boundary, turns_remaining)
+// are nullable and UNUSED in 3a. They ship now so 3b adds zero migrations.
+//
+// applied_by_combatant_id: soft FK (nullable, no referential constraint) to the
+// combatant that caused the condition. Used for dual-row correlation in 3b removal.
+//
+// Design ref: sdd/engine-forced-check-3a/design — ADR-3 (conditions table + idempotency),
+//             ADR-4 (dual-insert Stunned+Incapacitated, appliedBy correlation).
+// ---------------------------------------------------------------------------
+export const encounterCombatantConditions = pgTable(
+  'encounter_combatant_conditions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    combatantId: uuid('combatant_id')
+      .notNull()
+      .references(() => encounterCombatants.id, { onDelete: 'cascade' }),
+    conditionName: text('condition_name').notNull(),
+    appliedByCombatantId: uuid('applied_by_combatant_id'), // nullable, soft FK (source may leave)
+    // Turn-anchor columns — nullable, UNUSED in 3a; 3b adds zero migrations:
+    turnAnchorEntityId: uuid('turn_anchor_entity_id'),           // nullable
+    turnAnchorBoundary: text('turn_anchor_boundary', { enum: ['start', 'end'] }), // nullable
+    turnsRemaining: integer('turns_remaining'),                   // nullable
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_cond_combatant').on(t.combatantId)],
+);
+
+// ---------------------------------------------------------------------------
 // modifier_definitions — DB-backed catalog of RuleDoc templates (Slice 6).
 //
 // Each row is ONE RuleDoc (the compile-time template for a modifier rule).
