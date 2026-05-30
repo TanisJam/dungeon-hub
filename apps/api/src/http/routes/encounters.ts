@@ -21,6 +21,7 @@ import { performWeaponAttackApply } from '../../use-cases/encounters/perform-wea
 import { performForcedCheck } from '../../use-cases/encounters/perform-forced-check.js';
 import { applyCombatantEffect } from '../../use-cases/encounters/apply-combatant-effect.js';
 import { removeCombatantEffect } from '../../use-cases/encounters/remove-combatant-effect.js';
+import { performSpellHeal } from '../../use-cases/encounters/perform-spell-heal.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -682,6 +683,94 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       return reply.code(200).send({ removed: result.removed });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/heal ----------------------------------
+  // Engine mutation slice — GM-only, server-authoritative spell healing.
+  // REQ-H-01: applyHealing clamp. REQ-H-14: CAS atomicity.
+  // REQ-H-06: slot pre-check. REQ-H-09: spellcaster guard.
+  const HealApplyBody = z.object({
+    healerCombatantId: z.string().uuid(),
+    targetCombatantId: z.string().uuid(),
+    spellName: z.enum(['Cure Wounds', 'Healing Word']),
+    slotLevel: z.number().int().min(1).max(9),
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/heal',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = HealApplyBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+
+      const { healerCombatantId, targetCombatantId, spellName, slotLevel, version } =
+        bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for campaign membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (ADR-6 — symmetric with attack/apply).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await performSpellHeal({
+        encounterId: id,
+        healerCombatantId,
+        targetCombatantId,
+        spellName,
+        slotLevel,
+        version,
+        userId,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'NOT_YOUR_TURN':
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'SLOT_NOT_AVAILABLE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'SLOT_NOT_AVAILABLE' }],
+            });
+          case 'HEALER_NOT_SPELLCASTER':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'HEALER_NOT_SPELLCASTER' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // ADR-5: response includes both rolled (PHB amount) and healed (effective delta).
+      return reply.code(200).send({
+        spell: result.spell,
+        slotLevel: result.slotLevel,
+        dice: result.dice,
+        rolled: result.rolled,
+        healed: result.healed,
+        newHp: result.newHp,
+        perDie: result.perDie,
+      });
     },
   );
 
