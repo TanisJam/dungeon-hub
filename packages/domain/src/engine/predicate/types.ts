@@ -40,7 +40,14 @@ export type WorldQuery =
    * Does the weapon in use have the named property?
    * Returns false (NOT throws) when ctx.weaponInUse is absent — REQ-SA-WQ-01.3.
    */
-  | { kind: 'hasWeaponProperty'; property: string };
+  | { kind: 'hasWeaponProperty'; property: string }
+  /**
+   * Does the TARGET carry a named effect sourced from THIS attacker's combatant?
+   * Returns false (NOT throws) when ctx.targetCombatantEffects or ctx.attackerCombatantId is absent.
+   * Compares effect.sourceCombatantId against ctx.attackerCombatantId (COMBATANT UUID).
+   * REQ-CEF-02: PHB p.251 — Hex caster-sourced; PHB p.203 — concentration.
+   */
+  | { kind: 'hasEffectFromSelf'; effectName: string };
 
 // ── Predicate AST ─────────────────────────────────────────────────────────────
 

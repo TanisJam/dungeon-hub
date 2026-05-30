@@ -94,6 +94,8 @@ export {
   hasWeaponProperty,
   // Slice 3a — always-true predicate for unconditional grants (Stunned advantage, ADR-6 R2)
   alwaysTrue,
+  // engine-combatant-effects Slice A — caster-sourced effect predicate (REQ-CEF-02)
+  hasEffectFromSelf,
 } from './predicate/ast.js';
 
 // Evaluator

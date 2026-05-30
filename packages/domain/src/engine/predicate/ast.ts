@@ -91,6 +91,24 @@ export function hasWeaponProperty(property: string): Predicate {
 }
 
 /**
+ * Does the target carry the named effect sourced from this attacker's combatant?
+ *
+ * Returns false (NOT throws) when ctx.targetCombatantEffects or ctx.attackerCombatantId
+ * is absent — read-tolerant for non-attack contexts (REQ-CEF-02).
+ *
+ * ⚠️ IDENTITY-SPACE: compares effect.sourceCombatantId against ctx.attackerCombatantId
+ * (encounter_combatants.id — the COMBATANT UUID), NOT against ctx.attacker.id
+ * (which is the CHARACTER EntityId). These are guaranteed-distinct namespaces.
+ *
+ * PHB p.251 — Hex: caster-sourced, requires concentration.
+ * PHB p.203 — Concentration rules.
+ * REQ-CEF-02, REQ-CEF-03.
+ */
+export function hasEffectFromSelf(effectName: string): Predicate {
+  return query({ kind: 'hasEffectFromSelf', effectName });
+}
+
+/**
  * A trivially-true predicate (empty AND — vacuous truth).
  *
  * Used for unconditional modifiers such as Stunned's advantage grant

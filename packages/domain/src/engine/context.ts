@@ -84,6 +84,34 @@ export interface EvaluationContext {
    * Design ref: sdd/engine-timeline-duration/design — REQ-DUR-CTX-01, ADR-4.
    */
   encounterRound?: number;
+
+  /**
+   * Active effects on the TARGET combatant, with source info.
+   * Loaded by buildAttackContext from encounter_combatant_effects; read by
+   * the hasEffectFromSelf predicate. Absent = no effects loaded or non-attack
+   * context (predicate returns false — read-tolerant per CLAUDE.md §11).
+   *
+   * exactOptionalPropertyTypes: use conditional spread or omit when empty.
+   * REQ-CEF-02, REQ-CEF-04.
+   */
+  targetCombatantEffects?: ReadonlyArray<{ effectName: string; sourceCombatantId: string | null }>;
+
+  /**
+   * The ATTACKER's COMBATANT UUID (encounter_combatants.id).
+   *
+   * ⚠️ IDENTITY-SPACE WARNING (highest-risk correctness trap of this slice):
+   * This is a DIFFERENT namespace from ctx.attacker.id. ctx.attacker.id is the
+   * attacker's CHARACTER branded EntityId (set to charId in buildAttackContext).
+   * attackerCombatantId is the encounter_combatants row UUID.
+   * source_combatant_id in encounter_combatant_effects is a COMBATANT UUID, so
+   * hasEffectFromSelf MUST compare e.sourceCombatantId against attackerCombatantId
+   * — NEVER against ctx.attacker.id. Comparing the wrong one yields always-false
+   * (silent feature death) or cross-identity false matches.
+   *
+   * Absent in non-attack contexts (predicate returns false — read-tolerant).
+   * REQ-CEF-03, REQ-CEF-04. ADR-3.
+   */
+  attackerCombatantId?: string;
 }
 
 // ── WeaponInUse ───────────────────────────────────────────────────────────────

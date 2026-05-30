@@ -136,6 +136,23 @@ function evaluateWorldQuery(q: WorldQuery, ctx: EvaluationContext): boolean {
       return props.includes(q.property);
     }
 
+    case 'hasEffectFromSelf': {
+      // Returns false (NOT throws) when effects or attackerCombatantId absent — non-attack context.
+      // REQ-CEF-02: read-tolerant; REQ-CEF-03: compare combatant UUID, NOT character EntityId.
+      //
+      // ⚠️ IDENTITY-SPACE: ctx.attackerCombatantId is the COMBATANT UUID (encounter_combatants.id).
+      // ctx.attacker.id is the CHARACTER EntityId (charId) — a different namespace entirely.
+      // effect.sourceCombatantId is stored as a combatant UUID → compare against attackerCombatantId.
+      //
+      // PHB p.251 — Hex caster-sourced, concentration; PHB p.203 — concentration rules.
+      const effects = ctx.targetCombatantEffects;
+      const attackerCombatantId = ctx.attackerCombatantId;
+      if (!effects || attackerCombatantId === undefined) return false;
+      return effects.some(
+        (e) => e.effectName === q.effectName && e.sourceCombatantId === attackerCombatantId,
+      );
+    }
+
     default: {
       // Exhaustiveness guard — future WorldQuery leaves added without a case
       // will cause a compile-time error here. REQ-SA-WQ-01.4.

@@ -17,6 +17,7 @@ import {
   hasRollMode,
   runtimeDecision,
   hasWeaponProperty,
+  hasEffectFromSelf,
 } from './ast.js';
 import { createInMemoryRegistry } from '../registry/query.js';
 import type { EvaluationContext } from '../context.js';
@@ -222,6 +223,111 @@ describe('evaluatePredicate — hasWeaponProperty leaf', () => {
   it('hasWeaponProperty_not_present: returns false when property not in weapon properties', () => {
     const predicate = hasWeaponProperty('heavy');
     const ctx = makeCtx({ weaponInUse: { kind: 'melee', properties: ['finesse'] } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+});
+
+// ── hasEffectFromSelf leaf — REQ-CEF-02 + REQ-CEF-03 ─────────────────────────
+// PHB p.251 — Hex: "lasts for the duration" as long as the caster maintains concentration.
+// PHB p.203 — Concentration: spells that require concentration can't be stacked.
+// hasEffectFromSelf returns true iff the target carries a named effect from THIS attacker.
+// Comparison is combatant UUID (attackerCombatantId), NOT character EntityId (ctx.attacker.id).
+
+describe('evaluatePredicate — hasEffectFromSelf leaf', () => {
+  it('hasEffectFromSelf_present_from_self: returns true when effect present from attacker combatant', () => {
+    // REQ-CEF-02: effect present + source matches attackerCombatantId → true.
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      attackerCombatantId: 'combatant-uuid-A',
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: 'combatant-uuid-A' }],
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+
+  it('hasEffectFromSelf_different_source: returns false when effect present but from different combatant', () => {
+    // REQ-CEF-02 scenario: effect present but source_combatant_id !== attackerCombatantId → false.
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      attackerCombatantId: 'combatant-uuid-A',
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: 'combatant-uuid-B' }],
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('hasEffectFromSelf_absent: returns false when target has no effects', () => {
+    // REQ-CEF-02 scenario: empty effects list → false.
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      attackerCombatantId: 'combatant-uuid-A',
+      targetCombatantEffects: [],
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('hasEffectFromSelf_attackerCombatantId_absent: returns false (not throws) when attackerCombatantId absent', () => {
+    // REQ-CEF-02 scenario: non-attack context, attackerCombatantId undefined → false, NOT throws.
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: 'combatant-uuid-A' }],
+      // attackerCombatantId intentionally absent
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('hasEffectFromSelf_targetEffects_absent: returns false when targetCombatantEffects absent', () => {
+    // REQ-CEF-02 scenario: field absent (non-attack ctx) → false.
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      attackerCombatantId: 'combatant-uuid-A',
+      // targetCombatantEffects intentionally absent
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('hasEffectFromSelf_null_source: returns false when sourceCombatantId is null', () => {
+    // REQ-CEF-02 scenario: source is null (caster left encounter) → false (null !== any UUID).
+    const predicate = hasEffectFromSelf('TestMark');
+    const ctx = makeCtx({
+      attackerCombatantId: 'combatant-uuid-A',
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: null }],
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  // ── Identity-space correctness test (REQ-CEF-03) — the highest-value test ───
+  // CRITICAL: attackerCombatantId (encounter_combatants.id UUID) is DISTINCT from
+  // ctx.attacker.id (character branded EntityId). These are guaranteed-different
+  // in any real encounter. The predicate MUST match on combatant UUID only.
+
+  it('hasEffectFromSelf_identity_space_combatantUUID_matches: combatant UUID match → true', () => {
+    // REQ-CEF-03 scenario (a)+(b): attackerCombatantId='comb-uuid-111', attacker.id='char-entity-AAA'.
+    // Effect sourced by 'comb-uuid-111' → true (correct combatant UUID match).
+    const predicate = hasEffectFromSelf('TestMark');
+    const attackerCombatantId = 'comb-uuid-111'; // encounter_combatants.id (combatant UUID)
+    const attackerCharacterId = 'char-entity-AAA'; // character EntityId — DISTINCT namespace
+    // Sanity: they must be different strings (the identity-space invariant).
+    expect(attackerCombatantId).not.toBe(attackerCharacterId);
+    const ctx = makeCtx({
+      attackerCombatantId,
+      attacker: { id: attackerCharacterId as import('../types.js').EntityId, conditions: [] },
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: attackerCombatantId }],
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+
+  it('hasEffectFromSelf_identity_space_charEntityId_does_not_match: char EntityId as source → false', () => {
+    // REQ-CEF-03 scenario (c): effect sourced by character EntityId, NOT combatant UUID → false.
+    // This tests that the predicate compares against attackerCombatantId, NOT ctx.attacker.id.
+    const predicate = hasEffectFromSelf('TestMark');
+    const attackerCombatantId = 'comb-uuid-111'; // encounter_combatants.id
+    const attackerCharacterId = 'char-entity-AAA'; // character EntityId
+    expect(attackerCombatantId).not.toBe(attackerCharacterId);
+    const ctx = makeCtx({
+      attackerCombatantId,
+      attacker: { id: attackerCharacterId as import('../types.js').EntityId, conditions: [] },
+      // Source is the CHARACTER EntityId (wrong namespace) — predicate must NOT fire.
+      targetCombatantEffects: [{ effectName: 'TestMark', sourceCombatantId: attackerCharacterId }],
+    });
     expect(evaluatePredicate(predicate, ctx)).toBe(false);
   });
 });
