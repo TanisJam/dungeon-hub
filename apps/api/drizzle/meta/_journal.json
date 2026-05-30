@@ -162,6 +162,13 @@
       "when": 1780151444505,
       "tag": "0022_nasty_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1780166295029,
+      "tag": "0023_icy_eddie_brock",
+      "breakpoints": true
     }
   ]
 }

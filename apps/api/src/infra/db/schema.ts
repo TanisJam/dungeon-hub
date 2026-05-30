@@ -963,6 +963,51 @@ export const encounterCombatantConditions = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// encounter_combatant_effects — server-owned per-target effect state (engine-combatant-effects Slice A).
+//
+// Records active caster-sourced effects on a target combatant (e.g. Hex, Hunter's Mark).
+// One row = one effect instance on a target, with optional source combatant for predicate matching.
+//
+// Key design decisions (ADR-1):
+//   combatant_id: HARD FK CASCADE — target deleted → effect is meaningless → drop rows.
+//   source_combatant_id: HARD FK SET NULL — source leaves encounter → effect survives but
+//     source becomes null → hasEffectFromSelf predicate correctly stops matching (null !== UUID).
+//     This is STRICTLY BETTER than soft-FK conditions pattern: source identity is LOAD-BEARING
+//     for the predicate (conditions' appliedBy is correlation-only).
+//   effect_name: open text, no DB enum — supports homebrew effects (§1.2).
+//   concentration_token: nullable, UNUSED V1 — seats future concentration-enforcement SDD
+//     with zero migration (intentional dead column).
+//   NO unique constraint on (combatant_id, effect_name) — app-level idempotency on the
+//     TRIPLE (combatant_id, effect_name, source_combatant_id). Allows future multi-source
+//     stacking (distinct sources can both mark the same target).
+//
+// Design ref: sdd/engine-combatant-effects/design — ADR-1, ADR-5.
+// ---------------------------------------------------------------------------
+export const encounterCombatantEffects = pgTable(
+  'encounter_combatant_effects',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    // The AFFECTED/TARGET combatant (the Hexed one). Hard FK CASCADE.
+    combatantId: uuid('combatant_id')
+      .notNull()
+      .references(() => encounterCombatants.id, { onDelete: 'cascade' }),
+    effectName: text('effect_name').notNull(), // open text, no enum (§1.2 homebrew)
+    // The CASTER/SOURCE combatant. Hard FK SET NULL — source may leave; effect survives.
+    sourceCombatantId: uuid('source_combatant_id')
+      .references(() => encounterCombatants.id, { onDelete: 'set null' }),
+    // Nullable, UNUSED V1 — intentional dead column for future concentration-enforcement SDD.
+    concentrationToken: text('concentration_token'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_cef_combatant').on(t.combatantId),
+    index('idx_cef_source').on(t.sourceCombatantId),
+    index('idx_cef_conc_token').on(t.concentrationToken),
+    // NO unique constraint on (combatant_id, effect_name) — app-level idempotency (ADR-1).
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // modifier_definitions — DB-backed catalog of RuleDoc templates (Slice 6).
 //
 // Each row is ONE RuleDoc (the compile-time template for a modifier rule).
