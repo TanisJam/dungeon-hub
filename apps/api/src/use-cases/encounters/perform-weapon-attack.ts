@@ -18,8 +18,10 @@ import { encounters, encounterCombatants, characters } from '../../infra/db/sche
 import {
   resolveWeaponAttack,
   createInMemoryRegistry,
+  buildSneakAttackRider,
   type WeaponAttackResult,
 } from '@dungeon-hub/domain/engine';
+import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { isWeaponProficient } from '@dungeon-hub/domain/character/inventory';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
@@ -38,6 +40,14 @@ export interface PerformWeaponAttackInput {
   targetId: string;          // encounter_combatants.id
   weaponInstanceId: string;  // inventory instance UUID
   activeConditions?: string[];
+  /**
+   * Caller-asserted per-action runtime decisions (REQ-SA-API-01).
+   * Threaded into EvaluationContext.runtimeDecisions for predicate evaluation.
+   * Absence = no assertions → all runtimeDecision leaves evaluate to false.
+   * Backwards-compatible: existing callers may omit this field.
+   * exactOptionalPropertyTypes: use conditional spread; never assign undefined.
+   */
+  runtimeDecisions?: Record<string, boolean>;
   /** User ID of the authenticated caller (for ownership + turn guard). */
   callerId: string;
 }
@@ -64,7 +74,7 @@ export type PerformWeaponAttackResult =
 export async function performWeaponAttack(
   input: PerformWeaponAttackInput,
 ): Promise<PerformWeaponAttackResult> {
-  const { encounterId, attackerId, targetId, weaponInstanceId, callerId } = input;
+  const { encounterId, attackerId, targetId, weaponInstanceId, callerId, runtimeDecisions } = input;
 
   // ── Step 1: Load encounter ────────────────────────────────────────────────────
   const [encounterRow] = await db
@@ -176,8 +186,34 @@ export async function performWeaponAttack(
     { name: weaponDetail.name, slug: weaponDetail.slug },
   );
 
+  // ── Step 9b: Normalize 5etools weapon property codes to semantic strings ──────
+  // 5etools stores property codes as single-letter abbreviations (e.g. 'F'=finesse,
+  // 'T'=thrown). Domain predicates (hasWeaponProperty) match on semantic strings.
+  // Normalise here at the use-case boundary to avoid leaking 5etools codes into domain.
+  // PHB p.147-149: finesse='F', thrown='T', light='L', heavy='H', versatile='V',
+  //                two-handed='2H', reach='R', loading='LD', ammunition='A', special='S'.
+  const PROPERTY_CODE_TO_SEMANTIC: Record<string, string> = {
+    F: 'finesse',
+    T: 'thrown',
+    L: 'light',
+    H: 'heavy',
+    V: 'versatile',
+    '2H': 'two-handed',
+    R: 'reach',
+    LD: 'loading',
+    A: 'ammunition',
+    S: 'special',
+  };
+  const normalizedProperties = (weaponDetail.property ?? []).flatMap((p) => {
+    const semantic = PROPERTY_CODE_TO_SEMANTIC[p];
+    // Include both the semantic string AND the raw code for backwards-compatibility
+    // with predicates or legacy code that may check raw codes.
+    return semantic !== undefined ? [p, semantic] : [p];
+  });
+
   // ── Step 10: Build EvaluationContext ──────────────────────────────────────────
   // exactOptionalPropertyTypes: conditional spread for all optional ctx fields.
+  // runtimeDecisions threaded from input (caller-asserted) — REQ-SA-API-01.2.
   const ctx: EvaluationContext = {
     self: { id: charId, conditions: [] },
     activeConditions: [],
@@ -185,11 +221,12 @@ export async function performWeaponAttack(
     attacker: { id: charId, conditions: [] },
     weaponInUse: {
       kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
-      properties: weaponDetail.property ?? [],
+      properties: normalizedProperties,
     },
     ...(encounterRow.round !== undefined && encounterRow.round !== null
       ? { encounterRound: encounterRow.round }
       : {}),
+    ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
   };
 
   // ── Step 11: Build registry ───────────────────────────────────────────────────
@@ -199,6 +236,21 @@ export async function performWeaponAttack(
   const registry = createInMemoryRegistry();
   for (const m of inventoryMods) registry.register(m);
   for (const m of persistedMods) registry.register(m);
+
+  // ── Step 11b: Sneak Attack rider — rogue-level compute (REQ-SA-DICE-01) ──────
+  // Compute rogueLevel = sum(AppliedClass.level where slug==='rogue').
+  // Non-rogue (rogueLevel=0) → rider NOT registered (predicate never runs).
+  // PHB p.96: Sneak Attack dice = ceil(rogueLevel/2)d6.
+  // exactOptionalPropertyTypes: charData['classes'] is cast to AppliedClass[] | undefined.
+  const rogueLevel = ((charData['classes'] as AppliedClass[] | undefined) ?? [])
+    .filter((c) => c.slug === 'rogue')
+    .reduce((sum, c) => sum + c.level, 0);
+  if (rogueLevel > 0) {
+    const sneakAttackDice = `${Math.ceil(rogueLevel / 2)}d6`;
+    for (const m of buildSneakAttackRider(charId, targetId as EntityId, sneakAttackDice)) {
+      registry.register(m);
+    }
+  }
 
   // ── Step 12: Resolve ability mods ─────────────────────────────────────────────
   // Use sheet-sourced ability scores (may be engine-derived or legacy).
@@ -219,7 +271,7 @@ export async function performWeaponAttack(
     isProficient,
     weapon: {
       kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
-      properties: weaponDetail.property ?? [],
+      properties: normalizedProperties, // normalized: includes both 'F' and 'finesse' for selectAttackAbility + predicates
       magicBonus: 0, // Slice B: magic bonus deferred per design
       damageDice: weaponDetail.dmg1 ?? '1',
       damageType: weaponDetail.dmgType ?? 'untyped',

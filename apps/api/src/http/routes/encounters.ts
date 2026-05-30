@@ -56,6 +56,13 @@ const AttackActionBodySchema = z.object({
   targetId: z.string().uuid(),
   weaponInstanceId: z.string().uuid(),
   activeConditions: z.array(z.string()).optional(),
+  /**
+   * Caller-asserted per-action decisions (REQ-SA-API-01).
+   * Keys: 'sneakAttackFirstThisTurn', 'sneakAttackSpatialAssert', etc.
+   * Absence = no assertions → all runtimeDecision leaves evaluate to false.
+   * Additive and backwards-compatible: existing callers may omit this field.
+   */
+  runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
 });
 
 async function memberRole(
@@ -161,7 +168,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { attackerId, targetId, weaponInstanceId, activeConditions } = bodyResult.data;
+      const { attackerId, targetId, weaponInstanceId, activeConditions, runtimeDecisions } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter to check campaign membership for the GM/player gate.
@@ -182,6 +189,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         targetId,
         weaponInstanceId,
         ...(activeConditions !== undefined ? { activeConditions } : {}),
+        ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
         callerId: userId,
       });
 
