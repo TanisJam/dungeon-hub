@@ -28,6 +28,7 @@ import type { RollModeResult } from '../resolve/roll-mode.js';
 import { advancePhase } from '../pipeline/state-machine.js';
 import { resolveStat } from '../resolve/stat.js';
 import { resolveRollMode } from '../resolve/roll-mode.js';
+import { applyStacking } from '../stacking/apply.js';
 import { selectAttackAbility } from '../../character/weapon/attack-bonus.js';
 
 // ── Input / Output types ──────────────────────────────────────────────────────
@@ -202,6 +203,25 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
   if (!actionResult.ok) throw new Error('[resolveWeaponAttack] Phase advance failed: TO_HIT→ON_HIT');
   action = actionResult.action;
 
+  // ── ON_HIT: gather on-hit damage riders (PHB p.196 — damage on a hit) ────────
+  //
+  // ON_HIT channel: on-hit mods are invisible to resolveStat('damage')'s 'always'
+  // query — double-count is structurally impossible (query.ts:59). PHB p.196.
+  //
+  // ADR-4 (design): filter to def.stat==='damage' explicitly before applyStacking —
+  // query.ts does NOT filter by stat; only trigger+axis. Mirrors stat.ts:128-135.
+  // This is the stat-filter gate: an on-hit NumMod with a different stat (e.g.
+  // 'attack-roll') must NOT leak into damage.breakdown.
+  const onHitInstances = registry.query({ stat: 'damage', trigger: 'on-hit', self, ctx });
+  // Explicit stat filter — critical correctness guard (design ADR stat-filter):
+  const onHitDamageInstances = onHitInstances.filter(
+    (inst) => inst.def.kind === 'num' && inst.def.stat === 'damage',
+  );
+  // Reuse applyStacking for identical provenance/DiceExpr handling as resolveStat.
+  // Base=0; drop the synthetic base Source (amount=0) — mirrors bless pattern.
+  const [_onHitBase, ...onHitSources] = applyStacking(onHitDamageInstances, 0, selfRef).breakdown;
+  void _onHitBase;
+
   // ── Phase sweep: ON_HIT → DAMAGE ─────────────────────────────────────────────
   actionResult = advancePhase(action, 'advance');
   if (!actionResult.ok) throw new Error('[resolveWeaponAttack] Phase advance failed: ON_HIT→DAMAGE');
@@ -219,14 +239,17 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
     },
   ];
 
-  // Gather 'damage' stat NumMod deltas from registry (e.g. Hex, Sneak Attack in future slices).
+  // Gather 'damage' stat NumMod deltas from registry via trigger:'always'
+  // (e.g. Hex, Sneak Attack in future slices). On-hit mods are INVISIBLE here
+  // because their trigger is 'on-hit', not 'always' (query.ts:59 guard).
   const damageStatResult = resolveStat(self, 'damage', 0, ctx, registry);
   // damageStatResult.breakdown: first entry is base=0 (discard), rest are delta mods.
   const [_damageBase, ...damageDeltas] = damageStatResult.breakdown;
   void _damageBase;
 
-  // Combine for damage breakdown
-  const damageBreakdown: Source[] = [...damageFlatMods, ...damageDeltas];
+  // Fold breakdown: ability-mod + on-hit riders + always-trigger damage deltas.
+  // On-hit Sources carry DiceExpr amounts (e.g. '1d6') — not rolled (ADR-6).
+  const damageBreakdown: Source[] = [...damageFlatMods, ...onHitSources, ...damageDeltas];
   const damage = {
     dice: weapon.damageDice,
     flatMods: damageFlatMods,

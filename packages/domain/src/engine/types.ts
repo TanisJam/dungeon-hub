@@ -89,6 +89,7 @@ export type Trigger =
   | 'on-save'
   | 'on-cast'
   | 'on-attacked'
+  | 'on-hit'
   | 'on-damage';
 
 // ── ResetTrigger ──────────────────────────────────────────────────────────────

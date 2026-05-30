@@ -165,6 +165,7 @@ export type {
 // ── Rule builders ─────────────────────────────────────────────────────────────
 
 export { buildBlessModifiers } from './rules/bless.js';
+export { buildOnHitDamageRider } from './rules/on-hit-damage-rider.js';
 
 export { buildProneModifiers } from './rules/prone.js';
 export type {

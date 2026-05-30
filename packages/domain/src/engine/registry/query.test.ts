@@ -214,6 +214,66 @@ describe('registry.query — self-scoped modifier', () => {
   });
 });
 
+// ── Scenario 5: on-hit trigger isolation (REQ-ONHIT-TRIGGER-01.2) ────────────
+//
+// Documents the structural double-count guard:
+//   A modifier registered with trigger:'on-hit' is INVISIBLE to the DAMAGE-phase
+//   query (trigger:'always'). query.ts:59 enforces this — 'always' ≠ 'on-hit'.
+//   This test ensures that invariant is maintained so on-hit mods appear ONCE.
+
+describe("registry.query — on-hit trigger isolation (REQ-ONHIT-TRIGGER-01.2)", () => {
+  it(
+    "a modifier with trigger:'on-hit' is NOT returned by an 'always' query — double-count structural guard",
+    () => {
+      // PHB p.196 — "If your attack hits, you roll damage." On-hit extras apply on a
+      // successful hit (ON_HIT phase). Passive damage mods use trigger:'always'.
+      // These two channels are mutually exclusive by query.ts:59 semantics.
+      const registry = createInMemoryRegistry();
+
+      registry.register(
+        makeInstance({
+          iid: 'on-hit-damage-mod',
+          scope: {
+            owner: id('ranger-1'),
+            target: { axis: 'entities', ids: [id('ranger-1')] },
+            trigger: 'on-hit',
+          },
+        }),
+      );
+
+      const ctx = makeCtx({ self: { id: id('ranger-1'), conditions: [] } });
+
+      // 'always' query (the DAMAGE-phase query path via resolveStat) must NOT see the on-hit mod.
+      const alwaysResults = registry.query({ trigger: 'always', self: id('ranger-1'), ctx });
+      expect(alwaysResults).toHaveLength(0);
+    },
+  );
+
+  it(
+    "a modifier with trigger:'on-hit' IS returned by an 'on-hit' query (REQ-ONHIT-TRIGGER-01.1)",
+    () => {
+      const registry = createInMemoryRegistry();
+
+      registry.register(
+        makeInstance({
+          iid: 'on-hit-damage-mod',
+          scope: {
+            owner: id('ranger-1'),
+            target: { axis: 'entities', ids: [id('ranger-1')] },
+            trigger: 'on-hit',
+          },
+        }),
+      );
+
+      const ctx = makeCtx({ self: { id: id('ranger-1'), conditions: [] } });
+
+      // ON_HIT query must see it.
+      const onHitResults = registry.query({ trigger: 'on-hit', self: id('ranger-1'), ctx });
+      expect(onHitResults).toHaveLength(1);
+    },
+  );
+});
+
 // ── Scenario 4: predicate false → instance dropped ───────────────────────────
 
 describe('registry.query — predicate filtering', () => {

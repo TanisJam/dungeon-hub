@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveWeaponAttack, type WeaponAttackInput } from './resolve-weapon-attack.js';
 import { createInMemoryRegistry } from '../registry/query.js';
 import { buildBlessModifiers } from '../rules/bless.js';
+import { buildOnHitDamageRider } from '../rules/on-hit-damage-rider.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
 import type { EntityId } from '../types.js';
 
@@ -398,6 +399,253 @@ describe('resolveWeaponAttack — Scenario 7.1: damage_is_structured_not_rolled 
       expect(typeof (result.damage as unknown as { rolledValue?: unknown }).rolledValue).toBe(
         'undefined',
       );
+    },
+  );
+});
+
+// ── Scenario ON_HIT: onhit_rider_composes (REQ-ONHIT-COMPOSE-01.1) ────────────
+
+describe('resolveWeaponAttack — Scenario ONHIT-1: onhit_rider_composes (REQ-ONHIT-COMPOSE-01)', () => {
+  it(
+    "On-hit '1d6' rider registered → damage.breakdown contains Source{label=\"Hunter's Mark\", amount='1d6'} with provenance — PHB p.251",
+    () => {
+      // PHB p.251 — Hunter's Mark: "+1d6 damage to the marked target on a hit".
+      // REQ-ONHIT-COMPOSE-01.1: breakdown must contain the Source with label, amount:'1d6',
+      // and non-empty provenance (modifierId or origin).
+      // CRITICAL: assert provenance CONTENT, not just array length.
+      const registry = makeEmptyRegistry();
+      const rider = buildOnHitDamageRider(FIGHTER_ID, TARGET_ID, '1d6', "Hunter's Mark");
+      for (const m of rider) registry.register(m);
+
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // Must find a breakdown Source with the rider's label and dice amount
+      const riderSource = result.damage.breakdown.find((s) => s.label === "Hunter's Mark");
+      expect(riderSource).toBeDefined();
+      expect(riderSource!.amount).toBe('1d6');
+
+      // Provenance: modifierId or origin must be present and non-empty
+      const hasProvenance =
+        (riderSource!.modifierId !== undefined && String(riderSource!.modifierId).length > 0) ||
+        (riderSource!.origin !== undefined);
+      expect(hasProvenance).toBe(true);
+    },
+  );
+});
+
+// ── Scenario ONHIT-2: no_rider_no_source (REQ-ONHIT-NORIDER-01.1) ────────────
+
+describe('resolveWeaponAttack — Scenario ONHIT-2: no_rider_no_source (REQ-ONHIT-NORIDER-01)', () => {
+  it(
+    'No on-hit rider registered → breakdown has NO on-hit Source; ability-mod Source still present (regression guard)',
+    () => {
+      // REQ-ONHIT-NORIDER-01.1: no on-hit modifier means no on-hit Source in breakdown.
+      // Also a regression guard: the ability-mod Source (from DAMAGE assembly) must still be present.
+      const registry = makeEmptyRegistry();
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // Breakdown must NOT contain any Source with "Hunter's Mark" or on-hit provenance
+      const onHitSource = result.damage.breakdown.find(
+        (s) => s.label === "Hunter's Mark",
+      );
+      expect(onHitSource).toBeUndefined();
+
+      // Regression: ability-mod Source (+3) must still be present
+      const abilitySource = result.damage.breakdown.find(
+        (s) => typeof s.amount === 'number' && s.amount === 3,
+      );
+      expect(abilitySource).toBeDefined();
+    },
+  );
+});
+
+// ── Scenario ONHIT-3: stat_filter_negative (CRITICAL gate — REQ-ONHIT-COMPOSE-01) ──
+
+describe('resolveWeaponAttack — Scenario ONHIT-3: stat_filter_negative (CRITICAL stat-filter gate)', () => {
+  it(
+    "On-hit NumMod with stat='toHit' (not 'damage') must NOT appear in damage.breakdown — stat-filter guard",
+    () => {
+      // CRITICAL: the ON_HIT compose MUST filter to def.stat==='damage' explicitly.
+      // An on-hit mod with a different stat (e.g. 'toHit', 'attack-roll') must NOT leak
+      // into damage.breakdown. Without the filter this test fails.
+      // Design ref: sdd/engine-action-pipeline-onhit/design — ADR-3, stat filter.
+      const registry = makeEmptyRegistry();
+
+      // Deliberately register an on-hit mod with stat='attack-roll' (not 'damage')
+      const offStatInstance: ModifierInstance = {
+        id: iid('on-hit-off-stat'),
+        label: 'Off-stat on-hit mod',
+        def: {
+          kind: 'num',
+          op: 'add',
+          value: 5,
+          stat: 'attack-roll',
+          category: 'untyped',
+        },
+        scope: {
+          owner: FIGHTER_ID,
+          // ids:[FIGHTER_ID] (the querying self) so the instance PASSES axis-match and the
+          // test actually reaches the stat-filter — it must be excluded by def.stat!=='damage',
+          // NOT by axis-mismatch. With ids:[TARGET_ID] the test would pass for the wrong reason.
+          target: { axis: 'entities', ids: [FIGHTER_ID] },
+          trigger: 'on-hit',
+        },
+      };
+      registry.register(offStatInstance);
+
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // The off-stat on-hit mod must NOT appear in damage.breakdown
+      const leakedSource = result.damage.breakdown.find(
+        (s) => s.label === 'Off-stat on-hit mod',
+      );
+      expect(leakedSource).toBeUndefined();
+    },
+  );
+});
+
+// ── Scenario ONHIT-4: no_double_count (REQ-ONHIT-CONVENTION-01.1) ─────────────
+
+describe('resolveWeaponAttack — Scenario ONHIT-4: no_double_count (REQ-ONHIT-CONVENTION-01)', () => {
+  it(
+    "On-hit '1d6' damage mod appears EXACTLY ONCE in damage.breakdown (structural double-count guard)",
+    () => {
+      // REQ-ONHIT-CONVENTION-01.1: the ON_HIT query (trigger:'on-hit') and the DAMAGE
+      // resolveStat query (trigger:'always') are MUTUALLY EXCLUSIVE by query.ts:59.
+      // A trigger:'on-hit' mod is invisible to the 'always' query — structural guarantee.
+      // This test asserts the outcome: exactly ONE Source for the rider, not two.
+      const registry = makeEmptyRegistry();
+      const rider = buildOnHitDamageRider(FIGHTER_ID, TARGET_ID, '1d6', "Hunter's Mark");
+      for (const m of rider) registry.register(m);
+
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // Count how many Sources are attributable to "Hunter's Mark"
+      const riderSources = result.damage.breakdown.filter((s) => s.label === "Hunter's Mark");
+      expect(riderSources).toHaveLength(1); // EXACTLY once, not twice
+    },
+  );
+});
+
+// ── Scenario ONHIT-5: full_phase_still_resolves (REQ-ATK-PHASE-01.1 regression) ─
+
+describe('resolveWeaponAttack — Scenario ONHIT-5: full_phase_still_resolves (REQ-ATK-PHASE-01.1)', () => {
+  it(
+    'No rider → action.phase="RESOLVED"; result shape has exactly {action,toHit,damage,rollMode}; damage has exactly {dice,flatMods,breakdown}',
+    () => {
+      // REQ-ATK-PHASE-01.1: regression guard — ON_HIT insertion must not break phase flow
+      // or add extra fields to WeaponAttackResult / damage.
+      const registry = makeEmptyRegistry();
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      expect(result.action.phase).toBe('RESOLVED');
+
+      // WeaponAttackResult shape: exactly {action, toHit, damage, rollMode}
+      const topKeys = Object.keys(result).sort();
+      expect(topKeys).toEqual(['action', 'damage', 'rollMode', 'toHit']);
+
+      // damage shape: exactly {dice, flatMods, breakdown}
+      const damageKeys = Object.keys(result.damage).sort();
+      expect(damageKeys).toEqual(['breakdown', 'dice', 'flatMods']);
+    },
+  );
+});
+
+// ── Scenario ONHIT-6: damage_structured_not_rolled with rider (REQ-ONHIT-READONLY-01.1) ─
+
+describe('resolveWeaponAttack — Scenario ONHIT-6: damage_structured_not_rolled with rider (REQ-ONHIT-READONLY-01)', () => {
+  it(
+    "With '1d6' rider: damage.dice is weapon dice '1d8'; rider breakdown Source amount is DiceExpr '1d6', not a number",
+    () => {
+      // REQ-ONHIT-READONLY-01.1: no dice are rolled inside resolveWeaponAttack.
+      // damage.dice stays weapon dice only (not concatenated with rider).
+      // Rider appears as breakdown Source with DiceExpr amount — not a resolved integer.
+      const registry = makeEmptyRegistry();
+      const rider = buildOnHitDamageRider(FIGHTER_ID, TARGET_ID, '1d6', "Hunter's Mark");
+      for (const m of rider) registry.register(m);
+
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // damage.dice = weapon dice (1d8), NOT modified by rider
+      expect(result.damage.dice).toBe('1d8');
+
+      // Rider Source amount is DiceExpr '1d6' (string), not a rolled integer
+      const riderSource = result.damage.breakdown.find((s) => s.label === "Hunter's Mark");
+      expect(riderSource).toBeDefined();
+      expect(typeof riderSource!.amount).toBe('string');
+      expect(riderSource!.amount).toBe('1d6');
     },
   );
 });
