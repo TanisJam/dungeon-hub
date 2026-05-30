@@ -32,9 +32,26 @@ const CreateBody = z.object({
         initiative: z.number().int(),
         hpCurrent: z.number().int().nonnegative(),
         hpMax: z.number().int().positive(),
+        /** AC: required for NPC combatants (REQ-AC-CREATE-01); optional/ignored for PC (REQ-AC-CREATE-02). */
+        ac: z.number().int().nonnegative().optional(),
       }),
     )
-    .min(1),
+    .min(1)
+    .superRefine((combatants, ctx) => {
+      // REQ-AC-CREATE-01: NPC combatants MUST supply ac at creation time.
+      // REQ-AC-CREATE-02: PC combatants may omit ac; if provided it is silently ignored.
+      for (let i = 0; i < combatants.length; i++) {
+        const c = combatants[i]!;
+        if (c.kind === 'npc' && c.ac === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'AC is required for NPC combatants',
+            path: [i, 'ac'],
+            params: { code: 'AC_REQUIRED_FOR_NPC' },
+          });
+        }
+      }
+    }),
 });
 
 const ListQuery = z.object({ campaignId: z.string().uuid() });
@@ -69,10 +86,11 @@ const AttackActionBodySchema = z.object({
 /**
  * POST /encounters/:id/actions/attack/apply — engine mutation slice (FIRST mutation).
  *
- * GM-only. Server-authoritative: derives DiceExpr, rolls with crypto RNG, clamps HP,
- * persists atomically. Returns {rolledDamage, perDie, newHp}.
+ * GM-only. Server-authoritative: rolls d20, resolves target AC, derives DiceExpr,
+ * rolls damage with crypto RNG, clamps HP, persists atomically.
  *
- * REQ-ATK-APPLY-02: client supplies NO damage value — server derives and rolls.
+ * REQ-ROUTE-BODY-01: `crit` REMOVED — server derives crit from rollToHit.
+ * REQ-ATK-APPLY-02: client supplies NO damage or crit value — server derives both.
  * REQ-ATK-VERSION-01: optimistic CAS — version mismatch → 409 VERSION_CONFLICT.
  * REQ-ATK-AUTH-01: GM-only (memberRole check).
  */
@@ -80,8 +98,6 @@ const AttackApplyBody = z.object({
   attackerId: z.string().uuid(),
   targetId: z.string().uuid(),
   weaponInstanceId: z.string().uuid(),
-  /** If true, dice count is doubled (PHB p.196 — Critical Hit). Defaults to false. */
-  crit: z.boolean().optional(),
   /** Caller-asserted runtime decisions (for Sneak Attack predicates, etc.). */
   runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
   /** Client's known encounter version — must match DB version for CAS. */
@@ -104,7 +120,11 @@ async function memberRole(
 export const encountersRoute: FastifyPluginAsync = async (app) => {
   // ---- POST /encounters ---------------------------------------------------
   app.post('/encounters', { preHandler: app.authenticate }, async (request, reply) => {
-    const body = CreateBody.parse(request.body);
+    const bodyResult = CreateBody.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+    }
+    const body = bodyResult.data;
     const userId = request.user!.sub;
     const role = await memberRole(body.campaignId, userId);
     if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
@@ -120,6 +140,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         initiative: c.initiative,
         hpCurrent: c.hpCurrent,
         hpMax: c.hpMax,
+        // REQ-AC-CREATE-03: ac threaded for NPC combatants. PC: undefined → null in use-case.
+        ...(c.ac !== undefined ? { ac: c.ac } : {}),
       })),
     });
     return reply.code(201).send(created);
@@ -255,7 +277,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { attackerId, targetId, weaponInstanceId, crit, runtimeDecisions, version } = bodyResult.data;
+      const { attackerId, targetId, weaponInstanceId, runtimeDecisions, version } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter for campaign membership check.
@@ -275,7 +297,6 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         attackerId,
         targetId,
         weaponInstanceId,
-        ...(crit !== undefined ? { crit } : {}),
         ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
         version,
       });
@@ -290,12 +311,38 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(409).send({ error: result.code });
           case 'NOT_FOUND':
             return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'NO_TARGET_AC':
+            // REQ-ROUTE-BODY-04: NO_TARGET_AC → 400 VALIDATION_FAILED with issues[].
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_TARGET_AC' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
       }
 
+      // REQ-ROUTE-BODY-02: miss response — no damage fields.
+      if (!result.hit) {
+        return reply.code(200).send({
+          hit: false,
+          d20: result.d20,
+          d20All: result.d20All,
+          total: result.total,
+          toHitBonus: result.toHitBonus,
+          targetAc: result.targetAc,
+        });
+      }
+
+      // REQ-ROUTE-BODY-03: hit response — includes all to-hit + damage fields.
       return reply.code(200).send({
+        hit: true,
+        crit: result.crit,
+        d20: result.d20,
+        d20All: result.d20All,
+        total: result.total,
+        toHitBonus: result.toHitBonus,
+        targetAc: result.targetAc,
         rolledDamage: result.rolledDamage,
         perDie: result.perDie,
         newHp: result.newHp,

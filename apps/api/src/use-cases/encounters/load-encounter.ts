@@ -38,6 +38,7 @@ export async function loadEncounter(id: string): Promise<LoadedEncounter | null>
       initiative: c.initiative,
       hpCurrent: c.hpCurrent,
       hpMax: c.hpMax,
+      ac: c.ac,
       insertionOrder: c.insertionOrder,
     })),
   };

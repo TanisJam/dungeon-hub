@@ -19,6 +19,8 @@ export interface CreateEncounterInput {
     initiative: number;
     hpCurrent: number;
     hpMax: number;
+    /** NPC combatants: store AC in DB column. PC combatants: null (derived at attack time). */
+    ac?: number | null;
   }>;
 }
 
@@ -41,6 +43,7 @@ export interface CreatedEncounter {
     initiative: number;
     hpCurrent: number;
     hpMax: number;
+    ac: number | null;
     insertionOrder: number;
   }>;
 }
@@ -68,6 +71,8 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
           initiative: c.initiative,
           hpCurrent: c.hpCurrent,
           hpMax: c.hpMax,
+          // NPC: store provided ac (null if not given). PC: always null (derived at attack time).
+          ac: c.kind === 'npc' ? (c.ac ?? null) : null,
           insertionOrder: idx,
         })),
       )
@@ -104,6 +109,7 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
         initiative: c.initiative,
         hpCurrent: c.hpCurrent,
         hpMax: c.hpMax,
+        ac: c.ac,
         insertionOrder: c.insertionOrder,
       })),
     };

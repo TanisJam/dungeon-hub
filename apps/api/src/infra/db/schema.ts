@@ -917,6 +917,7 @@ export const encounterCombatants = pgTable(
     initiative: integer('initiative').notNull(),
     hpCurrent: integer('hp_current').notNull(),
     hpMax: integer('hp_max').notNull(),
+    ac: integer('ac'),
     insertionOrder: integer('insertion_order').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

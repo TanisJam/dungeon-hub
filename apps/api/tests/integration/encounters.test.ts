@@ -37,7 +37,8 @@ describe('encounters', () => {
 
   const baseCombatants = [
     { name: 'Mira', kind: 'pc', initiative: 18, hpCurrent: 22, hpMax: 22 },
-    { name: 'Goblin α', kind: 'npc', initiative: 15, hpCurrent: 5, hpMax: 7 },
+    // REQ-AC-CREATE-01: NPC combatants require ac at creation. Goblin AC=13 (PHB MM p.166).
+    { name: 'Goblin α', kind: 'npc', initiative: 15, hpCurrent: 5, hpMax: 7, ac: 13 },
     { name: 'Brann', kind: 'pc', initiative: 13, hpCurrent: 28, hpMax: 32 },
   ];
 

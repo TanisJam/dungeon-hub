@@ -214,6 +214,7 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
               initiative: 5,
               hpCurrent: 7,
               hpMax: 7,
+              ac: 13,
             },
           ],
         },
@@ -311,7 +312,7 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
                 hpCurrent: 8,
                 hpMax: 8,
               },
-              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 7, hpMax: 7 },
+              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 7, hpMax: 7, ac: 13 },
             ],
           },
         })
@@ -365,7 +366,7 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
                 hpCurrent: 12,
                 hpMax: 12,
               },
-              { name: 'Goblin', kind: 'npc', initiative: 20, hpCurrent: 7, hpMax: 7 },
+              { name: 'Goblin', kind: 'npc', initiative: 20, hpCurrent: 7, hpMax: 7, ac: 13 },
             ],
           },
         })
@@ -488,7 +489,7 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
                 hpCurrent: 12,
                 hpMax: 12,
               },
-              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 7, hpMax: 7 },
+              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 7, hpMax: 7, ac: 13 },
             ],
           },
         })

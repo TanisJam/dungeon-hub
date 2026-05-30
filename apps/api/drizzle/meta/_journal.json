@@ -148,6 +148,13 @@
       "when": 1780095216048,
       "tag": "0020_fluffy_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1780147431806,
+      "tag": "0021_abnormal_hulk",
+      "breakpoints": true
     }
   ]
 }
