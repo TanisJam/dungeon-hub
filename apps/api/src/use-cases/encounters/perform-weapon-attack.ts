@@ -2,10 +2,12 @@
  * perform-weapon-attack — Use-case for the engine action pipeline weapon attack route.
  *
  * Slice 1 (engine-action-pipeline SDD): Synchronous, read-only weapon attack resolver.
- * Loads all required data from DB, builds EvaluationContext + registry, calls the
- * pure domain resolveWeaponAttack function, and returns the result. NO DB writes.
+ * Loads encounter guards, delegates character+weapon context to buildAttackContext,
+ * calls the pure domain resolveWeaponAttack, and returns the result. NO DB writes.
  *
  * Design ref: sdd/engine-action-pipeline/design — ADR-9, data flow section.
+ * ADR-8 (engine-attack-apply-damage): character+weapon context loading extracted to
+ * buildAttackContext to avoid drift between read-only and mutation use-cases.
  *
  * REQ-ATK-READONLY-01: zero DB writes. No HP mutation, no encounter version bump,
  * no encounter_actions row created.
@@ -17,20 +19,9 @@ import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
 import {
   resolveWeaponAttack,
-  createInMemoryRegistry,
-  buildSneakAttackRider,
   type WeaponAttackResult,
 } from '@dungeon-hub/domain/engine';
-import type { AppliedClass } from '@dungeon-hub/domain/character/class';
-import { isWeaponProficient } from '@dungeon-hub/domain/character/inventory';
-import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
-import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
-import type { EntityId, EvaluationContext } from '@dungeon-hub/domain/engine';
-import { deriveCharacterModifiers } from '../characters/derive-character-modifiers.js';
-import { loadPersistedModifiers } from '../characters/load-persisted-modifiers.js';
-import { loadModifierDefinitions } from '../characters/load-modifier-definitions.js';
-import { loadItemDataDetailMany } from '../characters/load-item-data.js';
-import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
+import { buildAttackContext } from './build-attack-context.js';
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -62,7 +53,9 @@ export type PerformWeaponAttackResult =
 // ── perform-weapon-attack ──────────────────────────────────────────────────────
 
 /**
- * Loads encounter + character + weapon + registry, calls resolveWeaponAttack, returns result.
+ * Loads encounter + attacker combatant, checks ownership + turn guard, then
+ * delegates character+weapon context building to buildAttackContext, calls
+ * resolveWeaponAttack, and returns the read-only result.
  *
  * ADR-9 ownership guard: caller must own the attacker character. If attackerCombatant
  * is an NPC (characterId === null), only GM role passes (but full GM check is done at
@@ -125,140 +118,26 @@ export async function performWeaponAttack(
     if (charRow.userId !== callerId) return { ok: false, code: 'FORBIDDEN' };
   }
 
-  // ── Step 6: Load character sheet (proficiencies, ability mods, pb) ───────────
   // attackerCombatant.characterId is not null at this point (enforced above for PC).
   const characterId = attackerCombatant.characterId!;
 
-  const [characterRow] = await db
-    .select()
-    .from(characters)
-    .where(eq(characters.id, characterId))
-    .limit(1);
-
-  if (!characterRow) return { ok: false, code: 'NOT_FOUND', target: 'character' };
-
-  const charData = (characterRow.data as Record<string, unknown>) ?? {};
-  const inventory = (characterRow.inventory as InventoryItem[]) ?? [];
-
-  // Build a minimal character shape for computeCharacterSheet.
-  // exactOptionalPropertyTypes: conditional spread for nullable fields.
-  const characterInput = {
-    name: characterRow.name,
-    baseStats: charData['baseStats'] as never,
-    asisApplied: charData['asisApplied'] as never,
-    levelUpAsis: charData['levelUpAsis'] as never,
-    classes: charData['classes'] as never,
-    background: charData['background'] as never,
-    feats: charData['feats'] as never,
-    race: (charData['race'] ?? null) as never,
-    subrace: (charData['subrace'] ?? null) as never,
-    inventory,
-    currency: charData['currency'] as never,
-    spells: charData['spells'] as never,
-    exhaustion: charData['exhaustion'] as never,
-    classFeatures: charData['classFeatures'] as never,
-    raceLanguageChoices: charData['raceLanguageChoices'] as never,
-    raceSkillChoices: charData['raceSkillChoices'] as never,
-    raceCantrip: charData['raceCantrip'] as never,
-    spellSlotsUsed: charData['spellSlotsUsed'] as never,
-    warlockSlotsUsed: charData['warlockSlotsUsed'] as never,
-    classResourcesUsed: charData['classResourcesUsed'] as never,
-  };
-
-  const sheet = computeCharacterSheet({ character: characterInput });
-  const charId = characterId as EntityId;
-
-  // ── Step 7: Find weapon in inventory ─────────────────────────────────────────
-  const weaponInstance = inventory.find(
-    (item) => item.instanceId === weaponInstanceId,
-  );
-  if (!weaponInstance) return { ok: false, code: 'NOT_FOUND', target: 'weapon' };
-
-  // ── Step 8: Load weapon compendium data ───────────────────────────────────────
-  const [weaponDetail] = await loadItemDataDetailMany([
-    { slug: weaponInstance.itemSlug, source: weaponInstance.itemSource },
-  ]);
-  if (!weaponDetail) return { ok: false, code: 'NOT_FOUND', target: 'weapon' };
-
-  // ── Step 9: Resolve proficiency ───────────────────────────────────────────────
-  const isProficient = isWeaponProficient(
-    sheet.proficiencies.weapons,
-    { name: weaponDetail.name, slug: weaponDetail.slug },
-  );
-
-  // ── Step 9b: Normalize 5etools weapon property codes to semantic strings ──────
-  // 5etools stores property codes as single-letter abbreviations (e.g. 'F'=finesse,
-  // 'T'=thrown). Domain predicates (hasWeaponProperty) match on semantic strings.
-  // Normalise here at the use-case boundary to avoid leaking 5etools codes into domain.
-  // PHB p.147-149: finesse='F', thrown='T', light='L', heavy='H', versatile='V',
-  //                two-handed='2H', reach='R', loading='LD', ammunition='A', special='S'.
-  const PROPERTY_CODE_TO_SEMANTIC: Record<string, string> = {
-    F: 'finesse',
-    T: 'thrown',
-    L: 'light',
-    H: 'heavy',
-    V: 'versatile',
-    '2H': 'two-handed',
-    R: 'reach',
-    LD: 'loading',
-    A: 'ammunition',
-    S: 'special',
-  };
-  const normalizedProperties = (weaponDetail.property ?? []).flatMap((p) => {
-    const semantic = PROPERTY_CODE_TO_SEMANTIC[p];
-    // Include both the semantic string AND the raw code for backwards-compatibility
-    // with predicates or legacy code that may check raw codes.
-    return semantic !== undefined ? [p, semantic] : [p];
+  // ── Steps 6-13: Build character+weapon+registry context ──────────────────────
+  // ADR-8: extracted to buildAttackContext to share with perform-weapon-attack-apply.
+  const ctxResult = await buildAttackContext({
+    characterId,
+    attackerId,
+    targetId,
+    weaponInstanceId,
+    encounterRound: encounterRow.round,
+    ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
   });
 
-  // ── Step 10: Build EvaluationContext ──────────────────────────────────────────
-  // exactOptionalPropertyTypes: conditional spread for all optional ctx fields.
-  // runtimeDecisions threaded from input (caller-asserted) — REQ-SA-API-01.2.
-  const ctx: EvaluationContext = {
-    self: { id: charId, conditions: [] },
-    activeConditions: [],
-    target: { id: targetId as EntityId, conditions: [] },
-    attacker: { id: charId, conditions: [] },
-    weaponInUse: {
-      kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
-      properties: normalizedProperties,
-    },
-    ...(encounterRow.round !== undefined && encounterRow.round !== null
-      ? { encounterRound: encounterRow.round }
-      : {}),
-    ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
-  };
-
-  // ── Step 11: Build registry ───────────────────────────────────────────────────
-  const modifierCatalog = await loadModifierDefinitions();
-  const inventoryMods = deriveCharacterModifiers(inventory, charId, modifierCatalog);
-  const persistedMods = await loadPersistedModifiers(characterId, ctx);
-  const registry = createInMemoryRegistry();
-  for (const m of inventoryMods) registry.register(m);
-  for (const m of persistedMods) registry.register(m);
-
-  // ── Step 11b: Sneak Attack rider — rogue-level compute (REQ-SA-DICE-01) ──────
-  // Compute rogueLevel = sum(AppliedClass.level where slug==='rogue').
-  // Non-rogue (rogueLevel=0) → rider NOT registered (predicate never runs).
-  // PHB p.96: Sneak Attack dice = ceil(rogueLevel/2)d6.
-  // exactOptionalPropertyTypes: charData['classes'] is cast to AppliedClass[] | undefined.
-  const rogueLevel = ((charData['classes'] as AppliedClass[] | undefined) ?? [])
-    .filter((c) => c.slug === 'rogue')
-    .reduce((sum, c) => sum + c.level, 0);
-  if (rogueLevel > 0) {
-    const sneakAttackDice = `${Math.ceil(rogueLevel / 2)}d6`;
-    for (const m of buildSneakAttackRider(charId, targetId as EntityId, sneakAttackDice)) {
-      registry.register(m);
-    }
+  if (!ctxResult.ok) {
+    if (ctxResult.code === 'FORBIDDEN') return { ok: false, code: 'FORBIDDEN' };
+    return { ok: false, code: 'NOT_FOUND', target: ctxResult.target };
   }
 
-  // ── Step 12: Resolve ability mods ─────────────────────────────────────────────
-  // Use sheet-sourced ability scores (may be engine-derived or legacy).
-  // sheet.abilityScores contains the final scores including ASI modifiers.
-  const strScore = sheet.abilityScores.str?.score ?? 10;
-  const dexScore = sheet.abilityScores.dex?.score ?? 10;
-  const strMod = abilityModifier(strScore);
-  const dexMod = abilityModifier(dexScore);
+  const { charId, ctx, registry, strMod, dexMod, proficiencyBonus, isProficient, weapon } = ctxResult;
 
   // ── Step 13: Call resolveWeaponAttack ─────────────────────────────────────────
   const result = resolveWeaponAttack({
@@ -267,15 +146,9 @@ export async function performWeaponAttack(
     registry,
     strMod,
     dexMod,
-    proficiencyBonus: sheet.proficiencyBonus,
+    proficiencyBonus,
     isProficient,
-    weapon: {
-      kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
-      properties: normalizedProperties, // normalized: includes both 'F' and 'finesse' for selectAttackAbility + predicates
-      magicBonus: 0, // Slice B: magic bonus deferred per design
-      damageDice: weaponDetail.dmg1 ?? '1',
-      damageType: weaponDetail.dmgType ?? 'untyped',
-    },
+    weapon,
   });
 
   return {

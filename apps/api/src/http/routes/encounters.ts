@@ -17,6 +17,7 @@ import { loadEncounter } from '../../use-cases/encounters/load-encounter.js';
 import { advanceEncounterTurn } from '../../use-cases/encounters/advance-encounter-turn.js';
 import { patchCombatant } from '../../use-cases/encounters/patch-combatant.js';
 import { performWeaponAttack } from '../../use-cases/encounters/perform-weapon-attack.js';
+import { performWeaponAttackApply } from '../../use-cases/encounters/perform-weapon-attack-apply.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -63,6 +64,28 @@ const AttackActionBodySchema = z.object({
    * Additive and backwards-compatible: existing callers may omit this field.
    */
   runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
+});
+
+/**
+ * POST /encounters/:id/actions/attack/apply — engine mutation slice (FIRST mutation).
+ *
+ * GM-only. Server-authoritative: derives DiceExpr, rolls with crypto RNG, clamps HP,
+ * persists atomically. Returns {rolledDamage, perDie, newHp}.
+ *
+ * REQ-ATK-APPLY-02: client supplies NO damage value — server derives and rolls.
+ * REQ-ATK-VERSION-01: optimistic CAS — version mismatch → 409 VERSION_CONFLICT.
+ * REQ-ATK-AUTH-01: GM-only (memberRole check).
+ */
+const AttackApplyBody = z.object({
+  attackerId: z.string().uuid(),
+  targetId: z.string().uuid(),
+  weaponInstanceId: z.string().uuid(),
+  /** If true, dice count is doubled (PHB p.196 — Critical Hit). Defaults to false. */
+  crit: z.boolean().optional(),
+  /** Caller-asserted runtime decisions (for Sneak Attack predicates, etc.). */
+  runtimeDecisions: z.record(z.string(), z.boolean()).optional(),
+  /** Client's known encounter version — must match DB version for CAS. */
+  version: z.number().int().nonnegative(),
 });
 
 async function memberRole(
@@ -212,6 +235,71 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         toHit: result.toHit,
         damage: result.damage,
         rollMode: result.rollMode,
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/attack/apply --------------------------
+  // Engine mutation slice — GM-only, server-authoritative damage application.
+  // REQ-ATK-AUTH-01: GM-only. REQ-ATK-VERSION-01: CAS version. REQ-ATK-APPLY-02: no client damage.
+  app.post(
+    '/encounters/:id/actions/attack/apply',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = AttackApplyBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { attackerId, targetId, weaponInstanceId, crit, runtimeDecisions, version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for campaign membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ATK-AUTH-01).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await performWeaponAttackApply({
+        encounterId: id,
+        attackerId,
+        targetId,
+        weaponInstanceId,
+        ...(crit !== undefined ? { crit } : {}),
+        ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
+        version,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
+          case 'NOT_YOUR_TURN':
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({
+        rolledDamage: result.rolledDamage,
+        perDie: result.perDie,
+        newHp: result.newHp,
+        damageType: result.damageType,
       });
     },
   );
