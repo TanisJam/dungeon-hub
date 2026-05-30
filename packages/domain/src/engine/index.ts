@@ -134,6 +134,9 @@ export type { RngFn, RollResult, PerDieEntry } from './dice/roll.js';
 export { rollSavingThrow } from './save/roll-saving-throw.js';
 export type { RollSavingThrowResult } from './save/roll-saving-throw.js';
 
+// Slice 3b-ii — Stunning Strike ki save DC (PHB p.78)
+export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
