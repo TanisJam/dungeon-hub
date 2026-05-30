@@ -24,6 +24,12 @@ import {
   buildHexRider,
   buildStunnedModifiers,
   STUNNED_CONDITION_DEF,
+  buildBlindedModifiers,
+  BLINDED_CONDITION_DEF,
+  buildInvisibleModifiers,
+  INVISIBLE_CONDITION_DEF,
+  buildPoisonedModifiers,
+  POISONED_CONDITION_DEF,
   type ModifierRegistry,
   type EvaluationContext,
 } from '@dungeon-hub/domain/engine';
@@ -332,6 +338,91 @@ export async function buildAttackContext(
     );
     if (stunnedResult.ok) {
       for (const m of stunnedResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+
+  // ── Blinded target: outgoing attackers-of grant + attacker self-impose ────────
+  // PHB p.290: "Attack rolls against the [Blinded] creature have advantage."
+  //            "The creature's attack rolls have disadvantage."
+  // Outgoing mods bind to targetId (attackers-of axis).
+  // Attacker self-impose binds to charId (self axis).
+  if (targetConditions.some((c) => c.name === 'Blinded')) {
+    const blindedTargetResult = buildBlindedModifiers(
+      targetId as import('@dungeon-hub/domain/engine').EntityId,
+      (name) => {
+        if (name === 'Blinded') return BLINDED_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (blindedTargetResult.ok) {
+      for (const m of blindedTargetResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+  if (attackerConditions.some((c) => c.name === 'Blinded')) {
+    const blindedAttackerResult = buildBlindedModifiers(
+      charId,
+      (name) => {
+        if (name === 'Blinded') return BLINDED_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (blindedAttackerResult.ok) {
+      for (const m of blindedAttackerResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+
+  // ── Invisible target: outgoing attackers-of impose + attacker self-grant ───────
+  // PHB p.291: "Attack rolls against the [Invisible] creature have disadvantage."
+  //            "The creature's attack rolls have advantage."
+  // Outgoing mods bind to targetId; attacker self-grant binds to charId.
+  if (targetConditions.some((c) => c.name === 'Invisible')) {
+    const invisibleTargetResult = buildInvisibleModifiers(
+      targetId as import('@dungeon-hub/domain/engine').EntityId,
+      (name) => {
+        if (name === 'Invisible') return INVISIBLE_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (invisibleTargetResult.ok) {
+      for (const m of invisibleTargetResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+  if (attackerConditions.some((c) => c.name === 'Invisible')) {
+    const invisibleAttackerResult = buildInvisibleModifiers(
+      charId,
+      (name) => {
+        if (name === 'Invisible') return INVISIBLE_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (invisibleAttackerResult.ok) {
+      for (const m of invisibleAttackerResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+
+  // ── Poisoned attacker: self-impose on attacks + ability checks ────────────────
+  // PHB p.292: "A poisoned creature has disadvantage on attack rolls and ability checks."
+  // Self mods only — no outgoing effect on target. Bind to charId (self axis).
+  if (attackerConditions.some((c) => c.name === 'Poisoned')) {
+    const poisonedResult = buildPoisonedModifiers(
+      charId,
+      (name) => {
+        if (name === 'Poisoned') return POISONED_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (poisonedResult.ok) {
+      for (const m of poisonedResult.instances) {
         registry.register(m);
       }
     }

@@ -48,10 +48,10 @@ const cryptoRng: RngFn = (sides: number): number => {
 // ── Condition catalog (hardcoded in 3a) ───────────────────────────────────────
 
 /**
- * 3a condition catalog — valid values for conditionOnFail.
+ * Condition catalog — valid values for conditionOnFail.
  * TODO #513: replace with DB catalog when conditions-catalog SDD lands.
  */
-const CONDITION_CATALOG_3A = new Set(['Stunned']);
+const CONDITION_CATALOG = new Set(['Stunned', 'Blinded', 'Invisible', 'Poisoned']);
 
 // Abilities that trigger auto-fail when target is Stunned (PHB p.292).
 const STUNNED_AUTOFAIL_ABILITIES = new Set<Ability>(['str', 'dex']);
@@ -190,7 +190,7 @@ export async function performForcedCheck(
   if (!targetCombatant) return { ok: false, code: 'NOT_FOUND', target: 'target' };
 
   // ── Step 3: Validate conditionOnFail against 3a catalog ───────────────────────
-  if (!CONDITION_CATALOG_3A.has(conditionOnFail)) {
+  if (!CONDITION_CATALOG.has(conditionOnFail)) {
     return { ok: false, code: 'UNKNOWN_CONDITION', condition: conditionOnFail };
   }
 
