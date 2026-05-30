@@ -68,6 +68,11 @@ export interface PerformForcedCheckInput {
   rollMode?: 'normal' | 'advantage' | 'disadvantage';
   /** Optional: ID of the combatant that caused this forced check (for applied_by correlation). */
   appliedByCombatantId?: string | null;
+  // Turn-anchor fields (3b-i sweep). All optional — when omitted, conditions are permanent.
+  // TODO 3b-future: orphaned-anchor cleanup if anchor combatant is removed mid-stun (ADR-6).
+  turnAnchorEntityId?: string | null;
+  turnAnchorBoundary?: 'start' | 'end';
+  turnsRemaining?: number | null;
 }
 
 export type PerformForcedCheckResult =
@@ -134,6 +139,9 @@ export async function performForcedCheck(
     npcSaveMod,
     rollMode = 'normal',
     appliedByCombatantId = null,
+    turnAnchorEntityId = null,
+    turnAnchorBoundary,       // undefined when omitted → maps to null in INSERT
+    turnsRemaining = null,
   } = input;
 
   // ── Step 1: Load encounter + active guard ─────────────────────────────────────
@@ -190,6 +198,9 @@ export async function performForcedCheck(
       conditionOnFail,
       existingConditionNames,
       appliedByCombatantId,
+      turnAnchorEntityId,
+      turnAnchorBoundary,
+      turnsRemaining,
     });
     return {
       ok: true,
@@ -228,6 +239,9 @@ export async function performForcedCheck(
       conditionOnFail,
       existingConditionNames,
       appliedByCombatantId,
+      turnAnchorEntityId,
+      turnAnchorBoundary,
+      turnsRemaining,
     });
 
     return {
@@ -279,8 +293,19 @@ async function applyConditions(opts: {
   conditionOnFail: string;
   existingConditionNames: Set<string>;
   appliedByCombatantId: string | null;
+  turnAnchorEntityId: string | null;
+  turnAnchorBoundary: 'start' | 'end' | undefined;
+  turnsRemaining: number | null;
 }): Promise<string[]> {
-  const { targetCombatantId, conditionOnFail, existingConditionNames, appliedByCombatantId } = opts;
+  const {
+    targetCombatantId,
+    conditionOnFail,
+    existingConditionNames,
+    appliedByCombatantId,
+    turnAnchorEntityId,
+    turnAnchorBoundary,
+    turnsRemaining,
+  } = opts;
   const applied: string[] = [];
 
   // Determine which conditions to insert.
@@ -297,10 +322,16 @@ async function applyConditions(opts: {
     }
 
     // INSERT into encounter_combatant_conditions (plain INSERT, no CAS — ADR-5).
+    // Anchor fields: null when omitted → permanent condition (ADR-4 backward-compat).
+    // Both Stunned+Incapacitated rows receive IDENTICAL anchor data from shared closure
+    // vars → ensures the ADR-2 DELETE sweep removes them as an atomic pair (REQ-TAS-05).
     await db.insert(encounterCombatantConditions).values({
       combatantId: targetCombatantId,
       conditionName,
       appliedByCombatantId: appliedByCombatantId ?? null,
+      turnAnchorEntityId: turnAnchorEntityId ?? null,
+      turnAnchorBoundary: turnAnchorBoundary ?? null,
+      turnsRemaining: turnsRemaining ?? null,
     });
 
     applied.push(conditionName);

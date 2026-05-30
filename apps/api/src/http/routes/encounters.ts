@@ -364,6 +364,10 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
     conditionOnFail: z.string().min(1),
     npcSaveMod: z.number().optional(),
     rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
+    // Turn-anchor params (3b-i sweep — ADR-5). All optional for backward-compat.
+    turnAnchorEntityId: z.string().uuid().optional(),
+    turnAnchorBoundary: z.enum(['start', 'end']).optional(),
+    turnsRemaining: z.number().int().min(0).optional(),
   });
 
   app.post(
@@ -379,7 +383,17 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { targetCombatantId, ability, dc, conditionOnFail, npcSaveMod, rollMode } = bodyResult.data;
+      const {
+        targetCombatantId,
+        ability,
+        dc,
+        conditionOnFail,
+        npcSaveMod,
+        rollMode,
+        turnAnchorEntityId,
+        turnAnchorBoundary,
+        turnsRemaining,
+      } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter for campaign membership check.
@@ -402,6 +416,10 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         conditionOnFail,
         npcSaveMod: npcSaveMod ?? null,
         rollMode,
+        turnAnchorEntityId: turnAnchorEntityId ?? null,
+        // exactOptionalPropertyTypes: omit the key entirely when undefined (not pass undefined).
+        ...(turnAnchorBoundary !== undefined ? { turnAnchorBoundary } : {}),
+        turnsRemaining: turnsRemaining ?? null,
       });
 
       if (!result.ok) {
