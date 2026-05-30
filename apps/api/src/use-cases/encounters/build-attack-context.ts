@@ -21,6 +21,7 @@ import { characters, encounterCombatantConditions, encounterCombatantEffects } f
 import {
   createInMemoryRegistry,
   buildSneakAttackRider,
+  buildHexRider,
   buildStunnedModifiers,
   STUNNED_CONDITION_DEF,
   type ModifierRegistry,
@@ -305,6 +306,15 @@ export async function buildAttackContext(
     for (const m of buildSneakAttackRider(charId, targetId as EntityId, sneakAttackDice)) {
       registry.register(m);
     }
+  }
+
+  // ── Step 11b-Hex: Hex on-hit necrotic rider (PHB p.251) ──────────────────────
+  // Unconditional registration — hasEffectFromSelf('Hex') predicate gates firing.
+  // Hex is a spell-on-target, not a class feature → no caster-class guard.
+  // ctx.attackerCombatantId + ctx.targetCombatantEffects (Slice A threading) are
+  // populated above (L283 + L288) before the ON_HIT phase queries the registry.
+  for (const m of buildHexRider(charId, targetId as EntityId)) {
+    registry.register(m);
   }
 
   // ── Step 11c: Condition modifiers (REQ-CTX-01 — ADR-6) ──────────────────────
