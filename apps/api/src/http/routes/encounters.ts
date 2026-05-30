@@ -19,6 +19,8 @@ import { patchCombatant } from '../../use-cases/encounters/patch-combatant.js';
 import { performWeaponAttack } from '../../use-cases/encounters/perform-weapon-attack.js';
 import { performWeaponAttackApply } from '../../use-cases/encounters/perform-weapon-attack-apply.js';
 import { performForcedCheck } from '../../use-cases/encounters/perform-forced-check.js';
+import { applyCombatantEffect } from '../../use-cases/encounters/apply-combatant-effect.js';
+import { removeCombatantEffect } from '../../use-cases/encounters/remove-combatant-effect.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -560,6 +562,126 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         save: result.save,
         applied: result.applied,
       });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/apply-combatant-effect ---------------
+  // Apply a named effect to a target combatant (idempotent). GM-only.
+  // REQ-CEF-06: thin route — Zod body → applyCombatantEffect → response.
+  // NO version/CAS coupling — append-only child table (ADR-5).
+  const ApplyCombatantEffectBody = z.object({
+    targetCombatantId: z.string().uuid(),
+    effectName: z.string().min(1),
+    sourceCombatantId: z.string().uuid().optional(),
+    concentrationToken: z.string().optional(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/apply-combatant-effect',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = ApplyCombatantEffectBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { targetCombatantId, effectName, sourceCombatantId, concentrationToken } =
+        bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (mirrors forced-check :488-500).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await applyCombatantEffect({
+        encounterId: id,
+        targetCombatantId,
+        effectName,
+        // exactOptionalPropertyTypes: conditional spread for optional uuid fields.
+        ...(sourceCombatantId !== undefined ? { sourceCombatantId } : {}),
+        ...(concentrationToken !== undefined ? { concentrationToken } : {}),
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({ applied: result.applied });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/remove-combatant-effect ---------------
+  // Remove a named effect from a target combatant. GM-only.
+  // REQ-CEF-07: thin route — Zod body → removeCombatantEffect → response.
+  // Zero rows deleted = 200 success (idempotent remove).
+  const RemoveCombatantEffectBody = z.object({
+    targetCombatantId: z.string().uuid(),
+    effectName: z.string().min(1),
+    sourceCombatantId: z.string().uuid().optional(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/remove-combatant-effect',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = RemoveCombatantEffectBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { targetCombatantId, effectName, sourceCombatantId } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate.
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await removeCombatantEffect({
+        encounterId: id,
+        targetCombatantId,
+        effectName,
+        ...(sourceCombatantId !== undefined ? { sourceCombatantId } : {}),
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({ removed: result.removed });
     },
   );
 

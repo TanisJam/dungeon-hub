@@ -17,7 +17,7 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characters, encounterCombatantConditions } from '../../infra/db/schema.js';
+import { characters, encounterCombatantConditions, encounterCombatantEffects } from '../../infra/db/schema.js';
 import {
   createInMemoryRegistry,
   buildSneakAttackRider,
@@ -248,6 +248,25 @@ export async function buildAttackContext(
     .filter((r) => r.combatantId === targetId)
     .map((r) => ({ name: r.conditionName }));
 
+  // ── Step 10c: Load active effects on the TARGET (REQ-CEF-05) ────────────────
+  // Target-only: hasEffectFromSelf reads only the target's effects. Read-tolerant —
+  // zero-row targets → empty array → predicate returns false (CLAUDE.md §11).
+  // source_combatant_id is a COMBATANT UUID — compare against attackerCombatantId,
+  // NOT against charId (which is the CHARACTER EntityId — a distinct namespace).
+  // ADR-3 identity-space warning: DO NOT confuse attackerId (combatant UUID) with charId.
+  const effectRows = await db
+    .select({
+      effectName: encounterCombatantEffects.effectName,
+      sourceCombatantId: encounterCombatantEffects.sourceCombatantId,
+    })
+    .from(encounterCombatantEffects)
+    .where(eq(encounterCombatantEffects.combatantId, targetId));
+
+  const targetCombatantEffects = effectRows.map((r) => ({
+    effectName: r.effectName,
+    sourceCombatantId: r.sourceCombatantId,
+  }));
+
   // ── Step 10b: Build EvaluationContext ─────────────────────────────────────────
   // exactOptionalPropertyTypes: conditional spread for all optional ctx fields.
   const ctx: EvaluationContext = {
@@ -259,10 +278,14 @@ export async function buildAttackContext(
       kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
       properties: normalizedProperties,
     },
+    // attackerCombatantId: the COMBATANT UUID (encounter_combatants.id).
+    // ⚠️ This is NOT charId (character EntityId) — different namespaces. ADR-3.
+    attackerCombatantId: attackerId,
     ...(encounterRound !== undefined && encounterRound !== null
       ? { encounterRound }
       : {}),
     ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
+    ...(targetCombatantEffects.length > 0 ? { targetCombatantEffects } : {}),
   };
 
   // ── Step 11: Build registry ───────────────────────────────────────────────────
