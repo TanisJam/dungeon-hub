@@ -21,6 +21,7 @@ import { performWeaponAttackApply } from '../../use-cases/encounters/perform-wea
 import { performForcedCheck } from '../../use-cases/encounters/perform-forced-check.js';
 import { applyCombatantEffect } from '../../use-cases/encounters/apply-combatant-effect.js';
 import { removeCombatantEffect } from '../../use-cases/encounters/remove-combatant-effect.js';
+import { removeCombatantCondition } from '../../use-cases/encounters/remove-combatant-condition.js';
 import { performSpellHeal } from '../../use-cases/encounters/perform-spell-heal.js';
 
 const CreateBody = z.object({
@@ -669,6 +670,57 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         targetCombatantId,
         effectName,
         ...(sourceCombatantId !== undefined ? { sourceCombatantId } : {}),
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({ removed: result.removed });
+    },
+  );
+
+  // ---- DELETE /encounters/:id/combatants/:cid/conditions/:name -----------
+  // Remove a named condition from a target combatant. GM-only, idempotent.
+  // REQ-COND-DEL-01..04 (conditions-catalog Slice 1, ADR-4):
+  //   - 200 {removed:n} on success (n=0 when condition was absent — idempotent)
+  //   - 403 for non-DM callers
+  //   - 404 for missing encounter or combatant (NOT for absent condition)
+  //   - 409 for inactive encounter
+
+  app.delete(
+    '/encounters/:id/combatants/:cid/conditions/:name',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const params = request.params as { cid: string; name: string };
+      const cid = params.cid;
+      const conditionName = params.name;
+
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (mirrors apply-condition + remove-combatant-effect).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await removeCombatantCondition({
+        encounterId: id,
+        targetCombatantId: cid,
+        conditionName,
       });
 
       if (!result.ok) {
