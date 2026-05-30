@@ -135,6 +135,9 @@ export type { PipelineSignal, AdvanceResult } from './pipeline/state-machine.js'
 export { resolveWeaponAttack } from './attack/resolve-weapon-attack.js';
 export type { WeaponAttackInput, WeaponAttackResult } from './attack/resolve-weapon-attack.js';
 
+export { rollToHit } from './attack/roll-to-hit.js';
+export type { RollToHitResult, RollMode } from './attack/roll-to-hit.js';
+
 // ── Form-switching subsystem ──────────────────────────────────────────────────
 
 export { applyFormSwitch } from './form-switching/substitute.js';
