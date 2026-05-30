@@ -15,12 +15,14 @@
  * different target fields).
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characters } from '../../infra/db/schema.js';
+import { characters, encounterCombatantConditions } from '../../infra/db/schema.js';
 import {
   createInMemoryRegistry,
   buildSneakAttackRider,
+  buildStunnedModifiers,
+  STUNNED_CONDITION_DEF,
   type ModifierRegistry,
   type EvaluationContext,
 } from '@dungeon-hub/domain/engine';
@@ -194,13 +196,31 @@ export async function buildAttackContext(
     return semantic !== undefined ? [p, semantic] : [p];
   });
 
-  // ── Step 10: Build EvaluationContext ──────────────────────────────────────────
+  // ── Step 10: Load active conditions for attacker + target (REQ-CTX-01) ──────────
+  // ADR-6: 1 IN-query for both combatants. Zero-row combatants → empty arrays
+  // (read-tolerance for legacy combatants without conditions, CLAUDE.md §11).
+  const conditionRows = await db
+    .select({
+      combatantId: encounterCombatantConditions.combatantId,
+      conditionName: encounterCombatantConditions.conditionName,
+    })
+    .from(encounterCombatantConditions)
+    .where(inArray(encounterCombatantConditions.combatantId, [attackerId, targetId]));
+
+  const attackerConditions = conditionRows
+    .filter((r) => r.combatantId === attackerId)
+    .map((r) => ({ name: r.conditionName }));
+  const targetConditions = conditionRows
+    .filter((r) => r.combatantId === targetId)
+    .map((r) => ({ name: r.conditionName }));
+
+  // ── Step 10b: Build EvaluationContext ─────────────────────────────────────────
   // exactOptionalPropertyTypes: conditional spread for all optional ctx fields.
   const ctx: EvaluationContext = {
-    self: { id: charId, conditions: [] },
-    activeConditions: [],
-    target: { id: targetId as EntityId, conditions: [] },
-    attacker: { id: charId, conditions: [] },
+    self: { id: charId, conditions: attackerConditions },
+    activeConditions: [...attackerConditions, ...targetConditions],
+    target: { id: targetId as EntityId, conditions: targetConditions },
+    attacker: { id: charId, conditions: attackerConditions },
     weaponInUse: {
       kind: weaponDetail.type === 'R' ? 'ranged' : 'melee',
       properties: normalizedProperties,
@@ -227,6 +247,26 @@ export async function buildAttackContext(
     const sneakAttackDice = `${Math.ceil(rogueLevel / 2)}d6`;
     for (const m of buildSneakAttackRider(charId, targetId as EntityId, sneakAttackDice)) {
       registry.register(m);
+    }
+  }
+
+  // ── Step 11c: Condition modifiers (REQ-CTX-01 — ADR-6) ──────────────────────
+  // Register outgoing condition mods for the target so resolveRollMode sees them.
+  // PHB p.292: if target is Stunned, ALL attackers get advantage (unconditional).
+  // This is the FIRST production wiring of the attackers-of registry path.
+  // buildProneModifiers existed but had zero production call sites before this slice.
+  if (targetConditions.some((c) => c.name === 'Stunned')) {
+    const stunnedResult = buildStunnedModifiers(
+      targetId as import('@dungeon-hub/domain/engine').EntityId,
+      (name) => {
+        if (name === 'Stunned') return STUNNED_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (stunnedResult.ok) {
+      for (const m of stunnedResult.instances) {
+        registry.register(m);
+      }
     }
   }
 
