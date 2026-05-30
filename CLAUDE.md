@@ -246,6 +246,7 @@ If you trip on any of these, save a `discovery` to engram and link from your SDD
 - **Playwright `selectOption({ label: regex })` does not exist.** Use `selectOption('exact-string')` or `selectOption({ value: '...' })`.
 - **Sub-agent skips RED step silently.** When delegating `sdd-apply`, the prompt must say `NEVER write production code without a failing test` AND must ask the agent to paste `Tests N passed` deltas as proof. Without that, agents can ship Phase X with 0 new tests and report "complete".
 - **Read-path tolerance for new gates.** When adding a new write-time validation gate (e.g. `RACE_SUBRACE_REQUIRED`), legacy DB rows that predate the gate must still load via GET without erroring. Validate write-only; tolerate read.
+- **Migrations: never apply via raw psql.** Always `pnpm --filter @dungeon-hub/api db:migrate` (it records the row in `drizzle.__drizzle_migrations`). Applying DDL manually desyncs the tracking table → `db:migrate` then re-runs every migration and fails on "already exists". If a migration ever *was* applied manually, backfill `__drizzle_migrations` with `sha256(<file>.sql)` as the `hash` + the journal `when` as `created_at`. See engram #1314 (root cause of the recurring #1284/#1293 failures).
 
 ---
 
