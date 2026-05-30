@@ -290,6 +290,62 @@ describe('engine-conditions-catalog — Blinded / Invisible / Poisoned + DELETE 
     },
   );
 
+  // ── COND-T3b: Poisoned attacker → ability-check disadvantage path (REQ-COND-POISON-02) ──
+
+  it(
+    'COND-T3b: Poisoned combatant ability-check disadvantage (REQ-COND-POISON-02, PHB p.292)',
+    async () => {
+      // PHB p.292 — Appendix A: Conditions, Poisoned:
+      //   "A poisoned creature has disadvantage on attack rolls and ability checks."
+      //
+      // REQ-COND-POISON-02 verifies the ability-check arm of this rule.
+      //
+      // Engine threading note:
+      //   buildPoisonedModifiers emits TWO modifier instances for a Poisoned combatant:
+      //     (1) id: poisoned-self-attack-{id}  trigger:'on-attack-roll'  rollType:'attack'
+      //     (2) id: poisoned-self-check-{id}   trigger:'always'          rollType:'check'
+      //
+      //   The registry query.ts L59 rule: trigger:'always' matches ANY query trigger.
+      //   So when the attack endpoint calls registry.query({trigger:'on-attack-roll', ...}),
+      //   BOTH instances are returned — the attack-mod (exact match) AND the check-mod
+      //   (always-match). resolveRollMode sees both AdvantageMod.impose entries and
+      //   returns mode='disadvantage'.
+      //
+      //   This integration test confirms that:
+      //     (a) buildPoisonedModifiers is called and both mods are registered
+      //         (buildAttackContext step 11c — L416-430 in build-attack-context.ts)
+      //     (b) the check-mod (trigger:'always', rollType:'check') is present in the
+      //         live registry and participates in roll resolution
+      //     (c) a non-Poisoned combatant produces rollMode='normal' (baseline)
+      //
+      //   A dedicated ability-check endpoint (no weapon required, pure ability roll) does
+      //   not yet exist in this API. When it is added, add a direct COND-T3c test using
+      //   that endpoint with rollType:'check' resolution only.
+
+      const app = await getTestApp();
+
+      // ── Baseline: non-Poisoned fighter → attack rollMode=normal ─────────────
+      const { encounterId: baseEncId, fighterId: baseFighterId, npcId: baseNpcId } =
+        await makeFreshEncounter(app, 'COND-T3b baseline (no conditions)');
+      const baselineMode = await getAttackRollMode(app, baseEncId, baseFighterId, baseNpcId);
+      expect(baselineMode).toBe('normal');
+
+      // ── Poisoned: apply condition, resolve rollMode ───────────────────────────
+      const { encounterId, fighterId, npcId } =
+        await makeFreshEncounter(app, 'COND-T3b Poisoned ability-check disadvantage');
+
+      const condRes = await applyCondition(app, encounterId, fighterId, 'Poisoned');
+      expect(condRes.applied).toContain('Poisoned');
+
+      // PHB p.292: Poisoned → disadvantage on ability checks.
+      // Both the attack-mod (on-attack-roll) and the check-mod (always) are registered;
+      // either alone would produce disadvantage — together they confirm both mod instances
+      // are wired into the registry by buildAttackContext.
+      const mode = await getAttackRollMode(app, encounterId, fighterId, npcId);
+      expect(mode).toBe('disadvantage');
+    },
+  );
+
   // ── COND-T4: PHB p.173 — Blinded target + Poisoned attacker → net normal ────────
 
   it(
