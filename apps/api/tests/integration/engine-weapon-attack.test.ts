@@ -61,7 +61,8 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
     await addCampaignAndWorldMember(campaignId, outsider.id, 'player');
 
     // ── Fighter character ──────────────────────────────────────────────────────
-    // Fighter level 1: STR 16 (+3), pb 2, martial weapons (longsword proficient)
+    // Fighter level 1: STR 15 (+2), pb 2, martial weapons (longsword proficient).
+    // STR 15 (not 16) because the standard array is [15,14,13,12,10,8] — no 16 without a racial ASI.
     const fighter = await app
       .inject({
         method: 'POST',
@@ -235,7 +236,7 @@ describe('engine-weapon-attack — POST /encounters/:id/actions/attack', () => {
 
   // ── T1: proficient_hit ────────────────────────────────────────────────────────
   it(
-    'T1: Fighter (proficient, STR+3, pb 2) longsword → 200; toHit.value = 5; no DB rows mutated (REQ-ATK-PROF-01, REQ-ATK-READONLY-01)',
+    'T1: Fighter (proficient, STR+2, pb 2) longsword → 200; toHit.value = 4; no DB rows mutated (REQ-ATK-PROF-01, REQ-ATK-READONLY-01)',
     async () => {
       const app = await getTestApp();
 
