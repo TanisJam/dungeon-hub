@@ -155,8 +155,7 @@ describe('engine-active-effects (Slice 7)', () => {
     const { db } = await import('../../src/infra/db/client.js');
     const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
-    const token = 'ae-tok-a';
-
+    // REQ-CONC-01: no concentrationToken in body — server generates it.
     // Target only allyIdA to keep allyIdB clean for case (c).
     // Two targets demonstrate multi-target fan-out; using allyIdA + allyIdA would produce
     // duplicate IDs. Use allyIdA only and verify the 2-row (1 target) count.
@@ -167,11 +166,15 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BLESS_SLUG,
         targetIds: [allyIdA],
-        concentrationToken: token,
       },
     });
 
     expect(res.statusCode).toBe(201);
+
+    // REQ-CONC-01: server returns the minted token.
+    const resBody = res.json();
+    expect(typeof resBody.concentrationToken).toBe('string');
+    const token: string = resBody.concentrationToken;
 
     // DB: 2 rows (attack-roll + saving-throw) for allyIdA.
     const rows = await db
@@ -191,9 +194,9 @@ describe('engine-active-effects (Slice 7)', () => {
   // REQ-AE-06: GET /sheet for target after active-effects → engineStats shows Bless.
   it('(b) GET /sheet target after active-effects → engineStats has Bless breakdown', async () => {
     const app = await getTestApp();
-    const token = 'ae-tok-b';
 
     // Apply Bless for this case.
+    // REQ-CONC-01: no concentrationToken in body — server generates it.
     const applyRes = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${casterId}/active-effects`,
@@ -201,7 +204,6 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BLESS_SLUG,
         targetIds: [allyIdA],
-        concentrationToken: token,
       },
     });
     expect(applyRes.statusCode).toBe(201);
@@ -246,9 +248,8 @@ describe('engine-active-effects (Slice 7)', () => {
     const { db } = await import('../../src/infra/db/client.js');
     const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
-    const token = 'ae-tok-c';
-
     // Apply Bless to allyIdB (isolated from cases a/b which use allyIdA).
+    // REQ-CONC-01: no concentrationToken in body — server generates it.
     const applyRes = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${casterId}/active-effects`,
@@ -256,10 +257,14 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BLESS_SLUG,
         targetIds: [allyIdB],
-        concentrationToken: token,
       },
     });
     expect(applyRes.statusCode).toBe(201);
+
+    // REQ-CONC-01: extract server-minted token from response.
+    const token: string = applyRes.json().concentrationToken;
+    expect(typeof token).toBe('string');
+    expect(token.length).toBeGreaterThan(0);
 
     // Confirm rows inserted for allyIdB before deletion.
     const before = await db
@@ -314,7 +319,7 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: 'unknown-spell',
         targetIds: [allyIdA],
-        concentrationToken: 'tok-d',
+        // REQ-CONC-01: no concentrationToken in body
       },
     });
 
@@ -336,7 +341,7 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BROKEN_SLUG,
         targetIds: [allyIdA],
-        concentrationToken: 'tok-e',
+        // REQ-CONC-01: no concentrationToken in body
       },
     });
 
@@ -358,7 +363,7 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BLESS_SLUG,
         targetIds: [allyIdA],
-        concentrationToken: 'tok-f',
+        // REQ-CONC-01: no concentrationToken in body
       },
     });
 
@@ -377,7 +382,7 @@ describe('engine-active-effects (Slice 7)', () => {
       payload: {
         effectSlug: BLESS_SLUG,
         targetIds: [],
-        concentrationToken: 'tok-g',
+        // REQ-CONC-01: no concentrationToken in body
       },
     });
 

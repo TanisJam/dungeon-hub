@@ -10,7 +10,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { campaignMembers, encounters } from '../../infra/db/schema.js';
+import { campaignMembers, encounters, encounterCombatants } from '../../infra/db/schema.js';
 import { createEncounter } from '../../use-cases/encounters/create-encounter.js';
 import { listCampaignEncounters } from '../../use-cases/encounters/list-campaign-encounters.js';
 import { loadEncounter } from '../../use-cases/encounters/load-encounter.js';
@@ -606,12 +606,15 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
   // Apply a named effect to a target combatant (idempotent). GM-only.
   // REQ-CEF-06: thin route — Zod body → applyCombatantEffect → response.
   // NO version/CAS coupling — append-only child table (ADR-5).
-  const ApplyCombatantEffectBody = z.object({
-    targetCombatantId: z.string().uuid(),
-    effectName: z.string().min(1),
-    sourceCombatantId: z.string().uuid().optional(),
-    concentrationToken: z.string().optional(),
-  });
+  // REQ-CONC-01/06: concentrationToken is NOT accepted from the client — server-generated only.
+  // .strict() rejects any unknown field (concentrationToken or any client-fabricated field).
+  const ApplyCombatantEffectBody = z
+    .object({
+      targetCombatantId: z.string().uuid(),
+      effectName: z.string().min(1),
+      sourceCombatantId: z.string().uuid().optional(),
+    })
+    .strict();
 
   app.post(
     '/encounters/:id/actions/apply-combatant-effect',
@@ -625,8 +628,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { targetCombatantId, effectName, sourceCombatantId, concentrationToken } =
-        bodyResult.data;
+      const { targetCombatantId, effectName, sourceCombatantId } = bodyResult.data;
       const userId = request.user!.sub;
 
       const [encRow] = await db
@@ -640,13 +642,30 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       const role = await memberRole(encRow.campaignId, userId);
       if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
+      // REQ-CONC-01: server mints the concentration token.
+      const concentrationToken = globalThis.crypto.randomUUID();
+
+      // ADR-2: resolve sourceCombatant → characterId BEFORE the use-case.
+      // The use-case calls startConcentration if resolvedCharacterId is non-null (PC caster).
+      // NPC casters (characterId=null) skip concentration tracking.
+      let resolvedCharacterId: string | null = null;
+      if (sourceCombatantId !== undefined) {
+        const [combatantRow] = await db
+          .select({ characterId: encounterCombatants.characterId })
+          .from(encounterCombatants)
+          .where(eq(encounterCombatants.id, sourceCombatantId))
+          .limit(1);
+        resolvedCharacterId = combatantRow?.characterId ?? null;
+      }
+
       const result = await applyCombatantEffect({
         encounterId: id,
         targetCombatantId,
         effectName,
         // exactOptionalPropertyTypes: conditional spread for optional uuid fields.
         ...(sourceCombatantId !== undefined ? { sourceCombatantId } : {}),
-        ...(concentrationToken !== undefined ? { concentrationToken } : {}),
+        concentrationToken,
+        ...(resolvedCharacterId !== null ? { resolvedCharacterId } : {}),
       });
 
       if (!result.ok) {
@@ -660,7 +679,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         }
       }
 
-      return reply.code(200).send({ applied: result.applied });
+      return reply.code(200).send({ concentrationToken, applied: result.applied });
     },
   );
 

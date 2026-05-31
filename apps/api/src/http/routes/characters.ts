@@ -248,19 +248,25 @@ const ParamsWithId = z.object({ id: z.string().uuid() });
 // ── Bless / concentration schemas (Slice 5 — engine-stateful) ─────────────────
 
 /** REQ-CASTBLESS-01: targetIds must have 1–3 entries (PHB 219 — "up to 3 creatures"). */
-const CastBlessBody = z.object({
-  targetIds: z.array(z.string().uuid()).min(1).max(3),
-  concentrationToken: z.string().min(1),
-});
+// REQ-CONC-01/06: concentrationToken is NOT accepted from the client — server-generated only.
+// .strict() rejects any unknown field (concentrationToken or any client-fabricated field).
+const CastBlessBody = z
+  .object({
+    targetIds: z.array(z.string().uuid()).min(1).max(3),
+  })
+  .strict();
 
 // REQ-AE-05 — generic active-effect endpoint body validation (Slice 7).
 // No max on targetIds — spell-specific caps are enforced at the domain layer via RuleDoc testCases.
 // Bless's 3-target cap is a spell rule, not a generic endpoint constraint.
-const ActiveEffectBody = z.object({
-  effectSlug: z.string().min(1),
-  targetIds: z.array(z.string().uuid()).min(1),
-  concentrationToken: z.string().min(1),
-});
+// REQ-CONC-01/06: concentrationToken is NOT accepted from the client.
+// .strict() rejects any unknown field (concentrationToken or any client-fabricated field).
+const ActiveEffectBody = z
+  .object({
+    effectSlug: z.string().min(1),
+    targetIds: z.array(z.string().uuid()).min(1),
+  })
+  .strict();
 
 const ConcentrationTokenParams = z.object({
   id: z.string().uuid(),
@@ -1091,7 +1097,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           })),
         });
       }
-      const { targetIds, concentrationToken } = bodyResult.data;
+      const { targetIds } = bodyResult.data;
 
       // Ownership check: caster character must exist and belong to requester.
       const caster = await loadCharacter(casterId);
@@ -1102,8 +1108,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN' });
       }
 
+      // REQ-CONC-01: server mints the concentration token.
+      const concentrationToken = globalThis.crypto.randomUUID();
+      // castBless → applyActiveEffect → applies modifier_instances + calls startConcentration.
       await castBless(casterId, targetIds, concentrationToken);
-      return reply.code(201).send();
+
+      return reply.code(201).send({ concentrationToken });
     },
   );
 
@@ -1131,7 +1141,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           })),
         });
       }
-      const { effectSlug, targetIds, concentrationToken } = bodyResult.data;
+      const { effectSlug, targetIds } = bodyResult.data;
 
       // Ownership check: caster must exist and belong to requester.
       const caster = await loadCharacter(casterId);
@@ -1158,7 +1168,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         }
       }
 
-      // Delegate to use-case (catalog lookup → parseRule → compile → persist).
+      // REQ-CONC-01: server mints the concentration token.
+      const concentrationToken = globalThis.crypto.randomUUID();
+
+      // Delegate to use-case (catalog lookup → parseRule → compile → persist → startConcentration).
       const result = await applyActiveEffect(casterId, effectSlug, targetIds, concentrationToken, effectStartRound);
 
       if (!result.ok) {
@@ -1170,7 +1183,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         }
       }
 
-      return reply.code(201).send();
+      return reply.code(201).send({ concentrationToken });
     },
   );
 

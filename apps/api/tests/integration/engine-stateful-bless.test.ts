@@ -27,6 +27,9 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
   let u2: TestUser;
   let casterId: string;
   let allyId: string;
+  // REQ-CONC-01: server mints the token; tests capture it from the response
+  // and use it for subsequent queries and DELETE operations.
+  let sharedConcentrationToken: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -144,18 +147,25 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       method: 'POST',
       url: `/api/v1/characters/${casterId}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [allyId], concentrationToken: 'tok-1' },
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
+      payload: { targetIds: [allyId] },
     });
 
     expect(res.statusCode).toBe(201);
 
-    // Direct DB assert: 2 rows (attack-roll + saving-throw) with token + target.
+    // REQ-CONC-01: server returns the minted token in the response.
+    const resBody = res.json();
+    expect(typeof resBody.concentrationToken).toBe('string');
+    expect(resBody.concentrationToken.length).toBeGreaterThan(0);
+    sharedConcentrationToken = resBody.concentrationToken;
+
+    // Direct DB assert: 2 rows (attack-roll + saving-throw) with server token + target.
     const rows = await db
       .select()
       .from(modifierInstances)
       .where(
         and(
-          eq(modifierInstances.concentrationToken, 'tok-1'),
+          eq(modifierInstances.concentrationToken, sharedConcentrationToken),
           eq(modifierInstances.targetCharacterId, allyId),
         ),
       );
@@ -233,9 +243,10 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     const { db } = await import('../../src/infra/db/client.js');
     const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
+    // Use the server-minted token captured in test (a).
     const deleteRes = await app.inject({
       method: 'DELETE',
-      url: `/api/v1/characters/${casterId}/concentration/tok-1`,
+      url: `/api/v1/characters/${casterId}/concentration/${sharedConcentrationToken}`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
     });
     expect(deleteRes.statusCode).toBe(204);
@@ -244,7 +255,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     const remaining = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, 'tok-1'));
+      .where(eq(modifierInstances.concentrationToken, sharedConcentrationToken));
     expect(remaining).toHaveLength(0);
 
     // Sheet: breakdown must NOT contain Bless.
@@ -269,7 +280,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     // REQ-CONCENTRATION-01 Scenario B: second DELETE (idempotent) → still 204.
     const deleteAgain = await app.inject({
       method: 'DELETE',
-      url: `/api/v1/characters/${casterId}/concentration/tok-1`,
+      url: `/api/v1/characters/${casterId}/concentration/${sharedConcentrationToken}`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
     });
     expect(deleteAgain.statusCode).toBe(204);
@@ -286,7 +297,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       headers: { authorization: `Bearer ${u1.accessToken}` },
       payload: {
         targetIds: [allyId, allyId, allyId, allyId], // 4 entries — violates max(3)
-        concentrationToken: 'tok-bad',
+        // REQ-CONC-01: no concentrationToken in body
       },
     });
 
@@ -305,7 +316,8 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       method: 'POST',
       url: `/api/v1/characters/${casterId}/cast-bless`,
       headers: { authorization: `Bearer ${u2.accessToken}` }, // U2 does not own casterId
-      payload: { targetIds: [allyId], concentrationToken: 'tok-u2-hack' },
+      // REQ-CONC-01: no concentrationToken in body
+      payload: { targetIds: [allyId] },
     });
 
     expect(res.statusCode).toBe(403);
@@ -323,7 +335,8 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       method: 'POST',
       url: `/api/v1/characters/${unknownId}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [allyId], concentrationToken: 'tok-unknown' },
+      // REQ-CONC-01: no concentrationToken in body
+      payload: { targetIds: [allyId] },
     });
 
     expect(res.statusCode).toBe(404);
@@ -396,15 +409,17 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       method: 'POST',
       url: `/api/v1/characters/${casterBId}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [allyBId], concentrationToken: 'tok-cascade' },
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
+      payload: { targetIds: [allyBId] },
     });
     expect(castRes.statusCode).toBe(201);
+    const cascadeToken: string = castRes.json().concentrationToken;
 
     // Confirm 2 rows exist before deletion.
     const rowsBefore = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, 'tok-cascade'));
+      .where(eq(modifierInstances.concentrationToken, cascadeToken));
     expect(rowsBefore).toHaveLength(2);
 
     // ── Scenario B: delete the OWNER character (casterB) via the route.
@@ -419,7 +434,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     const rowsAfterOwnerDelete = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, 'tok-cascade'));
+      .where(eq(modifierInstances.concentrationToken, cascadeToken));
     // Cascade must have removed ALL rows owned by casterBId.
     expect(rowsAfterOwnerDelete).toHaveLength(0);
 
@@ -439,14 +454,16 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       method: 'POST',
       url: `/api/v1/characters/${casterCId}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [allyBId], concentrationToken: 'tok-cascade-c' },
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
+      payload: { targetIds: [allyBId] },
     });
     expect(castRes2.statusCode).toBe(201);
+    const cascadeToken2: string = castRes2.json().concentrationToken;
 
     const rowsBefore2 = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, 'tok-cascade-c'));
+      .where(eq(modifierInstances.concentrationToken, cascadeToken2));
     expect(rowsBefore2).toHaveLength(2);
 
     // Delete the TARGET character (allyB) directly via the route.
@@ -461,7 +478,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
     const rowsAfterTargetDelete = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, 'tok-cascade-c'));
+      .where(eq(modifierInstances.concentrationToken, cascadeToken2));
     // Cascade must have removed ALL rows targeting allyBId.
     expect(rowsAfterTargetDelete).toHaveLength(0);
   });
@@ -509,37 +526,60 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       .then((r) => r.json());
     const ally2Id: string = ally2Res.id;
 
-    const SHARED_TOKEN = 'tok-shared-isolation';
+    // REQ-CONC-01: Server mints tokens; each cast gets its own UUID.
+    // The caster-scoped isolation is now implicit (tokens differ), but we still
+    // verify that deleting caster1's token leaves caster2's rows untouched.
 
-    // Both casters cast with the SAME concentrationToken string.
+    // Both casters cast Bless; each gets a different server-minted token.
     // Caster1 (from beforeAll) targets allyId; Caster2 targets ally2Id.
     const cast1Res = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${casterId}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [allyId], concentrationToken: SHARED_TOKEN },
+      payload: { targetIds: [allyId] },
     });
     expect(cast1Res.statusCode).toBe(201);
+    const token1: string = cast1Res.json().concentrationToken;
 
     const cast2Res = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${caster2Id}/cast-bless`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
-      payload: { targetIds: [ally2Id], concentrationToken: SHARED_TOKEN },
+      payload: { targetIds: [ally2Id] },
     });
     expect(cast2Res.statusCode).toBe(201);
+    const token2: string = cast2Res.json().concentrationToken;
 
-    // Sanity: 4 rows total for the shared token (2 per cast × 2 casters).
-    const allRows = await db
+    // Tokens are distinct UUIDs (server-minted, not client-chosen).
+    expect(token1).not.toBe(token2);
+
+    // Sanity: 2 rows per caster.
+    const caster1RowsBefore = await db
       .select()
       .from(modifierInstances)
-      .where(eq(modifierInstances.concentrationToken, SHARED_TOKEN));
-    expect(allRows).toHaveLength(4);
+      .where(
+        and(
+          eq(modifierInstances.concentrationToken, token1),
+          eq(modifierInstances.ownerCharacterId, casterId),
+        ),
+      );
+    expect(caster1RowsBefore).toHaveLength(2);
+
+    const caster2RowsBefore = await db
+      .select()
+      .from(modifierInstances)
+      .where(
+        and(
+          eq(modifierInstances.concentrationToken, token2),
+          eq(modifierInstances.ownerCharacterId, caster2Id),
+        ),
+      );
+    expect(caster2RowsBefore).toHaveLength(2);
 
     // Remove caster1's concentration only.
     const deleteRes = await app.inject({
       method: 'DELETE',
-      url: `/api/v1/characters/${casterId}/concentration/${SHARED_TOKEN}`,
+      url: `/api/v1/characters/${casterId}/concentration/${token1}`,
       headers: { authorization: `Bearer ${u1.accessToken}` },
     });
     expect(deleteRes.statusCode).toBe(204);
@@ -550,7 +590,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       .from(modifierInstances)
       .where(
         and(
-          eq(modifierInstances.concentrationToken, SHARED_TOKEN),
+          eq(modifierInstances.concentrationToken, token1),
           eq(modifierInstances.ownerCharacterId, casterId),
         ),
       );
@@ -561,7 +601,7 @@ describe('Bless lifecycle — engine-stateful (Slice 5)', () => {
       .from(modifierInstances)
       .where(
         and(
-          eq(modifierInstances.concentrationToken, SHARED_TOKEN),
+          eq(modifierInstances.concentrationToken, token2),
           eq(modifierInstances.ownerCharacterId, caster2Id),
         ),
       );

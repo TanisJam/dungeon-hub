@@ -26,8 +26,8 @@ import { removeCombatantEffect } from '../../src/use-cases/encounters/remove-com
 import { buildAttackContext } from '../../src/use-cases/encounters/build-attack-context.js';
 import { evaluatePredicate, hasEffectFromSelf } from '@dungeon-hub/domain/engine';
 import { db } from '../../src/infra/db/client.js';
-import { encounterCombatants } from '../../src/infra/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { encounterCombatants, encounterCombatantEffects } from '../../src/infra/db/schema.js';
+import { and, eq } from 'drizzle-orm';
 
 describe('engine-combatant-effects — apply/remove use-cases', () => {
   let gm: TestUser;
@@ -144,19 +144,35 @@ describe('engine-combatant-effects — apply/remove use-cases', () => {
       expect(result.applied).toBe(false);
     });
 
-    it('apply_with_concentrationToken: row stores the token (REQ-CEF-06 optional field)', async () => {
-      const token = 'conc-token-abc-123';
+    it('apply_with_concentrationToken: row stores the token (REQ-CEF-06 — server-minted token)', async () => {
+      // REQ-CONC-01: token is now server-minted (passed directly to use-case in this test,
+      // mirroring what the route does after removing it from client bodies).
+      const token = '00000000-1111-2222-3333-444444444444'; // deterministic UUID for DB query
       const result = await applyCombatantEffect({
         encounterId: baseEncounterId,
         targetCombatantId,
         effectName: 'TestMark-ConcentrationToken',
         sourceCombatantId: attackerCombatantId,
         concentrationToken: token,
+        // resolvedCharacterId not provided → concentration service is skipped (NPC/no-char path).
       });
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
       expect(result.applied).toBe(true);
+
+      // Verify the token is stored on the row.
+      const [row] = await db
+        .select({ concentrationToken: encounterCombatantEffects.concentrationToken })
+        .from(encounterCombatantEffects)
+        .where(
+          and(
+            eq(encounterCombatantEffects.combatantId, targetCombatantId),
+            eq(encounterCombatantEffects.effectName, 'TestMark-ConcentrationToken'),
+          ),
+        )
+        .limit(1);
+      expect(row?.concentrationToken).toBe(token);
     });
 
     it('apply_not_found_encounter: missing encounter → NOT_FOUND encounter', async () => {
@@ -537,7 +553,7 @@ describe('engine-combatant-effects — buildAttackContext threading + routes (E2
     expect(res.statusCode).toBe(403);
   });
 
-  it('route_apply_gm_200: GM applies effect → 200 { applied: true }', async () => {
+  it('route_apply_gm_200: GM applies effect → 200 { applied: true, concentrationToken: uuid }', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
@@ -547,10 +563,15 @@ describe('engine-combatant-effects — buildAttackContext threading + routes (E2
         targetCombatantId,
         effectName: 'TestMark-Route',
         sourceCombatantId: attackerCombatantId,
+        // REQ-CONC-01: no concentrationToken in body — server generates it
       },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().applied).toBe(true);
+    const body = res.json();
+    expect(body.applied).toBe(true);
+    // REQ-CONC-01: server mints and returns the concentration token.
+    expect(typeof body.concentrationToken).toBe('string');
+    expect(body.concentrationToken.length).toBeGreaterThan(0);
   });
 
   it('route_apply_duplicate_200: GM applies same effect again → 200 { applied: false }', async () => {

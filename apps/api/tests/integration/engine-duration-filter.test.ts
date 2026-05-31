@@ -133,14 +133,18 @@ describe('engine-timeline-duration — duration filter + startRound write (Slice
       const { db } = await import('../../src/infra/db/client.js');
       const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
-      const token6a = randomUUID();
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/characters/${casterId}/active-effects?encounterId=${encounterId}`,
         headers: { authorization: `Bearer ${u1.accessToken}` },
-        payload: { effectSlug: 'bless', targetIds: [targetId], concentrationToken: token6a },
+        payload: { effectSlug: 'bless', targetIds: [targetId] },
       });
       expect(res.statusCode, `POST active-effects: ${res.body}`).toBe(201);
+
+      // REQ-CONC-01: extract server-minted token from response.
+      const token6a: string = res.json().concentrationToken;
+      expect(typeof token6a).toBe('string');
 
       // The encounter was created at round=1, so start_round should be 1.
       const rows = await db
@@ -163,14 +167,18 @@ describe('engine-timeline-duration — duration filter + startRound write (Slice
       const { db } = await import('../../src/infra/db/client.js');
       const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
-      const token6b = randomUUID();
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/characters/${casterId}/active-effects`,
         headers: { authorization: `Bearer ${u1.accessToken}` },
-        payload: { effectSlug: 'bless', targetIds: [targetId], concentrationToken: token6b },
+        payload: { effectSlug: 'bless', targetIds: [targetId] },
       });
       expect(res.statusCode, `POST active-effects no encounter: ${res.body}`).toBe(201);
+
+      // REQ-CONC-01: extract server-minted token from response.
+      const token6b: string = res.json().concentrationToken;
+      expect(typeof token6b).toBe('string');
 
       const rows = await db
         .select({ startRound: modifierInstances.startRound })
@@ -199,16 +207,16 @@ describe('engine-timeline-duration — duration filter + startRound write (Slice
       const { db } = await import('../../src/infra/db/client.js');
       const { modifierInstances } = await import('../../src/infra/db/schema.js');
 
-      token3f2 = randomUUID();
-
-      // Cast Bless with a known start_round (encounter round=1)
+      // REQ-CONC-01: no concentrationToken in body — server generates it.
       const castRes = await app.inject({
         method: 'POST',
         url: `/api/v1/characters/${casterId}/active-effects?encounterId=${encounterId}`,
         headers: { authorization: `Bearer ${u1.accessToken}` },
-        payload: { effectSlug: 'bless', targetIds: [targetId], concentrationToken: token3f2 },
+        payload: { effectSlug: 'bless', targetIds: [targetId] },
       });
       expect(castRes.statusCode).toBe(201);
+      // REQ-CONC-01: capture server-minted token for subsequent cleanup.
+      token3f2 = castRes.json().concentrationToken;
 
       // GET /sheet without encounterId → Bless should be present (conservative fallback)
       const sheetRes = await app.inject({

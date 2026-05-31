@@ -10,12 +10,15 @@
  *  3. App-level idempotency: SELECT existing row for the triple
  *     (combatant_id=targetId, effect_name=effectName, source_combatant_id=sourceCombatantId).
  *     If a match exists → no-op, return applied:false.
- *  4. INSERT new row → return applied:true.
+ *  4. INSERT new row (with server-minted concentrationToken) → return applied:true.
+ *  5. If resolvedCharacterId is non-null (PC caster), call startConcentration
+ *     to enforce PHB p.203 one-at-a-time across both stores. (REQ-CONC-02, REQ-CONC-03)
  *
  * NO effectName allowlist in V1 — open text, min(1) only (REQ-CEF-08, ADR-5).
  * NO version/CAS coupling — append-only child table, no lost-update hazard (ADR-5).
  *
  * Design ref: sdd/engine-combatant-effects/design — ADR-5.
+ * Design ref: sdd/engine-concentration-authority/design — ADR-2, ADR-4.
  */
 
 import { and, eq, isNull } from 'drizzle-orm';
@@ -25,6 +28,7 @@ import {
   encounterCombatants,
   encounterCombatantEffects,
 } from '../../infra/db/schema.js';
+import { startConcentration } from '../engine/concentration-service.js';
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -34,8 +38,17 @@ export interface ApplyCombatantEffectInput {
   effectName: string;
   /** encounter_combatants.id of the caster. null means no source attribution. */
   sourceCombatantId?: string | null;
-  /** Unused V1 — reserved for concentration-enforcement SDD. */
+  /** Server-minted concentration token. Written to the row and used to enforce one-at-a-time. */
   concentrationToken?: string | null;
+  /**
+   * The CHARACTER id of the source combatant, resolved by the route layer via
+   * encounter_combatants.characterId. Non-null for PC casters; null for NPCs.
+   *
+   * When non-null, startConcentration is called after INSERT to enforce PHB p.203
+   * one-at-a-time across both stores (ADR-2). NPC casters skip concentration tracking.
+   * REQ-CONC-02, REQ-CONC-03 — orchestrator reconciliation: PC casters ONLY.
+   */
+  resolvedCharacterId?: string | null;
 }
 
 export type ApplyCombatantEffectResult =
@@ -58,6 +71,7 @@ export async function applyCombatantEffect(
     effectName,
     sourceCombatantId = null,
     concentrationToken = null,
+    resolvedCharacterId = null,
   } = input;
 
   // ── Step 1: Load encounter + active guard ─────────────────────────────────────
@@ -113,6 +127,22 @@ export async function applyCombatantEffect(
     sourceCombatantId: sourceCombatantId ?? null,
     concentrationToken: concentrationToken ?? null,
   });
+
+  // ── Step 5: REQ-CONC-02/03 — one-at-a-time enforcement for PC casters ────────
+  // ADR-2: only PC casters (resolvedCharacterId non-null) get a registry row.
+  // NPC casters skip this — concentration tracking is keyed by characterId.
+  // Orchestrator reconciliation: "PC casters ONLY — when the casting combatant has
+  // NO characterId, SKIP the concentration service."
+  if (resolvedCharacterId !== null && concentrationToken !== null) {
+    await startConcentration({
+      characterId: resolvedCharacterId,
+      newConcentration: {
+        store: 'encounter_combatant_effects',
+        spellName: effectName,
+        token: concentrationToken,
+      },
+    });
+  }
 
   return { ok: true, applied: true };
 }
