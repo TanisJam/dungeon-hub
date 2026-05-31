@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { db } from '../../infra/db/client.js';
+import { db, type DbOrTx } from '../../infra/db/client.js';
 import { modifierInstances } from '../../infra/db/schema.js';
 
 /**
@@ -13,13 +13,20 @@ import { modifierInstances } from '../../infra/db/schema.js';
  * Idempotent: no-op if no rows match (DELETE 0 rows is not an error).
  * The route layer returns 204 regardless (REQ-CONCENTRATION-01 Scenario B).
  *
+ * @param executor — optional transaction proxy; pass `tx` from concentration-service
+ *   to ensure the DROP runs inside the same transaction as the registry UPSERT
+ *   (WARNING-1 atomicity fix — ADR-4 design ref #1430). Defaults to the module-level
+ *   `db` so existing standalone callers (e.g. DELETE /concentration/:token route) are
+ *   unaffected.
+ *
  * Design ref: sdd/engine-stateful/design #1131 — D4; tasks #1132 — T4.
  */
 export async function removeByConcentrationToken(
   ownerCharacterId: string,
   token: string,
+  executor: DbOrTx = db,
 ): Promise<void> {
-  await db
+  await executor
     .delete(modifierInstances)
     .where(
       and(

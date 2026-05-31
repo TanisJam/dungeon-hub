@@ -99,14 +99,19 @@ export async function startConcentration(input: StartConcentrationInput): Promis
     if ('noOp' in decision) return;
 
     // Step 3: Drop the prior concentration's child rows if one was active.
+    // Pass `tx` to BOTH removers so the DROP executes inside this transaction —
+    // not against the module-level db. This closes the atomicity gap identified
+    // in verify WARNING-1: without tx threading, a crash between drop and upsert
+    // would leave the caster with no concentration row despite the prior rows
+    // being deleted (or vice-versa). ADR-4 promised drop+register is atomic.
     if (decision.dropPrior) {
       const { store: priorStore, token: priorToken } = decision.dropPrior;
       if (priorStore === 'modifier_instances') {
         // removeByConcentrationToken is character-scoped (legacy caster-scope guard).
-        await removeByConcentrationToken(characterId, priorToken);
+        await removeByConcentrationToken(characterId, priorToken, tx);
       } else {
         // encounter_combatant_effects: token is globally unique (server-minted UUID).
-        await removeEffectsByConcentrationToken(priorToken);
+        await removeEffectsByConcentrationToken(priorToken, tx);
       }
     }
 

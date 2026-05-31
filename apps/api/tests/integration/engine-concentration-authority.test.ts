@@ -34,7 +34,47 @@ import {
   characterConcentration,
   modifierDefinitions,
 } from '../../src/infra/db/schema.js';
-import { blessRuleDoc } from '@dungeon-hub/domain/engine';
+import { blessRuleDoc, type RuleDoc } from '@dungeon-hub/domain/engine';
+
+// ── Non-concentration rule doc (WARNING-2 / CONC-04 real test) ────────────────
+// A minimal +1 attack-roll modifier with NO endsOn: ['concentration-ends'].
+// Uses the same casterId / targetIds / concentrationToken param names as
+// applyActiveEffect calls compiled.build({ casterId, targetIds, concentrationToken }).
+// PHB rationale: a flat bonus granted by a non-concentration feature (e.g. a
+// short-duration item aura) — no concentration required.
+const NON_CONC_SLUG = 'conc04-nonconc-test-spell';
+
+const nonConcRuleDoc: RuleDoc = {
+  id: NON_CONC_SLUG,
+  source: 'test',
+  ruleText: '+1 attack-roll (non-concentration, REQ-CONC-04 test only)',
+  params: [
+    { name: 'casterId', type: 'EntityId' },
+    { name: 'targetIds', type: 'EntityId[]' },
+    { name: 'concentrationToken', type: 'string' },
+  ],
+  emits: [
+    {
+      def: {
+        kind: 'num',
+        op: 'add',
+        value: 1,
+        stat: 'attack-roll',
+        category: 'untyped',
+      },
+      scope: {
+        owner: '{casterId}',
+        target: { axis: 'entities', ids: '{targetIds}' },
+        trigger: 'always',
+      },
+      // INTENTIONALLY no duration.endsOn — this is NOT a concentration spell.
+      // applyActiveEffect checks endsOn: ['concentration-ends']; absence → no startConcentration call.
+      label: 'NonConc Test Bonus',
+      idTemplate: 'conc04-nonconc-{casterId}-{targetId}',
+    },
+  ],
+  testCases: [],
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +146,20 @@ describe('engine-concentration-authority — REQ-CONC-01..07 (PHB p.203)', () =>
       })
       .onConflictDoNothing();
 
+    // Seed non-concentration modifier_definition row for CONC-04 real API test.
+    // WARNING-2 fix: CONC-04 must exercise a non-concentration spell THROUGH the API,
+    // not just check the registry passively. This row is the catalog entry for that slug.
+    await db
+      .insert(modifierDefinitions)
+      .values({
+        slug: NON_CONC_SLUG,
+        source: 'test',
+        name: 'NonConc Test Bonus',
+        kind: 'spell',
+        ruleDoc: nonConcRuleDoc,
+      })
+      .onConflictDoNothing();
+
     const campaign = await app
       .inject({
         method: 'POST',
@@ -143,6 +197,8 @@ describe('engine-concentration-authority — REQ-CONC-01..07 (PHB p.203)', () =>
 
   afterAll(async () => {
     if (u1) await deleteTestUser(u1.id);
+    // Clean up test-only catalog rows that are not owned by deleteTestUser cascade.
+    await db.delete(modifierDefinitions).where(eq(modifierDefinitions.slug, NON_CONC_SLUG));
     await closeTestApp();
   });
 
@@ -425,55 +481,74 @@ describe('engine-concentration-authority — REQ-CONC-01..07 (PHB p.203)', () =>
 
   // ── B.15: REQ-CONC-04 + REQ-CONC-06 + REQ-CONC-07 ───────────────────────────
 
-  it('CONC-04: Concentrating on Bless, cast non-concentration effect — Bless intact, registry unchanged', async () => {
-    // PHB p.203: "only spells that require concentration trigger the drop."
-    // This test uses applyActiveEffect directly with a non-concentration spell slug
-    // to verify the one-at-a-time rule does NOT fire.
+  it('CONC-04: Concentrating on Bless, POST non-concentration active-effect via API — Bless registry + modifier_instances rows intact', async () => {
+    // PHB p.203: "You lose concentration on a spell if you cast another spell that requires
+    // concentration." — the inverse: casting a NON-concentration spell MUST NOT drop concentration.
     //
-    // Since the test catalog only has 'bless' and 'broken-spell', we test this at the
-    // use-case level (domain decideConcentration returns noOp for non-concentration).
-    // The integration proof is: cast Bless, then call applyActiveEffect with a mock
-    // non-concentration slug — Bless rows + registry row unchanged.
-    // NOTE: For the catalog path, we verify directly via the concentration-service
-    // that non-concentration use-cases do not call startConcentration.
-    // The test below casts Bless, then casts Bless again to a DIFFERENT ally
-    // (a second concentration spell) — showing concentration drops — but also verifies
-    // that the FIRST token rows are gone (not the second). This indirectly proves the
-    // logic correctly identifies concentration spells via the RuleDoc 'concentration' emit.
+    // WARNING-2 fix: this test actually exercises the non-concentration path through the API
+    // (POST /characters/:id/active-effects with a non-concentration slug) and then asserts both:
+    //   (a) the Bless character_concentration registry row is UNCHANGED (same token, same store)
+    //   (b) the Bless modifier_instances rows are still present (not deleted)
+    // This guards against a regression where requiresConcentration detection wrongly fires for
+    // any spell (false positive → drops Bless) or never fires for concentration spells (false negative).
     const app = await getTestApp();
 
     const casterAId = await makeCharacter(app, u1.accessToken, worldId, 'CONC-04 Caster');
     const allyAId = await makeCharacter(app, u1.accessToken, worldId, 'CONC-04 Ally A');
-    const allyBId = await makeCharacter(app, u1.accessToken, worldId, 'CONC-04 Ally B');
 
-    // Cast Bless on allyA.
+    // Step 1: Cast Bless (concentration) on allyA — establishes concentration.
     const blessToken = await castBless(app, u1.accessToken, casterAId, [allyAId]);
 
-    // Registry has 1 row.
+    // Pre-condition: registry has 1 row pointing to Bless in modifier_instances.
     const regBefore = await db
       .select()
       .from(characterConcentration)
       .where(eq(characterConcentration.characterId, casterAId));
     expect(regBefore).toHaveLength(1);
     expect(regBefore[0]!.concentrationToken).toBe(blessToken);
+    expect(regBefore[0]!.store).toBe('modifier_instances');
 
-    // Simulate casting a non-concentration effect: directly verify via decideConcentration
-    // that a non-concentration incoming → noOp. The use-case path:
-    // applyActiveEffect checks `parseResult.rule.emits.some(e => e.def.kind === 'concentration')`.
-    // For a slug whose rule has NO concentration emit → startConcentration is NOT called.
-    // We verify this indirectly: after casting Bless (which IS concentration), the registry
-    // entry is unchanged. A non-concentration effect does nothing to the registry.
-    // (Direct DB check: character_concentration row unchanged after a direct DB-level check)
+    // Pre-condition: Bless modifier_instances rows exist under blessToken.
+    const blessRowsBefore = await db
+      .select({ id: modifierInstances.id })
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, blessToken));
+    expect(blessRowsBefore.length).toBeGreaterThan(0);
 
-    // Cleanup Bless rows so we can proceed with the key assertion.
-    // The key test: registry row for casterAId still has blessToken (no overwrite from a non-conc effect).
+    // Step 2: POST a NON-concentration active-effect (NON_CONC_SLUG has no endsOn: ['concentration-ends']).
+    // This goes through the full API → applyActiveEffect use-case path.
+    // applyActiveEffect detects requiresConcentration=false → does NOT call startConcentration.
+    const nonConcRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${casterAId}/active-effects`,
+      headers: { authorization: `Bearer ${u1.accessToken}` },
+      payload: {
+        effectSlug: NON_CONC_SLUG,
+        targetIds: [allyAId],
+        // REQ-CONC-01: no concentrationToken in body.
+      },
+    });
+    expect(nonConcRes.statusCode).toBe(201);
+
+    // Assertion (a): character_concentration registry row is UNCHANGED.
+    // Same token, same store — the non-concentration cast must not have touched the registry.
     const regAfter = await db
       .select()
       .from(characterConcentration)
       .where(eq(characterConcentration.characterId, casterAId));
     expect(regAfter).toHaveLength(1);
     expect(regAfter[0]!.concentrationToken).toBe(blessToken);
-    // REQ-CONC-04 proof: the registry was NOT touched by any non-concentration path.
+    expect(regAfter[0]!.store).toBe('modifier_instances');
+
+    // Assertion (b): Bless modifier_instances rows are still present.
+    // A false-positive requiresConcentration detection would have deleted them via startConcentration.
+    const blessRowsAfter = await db
+      .select({ id: modifierInstances.id })
+      .from(modifierInstances)
+      .where(eq(modifierInstances.concentrationToken, blessToken));
+    expect(blessRowsAfter.length).toBeGreaterThan(0);
+    expect(blessRowsAfter.length).toBe(blessRowsBefore.length);
+    // REQ-CONC-04: non-concentration cast did NOT alter concentration state.
   });
 
   it('CONC-06: POST cast-bless with concentrationToken → 400 VALIDATION_FAILED (client cannot forge token)', async () => {
