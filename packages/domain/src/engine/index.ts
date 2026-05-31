@@ -314,6 +314,9 @@ export type {
   ConcentrationDecision,
 } from './concentration/decide.js';
 
+// engine-concentration-break-damage — DC formula (REQ-CB-02, PHB p.203)
+export { computeConcentrationSaveDc } from './concentration/compute-concentration-save-dc.js';
+
 // ── Duration evaluator (engine-timeline-duration — Slice: Composable Modifier System 1) ──
 
 export { evaluateDuration, convertToRounds } from './duration/evaluate.js';
