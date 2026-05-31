@@ -1,1 +1,0 @@
-ALTER TABLE "encounters" ADD COLUMN "pending_cast" jsonb;
