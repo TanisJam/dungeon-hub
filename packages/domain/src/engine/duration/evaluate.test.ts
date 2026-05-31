@@ -228,3 +228,109 @@ describe('evaluateDuration — concentration + round-based additive (REQ-DUR-CON
     expect(evaluateDuration(inst, makeCtx({ encounterRound: 10 }))).toBe(true);
   });
 });
+
+// ── evaluateDuration: turn-anchor branch (Branch 7) ──────────────────────────
+//
+// PHB p.189 — durations relative to a creature's turn boundary:
+//   "until the end of your next turn", "until the start of your next turn".
+// Identity-namespace: anchorCombatantId + currentCombatantId are COMBATANT UUIDs
+// (encounter_combatants.id) — NEVER character EntityIds from ctx.self.id.
+// Tests intentionally use 'cmb-abc' / 'cmb-xyz' (visibly distinct from 'char-id').
+
+describe('evaluateDuration — turn-anchor branch (REQ-DUR-01, REQ-DUR-02, REQ-DUR-03)', () => {
+  it('Scenario 7.1 — expired: turnsRemaining=0, boundary=end, currentCombatantId matches anchor', () => {
+    // PHB p.189: "lasts until the end of your next turn" — expired when counter hits 0
+    // at the anchor combatant's turn-end boundary.
+    // REQ-DUR-01: all four conditions satisfied simultaneously → return false (expired).
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 0,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc' });
+    expect(evaluateDuration(inst, ctx)).toBe(false);
+  });
+
+  it('Scenario 7.2 — active: turnsRemaining=1 on anchor combatant\'s turn', () => {
+    // PHB p.189: still has remaining turns — not expired yet.
+    // REQ-DUR-01: turnsRemaining !== 0 → return true (active).
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 1,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc' });
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+
+  it('Scenario 7.3 — active: not the anchor combatant\'s turn (different combatant)', () => {
+    // PHB p.189: expiry is only evaluable on the anchor combatant's turn.
+    // REQ-DUR-01: currentCombatantId !== anchorCombatantId → return true (active).
+    // Even with turnsRemaining=0, a different combatant's turn cannot expire this effect.
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 0,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-xyz' });
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+
+  it('Scenario 7.4 — active: currentCombatantId absent (conservative fallback, no error thrown)', () => {
+    // REQ-DUR-02: turnAnchor present but currentCombatantId absent → cannot place anchor
+    // → return true (active, conservative). Mirrors absent-encounterRound fallback.
+    // Read-path tolerance: must NOT error even with turnsRemaining=0.
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 0,
+    });
+    const ctx = makeCtx(); // no currentCombatantId
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+
+  it('Scenario 7.5 — active: boundary=start, conservative-active (no PHB consumer this slice)', () => {
+    // REQ-DUR-06, ADR-6: no PHB consumer for boundary=\'start\' in Slice 0.
+    // Conservative stub: any \'start\'-boundary turn-anchor is always active until a future
+    // slice with a real PHB consumer defines the semantics.
+    // PHB p.189 — \'until the start of your next turn\' is declared but deferred.
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'start' },
+      }),
+      turnsRemaining: 0,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc' });
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+
+  it('Scenario 7.6 — active: turnAnchor present but turnsRemaining absent (strict === 0 check)', () => {
+    // REQ-DUR-02, ADR-3: undefined !== 0 — strict === 0 check; missing counter
+    // cannot be declared expired → conservative-active.
+    // Even on the anchor combatant\'s turn with boundary=\'end\': absent counter → active.
+    const inst = makeInstance({
+      duration: makeDuration({
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      // no turnsRemaining
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc' });
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+
+  it('Scenario 7.7 — active: \'turn-ends\' EndCondition without turnAnchor → conservative active (no error)', () => {
+    // REQ-DUR-07, ADR-5: \'turn-ends\' is declared in EndCondition union but has no evaluated
+    // branch. Without a structured turnAnchor descriptor (no anchor identity), it cannot
+    // determine WHICH combatant\'s turn ends it → conservative fallback to active.
+    // No error must be thrown. This exercises the deferred / declared-but-unevaluated path.
+    const inst = makeInstance({
+      duration: makeDuration({ endsOn: ['turn-ends'] }),
+      // no turnAnchor on duration, no startRound → will hit encounterRound/startRound fallbacks
+    });
+    expect(evaluateDuration(inst, makeCtx({ encounterRound: 5 }))).toBe(true);
+  });
+});

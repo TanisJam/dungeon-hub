@@ -112,6 +112,27 @@ export interface EvaluationContext {
    * REQ-CEF-03, REQ-CEF-04. ADR-3.
    */
   attackerCombatantId?: string;
+
+  /**
+   * The UUID of the combatant whose turn is currently being processed.
+   *
+   * ⚠️ IDENTITY-SPACE WARNING (same namespace as attackerCombatantId):
+   * This is a COMBATANT UUID (encounter_combatants.id) — DISTINCT from ctx.self.id
+   * (character branded EntityId). The turn-anchor branch MUST compare this against
+   * turnAnchor.anchorCombatantId — NEVER against a character EntityId. Comparing
+   * the wrong namespace yields always-false expiry (silent feature death).
+   *
+   * Absent = not in a turn-tick context → conservative fallback (evaluateDuration
+   * returns true; expiry cannot be evaluated without knowing whose turn it is).
+   *
+   * Injected by the route ctx-builder in Slice 4 (advance-encounter-turn path).
+   * Not populated by the existing characters.ts ctx-builder — additive optional,
+   * so all existing call sites are backward-compatible.
+   *
+   * Design ref: sdd/engine-unified-duration-evaluator/design — ADR-4.
+   * Satisfies: REQ-DUR-02.
+   */
+  currentCombatantId?: string;
 }
 
 // ── WeaponInUse ───────────────────────────────────────────────────────────────

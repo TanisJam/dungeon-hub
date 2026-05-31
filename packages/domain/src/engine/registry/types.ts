@@ -67,6 +67,19 @@ export interface ModifierInstance {
    * Design ref: sdd/engine-timeline-duration/design — ADR-1.
    */
   startRound?: number;
+
+  /**
+   * Per-instance runtime snapshot of remaining turns. Decremented by the SQL sweep
+   * (Slice 4). evaluateDuration reads this as the expiry counter.
+   *
+   * Absent = conservative-active (undefined !== 0 — strict === 0 check; missing
+   * counter cannot be declared expired). Parallels startRound: both are per-instance
+   * runtime positional snapshots owned by ModifierInstance, not by DurationSpec.
+   *
+   * Design ref: sdd/engine-unified-duration-evaluator/design — ADR-1, ADR-3.
+   * Satisfies: REQ-DUR-01.
+   */
+  turnsRemaining?: number;
 }
 
 /** Branded string ID for a live modifier instance. */

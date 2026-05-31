@@ -125,6 +125,35 @@ export interface DurationSpec {
    * Required for Bless (and any future concentration spell).
    */
   concentrationToken?: string;
+
+  /**
+   * Turn-anchor descriptor — identifies WHICH combatant's turn boundary expires this
+   * effect. Static; carries only identity + boundary kind (no mutable counter).
+   *
+   * PHB p.189 — durations measured relative to a creature's turn boundary:
+   *   "until the end of your next turn", "until the start of your next turn".
+   *
+   * Discrimination: evaluateDuration selects the turn-anchor branch iff this field
+   * is present. Durations without turnAnchor continue using absolute-round evaluation.
+   *
+   * anchorCombatantId: COMBATANT UUID (encounter_combatants.id) — distinct from
+   *   character EntityId. NEVER compare against ctx.self.id or ctx.attacker.id.
+   * boundary: 'end' is the only evaluable boundary this slice (Slice 0).
+   *   'start' is declared for completeness and treated conservatively-active until
+   *   a future slice with a PHB consumer defines the semantics.
+   *
+   * The per-instance decrement counter lives on ModifierInstance.turnsRemaining
+   * (parallel to startRound) — NOT here. DurationSpec is purely a static descriptor.
+   *
+   * Design ref: sdd/engine-unified-duration-evaluator/design — ADR-1, ADR-6.
+   * Satisfies: REQ-DUR-01, REQ-DUR-03.
+   */
+  turnAnchor?: {
+    /** COMBATANT UUID of the creature whose turn boundary governs expiry. */
+    anchorCombatantId: string;
+    /** Turn boundary that triggers expiry evaluation. */
+    boundary: 'start' | 'end';
+  };
 }
 
 // ── Reaction effects ──────────────────────────────────────────────────────────
