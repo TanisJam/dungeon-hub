@@ -900,6 +900,15 @@ export const encounters = pgTable(
      * NOT used for CAS version — does not bump `version` on write.
      */
     pendingReaction: jsonb('pending_reaction'),
+    /**
+     * Server-authoritative pending cast state for the interceptable cast-spell flow.
+     * Shape: { casterCombatantId, spellName, spellLevel, targets:[id], dartCount,
+     *          serverRolledDamage:{ total, perDart:number[] }, encVersion }
+     * Nullable — null means no cast is pending. Written at suspend time (no version bump),
+     * cleared atomically in resolve-cast-reaction CAS tx.
+     * engine-spell-cast-suspend — ADR-2, REQ-RB-02.
+     */
+    pendingCast: jsonb('pending_cast'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
