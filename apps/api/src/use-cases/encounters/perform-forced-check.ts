@@ -29,6 +29,7 @@ import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, encounterCombatantConditions } from '../../infra/db/schema.js';
 import {
   rollSavingThrow,
+  isImmuneToCondition,
   type RngFn,
 } from '@dungeon-hub/domain/engine';
 import { resolveTargetSave, type Ability } from './resolve-target-save.js';
@@ -51,7 +52,7 @@ const cryptoRng: RngFn = (sides: number): number => {
  * Condition catalog — valid values for conditionOnFail.
  * TODO #513: replace with DB catalog when conditions-catalog SDD lands.
  */
-const CONDITION_CATALOG = new Set(['Stunned', 'Blinded', 'Invisible', 'Poisoned', 'Incapacitated']);
+const CONDITION_CATALOG = new Set(['Stunned', 'Blinded', 'Invisible', 'Poisoned', 'Incapacitated', 'Petrified']);
 
 // Abilities that trigger auto-fail when target is Stunned (PHB p.292).
 const STUNNED_AUTOFAIL_ABILITIES = new Set<Ability>(['str', 'dex']);
@@ -91,6 +92,17 @@ export interface PerformForcedCheckInput {
   refreshAnchorOnExisting?: boolean;
 }
 
+/**
+ * A skipped condition entry when the target is immune to a condition being applied.
+ *
+ * engine-resist-immunity C-8 / orchestrator reconciliation:
+ * SILENT no-op + transparency field (not a hard reject).
+ */
+export interface SkippedImmuneEntry {
+  condition: string;
+  reason: 'immune';
+}
+
 export type PerformForcedCheckResult =
   // Rolled save — success: no condition applied.
   | {
@@ -106,6 +118,8 @@ export type PerformForcedCheckResult =
         rollMode: 'normal' | 'advantage' | 'disadvantage';
       };
       applied: string[];
+      /** Conditions skipped because the target is immune. Present only when non-empty. */
+      skippedImmune?: SkippedImmuneEntry[];
     }
   // Rolled save — fail: condition(s) applied.
   | {
@@ -121,13 +135,17 @@ export type PerformForcedCheckResult =
         rollMode: 'normal' | 'advantage' | 'disadvantage';
       };
       applied: string[];
+      /** Conditions skipped because the target is immune. Present only when non-empty. */
+      skippedImmune?: SkippedImmuneEntry[];
     }
-  // Auto-fail (Stunned target, STR/DEX save — PHB p.292): no d20 rolled.
+  // Auto-fail (Stunned or Petrified target, STR/DEX save — PHB p.292, p.291): no d20 rolled.
   | {
       ok: true;
       outcome: 'autoFail';
-      reason: 'stunned-str-dex';
+      reason: 'stunned-str-dex' | 'petrified-str-dex';
       applied: string[];
+      /** Conditions skipped because the target is immune. Present only when non-empty. */
+      skippedImmune?: SkippedImmuneEntry[];
     }
   // Error states
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'target' }
@@ -202,15 +220,18 @@ export async function performForcedCheck(
 
   const existingConditionNames = new Set(existingConditionRows.map((r) => r.conditionName));
 
-  // ── Step 5: Stunned-STR/DEX auto-fail short-circuit (PHB p.292) ───────────────
-  // "A stunned creature automatically fails Strength and Dexterity saving throws."
-  // This runs BEFORE resolveTargetSave (no need to derive save mod on auto-fail).
+  // ── Step 5: Stunned/Petrified-STR/DEX auto-fail short-circuit ──────────────────
+  // PHB p.292: "A stunned creature automatically fails Strength and Dexterity saving throws."
+  // PHB p.291: Petrified applies the same auto-fail rule (same ability set: STR+DEX).
+  // Both fire BEFORE resolveTargetSave (no save mod derivation needed on auto-fail).
   const targetIsStunned = existingConditionNames.has('Stunned');
+  // engine-resist-immunity C-7: generalize to Petrified (PHB p.291).
+  const targetIsPetrified = existingConditionNames.has('Petrified');
   const isAutoFailAbility = STUNNED_AUTOFAIL_ABILITIES.has(ability);
 
-  if (targetIsStunned && isAutoFailAbility) {
+  if ((targetIsStunned || targetIsPetrified) && isAutoFailAbility) {
     // Auto-fail — apply conditions without rolling.
-    const applied = await applyConditions({
+    const { applied, skippedImmune } = await applyConditions({
       targetCombatantId,
       conditionOnFail,
       existingConditionNames,
@@ -220,11 +241,13 @@ export async function performForcedCheck(
       turnsRemaining,
       refreshAnchorOnExisting,
     });
+    const reason = targetIsStunned ? 'stunned-str-dex' : 'petrified-str-dex';
     return {
       ok: true,
       outcome: 'autoFail',
-      reason: 'stunned-str-dex',
+      reason,
       applied,
+      ...(skippedImmune.length > 0 ? { skippedImmune } : {}),
     };
   }
 
@@ -252,7 +275,7 @@ export async function performForcedCheck(
 
   // ── Step 8: On fail, apply conditions idempotently ───────────────────────────
   if (!saveRoll.success) {
-    const applied = await applyConditions({
+    const { applied, skippedImmune } = await applyConditions({
       targetCombatantId,
       conditionOnFail,
       existingConditionNames,
@@ -276,6 +299,7 @@ export async function performForcedCheck(
         rollMode: saveRoll.rollMode,
       },
       applied,
+      ...(skippedImmune.length > 0 ? { skippedImmune } : {}),
     };
   }
 
@@ -302,7 +326,9 @@ export async function performForcedCheck(
  * Idempotently inserts (or refreshes) condition rows on fail (ADR-3, ADR-4).
  *
  * For conditionOnFail='Stunned': also inserts Incapacitated (PHB p.292 implication).
+ * For conditionOnFail='Petrified': also inserts Incapacitated (PHB p.291 implication).
  * Each condition checked independently:
+ *   - If immune → skip insert, push to skippedImmune[] (C-8 orchestrator reconciliation).
  *   - If absent → insert.
  *   - If already present + refreshAnchorOnExisting=true + turnAnchorEntityId≠null
  *     → UPDATE turn-anchor fields (re-stun refresh, Slice 3b-ii ADR-4).
@@ -313,7 +339,9 @@ export async function performForcedCheck(
  *   must hold. Standalone forced-check (no anchor, no flag) satisfies neither → no-op.
  *   NULL-anchor permanent conditions: flag true but anchor null → gate (b) fails → no-op.
  *
- * Returns list of newly-inserted condition names (refreshes NOT added to `applied`).
+ * Returns { applied, skippedImmune }.
+ *   applied      = list of newly-inserted condition names (refreshes NOT added).
+ *   skippedImmune = list of skipped immune entries (empty when no immunity fires).
  */
 async function applyConditions(opts: {
   targetCombatantId: string;
@@ -324,7 +352,7 @@ async function applyConditions(opts: {
   turnAnchorBoundary: 'start' | 'end' | undefined;
   turnsRemaining: number | null;
   refreshAnchorOnExisting: boolean;
-}): Promise<string[]> {
+}): Promise<{ applied: string[]; skippedImmune: SkippedImmuneEntry[] }> {
   const {
     targetCombatantId,
     conditionOnFail,
@@ -336,15 +364,33 @@ async function applyConditions(opts: {
     refreshAnchorOnExisting,
   } = opts;
   const applied: string[] = [];
+  const skippedImmune: SkippedImmuneEntry[] = [];
 
   // Determine which conditions to insert.
   // ADR-4: 'Stunned' implies 'Incapacitated' (PHB p.292 — dual-insert).
+  // engine-resist-immunity C-6: 'Petrified' also implies 'Incapacitated' (PHB p.291 — dual-insert).
   const conditionsToApply: string[] = [conditionOnFail];
-  if (conditionOnFail === 'Stunned') {
+  if (conditionOnFail === 'Stunned' || conditionOnFail === 'Petrified') {
     conditionsToApply.push('Incapacitated');
   }
 
+  // Build the set of existing condition objects for isImmuneToCondition (needs { name: string }[]).
+  const existingConditionsForImmunity = Array.from(existingConditionNames).map((name) => ({ name }));
+
   for (const conditionName of conditionsToApply) {
+    // ── C-8: Condition-immunity gate (engine-resist-immunity — ADR-7) ─────────
+    // isImmuneToCondition checks if any EXISTING active condition grants immunity
+    // to the incoming conditionName (e.g. Petrified → immune to Poisoned).
+    //
+    // ORCHESTRATOR RECONCILIATION (locked): SILENT no-op + skippedImmune[] transparency.
+    // No hard reject — the request succeeds; Poisoned row is NOT inserted;
+    // skippedImmune is surfaced in the result so DM/engine can observe the block.
+    // Applies to EVERY conditionName in conditionsToApply (covers dual-insert names too).
+    if (isImmuneToCondition(existingConditionsForImmunity, conditionName)) {
+      skippedImmune.push({ condition: conditionName, reason: 'immune' });
+      continue;
+    }
+
     // ADR-3: App-level idempotency — skip if already present (with optional refresh).
     if (existingConditionNames.has(conditionName)) {
       // REFRESH path (Slice 3b-ii ADR-4): update turn-anchor on existing row when:
@@ -390,5 +436,5 @@ async function applyConditions(opts: {
     applied.push(conditionName);
   }
 
-  return applied;
+  return { applied, skippedImmune };
 }

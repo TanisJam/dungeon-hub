@@ -42,7 +42,7 @@ import {
   computeSpellSlots,
   consumeSpellSlot,
 } from '@dungeon-hub/domain/character/spellcasting';
-import { applyDamage } from '@dungeon-hub/domain/encounter';
+import { resolveResistance } from './resolve-resistance.js';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 
 // ── Crypto RNG (mirrors perform-spell-heal.ts:55-59) ─────────────────────────
@@ -444,11 +444,18 @@ export async function performCastSpellApply(
 
   // ── Step 9b: ATOMIC PATH ──────────────────────────────────────────────────────
   // NPC target / defender has no slot / reaction_used=true → resolve immediately.
-  // Roll MM darts server-side, apply force damage to defender, consume caster slot.
-  // Single CAS tx: [defender HP + caster spellSlotsUsed + encounters.version++]
+  // Roll MM darts server-side, resolve resistance (PHB p.197), apply force damage,
+  // consume caster slot. Single CAS tx: [defender HP + caster spellSlotsUsed + version++]
   // PHB p.257: Magic Missile auto-hits — no attack roll, no save.
   const rollResult = rollMagicMissile({ slotLevel, rng: cryptoRng });
-  const newDefenderHp = applyDamage(targetCombatant.hpCurrent, rollResult.total);
+  // resolveResistance: loads target conditions from DB → applyDamageWithResist.
+  // rollResult.damageType === 'force' (PHB p.257). Runs OUTSIDE CAS tx (ADR-4).
+  const { newHp: newDefenderHp } = await resolveResistance(
+    targetId,
+    rollResult.total,
+    rollResult.damageType,
+    targetCombatant.hpCurrent,
+  );
 
   const txResult = await db.transaction(async (tx) => {
     // a. Update defender HP (apply force damage — PHB p.257).

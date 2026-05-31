@@ -36,8 +36,8 @@ import {
 } from '@dungeon-hub/domain/engine';
 import { consumeSpellSlot, computeSpellSlots } from '@dungeon-hub/domain/character/spellcasting';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
-import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { buildAttackContext } from './build-attack-context.js';
+import { resolveResistance } from './resolve-resistance.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
@@ -611,9 +611,17 @@ export async function performWeaponAttackApply(
     radiantDamage = smiteEntry?.rolls?.reduce((a, b) => a + b, 0) ?? 0;
   }
 
-  // ── Step 12: applyDamage + transaction ───────────────────────────────────────
-  // applyDamage → newHp (PHB p.197 clamp at 0).
-  const newHp = applyDamage(targetCombatant.hpCurrent, rolledDamage);
+  // ── Step 12: resolveResistance + transaction ─────────────────────────────────
+  // resolveResistance: loads target conditions → applyDamageWithResist → newHp.
+  // Replaces bare applyDamage; if target has no resist conditions, result is identical.
+  // Runs OUTSIDE the CAS tx (read-then-CAS — ADR-4 engine-resist-immunity).
+  // PHB p.197: resistance applied after all other modifiers, before HP loss.
+  const { newHp } = await resolveResistance(
+    targetId,
+    rolledDamage,
+    weapon.damageType,
+    targetCombatant.hpCurrent,
+  );
 
   // Transaction: UPDATE target HP + CAS version bump (ADR-10).
   // UPDATE encounters WHERE id=$id AND version=$incoming → 0 rows = VERSION_CONFLICT.

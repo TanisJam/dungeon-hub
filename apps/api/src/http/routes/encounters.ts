@@ -567,11 +567,15 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       // Return discriminated response by outcome.
+      // engine-resist-immunity C-8: include skippedImmune[] when present (transparency field).
       if (result.outcome === 'autoFail') {
         return reply.code(200).send({
           outcome: 'autoFail',
           reason: result.reason,
           applied: result.applied,
+          ...(result.skippedImmune !== undefined && result.skippedImmune.length > 0
+            ? { skippedImmune: result.skippedImmune }
+            : {}),
         });
       }
 
@@ -580,6 +584,9 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           outcome: 'fail',
           save: result.save,
           applied: result.applied,
+          ...(result.skippedImmune !== undefined && result.skippedImmune.length > 0
+            ? { skippedImmune: result.skippedImmune }
+            : {}),
         });
       }
 
@@ -588,6 +595,9 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         outcome: 'save',
         save: result.save,
         applied: result.applied,
+        ...(result.skippedImmune !== undefined && result.skippedImmune.length > 0
+          ? { skippedImmune: result.skippedImmune }
+          : {}),
       });
     },
   );

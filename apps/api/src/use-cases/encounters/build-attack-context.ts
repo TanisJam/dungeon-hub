@@ -30,6 +30,8 @@ import {
   INVISIBLE_CONDITION_DEF,
   buildPoisonedModifiers,
   POISONED_CONDITION_DEF,
+  buildPetrifiedModifiers,
+  PETRIFIED_CONDITION_DEF,
   type ModifierRegistry,
   type EvaluationContext,
 } from '@dungeon-hub/domain/engine';
@@ -423,6 +425,28 @@ export async function buildAttackContext(
     );
     if (poisonedResult.ok) {
       for (const m of poisonedResult.instances) {
+        registry.register(m);
+      }
+    }
+  }
+
+  // ── Petrified target: outgoing attackers-of advantage grant ──────────────────
+  // PHB p.291: "Attack rolls against the creature have advantage."
+  // UNCONDITIONAL (alwaysTrue predicate) — mirrors Stunned branch above.
+  // instances from buildPetrifiedModifiers register the advantage grant in the
+  // registry so resolveRollMode sees it (attacker-centric registry path).
+  // resistMods are NOT registered here — they are consumed by resolveResistance
+  // via loadTargetResistMods (helper path — ADR-5 split return).
+  if (targetConditions.some((c) => c.name === 'Petrified')) {
+    const petrifiedResult = buildPetrifiedModifiers(
+      targetId as import('@dungeon-hub/domain/engine').EntityId,
+      (name) => {
+        if (name === 'Petrified') return PETRIFIED_CONDITION_DEF;
+        return null;
+      },
+    );
+    if (petrifiedResult.ok) {
+      for (const m of petrifiedResult.instances) {
         registry.register(m);
       }
     }
