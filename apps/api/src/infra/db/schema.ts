@@ -868,6 +868,17 @@ export const compendiumActions = pgTable(
 // `current_combatant_id` is a soft reference (no FK) — adding a FK to
 // `encounter_combatants` would create a cycle since combatants reference back.
 // Runtime invariant: it MUST point at a valid combatant of THIS encounter.
+//
+// `pending_reaction` — server-authoritative suspend state for the two-step Shield
+// reaction flow (engine-reaction-bus). Stored at suspend time by
+// `performWeaponAttackApply`; read and cleared atomically in `resolveAttackReaction`.
+// Shape: { defenderCombatantId, attackerCombatantId, toHitTotal, targetAc,
+//          rolledDamage, damageType, encVersion } | null.
+// Writing pending_reaction does NOT bump `version` — it is bookkeeping, not a
+// game-state change. The CAS version in `encVersion` binds the pending state to
+// a specific optimistic epoch; if the encounter version advances (via a concurrent
+// request) before the client resolves, the CAS guard in resolveAttackReaction will
+// reject the stale pending state (version mismatch → VERSION_CONFLICT).
 // ---------------------------------------------------------------------------
 export const encounters = pgTable(
   'encounters',
@@ -882,6 +893,13 @@ export const encounters = pgTable(
     currentCombatantId: uuid('current_combatant_id'),
     status: text('status', { enum: ['active', 'completed'] }).notNull().default('active'),
     version: integer('version').notNull().default(1),
+    /**
+     * Server-authoritative pending reaction state for the two-step Shield flow.
+     * Nullable — null means no reaction is pending. Written at suspend time,
+     * cleared in the same CAS tx that commits the resolve outcome.
+     * NOT used for CAS version — does not bump `version` on write.
+     */
+    pendingReaction: jsonb('pending_reaction'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
