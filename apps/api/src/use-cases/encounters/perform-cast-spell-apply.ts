@@ -44,8 +44,9 @@ import {
 } from '@dungeon-hub/domain/character/spellcasting';
 import { resolveResistance } from './resolve-resistance.js';
 import {
-  checkConcentrationOnDamage,
-  type ConcentrationSaveBlock,
+  prepareConcentrationCheck,
+  resolveConcentrationCheck,
+  type ConcentrationResolution,
 } from './check-concentration-on-damage.js';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 
@@ -123,11 +124,13 @@ export type PerformCastSpellApplyResult =
       };
       /**
        * Concentration save result (engine-concentration-break-damage, REQ-CB-06).
-       * Present only on the atomic path AND when the target was concentrating AND finalDamage > 0.
+       * Present only on the atomic path AND when the target was concentrating AND finalDamage > 0,
+       * OR when newHp===0 (outright break — PHB p.197/p.203, REQ-CID-02).
        * Absent (key omitted) otherwise — backward-compat omit-not-null (REQ-CB-12).
-       * TODO-saga: HP commit and concentration break are two separate atomic units.
+       * Shape: ConcentrationSaveBlock | { broke: true; reason: 'incapacitated-0hp' }.
+       * REQ-CID-04: breakConcentration runs INSIDE the same CAS tx as the HP UPDATE — atomicity saga closed.
        */
-      concentrationSave?: ConcentrationSaveBlock;
+      concentrationSave?: ConcentrationResolution;
     }
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'character' }
@@ -469,6 +472,15 @@ export async function performCastSpellApply(
     targetCombatant.hpCurrent,
   );
 
+  // ── REQ-CID-04: prepare/resolve split (ADR-1, Slice 3) ───────────────────────
+  // PREPARE outside CAS tx: registry SELECT + save-bonus read (or breakOutright on newHp===0).
+  // REQ-CB-11: ONE prepare call handles aggregate MM damage (not per-dart).
+  const concPlan = await prepareConcentrationCheck(
+    { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
+    finalDamageCast,
+    newDefenderHp,
+  );
+
   const txResult = await db.transaction(async (tx) => {
     // a. Update defender HP (apply force damage — PHB p.257).
     await tx
@@ -504,23 +516,21 @@ export async function performCastSpellApply(
       })
       .where(eq(characters.id, casterCharId));
 
-    return true;
+    // d. RESOLVE concentration IN-TX (REQ-CID-04, ADR-1).
+    // CRITICAL: inside closure — breakConcentration receives the same tx → atomic with HP write.
+    // concPlan===null → NPC/non-concentrating/zero-damage guard fired → no-op.
+    const conc = concPlan ? await resolveConcentrationCheck(concPlan, tx) : undefined;
+
+    return { committed: true as const, conc };
   });
 
-  if (!txResult) {
+  if (txResult === false) {
     return { ok: false, code: 'VERSION_CONFLICT' };
   }
 
-  // B2f: Concentration save (engine-concentration-break-damage, REQ-CB-06).
-  // Runs post-tx. Uses finalDamageCast (post-resistance) for DC — REQ-CB-07.
-  // REQ-CB-11: ONE save per damage-apply call — MM is ONE source (Sage Advice Crawford 2015).
-  // This single call handles the entire MM damage block, not one save per dart.
-  // TODO-saga: HP commit and concentration break are two separate atomic units.
-  // A crash between them leaves HP reduced but concentration intact — accepted V1 saga.
-  const concCheckCast = await checkConcentrationOnDamage(
-    { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
-    finalDamageCast,
-  );
+  // REQ-CID-02, REQ-CID-04: concentrationSave from tx closure.
+  // txResult.conc: ConcentrationResolution | undefined.
+  // ConcentrationSaveBlock (save rolled) or { broke:true, reason:'incapacitated-0hp' } (outright).
 
   return {
     ok: true,
@@ -529,6 +539,6 @@ export async function performCastSpellApply(
       perDart: rollResult.perDart,
       dartCount: rollResult.dartCount,
     },
-    ...(concCheckCast.concentrating ? { concentrationSave: concCheckCast.save } : {}),
+    ...(txResult.conc !== undefined ? { concentrationSave: txResult.conc } : {}),
   };
 }

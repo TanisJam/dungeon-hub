@@ -1,28 +1,29 @@
 /**
- * checkConcentrationOnDamage — shared use-case helper (kept for Batch B backward-compat).
- * prepareConcentrationCheck / resolveConcentrationCheck — Batch A split (ADR-1, Slice 3).
+ * prepareConcentrationCheck / resolveConcentrationCheck — Slice 3 prepare/resolve split (ADR-1).
  *
  * Called by all three damage paths (perform-weapon-attack-apply, perform-cast-spell-apply,
- * resolve-cast-reaction). The NEW prepare/resolve split replaces the old single post-tx call:
- *   - prepareConcentrationCheck: PRE-tx reads (registry, save bonus). Returns a plan or null.
- *   - resolveConcentrationCheck: IN-tx commit (roll if needed, break on fail/outright).
- * checkConcentrationOnDamage remains for Batch B call-site migration (will be deleted in B5.2).
+ * resolve-cast-reaction) via the in-tx wiring completed in Batch B:
+ *   - prepareConcentrationCheck: PRE-tx reads (registry SELECT, save-bonus read). Returns a plan or null.
+ *   - resolveConcentrationCheck: IN-tx commit (outright break on 0-HP OR roll save + break on fail).
+ *
+ * The old `checkConcentrationOnDamage` (post-tx saga pattern) has been removed in Batch B (B5.2).
+ * All three damage paths now call prepare/resolve — no dead export remains.
  *
  * PHB p.203 — "Maintaining Concentration":
  *   "Whenever you take damage while you are concentrating on a spell, you must make a
  *    Constitution saving throw to maintain your concentration. The DC equals 10 or half
  *    the damage you take, whichever number is higher."
- * PHB p.197 — 0 HP → Unconscious → Incapacitated → concentration ends (no save).
+ * PHB p.197 — 0 HP → Unconscious → Incapacitated → concentration ends (no save). REQ-CID-02.
  *
  * SERVER-AUTHORITY INVARIANT (REQ-CB-05):
  *   This module self-supplies a module-level cryptoRng and passes it to rollSavingThrow.
  *   The client NEVER supplies the d20 roll or the save modifier. Any request body field
  *   carrying a concentration roll that mutates state is FORBIDDEN.
  *
- * POST-TX PLACEMENT (old checkConcentrationOnDamage — ADR-3):
- *   Runs AFTER the HP-commit CAS tx (post-tx, mirroring Stunning Strike pattern).
- *   HP commit and concentration break are two separate atomic units — accepted V1 saga.
- *   The prepare/resolve split (Batch A/B) closes this fisura by moving resolve INTO the tx.
+ * ATOMICITY (REQ-CID-04):
+ *   resolveConcentrationCheck runs INSIDE the CAS tx (same tx as HP UPDATE).
+ *   breakConcentration receives the same tx handle → covered by rollback.
+ *   No intermediate state with HP=0 and active concentration is observable.
  *
  * Design ref: sdd/engine-concentration-break-damage/design — ADR-4.
  * Design ref: sdd/engine-concentration-break-incap-death/design — ADR-1, ADR-2.
@@ -78,18 +79,6 @@ export interface ConcentrationSaveBlock {
   broke: boolean;
 }
 
-/**
- * ConcentrationCheckResult — return type of checkConcentrationOnDamage.
- *
- * { concentrating: false } — any guard branch fired (NPC, zero damage, no registry row).
- * { concentrating: true; save: ConcentrationSaveBlock } — save was rolled.
- *
- * Call sites map concentrating:true to { concentrationSave: result.save } in the response,
- * and omit the key entirely on concentrating:false (REQ-CB-12 backward-compat omit-not-null).
- */
-export type ConcentrationCheckResult =
-  | { concentrating: false }
-  | { concentrating: true; save: ConcentrationSaveBlock };
 
 // ── Batch A: ConcentrationPlan / ConcentrationResolution / prepare / resolve ───
 //
@@ -269,87 +258,3 @@ export async function resolveConcentrationCheck(
   };
 }
 
-// ── checkConcentrationOnDamage ─────────────────────────────────────────────────
-
-/**
- * Rolls the PHB p.203 CON save for a concentrating PC target.
- *
- * Guard chain (returns {concentrating:false} immediately on any guard hit):
- *   1. NPC target (characterId=null) → no registry row possible (REQ-CB-10).
- *   2. finalDamage=0 → PHB p.203: a save is only triggered by damage TAKEN (REQ-CB-08).
- *   3. No character_concentration row → target not concentrating (REQ-CB-09).
- *   4. resolveTargetSave fails (NOT_FOUND / NO_TARGET_SAVE) → skip defensively.
- *
- * Happy path: computeConcentrationSaveDc → rollSavingThrow → breakConcentration on fail.
- *
- * @param targetCombatant - Combatant shape: kind + characterId (matches resolveTargetSave input).
- * @param finalDamage     - Post-resistance damage (used for DC formula). PHB p.203.
- * @param opts.npcSaveMod - GM-supplied CON save mod for NPC targets (forward-compat; V1 NPCs skip via guard 1).
- */
-export async function checkConcentrationOnDamage(
-  targetCombatant: { kind: 'pc' | 'npc'; characterId: string | null },
-  finalDamage: number,
-  opts?: { npcSaveMod?: number },
-): Promise<ConcentrationCheckResult> {
-  // Guard 1: NPC → no registry row possible. REQ-CB-10.
-  if (targetCombatant.characterId === null) {
-    return { concentrating: false };
-  }
-
-  // Guard 2: zero damage → PHB p.203: save only triggered by damage TAKEN. REQ-CB-08.
-  if (finalDamage === 0) {
-    return { concentrating: false };
-  }
-
-  const characterId = targetCombatant.characterId;
-
-  // Guard 3: No registry row → target not concentrating. REQ-CB-09.
-  const [registryRow] = await db
-    .select({ characterId: characterConcentration.characterId })
-    .from(characterConcentration)
-    .where(eq(characterConcentration.characterId, characterId))
-    .limit(1);
-
-  if (!registryRow) {
-    return { concentrating: false };
-  }
-
-  // Step 4: Compute DC (pure domain). PHB p.203: max(10, floor(finalDamage / 2)).
-  const dc = computeConcentrationSaveDc(finalDamage);
-
-  // Step 5: Resolve server-side CON save modifier. Guard 4: on failure skip (never crash).
-  const saveResult = await resolveTargetSave(
-    { kind: targetCombatant.kind, characterId, ability: 'con' },
-    opts?.npcSaveMod ?? undefined,
-  );
-
-  if (!saveResult.ok) {
-    // NOT_FOUND or NO_TARGET_SAVE — defensive skip. PC should always resolve.
-    return { concentrating: false };
-  }
-
-  const saveMod = saveResult.saveMod;
-
-  // Step 6: Roll the save. Server-minted cryptoRng — client NEVER supplies the d20 (REQ-CB-05).
-  // rollMode 'normal' in V1 (War Caster advantage deferred to future slice).
-  const roll = rollSavingThrow(saveMod, dc, 'normal', cryptoRng);
-
-  const success = roll.success;
-
-  // Step 7: Break concentration on fail. REQ-CB-04.
-  if (!success) {
-    await breakConcentration(characterId);
-  }
-
-  return {
-    concentrating: true,
-    save: {
-      dc,
-      d20: roll.d20,
-      total: roll.total,
-      saveMod: roll.saveMod,
-      success,
-      broke: !success,
-    },
-  };
-}

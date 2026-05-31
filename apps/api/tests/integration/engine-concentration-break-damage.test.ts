@@ -1510,4 +1510,328 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
       await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
     }, 60000);
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // B6 — REQ-CID-02 HTTP-level tests: 0-HP outright break (no save) per path
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // PHB p.197: 0 HP → Unconscious → Incapacitated → concentration ends (no save).
+  // PHB p.203: Concentration ends on incapacitation.
+  // ADR-2: response is { broke: true, reason: 'incapacitated-0hp' } — NO dc/d20 fields.
+  // All three damage paths are tested (REQ-CID-02).
+  //
+  // Strategy: set target HP to exactly 1 so longsword/MM minimum damage kills them.
+  // Longsword min = 1d8+STR(+2) = 3 (always > 1) — always kills hpCurrent=1.
+  // MM slot1 = 3*(1d4+1), min=3*(1+1)=6 (always > 1) — always kills hpCurrent=1.
+  //
+  // Note: CBW-07 / CBS-04 / CBR-06 require the TARGET to be concentrating and to die.
+  // We set target hpCurrent=1 in the encounter factory so ANY non-miss hit = 0 HP.
+
+  describe('B6 — REQ-CID-02 outright break via 3 damage paths', () => {
+    // CBW-07: weapon hit kills concentrating PC (newHp=0) →
+    //   response has concentrationSave: { broke: true, reason: 'incapacitated-0hp' }.
+    //   No d20/dc fields. REQ-CID-02 via weapon path.
+    it('CBW-07: weapon hit kills concentrating PC → concentrationSave has outright-break shape (REQ-CID-02)', async () => {
+      // Create encounter: fighter attacks caster (wizard) with hpCurrent=1.
+      // Any non-zero damage on a hit kills the target → newHp=0 → outright break.
+      const enc2 = await (await getTestApp())
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `CBW-07 (${randomUUID().slice(0, 8)})`,
+            combatants: [
+              {
+                name: 'Fighter',
+                kind: 'pc',
+                characterId: fighterCharId,
+                initiative: 20,
+                hpCurrent: 30,
+                hpMax: 30,
+              },
+              {
+                name: 'Wizard (dying)',
+                kind: 'pc',
+                characterId: casterCharId,
+                initiative: 5,
+                hpCurrent: 1,   // 1 HP — any non-zero hit kills
+                hpMax: 30,
+              },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const attackerCombId = enc2.currentCombatantId as string;
+      const targetCombId = enc2.combatants.find((c: { id: string }) => c.id !== attackerCombId)?.id as string;
+
+      // Give caster a concentration row.
+      await insertConcentrationRow(casterCharId);
+      expect(await hasConcentrationRow(casterCharId)).toBe(true);
+
+      // Attack until we get a hit that kills the target (newHp=0).
+      const app = await getTestApp();
+      let sawOutrightBreak = false;
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const version = await getEncounterVersion(enc2.id, gm.accessToken);
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${enc2.id}/actions/attack/apply`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
+        });
+        if (res.statusCode !== 200) continue;
+        const body = res.json<Record<string, unknown>>();
+        if (body['hit'] !== true || body['reactionOffered']) continue;
+
+        // On a hit: newHp should be 0 (target had 1 HP, min longsword damage = 3 > 1).
+        // REQ-CID-02: concentrationSave MUST be the outright-break shape.
+        expect(body).toHaveProperty('concentrationSave');
+        const cs = body['concentrationSave'] as Record<string, unknown>;
+
+        // ADR-2: outright break shape — has 'broke' and 'reason', NO 'd20' or 'dc'.
+        expect(cs['broke']).toBe(true);
+        expect(cs['reason']).toBe('incapacitated-0hp');
+        expect('d20' in cs).toBe(false);
+        expect('dc' in cs).toBe(false);
+
+        // Registry row MUST be deleted (breakConcentration ran inside the tx).
+        expect(await hasConcentrationRow(casterCharId)).toBe(false);
+
+        sawOutrightBreak = true;
+        break;
+      }
+
+      expect(sawOutrightBreak).toBe(true);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, casterCharId));
+    }, 120000);
+
+    // CBS-04: spell kills concentrating PC (newHp=0) →
+    //   concentrationSave: { broke: true, reason: 'incapacitated-0hp' }.
+    //   REQ-CID-02 via cast-spell path.
+    it('CBS-04: spell kills concentrating PC → concentrationSave has outright-break shape (REQ-CID-02)', async () => {
+      await resetSlots(casterCharId);
+
+      // Fighter is the TARGET (no spell slots → atomic path, always).
+      // Fighter hpCurrent=1 → any MM damage (min=6 for slot1) kills.
+      const enc = await (await getTestApp())
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `CBS-04 (${randomUUID().slice(0, 8)})`,
+            combatants: [
+              {
+                name: 'Elara (caster)',
+                kind: 'pc',
+                characterId: casterCharId,
+                initiative: 20,
+                hpCurrent: 25,
+                hpMax: 30,
+              },
+              {
+                name: 'Fighter (dying)',
+                kind: 'pc',
+                characterId: fighterCharId,
+                initiative: 5,
+                hpCurrent: 1,   // 1 HP — MM min=6 always kills
+                hpMax: 30,
+              },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const casterCombId = enc.currentCombatantId as string;
+      const targetCombId = enc.combatants.find((c: { id: string }) => c.id !== casterCombId)?.id as string;
+
+      // Fighter concentrating.
+      await insertConcentrationRow(fighterCharId);
+      expect(await hasConcentrationRow(fighterCharId)).toBe(true);
+
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/cast-spell`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          casterId: casterCombId,
+          spellName: 'Magic Missile',
+          slotLevel: 1,
+          targets: [targetCombId],
+          version: enc.version,
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<Record<string, unknown>>();
+
+      // Fighter has no slots → atomic path (no suspend).
+      if (body['castAnnounced']) {
+        // Unexpected suspend (fighter shouldn't have slots) — skip with a clear message.
+        await db.delete(characterConcentration).where(eq(characterConcentration.characterId, fighterCharId));
+        throw new Error('CBS-04: expected atomic path, got suspend. Check fighter slots.');
+      }
+
+      // REQ-CID-02: concentrationSave MUST be the outright-break shape.
+      expect(body).toHaveProperty('concentrationSave');
+      const cs = body['concentrationSave'] as Record<string, unknown>;
+
+      expect(cs['broke']).toBe(true);
+      expect(cs['reason']).toBe('incapacitated-0hp');
+      expect('d20' in cs).toBe(false);
+      expect('dc' in cs).toBe(false);
+
+      // Registry row deleted.
+      expect(await hasConcentrationRow(fighterCharId)).toBe(false);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, fighterCharId));
+    });
+
+    // CBR-06: DECLINE arm kills concentrating PC (newHp=0) →
+    //   concentrationSave: { broke: true, reason: 'incapacitated-0hp' }.
+    //   REQ-CID-02 via reaction (decline) path.
+    it('CBR-06: DECLINE arm kills concentrating PC → concentrationSave has outright-break shape (REQ-CID-02)', async () => {
+      await resetSlots(casterCharId);
+      await resetSlots(wizardTargetCharId);
+
+      // wizardTargetCharId (Wizard L1) has slots → suspend path fires.
+      // hpCurrent=1 on the wizard target → any MM damage kills (min=6 >> 1).
+      const enc = await makeReactionEncounter({
+        targetCharId: wizardTargetCharId,
+        targetHp: 1,  // 1 HP — MM min=6 always kills
+        casterCharId,
+      });
+
+      await insertConcentrationRow(wizardTargetCharId);
+      expect(await hasConcentrationRow(wizardTargetCharId)).toBe(true);
+
+      const app = await getTestApp();
+      // Suspend cast.
+      const suspendRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.encounterId}/actions/cast-spell`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          casterId: enc.casterCombatantId,
+          spellName: 'Magic Missile',
+          slotLevel: 1,
+          targets: [enc.targetCombatantId],
+          version: enc.version,
+        },
+      });
+      expect(suspendRes.statusCode).toBe(200);
+      const sBody = suspendRes.json<Record<string, unknown>>();
+
+      if (!sBody['castAnnounced']) {
+        await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+        throw new Error('CBR-06: expected suspend path (castAnnounced). Check wizard slots.');
+      }
+
+      const resolveVersion = await getEncounterVersion(enc.encounterId, gm.accessToken);
+      const resolveRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.encounterId}/actions/cast-spell/resolve-reaction`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          reactionDecision: 'decline',
+          defenderCombatantId: enc.targetCombatantId,
+          version: resolveVersion,
+        },
+      });
+
+      expect(resolveRes.statusCode).toBe(200);
+      const body = resolveRes.json<Record<string, unknown>>();
+
+      // MM damage (min=6) >> targetHp=1 → newHp=0 → outright break.
+      // REQ-CID-02: concentrationSave MUST be the outright-break shape.
+      expect(body).toHaveProperty('concentrationSave');
+      const cs = body['concentrationSave'] as Record<string, unknown>;
+
+      expect(cs['broke']).toBe(true);
+      expect(cs['reason']).toBe('incapacitated-0hp');
+      expect('d20' in cs).toBe(false);
+      expect('dc' in cs).toBe(false);
+
+      // Registry row deleted.
+      expect(await hasConcentrationRow(wizardTargetCharId)).toBe(false);
+
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+    });
+
+    // CBR-07: REQ-CID-04 atomicity — VERSION_CONFLICT path returns error but NO break.
+    // Verifies that the CAS guard fires before resolveConcentrationCheck is called:
+    // if the tx rolls back, concentration is NOT broken.
+    // We test this by sending a stale version and confirming the concentration row remains intact.
+    it('CBR-07: VERSION_CONFLICT → concentration NOT broken (atomicity REQ-CID-04)', async () => {
+      // Create an encounter with fighter as target.
+      const enc2 = await (await getTestApp())
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `CBR-07 atomicity (${randomUUID().slice(0, 8)})`,
+            combatants: [
+              {
+                name: 'Fighter attacker',
+                kind: 'pc',
+                characterId: fighterCharId,
+                initiative: 20,
+                hpCurrent: 30,
+                hpMax: 30,
+              },
+              {
+                name: 'Wizard target',
+                kind: 'pc',
+                characterId: casterCharId,
+                initiative: 5,
+                hpCurrent: 30,
+                hpMax: 30,
+              },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const attackerCombId = enc2.currentCombatantId as string;
+      const targetCombId = enc2.combatants.find((c: { id: string }) => c.id !== attackerCombId)?.id as string;
+
+      // Give caster a concentration row.
+      await insertConcentrationRow(casterCharId);
+      expect(await hasConcentrationRow(casterCharId)).toBe(true);
+
+      const app = await getTestApp();
+
+      // Send attack with a STALE version (version=0 when real version is ≥1).
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc2.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId: attackerCombId,
+          targetId: targetCombId,
+          weaponInstanceId: longswordInstanceId,
+          version: 0,   // stale — will be rejected by CAS pre-check
+        },
+      });
+
+      // Server must return VERSION_CONFLICT (409).
+      expect(res.statusCode).toBe(409);
+
+      // REQ-CID-04: concentration row MUST remain intact (tx never committed).
+      expect(await hasConcentrationRow(casterCharId)).toBe(true);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, casterCharId));
+    });
+  });
 });

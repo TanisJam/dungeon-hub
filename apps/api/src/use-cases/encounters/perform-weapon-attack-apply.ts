@@ -42,8 +42,9 @@ import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import {
-  checkConcentrationOnDamage,
-  type ConcentrationSaveBlock,
+  prepareConcentrationCheck,
+  resolveConcentrationCheck,
+  type ConcentrationResolution,
 } from './check-concentration-on-damage.js';
 
 // ── Crypto RNG (ADR-5) ─────────────────────────────────────────────────────────
@@ -200,11 +201,13 @@ export type PerformWeaponAttackApplyResult =
       divineSmite?: DivineSmiteBlock;
       /**
        * Concentration save result (engine-concentration-break-damage, REQ-CB-06).
-       * Present only when the target was concentrating AND finalDamage > 0.
-       * Absent (key omitted) otherwise — backward-compat omit-not-null (REQ-CB-12).
-       * TODO-saga: HP commit and concentration break are two separate atomic units.
+       * Present only when the target was concentrating AND finalDamage > 0, OR when newHp===0
+       * (outright break — PHB p.197/p.203, REQ-CID-02).
+       * Absent (key omitted) when no concentration row or finalDamage===0 — backward-compat omit-not-null (REQ-CB-12).
+       * Shape: ConcentrationSaveBlock (save rolled) | { broke: true; reason: 'incapacitated-0hp' } (outright).
+       * REQ-CID-04: breakConcentration now runs INSIDE the same CAS tx as the HP UPDATE — atomicity saga closed.
        */
-      concentrationSave?: ConcentrationSaveBlock;
+      concentrationSave?: ConcentrationResolution;
     }
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'weapon' | 'character' }
@@ -634,10 +637,23 @@ export async function performWeaponAttackApply(
     targetCombatant.hpCurrent,
   );
 
+  // ── REQ-CID-04: prepare/resolve split (ADR-1, Slice 3) ───────────────────────
+  // PREPARE runs OUTSIDE the CAS tx: registry SELECT + save-bonus read (4+ queries).
+  // On newHp===0 → plan.breakOutright=true (skip resolveTargetSave entirely — REQ-CID-02).
+  // On finalDamage===0 → null (PHB p.203: save only triggered by damage TAKEN — REQ-CB-08).
+  // Returns null when NPC, non-concentrating, or zero-damage guard fires.
+  const concPlan = await prepareConcentrationCheck(
+    { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
+    finalDamage,
+    newHp,
+  );
+
   // Transaction: UPDATE target HP + CAS version bump (ADR-10).
   // UPDATE encounters WHERE id=$id AND version=$incoming → 0 rows = VERSION_CONFLICT.
   // On stunningStrikeSpend=true: ALSO decrement ki via jsonb_set INSIDE this tx
   // so that HP + version + ki are atomic (REQ-SS-ATOMICITY-01, ADR-2).
+  // REQ-CID-04: RESOLVE runs INSIDE the tx closure, after the CAS guard.
+  // breakConcentration receives the same tx → covered by rollback (saga closed).
   const txResult = await db.transaction(async (tx) => {
     await tx
       .update(encounterCombatants)
@@ -659,7 +675,7 @@ export async function performWeaponAttackApply(
       .returning({ version: encounters.version });
 
     if (updated.length === 0) {
-      // CAS conflict — rollback entire tx (ki NOT decremented).
+      // CAS conflict — rollback entire tx (ki NOT decremented, concentration NOT broken).
       return false;
     }
 
@@ -698,14 +714,20 @@ export async function performWeaponAttackApply(
         .where(eq(characters.id, attackerCharacterId));
     }
 
-    return true;
+    // ── Step 12c-conc: resolveConcentrationCheck IN-TX (REQ-CID-04, ADR-1) ──────
+    // CRITICAL: called INSIDE the closure, after the CAS guard, so breakConcentration
+    // commits atomically with the HP UPDATE. If the tx rolls back, the break rolls back too.
+    // concPlan===null → no concentration row (NPC/non-concentrating/zero-dmg guard fired).
+    const conc = concPlan ? await resolveConcentrationCheck(concPlan, tx) : undefined;
+
+    return { committed: true as const, conc };
   });
 
-  if (!txResult) {
+  if (txResult === false) {
     return { ok: false, code: 'VERSION_CONFLICT' };
   }
 
-  // ── Step 12c: Stunning Strike post-tx (Slice 3b-ii, REQ-SS-CONDITION-01) ──────
+  // ── Step 12d: Stunning Strike post-tx (Slice 3b-ii, REQ-SS-CONDITION-01) ──────
   // performForcedCheck runs OUTSIDE the CAS tx (append-only, its own connection).
   // Ki+HP are committed; Stunned insert follows as a near-atomic append.
   // TODO saga: ki+HP commit and Stunned insert are not one atomic unit (cross-entity:
@@ -761,24 +783,17 @@ export async function performWeaponAttackApply(
     }
   }
 
-  // ── Step 12d: Divine Smite response block (engine-divine-smite — ADR-8) ────────
+  // ── Step 12e: Divine Smite response block (engine-divine-smite — ADR-8) ────────
   // Key OMITTED (not null) when divineSmiteSpend absent/false — backward-compat (REQ-DS-COMPAT-01).
   const divineSmiteResult: DivineSmiteBlock | undefined =
     divineSmiteSpend && smiteDice !== undefined
       ? { spent: true, slotLevel: divineSmiteSlotLevel!, dice: smiteDice, radiantDamage }
       : undefined;
 
-  // ── Step 12e: Concentration save (engine-concentration-break-damage, REQ-CB-06) ─
-  // Runs post-tx, after Stunning Strike and Divine Smite blocks.
-  // Uses finalDamage (post-resistance) for the DC — REQ-CB-07.
-  // TODO-saga: HP commit and concentration break are two separate atomic units.
-  // A crash between them leaves HP reduced but concentration intact — accepted V1 saga (ADR-3).
-  const concCheckWeapon = await checkConcentrationOnDamage(
-    { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
-    finalDamage,
-    // NPC target: npcSaveMod not supplied at this call site; resolveTargetSave returns NO_TARGET_SAVE →
-    // checkConcentrationOnDamage returns {concentrating:false} → key omitted (REQ-CB-10 NPC guard).
-  );
+  // ── Step 12f: concentrationSave from tx result (REQ-CID-02, REQ-CID-04) ───────
+  // txResult.conc is the ConcentrationResolution returned by resolveConcentrationCheck
+  // inside the tx closure. undefined when no concentration check was needed.
+  // Shape: ConcentrationSaveBlock (save rolled) or { broke:true, reason:'incapacitated-0hp' }.
 
   return {
     ok: true,
@@ -795,6 +810,6 @@ export async function performWeaponAttackApply(
     damageType: weapon.damageType,
     ...(stunningStrike !== undefined ? { stunningStrike } : {}),
     ...(divineSmiteResult !== undefined ? { divineSmite: divineSmiteResult } : {}),
-    ...(concCheckWeapon.concentrating ? { concentrationSave: concCheckWeapon.save } : {}),
+    ...(txResult.conc !== undefined ? { concentrationSave: txResult.conc } : {}),
   };
 }

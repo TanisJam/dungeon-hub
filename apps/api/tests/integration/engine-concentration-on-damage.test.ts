@@ -1,25 +1,30 @@
 /**
- * Integration tests — check-concentration-on-damage helper (B1c guard branches).
+ * Integration tests — concentration-on-damage helper guard branches + success/fail paths.
  *
  * PHB p.203: "Whenever you take damage while you are concentrating on a spell, you
  * must make a Constitution saving throw to maintain your concentration."
+ * PHB p.197: "0 HP → Unconscious → Incapacitated → concentration ends (no save)." REQ-CID-02.
  *
- * Tests the shared helper's guard branches and success/fail paths in isolation,
- * exercising it directly (not via HTTP). Path-wiring integration tests live in
- * B2g/B2h/B2i (weapon-attack, cast-spell, cast-reaction files).
+ * Tests prepareConcentrationCheck / resolveConcentrationCheck in isolation (not via HTTP).
+ * Path-wiring integration tests live in engine-concentration-break-damage.test.ts.
  *
- * B1c guard tests:
- *   BCB-01: NPC target (characterId=null) → returns {concentrating:false}, no DB query.
- *   BCB-02: finalDamage=0 → returns {concentrating:false}, no save rolled.
- *   BCB-03: non-concentrating PC (no registry row) → returns {concentrating:false}.
- *   BCB-04: concentrating PC + DC pass → returns {concentrating:true, save.success=true},
- *            registry row intact.
- *   BCB-05: concentrating PC + DC fail → returns {concentrating:true, save.success=false,
- *            save.broke=true}, registry row deleted (REQ-CB-04).
- *   BCB-06: ConcentrationSaveBlock has all 6 required fields (REQ-CB-12).
+ * B1 guard tests (migrated from checkConcentrationOnDamage to prepare/resolve split — ADR-1):
+ *   BCB-01: NPC target (characterId=null) → prepare returns null (no registry query).
+ *   BCB-02: finalDamage=0 (newHp>0) → prepare returns null (zero-damage guard — REQ-CB-08).
+ *   BCB-03: non-concentrating PC (no registry row) → prepare returns null (REQ-CB-09).
+ *   BCB-04: concentrating PC + newHp>0 + damage>0 → save block with all 6 fields (REQ-CB-12).
+ *   BCB-05: concentrating PC + guaranteed DC fail → broke=true, registry row deleted (REQ-CB-04).
+ *   BCB-06: ConcentrationSaveBlock has all 6 required fields on fail path (REQ-CB-12).
+ *
+ * BEHAVIOR-CHANGE NOTE (ADR-2, REQ-CID-02, Batch B):
+ *   Lethal damage (newHp===0) now breaks outright — NO save is rolled.
+ *   Response is { broke: true, reason: 'incapacitated-0hp' }, NOT a ConcentrationSaveBlock.
+ *   BCB-01..06 use newHp>0 and therefore exercise the Slice-2 save path unchanged.
+ *   The new 0-HP path is covered by CID-0HP-01..03 (in this file) and CBW-07/CBS-04/CBR-06 (break-damage file).
  *
  * Source rule: PHB p.203 — "Maintaining Concentration"
- * Design ref: sdd/engine-concentration-break-damage/design — ADR-4.
+ * Source rule: PHB p.197 — "0 HP → Unconscious → Incapacitated"
+ * Design ref: sdd/engine-concentration-break-incap-death/design — ADR-1, ADR-2.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -30,7 +35,6 @@ import { db } from '../../src/infra/db/client.js';
 import { characterConcentration, characters } from '../../src/infra/db/schema.js';
 import { randomUUID } from 'node:crypto';
 import {
-  checkConcentrationOnDamage,
   prepareConcentrationCheck,
   resolveConcentrationCheck,
   type ConcentrationPlan,
@@ -95,7 +99,7 @@ const hasConcentrationRow = async (characterId: string): Promise<boolean> => {
 
 // ── Test suite ─────────────────────────────────────────────────────────────────
 
-describe('check-concentration-on-damage — guard branches + success/fail (B1c)', () => {
+describe('prepare/resolveConcentrationCheck — guard branches + success/fail (B1c migration)', () => {
   let gm: TestUser;
   let worldId: string;
   let campaignId: string;
@@ -159,73 +163,74 @@ describe('check-concentration-on-damage — guard branches + success/fail (B1c)'
     await closeTestApp();
   });
 
-  // BCB-01: NPC target (characterId=null) → {concentrating:false}, no DB query.
-  it('BCB-01: NPC target → concentrating:false (no registry query)', async () => {
-    const result = await checkConcentrationOnDamage(
-      { kind: 'npc', characterId: null },
-      20,
-    );
-    expect(result).toEqual({ concentrating: false });
+  // BCB-01: NPC target (characterId=null) → prepare returns null (no registry query).
+  // ADR-1 guard 1: NPC → null. REQ-CB-10.
+  it('BCB-01: NPC target → prepare returns null (no registry query)', async () => {
+    const plan = await prepareConcentrationCheck({ kind: 'npc', characterId: null }, 20, 5);
+    expect(plan).toBeNull();
   });
 
-  // BCB-02: finalDamage=0 → {concentrating:false}, no save rolled.
-  it('BCB-02: finalDamage=0 → concentrating:false (no save)', async () => {
-    const result = await checkConcentrationOnDamage(
-      { kind: 'pc', characterId: pcCharId },
-      0,
-    );
-    expect(result).toEqual({ concentrating: false });
+  // BCB-02: finalDamage=0, newHp>0 → prepare returns null (zero-damage guard).
+  // ADR-1 guard 4: PHB p.203: save only triggered by damage TAKEN. REQ-CB-08.
+  // BEHAVIOR-CHANGE NOTE: with the split, this guard fires AFTER registry check but BEFORE
+  // the save branch. A non-concentrating PC with 0 damage would hit guard 2 first.
+  // This test uses a concentrating PC to reach guard 4.
+  it('BCB-02: concentrating PC + finalDamage=0 + newHp>0 → prepare returns null (zero-damage guard)', async () => {
+    await insertConcentrationRow(pcCharId);
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 0, 5);
+    expect(plan).toBeNull();
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
   });
 
-  // BCB-03: non-concentrating PC (no registry row) → {concentrating:false}.
-  it('BCB-03: non-concentrating PC → concentrating:false (no registry row)', async () => {
-    // Ensure no row exists.
+  // BCB-03: non-concentrating PC (no registry row) → prepare returns null.
+  // ADR-1 guard 2: registry SELECT → no row → null. REQ-CB-09.
+  it('BCB-03: non-concentrating PC → prepare returns null (no registry row)', async () => {
     await db
       .delete(characterConcentration)
       .where(eq(characterConcentration.characterId, pcCharId));
 
-    const result = await checkConcentrationOnDamage(
-      { kind: 'pc', characterId: pcCharId },
-      10,
-    );
-    expect(result).toEqual({ concentrating: false });
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 10, 5);
+    expect(plan).toBeNull();
   });
 
-  // BCB-04: concentrating PC + save succeeds → row intact.
+  // BCB-04: concentrating PC + damage>0 + newHp>0 → save-branch plan; resolve returns 6-field block.
   // PHB p.203: CON save total >= DC → concentration maintained.
-  // Strategy: use tiny damage (e.g. 1) so DC=10. Cleric with CON+2, prof bonus 2 →
-  // CON save = +2+2 = +4. With any d20 ≥ 6, total ≥ 10. We can't control the roll,
-  // so we loop up to 10 attempts to get at least one pass; if we always fail that's
-  // astronomically unlikely (6/20 chance each attempt). We just assert the shape.
-  // For deterministic success-path coverage we assert: when concentrating=true and
-  // success=true, the registry row is intact.
+  // BEHAVIOR-CHANGE NOTE (ADR-2): if newHp were 0 instead of 5, plan.breakOutright would be true
+  // and resolve would return { broke:true, reason:'incapacitated-0hp' } — no save block.
+  // This test uses newHp=5 to exercise the Slice-2 save path unchanged.
   it('BCB-04: concentrating PC + save result shape has all 6 fields (REQ-CB-12)', async () => {
     await insertConcentrationRow(pcCharId);
 
-    // Damage 1 → DC = max(10, floor(1/2)) = 10. Cleric L1 CON+2, con-save proficiency → +4.
-    // Expected: {concentrating:true, save:{dc,d20,total,saveMod,success,broke}}.
-    const result = await checkConcentrationOnDamage(
-      { kind: 'pc', characterId: pcCharId },
-      1,
-    );
+    // damage=1, newHp=5 → guard 3 (0-HP) skipped, guard 4 (zero-damage) skipped.
+    // DC = max(10, floor(1/2)) = 10. Fighter L1 CON+2, CON-save proficiency → +4.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 1, 5);
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(false);
 
-    // The result must be concentrating:true (we have a row, damage>0).
-    expect(result.concentrating).toBe(true);
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
 
-    if (result.concentrating) {
-      // REQ-CB-12: all 6 sub-fields must be present.
-      expect(typeof result.save.dc).toBe('number');
-      expect(typeof result.save.d20).toBe('number');
-      expect(typeof result.save.total).toBe('number');
-      expect(typeof result.save.saveMod).toBe('number');
-      expect(typeof result.save.success).toBe('boolean');
-      expect(typeof result.save.broke).toBe('boolean');
+    expect(resolution).not.toBeUndefined();
+    // Must be a ConcentrationSaveBlock (not an outright-break object).
+    const r = resolution as Record<string, unknown>;
+    // REQ-CB-12: all 6 sub-fields must be present.
+    expect(typeof r['dc']).toBe('number');
+    expect(typeof r['d20']).toBe('number');
+    expect(typeof r['total']).toBe('number');
+    expect(typeof r['saveMod']).toBe('number');
+    expect(typeof r['success']).toBe('boolean');
+    expect(typeof r['broke']).toBe('boolean');
 
-      // PHB p.203: DC = max(10, floor(finalDamage/2)) = max(10, 0) = 10.
-      expect(result.save.dc).toBe(10);
-      // success and broke are inverses (V1 — no War Caster nuance).
-      expect(result.save.broke).toBe(!result.save.success);
-    }
+    // PHB p.203: DC = max(10, floor(1/2)) = 10.
+    expect(r['dc']).toBe(10);
+    // success and broke are inverses (V1 — no War Caster nuance).
+    expect(r['broke']).toBe(!r['success']);
+
+    // BEHAVIOR-CHANGE ASSERTION (ADR-2): the outright-break shape is NOT a ConcentrationSaveBlock.
+    // Verify this is the save-branch shape (has 'd20' field) NOT the outright shape.
+    expect('reason' in r).toBe(false); // outright shape has `reason: 'incapacitated-0hp'`
 
     // Clean up for subsequent tests (whether row was deleted or not).
     await db
@@ -233,49 +238,53 @@ describe('check-concentration-on-damage — guard branches + success/fail (B1c)'
       .where(eq(characterConcentration.characterId, pcCharId));
   });
 
-  // BCB-05: concentrating PC + forced-fail path: use extreme damage so DC > max possible total.
-  // DC = max(10, floor(damage/2)). Fighter L1 CON+2 + CON-save prof+2 = +4 total.
-  // Max total with natural 20 = 24. Use damage=100 → DC=50 > 24 → guaranteed fail.
-  it('BCB-05: concentrating PC + save fails → broke=true, registry row deleted (REQ-CB-04)', async () => {
+  // BCB-05: concentrating PC + guaranteed DC fail → broke=true, registry row deleted.
+  // DC = max(10, floor(100/2)) = 50. Fighter L1 max save = 20+4 = 24 < 50 → guaranteed FAIL.
+  // BEHAVIOR-CHANGE NOTE (ADR-2): if newHp were 0, this would be an outright break (no save).
+  // newHp=5 ensures we exercise the save-fail path.
+  it('BCB-05: concentrating PC + save fails (newHp=5) → broke=true, registry deleted (REQ-CB-04)', async () => {
     await insertConcentrationRow(pcCharId);
     expect(await hasConcentrationRow(pcCharId)).toBe(true);
 
-    // damage=100 → DC=50; CON save max = d20(20) + CON(+2) + prof(+2) = 24 < 50 → guaranteed FAIL.
-    const result = await checkConcentrationOnDamage(
-      { kind: 'pc', characterId: pcCharId },
-      100,
-    );
+    // damage=100, newHp=5 → save-branch, DC=50.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 100, 5);
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(false);
 
-    expect(result.concentrating).toBe(true);
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
 
-    if (result.concentrating) {
-      expect(result.save.dc).toBe(50);
-      expect(result.save.success).toBe(false);
-      expect(result.save.broke).toBe(true);
-    }
+    const r = resolution as Record<string, unknown>;
+    expect(r['dc']).toBe(50);
+    expect(r['success']).toBe(false);
+    expect(r['broke']).toBe(true);
 
     // REQ-CB-04: registry row must be deleted on break.
     expect(await hasConcentrationRow(pcCharId)).toBe(false);
   });
 
   // BCB-06: re-verify shape completeness on the guaranteed-fail path.
-  it('BCB-06: ConcentrationSaveBlock has all 6 required fields on fail path', async () => {
+  it('BCB-06: ConcentrationSaveBlock has all 6 required fields on fail path (REQ-CB-12)', async () => {
     await insertConcentrationRow(pcCharId);
 
-    const result = await checkConcentrationOnDamage(
-      { kind: 'pc', characterId: pcCharId },
-      100,
-    );
+    // damage=100, newHp=5 → save-branch, DC=50 → guaranteed fail.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 100, 5);
+    expect(plan).not.toBeNull();
 
-    if (result.concentrating) {
-      const keys = Object.keys(result.save);
-      expect(keys).toContain('dc');
-      expect(keys).toContain('d20');
-      expect(keys).toContain('total');
-      expect(keys).toContain('saveMod');
-      expect(keys).toContain('success');
-      expect(keys).toContain('broke');
-    }
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
+
+    const r = resolution as Record<string, unknown>;
+    expect(Object.keys(r)).toContain('dc');
+    expect(Object.keys(r)).toContain('d20');
+    expect(Object.keys(r)).toContain('total');
+    expect(Object.keys(r)).toContain('saveMod');
+    expect(Object.keys(r)).toContain('success');
+    expect(Object.keys(r)).toContain('broke');
 
     // Cleanup.
     await db
@@ -504,5 +513,153 @@ describe('prepareConcentrationCheck + resolveConcentrationCheck — Batch A1 gua
     // If broke, row is deleted; if pass, row still exists. Either is valid.
     // Just clean up.
     await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+  });
+});
+
+// ── B6 suite: REQ-CID-02 unit-level — 0-HP outright break via prepare/resolve ─
+//
+// PHB p.197: 0 HP → Unconscious → Incapacitated → concentration ends (no save required).
+// PHB p.203: Concentration ends on incapacitation.
+// ADR-2: the outright-break shape is { broke: true, reason: 'incapacitated-0hp' } — NO dc/d20 fields.
+// This suite exercises the prepare/resolve split at unit level (not via HTTP).
+// HTTP-level 0-HP tests are in engine-concentration-break-damage.test.ts (CBW-07, CBS-04, CBR-06).
+
+describe('REQ-CID-02 — 0-HP outright break (no save) via prepare/resolve', () => {
+  let gm: TestUser;
+  let worldId: string;
+  let pcCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    gm = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { name: 'CID-0HP unit test campaign' },
+      })
+      .then((r) => r.json());
+    worldId = campaign.worldId;
+
+    pcCharId = await (async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Ryn (CID-0HP test)' },
+      });
+      if (res.statusCode !== 201) throw new Error(`makeChar: ${res.statusCode} ${res.body}`);
+      const charId = res.json<{ id: string }>().id;
+
+      // Fighter L1 — CON save proficient (CON+2, prof+2 = +4).
+      const statsRes = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/stats`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          method: 'standard-array',
+          scores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+        },
+      });
+      if (statsRes.statusCode !== 200 && statsRes.statusCode !== 201)
+        throw new Error(`set-stats: ${statsRes.statusCode} ${statsRes.body}`);
+      const classRes = await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/class`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          class: { slug: 'fighter', source: 'PHB' },
+          level: 1,
+          skillChoices: ['athletics', 'perception'],
+        },
+      });
+      if (classRes.statusCode !== 200 && classRes.statusCode !== 201)
+        throw new Error(`set-class: ${classRes.statusCode} ${classRes.body}`);
+      return charId;
+    })();
+  });
+
+  afterAll(async () => {
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+    if (gm) await deleteTestUser(gm.id);
+  });
+
+  // CID-0HP-01: concentrating PC + newHp===0 + finalDamage>0 →
+  //   prepare returns { breakOutright: true }, resolve returns { broke: true, reason: 'incapacitated-0hp' }.
+  //   NO save rolled. Registry row deleted.
+  // PHB p.197/p.203. REQ-CID-02.
+  it('CID-0HP-01: concentrating PC + newHp===0 → outright break, no save, row deleted (REQ-CID-02)', async () => {
+    // Insert concentration row.
+    await db
+      .insert(characterConcentration)
+      .values({
+        characterId: pcCharId,
+        concentrationToken: randomUUID(),
+        store: 'modifier_instances',
+        spellName: 'Bless',
+      })
+      .onConflictDoUpdate({
+        target: characterConcentration.characterId,
+        set: { concentrationToken: randomUUID(), store: 'modifier_instances', spellName: 'Bless' },
+      });
+
+    const [registryBefore] = await db
+      .select({ characterId: characterConcentration.characterId })
+      .from(characterConcentration)
+      .where(eq(characterConcentration.characterId, pcCharId))
+      .limit(1);
+    expect(registryBefore).not.toBeUndefined();
+
+    // PREPARE: finalDamage=20, newHp=0 → guard 3 fires → breakOutright:true.
+    // (Guard 2 — registry SELECT — passes because row exists.)
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 20, 0);
+
+    // ADR-2: plan must be breakOutright:true with no dc/saveBonus.
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(true);
+    expect(plan!.characterId).toBe(pcCharId);
+    expect('dc' in plan!).toBe(false);
+    expect('saveBonus' in plan!).toBe(false);
+
+    // RESOLVE inside a tx: breakConcentration fires inside tx (REQ-CID-04).
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
+
+    // ADR-2 response: { broke: true, reason: 'incapacitated-0hp' } — no d20/dc fields.
+    expect(resolution).toEqual({ broke: true, reason: 'incapacitated-0hp' });
+
+    // REQ-CID-02: registry row MUST be deleted (outright break, no save).
+    const [registryAfter] = await db
+      .select({ characterId: characterConcentration.characterId })
+      .from(characterConcentration)
+      .where(eq(characterConcentration.characterId, pcCharId))
+      .limit(1);
+    expect(registryAfter).toBeUndefined();
+  });
+
+  // CID-0HP-02: non-concentrating PC + newHp===0 → prepare returns null.
+  //   PHB p.197/p.203 still applies, but the PC was not concentrating — no-op.
+  //   REQ-CID-02 scenario "Non-concentrating PC takes lethal damage".
+  it('CID-0HP-02: non-concentrating PC + newHp===0 → prepare returns null (no concentration — REQ-CID-02)', async () => {
+    // Ensure NO concentration row.
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+
+    // finalDamage=20, newHp=0 → guard 2 (no registry row) fires before guard 3.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 20, 0);
+
+    // Guard 2 (registry) fires first → null. breakOutright path is never reached.
+    expect(plan).toBeNull();
+  });
+
+  // CID-0HP-03: NPC + newHp===0 → prepare returns null (NPC guard 1).
+  //   REQ-CID-02 scenario "NPC takes lethal damage".
+  it('CID-0HP-03: NPC + newHp===0 → prepare returns null (NPC guard 1 — REQ-CID-02)', async () => {
+    const plan = await prepareConcentrationCheck({ kind: 'npc', characterId: null }, 20, 0);
+    // Guard 1 (NPC/characterId=null) fires immediately → null.
+    expect(plan).toBeNull();
   });
 });
