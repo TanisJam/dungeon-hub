@@ -524,7 +524,7 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       );
       expect(resolveRes.statusCode).toBe(200);
       const resolveBody = resolveRes.json();
-      expect(resolveBody.spelCountered).toBe(true);
+      expect(resolveBody.spellCountered).toBe(true);
       expect(resolveBody.damageApplied).toBe(0);
 
       // Target HP UNCHANGED — spell cancelled, zero damage (PHB p.281 + C-1 planted proof).
@@ -988,8 +988,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       const body = resolveRes.json();
 
       // Auto-counter: MM level 1 vs Counterspell slot 3 → always countered.
-      // spelCountered===true → damageApplied===0 (server-authority wins over any client fields).
-      expect(body.spelCountered).toBe(true);
+      // spellCountered===true → damageApplied===0 (server-authority wins over any client fields).
+      expect(body.spellCountered).toBe(true);
       expect(body.damageApplied).toBe(0); // spell CANCELLED — planted 42 is ignored because spell is negated
 
       // Target HP unchanged (spell cancelled).

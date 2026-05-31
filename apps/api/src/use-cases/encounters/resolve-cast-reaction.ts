@@ -167,7 +167,7 @@ export type ResolveCastReactionResult =
       ok: true;
       shieldCast: boolean;
       /** Whether the counterspell succeeded (true = spell CANCELLED). */
-      spelCountered?: boolean;
+      spellCountered?: boolean;
       /** Defender's HP after resolve (unchanged on cast-shield, decreased on decline). */
       newHp: number;
       /** Server-rolled total damage applied (0 on cast-shield/counter-success, server-rolled on decline/counter-fail). */
@@ -653,7 +653,7 @@ export async function resolveCastReaction(
   return {
     ok: true,
     shieldCast: false,
-    spelCountered: countered,
+    spellCountered: countered,
     newHp: newTargetHp,
     damageApplied,
   };

@@ -1024,7 +1024,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
     version: z.number().int().nonnegative(),
     // cast-counterspell fields (optional for backward-compat; required when reactionDecision === 'cast-counterspell').
     counterspellerCombatantId: z.string().uuid().optional(),
-    slotLevel: z.number().int().min(1).optional(),
+    slotLevel: z.number().int().min(1).max(9).optional(),
     // Zod strips unknown keys — any client-injected damage/roll field is silently dropped (C-1).
   });
 
@@ -1104,7 +1104,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
 
       return reply.code(200).send({
         shieldCast: result.shieldCast,
-        spelCountered: result.spelCountered,
+        spellCountered: result.spellCountered,
         newHp: result.newHp,
         damageApplied: result.damageApplied,
       });
