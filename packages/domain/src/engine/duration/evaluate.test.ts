@@ -334,3 +334,61 @@ describe('evaluateDuration — turn-anchor branch (REQ-DUR-01, REQ-DUR-02, REQ-D
     expect(evaluateDuration(inst, makeCtx({ encounterRound: 5 }))).toBe(true);
   });
 });
+
+// ── Branch-order guard: Branch 4 (turn-anchor) sits BEFORE Branch 7 (absolute-round) ─────────
+//
+// ADR-2 (sdd/engine-unified-duration-evaluator/design): Branch 4 MUST precede branches 5-7.
+// A turn-anchored effect expires on a TURN BOUNDARY, not a round count — if it fell into the
+// absolute-round branch the semantics would be wrong.
+//
+// These tests construct instances where Branch 4 and Branch 7 give DIFFERENT answers, so they
+// will FAIL if Branch 4 is deleted or reordered AFTER Branch 7.
+//
+// PHB p.189: "lasts until the end of your next turn" — turn-boundary expiry, not round-count.
+
+describe('evaluateDuration — Branch 4 order guard: turn-anchor wins over absolute-round (ADR-2)', () => {
+  it('Scenario 7.8 — EXPIRED via Branch 4 even though absolute-round would return ACTIVE', () => {
+    // Branch 4 answer: turnsRemaining=0 + boundary=end + currentCombatantId matches anchor
+    //   → return false (EXPIRED).
+    // Branch 7 answer (if Branch 4 were removed or came after): startRound=5, encounterRound=5
+    //   → elapsed=0 < convertToRounds({ unit:'minute', amount:10 })=100 → return true (ACTIVE).
+    // The two branches disagree. Asserting false DEPENDS on Branch 4 firing first.
+    // If Branch 4 were removed or ordered after Branch 7, this test would receive true → FAIL.
+    // PHB p.189 + ADR-2: turn-boundary expiry takes precedence over elapsed-round computation.
+    const inst = makeInstance({
+      duration: makeDuration({
+        unit: 'minute',
+        amount: 10, // 100 rounds → absolute-round branch would say ACTIVE at elapsed=0
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 0,
+      startRound: 5,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc', encounterRound: 5 });
+    // Branch 4 fires: EXPIRED (counter exhausted on anchor's turn-end boundary).
+    // Branch 7 would have returned: true (elapsed 0 < 100). Branches disagree → test guards order.
+    expect(evaluateDuration(inst, ctx)).toBe(false);
+  });
+
+  it('Scenario 7.9 — ACTIVE via Branch 4 even though absolute-round would return EXPIRED', () => {
+    // Branch 4 answer: turnsRemaining=1 (counter not exhausted) → return true (ACTIVE).
+    // Branch 7 answer (if Branch 4 were removed or came after): startRound=0, encounterRound=200
+    //   → elapsed=200 >= convertToRounds({ unit:'minute', amount:10 })=100 → return false (EXPIRED).
+    // Asserting true DEPENDS on Branch 4 firing first.
+    // If Branch 4 were removed or ordered after Branch 7, this test would receive false → FAIL.
+    // PHB p.189 + ADR-2: turn-boundary active status takes precedence over elapsed-round expiry.
+    const inst = makeInstance({
+      duration: makeDuration({
+        unit: 'minute',
+        amount: 10, // 100 rounds → absolute-round branch says EXPIRED at elapsed=200
+        turnAnchor: { anchorCombatantId: 'cmb-abc', boundary: 'end' },
+      }),
+      turnsRemaining: 1,
+      startRound: 0,
+    });
+    const ctx = makeCtx({ currentCombatantId: 'cmb-abc', encounterRound: 200 });
+    // Branch 4 fires: ACTIVE (turnsRemaining=1, counter not yet exhausted).
+    // Branch 7 would have returned: false (elapsed 200 >= 100). Branches disagree → test guards order.
+    expect(evaluateDuration(inst, ctx)).toBe(true);
+  });
+});
