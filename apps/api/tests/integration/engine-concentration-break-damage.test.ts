@@ -29,8 +29,10 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 import { db } from '../../src/infra/db/client.js';
 import {
   characterConcentration,
+  characters,
   encounterCombatantConditions,
   encounterCombatants,
+  encounters,
 } from '../../src/infra/db/schema.js';
 import { randomUUID } from 'node:crypto';
 
@@ -110,6 +112,28 @@ const clearConditions = async (combatantId: string): Promise<void> => {
   await db
     .delete(encounterCombatantConditions)
     .where(eq(encounterCombatantConditions.combatantId, combatantId));
+};
+
+/** Plant a pending_cast directly in DB (for server-authority / counterspell tests). */
+const plantPendingCast = async (
+  encounterId: string,
+  pendingCast: Record<string, unknown>,
+): Promise<void> => {
+  await db
+    .update(encounters)
+    .set({ pendingCast, updatedAt: new Date() })
+    .where(eq(encounters.id, encounterId));
+};
+
+/** Set spellSlotsUsed directly on a character (for test setup/reset). */
+const setSlotsUsed = async (charId: string, slotsUsed: number[]): Promise<void> => {
+  const [row] = await db.select().from(characters).where(eq(characters.id, charId)).limit(1);
+  if (!row) return;
+  const data = row.data as Record<string, unknown>;
+  await db
+    .update(characters)
+    .set({ data: { ...data, spellSlotsUsed: slotsUsed }, updatedAt: new Date() })
+    .where(eq(characters.id, charId));
 };
 
 /** Reset spellSlotsUsed to all zeros for a character (restores spell slots for re-use). */
@@ -231,9 +255,13 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
   // fighterCharId: Fighter L1, CON+2, CON-save prof → save mod +4.
   // casterCharId: Wizard L1 (for MM cast tests).
   // wizardTargetCharId: Wizard L1 target (has 1st-level slots → canShield=true → suspend path).
+  // counterspellerL5CharId: Wizard L5, INT 16 (for CBR-04/05 counterspell-resolve arm tests — counterspell role).
+  // casterL7CharId: Wizard L7, INT 16 (for CBR-04 — casts at spellLevel=4; Wizard L7 has 1 L4 slot per PHB table).
   let fighterCharId: string;
   let casterCharId: string;
   let wizardTargetCharId: string;
+  let counterspellerL5CharId: string;
+  let casterL7CharId: string;
   let longswordInstanceId: string;
 
   beforeAll(async () => {
@@ -254,6 +282,82 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     fighterCharId = await makeCharacterWithCon(app, gm.accessToken, worldId, 'Torinn (conc-break)');
     casterCharId = await makeWizardL1(app, gm.accessToken, worldId, 'Elara (caster)');
     wizardTargetCharId = await makeWizardL1(app, gm.accessToken, worldId, 'Merric (wizard-target)');
+
+    // ── Counterspeller: Wizard L5, INT 16 (for CBR-04/05 counterspell-resolve arm tests).
+    // Wizard L5 slotsMax = [4,3,2,1,0,0,0,0,0] — has 3rd-level slots.
+    // Created via POST + PATCH to bypass PUT /class subclass requirement for L5 Wizard.
+    const csChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Valdris (counterspeller L5)' },
+      })
+      .then((r) => r.json<{ id: string }>());
+    counterspellerL5CharId = csChar.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${counterspellerL5CharId}`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'wizard',
+              source: 'PHB',
+              level: 5,
+              hitDie: 'd6',
+              subclass: null,
+              savingThrows: ['int', 'wis'],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          baseStats: { str: 8, dex: 14, con: 12, int: 16, wis: 12, cha: 10 },
+          spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        },
+      },
+    });
+
+    // ── Caster L7: Wizard L7, INT 16 (for CBR-04 — casts at spellLevel=4 so DC-check fires).
+    // Uses PATCH to set data directly (bypasses PUT /class subclass guard for L7).
+    // Wizard L7 slotsMax = [4,3,3,1,0,0,0,0,0] per PHB table (1 fourth-level slot at index 3).
+    const cL7Char = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Lyra (caster L7)' },
+      })
+      .then((r) => r.json<{ id: string }>());
+    casterL7CharId = cL7Char.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${casterL7CharId}`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'wizard',
+              source: 'PHB',
+              level: 7,
+              hitDie: 'd6',
+              subclass: null,
+              savingThrows: ['int', 'wis'],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          baseStats: { str: 8, dex: 14, con: 12, int: 16, wis: 12, cha: 10 },
+          spellSlotsUsed: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        },
+      },
+    });
 
     // Get longsword instance for weapon attack tests.
     await expectOk(
@@ -291,6 +395,16 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     await db
       .delete(characterConcentration)
       .where(eq(characterConcentration.characterId, wizardTargetCharId));
+    if (counterspellerL5CharId) {
+      await db
+        .delete(characterConcentration)
+        .where(eq(characterConcentration.characterId, counterspellerL5CharId));
+    }
+    if (casterL7CharId) {
+      await db
+        .delete(characterConcentration)
+        .where(eq(characterConcentration.characterId, casterL7CharId));
+    }
     await deleteTestUser(gm.id);
     await closeTestApp();
   });
@@ -1035,7 +1149,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           ...(opts.counterspellerCombatantId
             ? {
                 counterspellerCombatantId: opts.counterspellerCombatantId,
-                counterspellSlotLevel: opts.counterspellSlotLevel ?? 3,
+                slotLevel: opts.counterspellSlotLevel ?? 3,
               }
             : {}),
         },
@@ -1208,40 +1322,192 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
       expect(body).not.toHaveProperty('concentrationSave');
     });
 
-    // CBR-04: COUNTERSPELL-RESOLVE arm + !countered → concentration check fires.
-    it('CBR-04: counterspell fails (spell resolves) → concentrationSave present (REQ-CB-06)', async () => {
-      const enc = await makeReactionEncounter({
-        targetCharId: fighterCharId,
+    // CBR-04: COUNTERSPELL-RESOLVE arm + countered=false (DC check fails) →
+    // spell resolves, damage applies, concentration check fires on concentrating target.
+    //
+    // PHB p.281: "If it is casting a spell of 4th level or higher, make an ability check
+    //   using your spellcasting ability. The DC equals 10 + the spell's level."
+    //   Counterspell L3 vs spell L4 → DC = 10+4 = 14. Wizard L5 INT 16 (+3) → d20+3 ≥ 14
+    //   → d20 ≥ 11 → P(fail, countered=false) ≈ 50%. Retry loop until we see countered=false.
+    //
+    // REQ-CB-06: COUNTERSPELL-RESOLVE arm wires checkConcentrationOnDamage (B2d wiring).
+    // Setup: wizardTargetCharId (Wizard L1, concentrating) as target.
+    //        counterspellerL5CharId (Wizard L5, INT 16) as counterspeller.
+    //        casterL7CharId (Wizard L7) as caster — Wizard L7 has 1 L4 slot (PHB table) needed by spellLevel=4.
+    //        spellLevel 4 planted via plantPendingCast → DC-check path fires (L4 > CS slot L3).
+    it('CBR-04: counterspell DC-check fails (countered=false) → concentrationSave present on concentrating target (REQ-CB-06)', async () => {
+      let sawCounteredFalse = false;
+
+      for (let attempt = 0; attempt < 60; attempt++) {
+        // Reset slots for casterL7 (L4 slot index=3) and counterspeller (L3 slot index=2).
+        await setSlotsUsed(casterL7CharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        await setSlotsUsed(counterspellerL5CharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        const freshEnc = await makeReactionEncounter({
+          targetCharId: wizardTargetCharId,
+          targetHp: 200,
+          casterCharId: casterL7CharId,
+          includeCounterspeller: true,
+          counterspellerCharId: counterspellerL5CharId,
+        });
+
+        // Plant a concentration row on the target.
+        await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+        await insertConcentrationRow(wizardTargetCharId);
+
+        // Suspend cast (wizardTargetCharId has L1 slots → canShield=true + counterspellerL5 present → suspend path).
+        const suspendRes = await suspendCast(
+          freshEnc.encounterId,
+          freshEnc.casterCombatantId,
+          freshEnc.targetCombatantId,
+          freshEnc.version,
+        );
+        if (suspendRes.statusCode !== 200) continue;
+        const sBody = suspendRes.json<Record<string, unknown>>();
+        if (!sBody['castAnnounced']) continue;
+
+        // Plant spellLevel=4 in pending_cast so DC-check path fires (L4 > CS slot L3).
+        // PHB p.281: "If it is casting a spell of 4th level or higher, make an ability check."
+        // serverRolledDamage.total: 9 (deterministic, matches CBR-01 style).
+        await plantPendingCast(freshEnc.encounterId, {
+          casterCombatantId: freshEnc.casterCombatantId,
+          spellName: 'Magic Missile',
+          spellLevel: 4,
+          targets: [freshEnc.targetCombatantId],
+          dartCount: 3,
+          serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
+          encVersion: freshEnc.version,
+        });
+
+        const resolveVersion = await getEncounterVersion(freshEnc.encounterId, gm.accessToken);
+        const resolveRes = await resolveReaction(
+          freshEnc.encounterId,
+          freshEnc.targetCombatantId,
+          resolveVersion,
+          {
+            reactionDecision: 'cast-counterspell',
+            counterspellerCombatantId: freshEnc.counterspellerCombatantId,
+            counterspellSlotLevel: 3,
+          },
+        );
+        if (resolveRes.statusCode !== 200) continue;
+        const body = resolveRes.json<Record<string, unknown>>();
+
+        // We want the countered=false branch (spell resolved, damage applied).
+        if (body['spellCountered'] !== false) continue;
+
+        // PHB p.281 / REQ-CB-06: spell resolved → damage applied → concentration check must fire.
+        sawCounteredFalse = true;
+        expect(resolveRes.statusCode).toBe(200);
+        expect(body['spellCountered']).toBe(false);
+        expect((body['damageApplied'] as number)).toBeGreaterThan(0);
+
+        // REQ-CB-01 shape: concentrationSave present with full block.
+        expect(body).toHaveProperty('concentrationSave');
+        const cs = body['concentrationSave'] as Record<string, unknown>;
+        expect(typeof cs['dc']).toBe('number');
+        expect(typeof cs['d20']).toBe('number');
+        expect(typeof cs['total']).toBe('number');
+        expect(typeof cs['saveMod']).toBe('number');
+        expect(typeof cs['success']).toBe('boolean');
+        expect(typeof cs['broke']).toBe('boolean');
+
+        // REQ-CB-02: DC = max(10, floor(finalDamage/2)). finalDamage=damageApplied=9 → DC=max(10,4)=10.
+        const expectedDc = Math.max(10, Math.floor((body['damageApplied'] as number) / 2));
+        expect(cs['dc']).toBe(expectedDc);
+
+        break;
+      }
+
+      expect(sawCounteredFalse).toBe(true);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+    }, 240000);
+
+    // CBR-05: COUNTERSPELL-RESOLVE arm + countered=true (auto-counter) →
+    // spell cancelled, finalDamage=0, concentrationSave absent, concentration row intact.
+    //
+    // PHB p.281: "If the creature is casting a spell of 3rd level or lower, its spell fails
+    //   and has no effect." Counterspell L3 vs MM L1 → auto-counter (no DC check).
+    //   countered=true → finalDamage=0 → checkConcentrationOnDamage guard 2: return early.
+    //
+    // REQ-CB-08: finalDamage=0 → concentrationSave absent (omit-not-null — backward-compat).
+    // Setup: wizardTargetCharId (Wizard L1, concentrating) as target.
+    //        counterspellerL5CharId (Wizard L5) as counterspeller.
+    //        spellLevel 1 → auto-counter (countered=true guaranteed by PHB p.281).
+    it('CBR-05: spell auto-countered (countered=true, damage=0) → concentrationSave absent, registry row intact (REQ-CB-08)', async () => {
+      await resetSlots(casterCharId);
+      await setSlotsUsed(counterspellerL5CharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+      const freshEnc = await makeReactionEncounter({
+        targetCharId: wizardTargetCharId,
         targetHp: 200,
         casterCharId,
         includeCounterspeller: true,
-        counterspellerCharId: fighterCharId,  // reuse fighter as counterspeller (different enc role)
+        counterspellerCharId: counterspellerL5CharId,
       });
 
-      // Actually fighter can't be both target and counterspeller. We need a third character.
-      // Skip this test if no second PC is available beyond caster+target.
-      // The encounter factory puts casterCharId as caster, fighterCharId as target.
-      // We need a counterspeller who is a DIFFERENT character with 3rd-level slots.
-      // Since we only have fighter (no slots) and wizard (caster), skip this test.
-      // The counterspell path will be covered by existing CS-T1/CS-T2 (engine-counterspell.test.ts).
-      // We assert the existing behavior: when countered=false (decline), concentration fires.
-      // Actually CBR-04 maps to the "decline" scenario which is already covered by CBR-01..03.
-      // The counterspell-resolve NOT-countered arm fires when countered===false in resolve-cast-reaction.
-      // Without a separate counterspeller character, we can't exercise that arm here.
-      // This test documents the intent; mark as covered by CBR-01 + the existing CS tests.
-      // For completeness, we assert that the DECLINE arm fires the check (already done in CBR-01..03).
-      expect(true).toBe(true);
-    });
+      // Plant a concentration row on the target.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+      await insertConcentrationRow(wizardTargetCharId);
+      expect(await hasConcentrationRow(wizardTargetCharId)).toBe(true);
 
-    // CBR-05: COUNTERSPELL countered=true → no concentration check (finalDamage=0 no-op).
-    it('CBR-05: spell countered → damageApplied=0, concentrationSave absent (REQ-CB-08)', async () => {
-      // Use existing counterspell tests pattern. We need a third PC with 3rd-level slots.
-      // Without a counterspeller setup, we can't reach this path here.
-      // This is covered by the existing CS-T1 test (countered → HP unchanged).
-      // Mark as documented coverage gap — real scenario covered by CBR-03 (0 damage → no save).
-      // Assert: damage=0 → concentrationSave absent (guard 2 in checkConcentrationOnDamage).
-      // The helper unit test BCB-02 covers this path directly.
-      expect(true).toBe(true);
-    });
+      // Suspend cast (MM L1).
+      const suspendRes = await suspendCast(
+        freshEnc.encounterId,
+        freshEnc.casterCombatantId,
+        freshEnc.targetCombatantId,
+        freshEnc.version,
+      );
+      expect(suspendRes.statusCode).toBe(200);
+      const sBody = suspendRes.json<Record<string, unknown>>();
+
+      if (!sBody['castAnnounced']) {
+        // Went atomic (no eligible counterspeller detected by server) — this shouldn't happen
+        // since counterspellerL5 is in the encounter. Fail with a clear error.
+        await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+        throw new Error('Expected suspend path (castAnnounced) for CBR-05, got atomic path. Counterspeller L5 may not have been detected.');
+      }
+
+      // Plant spellLevel=1 (Magic Missile L1) → Counterspell L3 auto-counters (PHB p.281).
+      // serverRolledDamage set to a non-zero value to prove it's NEVER applied when countered=true.
+      await plantPendingCast(freshEnc.encounterId, {
+        casterCombatantId: freshEnc.casterCombatantId,
+        spellName: 'Magic Missile',
+        spellLevel: 1,
+        targets: [freshEnc.targetCombatantId],
+        dartCount: 3,
+        serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
+        encVersion: freshEnc.version,
+      });
+
+      const resolveVersion = await getEncounterVersion(freshEnc.encounterId, gm.accessToken);
+      const resolveRes = await resolveReaction(
+        freshEnc.encounterId,
+        freshEnc.targetCombatantId,
+        resolveVersion,
+        {
+          reactionDecision: 'cast-counterspell',
+          counterspellerCombatantId: freshEnc.counterspellerCombatantId,
+          counterspellSlotLevel: 3,
+        },
+      );
+      expect(resolveRes.statusCode).toBe(200);
+      const body = resolveRes.json<Record<string, unknown>>();
+
+      // PHB p.281: spell of 3rd level or lower vs Counterspell 3rd → auto-counter.
+      expect(body['spellCountered']).toBe(true);
+      expect(body['damageApplied']).toBe(0);
+
+      // REQ-CB-08: finalDamage=0 → concentrationSave ABSENT (key omitted — omit-not-null).
+      expect(body).not.toHaveProperty('concentrationSave');
+
+      // Concentration row UNCHANGED — no break triggered (damage=0 short-circuits the check).
+      expect(await hasConcentrationRow(wizardTargetCharId)).toBe(true);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, wizardTargetCharId));
+    }, 60000);
   });
 });
