@@ -17,9 +17,13 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
+import { db } from '../../src/infra/db/client.js';
+import { characterConcentration } from '../../src/infra/db/schema.js';
+import { randomUUID } from 'node:crypto';
 
 describe('engine-forced-check — POST /encounters/:id/actions/forced-check', () => {
   let gm: TestUser;
@@ -747,6 +751,182 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
       expect(res.statusCode).toBe(400);
       expect(res.json().error).toBe('VALIDATION_FAILED');
       expect(res.json().issues.some((i: { code: string }) => i.code === 'UNKNOWN_CONDITION')).toBe(true);
+    },
+  );
+
+  // ── CID-INCAP tests: concentration break on incapacitation (REQ-CID-01, ADR-4, Batch A2) ──
+  //
+  // PHB p.203: concentration ends when the caster becomes Incapacitated.
+  // PHB pp.291–292: Stunned, Petrified, Paralyzed, Unconscious all imply Incapacitated.
+  // The hook fires AFTER applyConditions (best-effort post-apply, no mini-tx — ADR-4).
+  //
+  // RED: these tests are written before the hook is wired into performForcedCheck.
+
+  /** Insert a concentration row directly for test setup. */
+  const insertConcentrationRow = async (characterId: string): Promise<void> => {
+    await db
+      .insert(characterConcentration)
+      .values({
+        characterId,
+        concentrationToken: randomUUID(),
+        store: 'modifier_instances',
+        spellName: 'Bless',
+      })
+      .onConflictDoUpdate({
+        target: characterConcentration.characterId,
+        set: {
+          concentrationToken: randomUUID(),
+          store: 'modifier_instances',
+          spellName: 'Bless',
+        },
+      });
+  };
+
+  /** Check if a concentration row exists for the given characterId. */
+  const hasConcentrationRow = async (characterId: string): Promise<boolean> => {
+    const [row] = await db
+      .select({ characterId: characterConcentration.characterId })
+      .from(characterConcentration)
+      .where(eq(characterConcentration.characterId, characterId))
+      .limit(1);
+    return row !== undefined;
+  };
+
+  it(
+    'CID-INCAP-01: concentrating PC + Stunned applied (dual-inserts Incapacitated) → concentration row deleted (REQ-CID-01)',
+    async () => {
+      // PHB p.292: Stunned implies Incapacitated (dual-insert on fail).
+      // PHB p.203: Incapacitated → concentration ends.
+      // Setup: insert concentration row for fighter, then apply Stunned (DC=30 → guaranteed fail).
+      const app = await getTestApp();
+      const { encounterId, fighterId } = await makeFreshEncounter(app, 'CID-INCAP-01 Stunned breaks conc');
+
+      await insertConcentrationRow(fighterCharId);
+      expect(await hasConcentrationRow(fighterCharId)).toBe(true);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: fighterId,
+          ability: 'con',
+          dc: 30, // impossible to pass → guaranteed fail → Stunned + Incapacitated applied
+          conditionOnFail: 'Stunned',
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe('fail');
+      expect(body.applied).toContain('Stunned');
+      expect(body.applied).toContain('Incapacitated');
+
+      // REQ-CID-01: concentration row MUST be deleted after Incapacitated is applied.
+      expect(await hasConcentrationRow(fighterCharId)).toBe(false);
+    },
+  );
+
+  it(
+    'CID-INCAP-02: concentrating PC + direct Incapacitated applied → concentration row deleted (REQ-CID-01)',
+    async () => {
+      // PHB p.203: Incapacitated → concentration ends.
+      // Apply Incapacitated directly (not via dual-insert from Stunned).
+      const app = await getTestApp();
+      const { encounterId, fighterId } = await makeFreshEncounter(app, 'CID-INCAP-02 direct Incapacitated breaks conc');
+
+      await insertConcentrationRow(fighterCharId);
+      expect(await hasConcentrationRow(fighterCharId)).toBe(true);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: fighterId,
+          ability: 'con',
+          dc: 30, // guaranteed fail
+          conditionOnFail: 'Incapacitated',
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe('fail');
+      expect(body.applied).toContain('Incapacitated');
+
+      // REQ-CID-01: concentration row MUST be deleted.
+      expect(await hasConcentrationRow(fighterCharId)).toBe(false);
+    },
+  );
+
+  it(
+    'CID-INCAP-03: concentrating PC + Poisoned applied (non-incapacitating) → concentration row intact (REQ-CID-01)',
+    async () => {
+      // PHB p.203: Poisoned does not cause Incapacitated → concentration remains.
+      const app = await getTestApp();
+      const { encounterId, fighterId } = await makeFreshEncounter(app, 'CID-INCAP-03 Poisoned does not break conc');
+
+      await insertConcentrationRow(fighterCharId);
+      expect(await hasConcentrationRow(fighterCharId)).toBe(true);
+
+      // Apply Poisoned via guaranteed-fail (DC=30 vs fighter CON+4 → max 24 < 30).
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: fighterId,
+          ability: 'con',
+          dc: 30,
+          conditionOnFail: 'Poisoned',
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe('fail');
+      expect(body.applied).toContain('Poisoned');
+      // PHB: Poisoned is NOT an incapacitating condition.
+      expect(body.applied).not.toContain('Incapacitated');
+
+      // REQ-CID-01: concentration row must remain — Poisoned does NOT break concentration.
+      expect(await hasConcentrationRow(fighterCharId)).toBe(true);
+
+      // Cleanup.
+      await db.delete(characterConcentration).where(eq(characterConcentration.characterId, fighterCharId));
+    },
+  );
+
+  it(
+    'CID-INCAP-04: NPC target (characterId=null) → Incapacitated applied → no breakConcentration called (guard) (REQ-CID-01)',
+    async () => {
+      // NPC combatant (no characterId) → breakConcentration MUST NOT be called.
+      // The NPC guard in breakConcentration isn't directly visible here, but we verify:
+      //   1. The request succeeds normally (Incapacitated applied to NPC).
+      //   2. No error thrown from the NPC having no characterId.
+      // If the hook were to run without the NPC guard, it would crash or throw.
+      const app = await getTestApp();
+      const { encounterId, npcId } = await makeFreshEncounter(app, 'CID-INCAP-04 NPC incapacitated no conc break');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: npcId,
+          ability: 'con',
+          dc: 30,
+          conditionOnFail: 'Incapacitated',
+          npcSaveMod: 0,
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe('fail');
+      expect(body.applied).toContain('Incapacitated');
+      // No crash, no error — NPC guard protected the breakConcentration call.
     },
   );
 });

@@ -33,6 +33,7 @@ import {
   type RngFn,
 } from '@dungeon-hub/domain/engine';
 import { resolveTargetSave, type Ability } from './resolve-target-save.js';
+import { breakConcentration } from '../engine/concentration-service.js';
 
 // ── Crypto RNG (mirrors perform-weapon-attack-apply.ts) ───────────────────────
 
@@ -241,6 +242,18 @@ export async function performForcedCheck(
       turnsRemaining,
       refreshAnchorOnExisting,
     });
+
+    // REQ-CID-01: break concentration when Incapacitated is freshly applied to a PC.
+    // PHB p.203: concentration ends on incapacitation.
+    // BEST-EFFORT POST-APPLY (ADR-4 — no mini-tx): breakConcentration runs after applyConditions
+    // commits. A crash between condition insert and this call leaves an incapacitated-but-
+    // concentrating state — a generous (not punitive) failure. The inverse (break without
+    // condition) cannot occur because breakConcentration runs strictly after applyConditions.
+    // NPC guard: characterId===null → skip (registry is characterId-keyed).
+    if (applied.includes('Incapacitated') && targetCombatant.characterId !== null) {
+      await breakConcentration(targetCombatant.characterId);
+    }
+
     const reason = targetIsStunned ? 'stunned-str-dex' : 'petrified-str-dex';
     return {
       ok: true,
@@ -285,6 +298,14 @@ export async function performForcedCheck(
       turnsRemaining,
       refreshAnchorOnExisting,
     });
+
+    // REQ-CID-01: break concentration when Incapacitated is freshly applied to a PC.
+    // PHB p.203: concentration ends on incapacitation.
+    // BEST-EFFORT POST-APPLY (ADR-4 — no mini-tx): see comment in auto-fail branch above.
+    // NPC guard: characterId===null → skip.
+    if (applied.includes('Incapacitated') && targetCombatant.characterId !== null) {
+      await breakConcentration(targetCombatant.characterId);
+    }
 
     return {
       ok: true,

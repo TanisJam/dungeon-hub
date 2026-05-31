@@ -29,7 +29,14 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 import { db } from '../../src/infra/db/client.js';
 import { characterConcentration, characters } from '../../src/infra/db/schema.js';
 import { randomUUID } from 'node:crypto';
-import { checkConcentrationOnDamage } from '../../src/use-cases/encounters/check-concentration-on-damage.js';
+import {
+  checkConcentrationOnDamage,
+  prepareConcentrationCheck,
+  resolveConcentrationCheck,
+  type ConcentrationPlan,
+  type ConcentrationResolution,
+} from '../../src/use-cases/encounters/check-concentration-on-damage.js';
+import { db as dbClient } from '../../src/infra/db/client.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -274,5 +281,228 @@ describe('check-concentration-on-damage — guard branches + success/fail (B1c)'
     await db
       .delete(characterConcentration)
       .where(eq(characterConcentration.characterId, pcCharId));
+  });
+});
+
+// ── A1 suite: prepareConcentrationCheck + resolveConcentrationCheck ────────────
+//
+// Tests guard ordering, breakOutright, and resolve outright-vs-save paths.
+// REQ-CID-02, ADR-1, ADR-2.
+//
+// Guard order (per design ADR-1):
+//   1. NPC (characterId=null) → null
+//   2. registry SELECT → no row → null
+//   3. newHp===0 → { breakOutright: true }   ← NEW (PHB p.197/p.203)
+//   4. finalDamage===0 → null
+//   5. save branch → { breakOutright: false, dc, saveBonus }
+
+describe('prepareConcentrationCheck + resolveConcentrationCheck — Batch A1 guard branches', () => {
+  let gm: TestUser;
+  let worldId: string;
+  let pcCharId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    gm = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { name: 'Prepare-resolve A1 test campaign' },
+      })
+      .then((r) => r.json());
+    worldId = campaign.worldId;
+
+    pcCharId = await makeCharacter(app, gm.accessToken, worldId, 'Aryn (prepare-resolve test)');
+
+    // Fighter L1 — CON save proficient (+4 total with CON=14).
+    await expectOk(
+      'set-stats',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${pcCharId}/stats`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          method: 'standard-array',
+          scores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+        },
+      }),
+    );
+    await expectOk(
+      'set-class',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${pcCharId}/class`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          class: { slug: 'fighter', source: 'PHB' },
+          level: 1,
+          skillChoices: ['athletics', 'perception'],
+        },
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(characterConcentration)
+      .where(eq(characterConcentration.characterId, pcCharId));
+    if (gm) await deleteTestUser(gm.id);
+  });
+
+  // ── Guard 1: NPC → null ─────────────────────────────────────────────────────
+  // REQ-CB-10 / ADR-1 guard 1.
+  it('CID-PREP-01: NPC target (characterId=null) → prepareConcentrationCheck returns null', async () => {
+    const plan = await prepareConcentrationCheck({ kind: 'npc', characterId: null }, 20, 5);
+    expect(plan).toBeNull();
+  });
+
+  // ── Guard 2: no registry row → null ────────────────────────────────────────
+  // REQ-CB-09 / ADR-1 guard 2.
+  it('CID-PREP-02: non-concentrating PC → prepareConcentrationCheck returns null', async () => {
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 10, 5);
+    expect(plan).toBeNull();
+  });
+
+  // ── Guard 3: 0-HP PRECEDENCE → breakOutright:true ─────────────────────────
+  // REQ-CID-02 / ADR-2. Registry read must pass (concentrating), THEN 0-HP short-circuits.
+  // This confirms guard order: registry (2) BEFORE 0-HP (3) — a non-concentrating 0-HP PC stays null.
+  it('CID-PREP-03: concentrating PC + newHp===0 → breakOutright:true, no dc/saveBonus', async () => {
+    await insertConcentrationRow(pcCharId);
+
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 20, 0);
+
+    // MUST have a plan and the breakOutright arm.
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(true);
+    expect(plan!.characterId).toBe(pcCharId);
+    // PHB p.197/p.203: outright break carries NO dc/saveBonus (omit-not-null).
+    expect('dc' in plan!).toBe(false);
+    expect('saveBonus' in plan!).toBe(false);
+
+    // Cleanup: the plan doesn't delete the row; resolveConcentrationCheck does.
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+  });
+
+  // ── Guard 3 interaction: non-concentrating PC + newHp===0 → null (guard 2 fires first) ─
+  it('CID-PREP-04: non-concentrating PC + newHp===0 → null (registry guard fires before 0-HP)', async () => {
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 20, 0);
+    // Guard 2 (no row) fires before guard 3 (0-HP) → null.
+    expect(plan).toBeNull();
+  });
+
+  // ── Guard 4: zero damage → null ─────────────────────────────────────────────
+  // PHB p.203: save only triggered by damage TAKEN. REQ-CB-08.
+  it('CID-PREP-05: concentrating PC + finalDamage===0 → null (zero-damage guard)', async () => {
+    await insertConcentrationRow(pcCharId);
+
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 0, 5);
+    expect(plan).toBeNull();
+
+    // Cleanup.
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+  });
+
+  // ── Guard 5: save branch → plan with breakOutright:false + dc + saveBonus ──
+  it('CID-PREP-06: concentrating PC + damage>0 + newHp>0 → save branch plan', async () => {
+    await insertConcentrationRow(pcCharId);
+
+    // damage=20 → DC=max(10,10)=10. Fighter L1 CON+2 + prof+2 = saveBonus=4.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 20, 5);
+
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(false);
+    expect(plan!.characterId).toBe(pcCharId);
+    if (!plan!.breakOutright) {
+      expect(typeof plan!.dc).toBe('number');
+      expect(plan!.dc).toBe(10); // max(10, floor(20/2)) = max(10,10) = 10
+      expect(typeof plan!.saveBonus).toBe('number');
+    }
+
+    // Cleanup.
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
+  });
+
+  // ── resolveConcentrationCheck: outright break (breakOutright:true) ─────────
+  // REQ-CID-02. Inside a tx, breakConcentration fires, returns {broke:true, reason:'incapacitated-0hp'}.
+  it('CID-RESOLVE-01: resolveConcentrationCheck with breakOutright plan → row deleted, {broke:true,reason:\'incapacitated-0hp\'}', async () => {
+    await insertConcentrationRow(pcCharId);
+    expect(await hasConcentrationRow(pcCharId)).toBe(true);
+
+    const plan: ConcentrationPlan = { breakOutright: true, characterId: pcCharId };
+
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan, tx);
+    });
+
+    // Response shape: outright block — no d20/dc fields.
+    expect(resolution).toEqual({ broke: true, reason: 'incapacitated-0hp' });
+    // Registry row must be gone.
+    expect(await hasConcentrationRow(pcCharId)).toBe(false);
+  });
+
+  // ── resolveConcentrationCheck: save branch, guaranteed fail ────────────────
+  // damage=100 → DC=50; Fighter L1 max save = 20+4 = 24 < 50 → guaranteed fail.
+  it('CID-RESOLVE-02: resolveConcentrationCheck with save plan + guaranteed fail → row deleted, save block returned', async () => {
+    await insertConcentrationRow(pcCharId);
+    expect(await hasConcentrationRow(pcCharId)).toBe(true);
+
+    // damage=100 → DC=50 (max(10, floor(100/2)) = 50). Fighter L1 max = 20+4=24 < 50.
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 100, 5);
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(false);
+
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
+
+    // Must be a ConcentrationSaveBlock with broke:true.
+    expect(resolution).not.toBeUndefined();
+    expect((resolution as any).broke).toBe(true);
+    expect((resolution as any).success).toBe(false);
+    expect(typeof (resolution as any).d20).toBe('number');
+    expect(typeof (resolution as any).dc).toBe('number');
+    expect((resolution as any).dc).toBe(50);
+
+    // Registry row deleted on fail (REQ-CB-04).
+    expect(await hasConcentrationRow(pcCharId)).toBe(false);
+  });
+
+  // ── resolveConcentrationCheck: save branch, guaranteed pass ────────────────
+  // damage=1 → DC=10; same fighter save mod +4. On a 20, total=24 ≥ 10 → pass.
+  // Can't guarantee pass deterministically, so just verify shape on a low-DC plan.
+  // We use DC=10 and just assert the save block shape is correct (6 fields).
+  it('CID-RESOLVE-03: resolveConcentrationCheck save block has 6 required fields on any outcome', async () => {
+    await insertConcentrationRow(pcCharId);
+
+    const plan = await prepareConcentrationCheck({ kind: 'pc', characterId: pcCharId }, 1, 5);
+    expect(plan).not.toBeNull();
+    expect(plan!.breakOutright).toBe(false);
+
+    let resolution: ConcentrationResolution | undefined;
+    await dbClient.transaction(async (tx) => {
+      resolution = await resolveConcentrationCheck(plan!, tx);
+    });
+
+    expect(resolution).not.toBeUndefined();
+    // Save block (6 fields per REQ-CB-12).
+    const r = resolution as any;
+    expect(typeof r.dc).toBe('number');
+    expect(typeof r.d20).toBe('number');
+    expect(typeof r.total).toBe('number');
+    expect(typeof r.saveMod).toBe('number');
+    expect(typeof r.success).toBe('boolean');
+    expect(typeof r.broke).toBe('boolean');
+    expect(r.broke).toBe(!r.success);
+
+    // If broke, row is deleted; if pass, row still exists. Either is valid.
+    // Just clean up.
+    await db.delete(characterConcentration).where(eq(characterConcentration.characterId, pcCharId));
   });
 });
