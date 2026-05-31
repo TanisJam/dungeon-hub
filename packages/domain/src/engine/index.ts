@@ -304,6 +304,16 @@ export { buildFrightenedModifiers } from './rules/frightened.js';
 export { cloakOfProtectionRuleDoc } from './rules-authored/cloak-of-protection.js';
 export { blessRuleDoc } from './rules-authored/bless.js';
 
+// ── Concentration rule helper (engine-concentration-authority — PHB p.203) ────
+
+export { decideConcentration } from './concentration/decide.js';
+export type {
+  ConcentrationStore,
+  ConcentrationEntry,
+  ConcentrationCandidate,
+  ConcentrationDecision,
+} from './concentration/decide.js';
+
 // ── Duration evaluator (engine-timeline-duration — Slice: Composable Modifier System 1) ──
 
 export { evaluateDuration, convertToRounds } from './duration/evaluate.js';
