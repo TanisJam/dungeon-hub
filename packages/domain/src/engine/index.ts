@@ -194,6 +194,8 @@ export type { ConditionDefinition } from './conditions/prone.js';
 // Slice 3a — Stunned + Incapacitated condition definitions
 export { STUNNED_CONDITION_DEF } from './conditions/stunned.js';
 export { INCAPACITATED_CONDITION_DEF } from './conditions/incapacitated.js';
+// engine-incapacitated-gating — action-economy gate predicate (PHB p.290)
+export { isIncapacitated } from './conditions/incapacitated.js';
 
 // conditions-catalog Slice 1 — Blinded, Invisible, Poisoned condition definitions
 export { BLINDED_CONDITION_DEF } from './conditions/blinded.js';

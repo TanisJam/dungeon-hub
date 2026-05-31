@@ -15,7 +15,7 @@
  * Strict TDD — RED first.
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { INCAPACITATED_CONDITION_DEF } from './incapacitated.js';
 import { STUNNED_CONDITION_DEF } from './stunned.js';
 import { BLINDED_CONDITION_DEF } from './blinded.js';
@@ -150,6 +150,48 @@ describe('POISONED_CONDITION_DEF', () => {
     // PHB p.292: Poisoned only affects the holder's own rolls, no outgoing effect
     const pred = POISONED_CONDITION_DEF.outgoingMod.imposePredicate;
     expect(pred).toEqual({ op: 'not', node: { op: 'and', nodes: [] } });
+  });
+});
+
+// ── isIncapacitated predicate ─────────────────────────────────────────────────
+
+describe('isIncapacitated', () => {
+  /**
+   * PHB p.290, Appendix A — "An incapacitated creature can't take actions or
+   * reactions."
+   *
+   * Predicate contract (REQ-INC-01):
+   *   isIncapacitated(conditions) → true  iff conditions contains { name: 'Incapacitated' }
+   *   isIncapacitated([])         → false (empty set)
+   *   Case-sensitive: 'Incapacitated' only; no decomposition of Stunned/Paralyzed.
+   *
+   * NOTE: Stunned-includes-Incapacitated composition is OUT of scope;
+   * this predicate matches the literal name only.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let isIncapacitated: (conditions: Array<{ name: string }>) => boolean;
+
+  beforeAll(async () => {
+    const mod = await import('./incapacitated.js');
+    isIncapacitated = (mod as any).isIncapacitated;
+  });
+
+  it('empty condition set → false (REQ-INC-01, PHB p.290)', () => {
+    expect(isIncapacitated([])).toBe(false);
+  });
+
+  it('set containing Incapacitated → true (REQ-INC-01, PHB p.290)', () => {
+    expect(isIncapacitated([{ name: 'Incapacitated' }])).toBe(true);
+  });
+
+  it('set containing only Prone → false (REQ-INC-01 — non-Incapacitated condition)', () => {
+    expect(isIncapacitated([{ name: 'Prone' }])).toBe(false);
+  });
+
+  it('multi-condition set including Incapacitated → true (REQ-INC-01, PHB p.290)', () => {
+    // NOTE: Stunned-includes-Incapacitated composition is OUT of scope;
+    // this predicate matches the literal name only.
+    expect(isIncapacitated([{ name: 'Stunned' }, { name: 'Incapacitated' }])).toBe(true);
   });
 });
 
