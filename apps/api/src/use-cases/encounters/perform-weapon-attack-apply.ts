@@ -525,7 +525,13 @@ export async function performWeaponAttackApply(
       // bookkeeping, not a game-state change). encVersion binds the pending state to this
       // CAS epoch; a concurrent commit before resolve-reaction will cause a version mismatch
       // and the CAS guard in resolveAttackReaction will reject the stale state.
-      await db
+      //
+      // W-3 fix: version guard on the suspend UPDATE. If the encounter version changed
+      // between the pre-check (Step 1) and this write (e.g. another CAS commit landed
+      // concurrently), 0 rows are updated and we return VERSION_CONFLICT rather than
+      // overwriting a valid pending_reaction belonging to a different attack.
+      // Pattern mirrors the CAS tx in Step 12 (lines below) and in resolveAttackReaction.
+      const suspendUpdated = await db
         .update(encounters)
         .set({
           pendingReaction: {
@@ -539,7 +545,12 @@ export async function performWeaponAttackApply(
           },
           updatedAt: new Date(),
         })
-        .where(eq(encounters.id, encounterId));
+        .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
+        .returning({ id: encounters.id });
+
+      if (suspendUpdated.length === 0) {
+        return { ok: false, code: 'VERSION_CONFLICT' };
+      }
 
       return {
         ok: true,
