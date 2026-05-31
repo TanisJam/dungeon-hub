@@ -58,6 +58,7 @@ import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
 import { resolveCounterspell, type RngFn } from '@dungeon-hub/domain/engine';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 
@@ -179,7 +180,9 @@ export type ResolveCastReactionResult =
   | { ok: false; code: 'REACTION_ALREADY_USED' }
   | { ok: false; code: 'SHIELD_NO_SLOT_AVAILABLE' }
   | { ok: false; code: 'INSUFFICIENT_SLOT'; slotLevel?: number }
-  | { ok: false; code: 'COUNTERSPELLER_IS_CASTER' };
+  | { ok: false; code: 'COUNTERSPELLER_IS_CASTER' }
+  // engine-incapacitated-gating — REQ-INC-05 (PHB p.290: can't take reactions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' };
 
 // ── resolveCastReaction ────────────────────────────────────────────────────────
 
@@ -359,6 +362,13 @@ export async function resolveCastReaction(
   // PHB p.190: one reaction per round.
 
   if (reactionDecision === 'cast-shield') {
+    // Step 4b-i: Incapacitated gate (REQ-INC-05, PHB p.290 — can't take reactions).
+    // Fires FIRST in the cast-shield arm — independent of reactionUsed gate (ADR-4.4).
+    // decline path (Step 4a) is NOT gated — declining is not taking a reaction.
+    if (await isCombatantIncapacitated(defenderCombatantId)) {
+      return { ok: false, code: 'ACTOR_INCAPACITATED' };
+    }
+
     // Step 4b-a: reaction availability (REQ-SC-08, PHB p.190).
     if (defenderCombatant.reactionUsed) {
       return { ok: false, code: 'REACTION_ALREADY_USED' };
@@ -498,6 +508,12 @@ export async function resolveCastReaction(
 
   if (!counterspellerCombatant) {
     return { ok: false, code: 'NOT_FOUND', target: 'counterspeller' };
+  }
+
+  // (b-i) Incapacitated gate (REQ-INC-05, PHB p.290 — can't take reactions).
+  // Independent gate: fires before reactionUsed check (ADR-4.4).
+  if (await isCombatantIncapacitated(counterspellerCombatantId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
   // (c) Reaction must be available (PHB p.190).

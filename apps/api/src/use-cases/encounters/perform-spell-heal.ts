@@ -28,6 +28,7 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import {
   rollDamageBreakdown,
   type RngFn,
@@ -92,7 +93,9 @@ export type PerformSpellHealResult =
   | { ok: false; code: 'NOT_YOUR_TURN' }
   | { ok: false; code: 'VERSION_CONFLICT' }
   | { ok: false; code: 'HEALER_NOT_SPELLCASTER' }
-  | { ok: false; code: 'SLOT_NOT_AVAILABLE' };
+  | { ok: false; code: 'SLOT_NOT_AVAILABLE' }
+  // engine-incapacitated-gating — REQ-INC-04 (PHB p.290: can't take actions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' };
 
 // ── perform-spell-heal ─────────────────────────────────────────────────────────
 
@@ -167,6 +170,13 @@ export async function performSpellHeal(
   }
 
   const healerCharacterId = healerCombatant.characterId;
+
+  // ── Step 4a: Incapacitated gate (REQ-INC-04, PHB p.290 — can't take actions) ──
+  // Fail-fast BEFORE character sheet load (ADR-3.4).
+  // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
+  if (await isCombatantIncapacitated(healerCombatantId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
 
   // ── Step 5: Load target combatant ─────────────────────────────────────────────
   // Explicit select: we need hpCurrent and hpMax only (REQ-H-13: NPC targets allowed).

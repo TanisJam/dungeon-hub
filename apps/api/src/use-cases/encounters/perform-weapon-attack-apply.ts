@@ -40,6 +40,7 @@ import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { buildAttackContext } from './build-attack-context.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 
 // ── Crypto RNG (ADR-5) ─────────────────────────────────────────────────────────
 
@@ -200,6 +201,8 @@ export type PerformWeaponAttackApplyResult =
   | { ok: false; code: 'VERSION_CONFLICT' }
   | { ok: false; code: 'NO_TARGET_AC' }     // NPC with null ac (legacy/unset)
   | { ok: false; code: 'FORBIDDEN' }
+  // engine-incapacitated-gating — REQ-INC-02 (PHB p.290: can't take actions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' }
   // Stunning Strike pre-roll 400 guards (Slice 3b-ii, FAIL-FAST — REQ-SS-MELEE-01, REQ-SS-KI-EXHAUSTED-01, REQ-SS-NPC-01).
   // NOTHING committed (no to-hit roll, no HP change, no ki change) — pure pre-validation.
   | { ok: false; code: 'STUNNING_STRIKE_NOT_MELEE' }
@@ -278,6 +281,14 @@ export async function performWeaponAttackApply(
   // ── Step 3: Turn guard (REQ-ATK-TURN-01) ─────────────────────────────────────
   if (encounterRow.currentCombatantId !== attackerId) {
     return { ok: false, code: 'NOT_YOUR_TURN' };
+  }
+
+  // ── Step 3a: Incapacitated gate (REQ-INC-02, PHB p.290 — can't take actions) ──
+  // Fail-fast BEFORE buildAttackContext (skips the heavy sheet/weapon/registry build).
+  // Per ADR-3.2: fires after turn guard, after version pre-check, before Step 4+.
+  // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
+  if (await isCombatantIncapacitated(attackerId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
   // ── Step 4: Load target combatant (explicit select: hp, ac, kind, characterId) ─

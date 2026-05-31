@@ -50,6 +50,7 @@ import {
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { resolveTargetAc } from './resolve-target-ac.js';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 
 // ── Pending Reaction shape ─────────────────────────────────────────────────────
 
@@ -101,7 +102,9 @@ export type ResolveAttackReactionResult =
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'FORBIDDEN' }
   | { ok: false; code: 'REACTION_ALREADY_USED' }
-  | { ok: false; code: 'SHIELD_NO_SLOT_AVAILABLE' };
+  | { ok: false; code: 'SHIELD_NO_SLOT_AVAILABLE' }
+  // engine-incapacitated-gating — REQ-INC-05 (PHB p.290: can't take reactions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' };
 
 // ── resolveAttackReaction ──────────────────────────────────────────────────────
 
@@ -233,6 +236,13 @@ export async function resolveAttackReaction(
   }
 
   // ── Step 5: cast-shield path ───────────────────────────────────────────────
+
+  // Step 5a-i: Incapacitated gate (REQ-INC-05, PHB p.290 — can't take reactions).
+  // Fires FIRST (before reactionUsed check) — cheap targeted read, independent gate.
+  // ADR-4.3: decline path (Step 4) is NOT gated — declining is not taking a reaction.
+  if (await isCombatantIncapacitated(defenderCombatantId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
 
   // Step 5a: reaction availability (REQ-ERB-ECON-01)
   // PHB p.190: one reaction per round.

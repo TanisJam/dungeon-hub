@@ -690,4 +690,63 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
       expect(body.applied).toEqual([]);
     },
   );
+
+  // ── B-7 — CONDITION_CATALOG add: 'Incapacitated' (REQ-INC-07, engine-incapacitated-gating) ─
+
+  it(
+    'FC-T13: conditionOnFail:Incapacitated passes catalog validation → row written (REQ-INC-07, PHB p.290)',
+    async () => {
+      // PHB p.290: Incapacitated can be applied directly by a DM or spell effect
+      // (e.g. Hold Person, PHB p.251) without it being a by-product of another condition.
+      // CONDITION_CATALOG must include 'Incapacitated' (engine-incapacitated-gating B-2).
+      // DC=30 with npcSaveMod=0: impossible to pass (max total = 20+0 = 20 < 30) → deterministic fail.
+      const app = await getTestApp();
+      const { encounterId, npcId } = await makeFreshEncounter(app, 'FC-T13 incapacitated direct apply');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: npcId,
+          ability: 'con',
+          dc: 30,
+          conditionOnFail: 'Incapacitated',
+          npcSaveMod: 0,
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.outcome).toBe('fail');
+      expect(body.save.success).toBe(false);
+      // 'Incapacitated' applied directly (not via Stunned dual-insert)
+      expect(body.applied).toContain('Incapacitated');
+    },
+  );
+
+  it(
+    'FC-T14: invalid conditionOnFail still rejected (REQ-INC-07 — catalog negative case)',
+    async () => {
+      // 'Flying' is not in the condition catalog — must still be rejected.
+      const app = await getTestApp();
+      const { encounterId, fighterId } = await makeFreshEncounter(app, 'FC-T14 invalid condition still rejected');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          targetCombatantId: fighterId,
+          ability: 'con',
+          dc: 15,
+          conditionOnFail: 'Flying',
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe('VALIDATION_FAILED');
+      expect(res.json().issues.some((i: { code: string }) => i.code === 'UNKNOWN_CONDITION')).toBe(true);
+    },
+  );
 });

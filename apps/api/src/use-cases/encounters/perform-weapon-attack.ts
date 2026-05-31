@@ -22,6 +22,7 @@ import {
   type WeaponAttackResult,
 } from '@dungeon-hub/domain/engine';
 import { buildAttackContext } from './build-attack-context.js';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -48,7 +49,9 @@ export type PerformWeaponAttackResult =
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'weapon' | 'character' }
   | { ok: false; code: 'NOT_YOUR_TURN' }
-  | { ok: false; code: 'FORBIDDEN' };
+  | { ok: false; code: 'FORBIDDEN' }
+  // engine-incapacitated-gating — REQ-INC-02 (PHB p.290: can't take actions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' };
 
 // ── perform-weapon-attack ──────────────────────────────────────────────────────
 
@@ -91,6 +94,13 @@ export async function performWeaponAttack(
   // ── Step 3: Turn guard ────────────────────────────────────────────────────────
   if (encounterRow.currentCombatantId !== attackerId) {
     return { ok: false, code: 'NOT_YOUR_TURN' };
+  }
+
+  // ── Step 3a: Incapacitated gate (REQ-INC-02, PHB p.290 — can't take actions) ──
+  // Fail-fast BEFORE buildAttackContext (skips the heavy sheet/weapon/registry build).
+  // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
+  if (await isCombatantIncapacitated(attackerId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
   // ── Step 4: Load target combatant ────────────────────────────────────────────

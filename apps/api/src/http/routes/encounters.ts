@@ -286,6 +286,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
           case 'NOT_FOUND':
             return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-02 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -404,6 +410,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' }],
+            });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-02 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
@@ -821,6 +833,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'HEALER_NOT_SPELLCASTER' }],
             });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-04 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -905,6 +923,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'SHIELD_NO_SLOT_AVAILABLE' }],
+            });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-05 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
@@ -993,6 +1017,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'CASTER_NOT_SPELLCASTER' }],
+            });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-03 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
@@ -1096,6 +1126,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'COUNTERSPELLER_IS_CASTER' }],
+            });
+          case 'ACTOR_INCAPACITATED':
+            // engine-incapacitated-gating — REQ-INC-05 (PHB p.290). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });

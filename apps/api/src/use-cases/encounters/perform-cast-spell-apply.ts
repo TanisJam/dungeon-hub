@@ -30,9 +30,10 @@
  * REQ-SC-05: Atomic cast — NPC / no defender slot / reaction_used=true → immediate damage.
  */
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants, characters, encounterCombatantConditions } from '../../infra/db/schema.js';
+import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import {
   rollMagicMissile,
   type RngFn,
@@ -123,7 +124,9 @@ export type PerformCastSpellApplyResult =
   | { ok: false; code: 'VERSION_CONFLICT' }
   | { ok: false; code: 'CASTER_NOT_SPELLCASTER' }
   | { ok: false; code: 'INSUFFICIENT_SLOT' }
-  | { ok: false; code: 'MULTI_TARGET_NOT_SUPPORTED' };
+  | { ok: false; code: 'MULTI_TARGET_NOT_SUPPORTED' }
+  // engine-incapacitated-gating — REQ-INC-03 (PHB p.290: can't take actions).
+  | { ok: false; code: 'ACTOR_INCAPACITATED' };
 
 // ── perform-cast-spell-apply ──────────────────────────────────────────────────
 
@@ -196,6 +199,13 @@ export async function performCastSpellApply(
 
   const casterCharId = casterCombatant.characterId;
 
+  // ── Step 4a: Incapacitated gate (REQ-INC-03, PHB p.290 — can't take actions) ──
+  // Fail-fast BEFORE character sheet load and slot math (ADR-3.3).
+  // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
+  if (await isCombatantIncapacitated(casterId)) {
+    return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
   // ── Step 6: Load target combatant ─────────────────────────────────────────────
   const [targetCombatant] = await db
     .select({
@@ -262,8 +272,12 @@ export async function performCastSpellApply(
   const isDefenderPc = targetCombatant.kind === 'pc';
   const defenderNotUsedReaction = !targetCombatant.reactionUsed;
 
+  // REQ-INC-06: Incapacitated defender cannot react — exclude from Shield eligibility
+  // BEFORE loading character sheet (fail-fast; ADR-4.1 single targeted SELECT).
+  const defenderIncapacitated = await isCombatantIncapacitated(targetId);
+
   let canShield = false;
-  if (isDefenderPc && defenderNotUsedReaction && targetCombatant.characterId) {
+  if (isDefenderPc && defenderNotUsedReaction && !defenderIncapacitated && targetCombatant.characterId) {
     const [defCharRow] = await db
       .select({ data: characters.data })
       .from(characters)
@@ -310,6 +324,26 @@ export async function performCastSpellApply(
       ),
     );
 
+  // REQ-INC-06: Incapacitated combatants cannot react — exclude from canCounter eligibility.
+  // ADR-4.2: ONE batched IN-query over all candidates (not N scalar calls) to keep O(1) round-trips.
+  // Build a Set<combatantId> for O(1) membership testing inside the loop.
+  const candidateIds = otherCombatants.map((c) => c.id);
+  const incapacitatedIds = new Set<string>();
+  if (candidateIds.length > 0) {
+    const incapRows = await db
+      .select({ combatantId: encounterCombatantConditions.combatantId })
+      .from(encounterCombatantConditions)
+      .where(
+        and(
+          inArray(encounterCombatantConditions.combatantId, candidateIds),
+          eq(encounterCombatantConditions.conditionName, 'Incapacitated'),
+        ),
+      );
+    for (const row of incapRows) {
+      incapacitatedIds.add(row.combatantId);
+    }
+  }
+
   for (const combatant of otherCombatants) {
     // Must be non-caster (Counterspell is a reaction to ANOTHER creature's cast).
     if (combatant.id === casterId) continue;
@@ -318,6 +352,8 @@ export async function performCastSpellApply(
     // Must have reaction available.
     if (combatant.reactionUsed) continue;
     if (!combatant.characterId) continue;
+    // REQ-INC-06: Incapacitated combatants cannot react — skip via batched set (ADR-4.2).
+    if (incapacitatedIds.has(combatant.id)) continue;
 
     const [charRow] = await db
       .select({ data: characters.data })
