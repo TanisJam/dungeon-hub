@@ -447,6 +447,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       // REQ-ROUTE-BODY-03: hit response — includes all to-hit + damage fields.
       // Slice 3b-ii: stunningStrike block forwarded when present (omitted on non-spend — backward-compat).
       // engine-divine-smite: divineSmite block forwarded when present (omitted on non-spend — REQ-DS-COMPAT-01).
+      // engine-concentration-break-damage: concentrationSave forwarded when present (REQ-CB-12).
       return reply.code(200).send({
         hit: true,
         crit: result.crit,
@@ -461,6 +462,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         damageType: result.damageType,
         ...(result.stunningStrike !== undefined ? { stunningStrike: result.stunningStrike } : {}),
         ...(result.divineSmite !== undefined ? { divineSmite: result.divineSmite } : {}),
+        ...(result.concentrationSave !== undefined ? { concentrationSave: result.concentrationSave } : {}),
       });
     },
   );
@@ -1064,7 +1066,11 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       // Atomic path: damage result (NPC target / no defender slot / reaction used).
-      return reply.code(200).send({ damage: result.damage });
+      // engine-concentration-break-damage: concentrationSave forwarded when present (REQ-CB-12).
+      return reply.code(200).send({
+        damage: result.damage,
+        ...(result.concentrationSave !== undefined ? { concentrationSave: result.concentrationSave } : {}),
+      });
     },
   );
 
@@ -1169,9 +1175,10 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
 
       return reply.code(200).send({
         shieldCast: result.shieldCast,
-        spellCountered: result.spellCountered,
+        ...(result.spellCountered !== undefined ? { spellCountered: result.spellCountered } : {}),
         newHp: result.newHp,
         damageApplied: result.damageApplied,
+        ...(result.concentrationSave !== undefined ? { concentrationSave: result.concentrationSave } : {}),
       });
     },
   );

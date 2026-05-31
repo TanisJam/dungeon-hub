@@ -41,6 +41,10 @@ import { resolveResistance } from './resolve-resistance.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import {
+  checkConcentrationOnDamage,
+  type ConcentrationSaveBlock,
+} from './check-concentration-on-damage.js';
 
 // ── Crypto RNG (ADR-5) ─────────────────────────────────────────────────────────
 
@@ -194,6 +198,13 @@ export type PerformWeaponAttackApplyResult =
        * Absent (key omitted) for backward-compat when divineSmiteSpend absent/false — REQ-DS-COMPAT-01.
        */
       divineSmite?: DivineSmiteBlock;
+      /**
+       * Concentration save result (engine-concentration-break-damage, REQ-CB-06).
+       * Present only when the target was concentrating AND finalDamage > 0.
+       * Absent (key omitted) otherwise — backward-compat omit-not-null (REQ-CB-12).
+       * TODO-saga: HP commit and concentration break are two separate atomic units.
+       */
+      concentrationSave?: ConcentrationSaveBlock;
     }
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'attacker' | 'target' | 'weapon' | 'character' }
@@ -616,7 +627,7 @@ export async function performWeaponAttackApply(
   // Replaces bare applyDamage; if target has no resist conditions, result is identical.
   // Runs OUTSIDE the CAS tx (read-then-CAS — ADR-4 engine-resist-immunity).
   // PHB p.197: resistance applied after all other modifiers, before HP loss.
-  const { newHp } = await resolveResistance(
+  const { newHp, finalDamage } = await resolveResistance(
     targetId,
     rolledDamage,
     weapon.damageType,
@@ -757,6 +768,18 @@ export async function performWeaponAttackApply(
       ? { spent: true, slotLevel: divineSmiteSlotLevel!, dice: smiteDice, radiantDamage }
       : undefined;
 
+  // ── Step 12e: Concentration save (engine-concentration-break-damage, REQ-CB-06) ─
+  // Runs post-tx, after Stunning Strike and Divine Smite blocks.
+  // Uses finalDamage (post-resistance) for the DC — REQ-CB-07.
+  // TODO-saga: HP commit and concentration break are two separate atomic units.
+  // A crash between them leaves HP reduced but concentration intact — accepted V1 saga (ADR-3).
+  const concCheckWeapon = await checkConcentrationOnDamage(
+    { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
+    finalDamage,
+    // NPC target: npcSaveMod not supplied at this call site; resolveTargetSave returns NO_TARGET_SAVE →
+    // checkConcentrationOnDamage returns {concentrating:false} → key omitted (REQ-CB-10 NPC guard).
+  );
+
   return {
     ok: true,
     hit: true,
@@ -772,5 +795,6 @@ export async function performWeaponAttackApply(
     damageType: weapon.damageType,
     ...(stunningStrike !== undefined ? { stunningStrike } : {}),
     ...(divineSmiteResult !== undefined ? { divineSmite: divineSmiteResult } : {}),
+    ...(concCheckWeapon.concentrating ? { concentrationSave: concCheckWeapon.save } : {}),
   };
 }

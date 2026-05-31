@@ -59,6 +59,11 @@ import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
 import { resolveCounterspell, type RngFn } from '@dungeon-hub/domain/engine';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import { resolveResistance } from './resolve-resistance.js';
+import {
+  checkConcentrationOnDamage,
+  type ConcentrationSaveBlock,
+} from './check-concentration-on-damage.js';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 
@@ -173,6 +178,14 @@ export type ResolveCastReactionResult =
       newHp: number;
       /** Server-rolled total damage applied (0 on cast-shield/counter-success, server-rolled on decline/counter-fail). */
       damageApplied: number;
+      /**
+       * Concentration save result (REQ-CB-06, REQ-CB-12).
+       * Present when the defender was concentrating AND finalDamage > 0.
+       * Absent (key omitted) otherwise — backward-compat omit-not-null.
+       * TODO-saga: HP commit and concentration break are two separate atomic units.
+       * A crash between them leaves HP reduced but concentration intact — accepted V1 saga.
+       */
+      concentrationSave?: ConcentrationSaveBlock;
     }
   | { ok: false; code: 'NOT_FOUND'; target: 'encounter' | 'defender' | 'character' | 'caster-character' | 'counterspeller' | 'counterspeller-character' }
   | { ok: false; code: 'VERSION_CONFLICT' }
@@ -308,14 +321,21 @@ export async function resolveCastReaction(
   // ── Step 4a: decline path ─────────────────────────────────────────────────
   // reaction_used NOT set (player chose not to react).
   if (reactionDecision === 'decline') {
-    // Apply full server-rolled force damage (C-1: from pending_cast, never from client body).
-    const newHp = applyDamage(defenderCombatant.hpCurrent, serverDamage);
+    // B2b: Apply resolveResistance (replaces bare applyDamage).
+    // REQ-CB-07: resistance applied before concentration DC — DC uses post-resistance finalDamage.
+    // PHB p.197: resistance halves damage before HP loss. Force damage type from Magic Missile.
+    const { newHp: newHpDecline, finalDamage: finalDamageDecline } = await resolveResistance(
+      defenderCombatantId,
+      serverDamage,
+      'force',
+      defenderCombatant.hpCurrent,
+    );
 
     const txResult = await db.transaction(async (tx) => {
       // Update defender HP.
       await tx
         .update(encounterCombatants)
-        .set({ hpCurrent: newHp })
+        .set({ hpCurrent: newHpDecline })
         .where(
           and(
             eq(encounterCombatants.id, defenderCombatantId),
@@ -349,11 +369,23 @@ export async function resolveCastReaction(
 
     if (!txResult) return { ok: false, code: 'VERSION_CONFLICT' };
 
+    // B2d: wire checkConcentrationOnDamage post-HP-commit.
+    // REQ-CB-06: all damage paths fire the check. Uses finalDamageDecline (post-resistance).
+    // TODO-saga: HP commit and concentration break are two separate atomic units.
+    // A crash between them leaves HP reduced but concentration intact — accepted V1 saga.
+    const concCheckDecline = await checkConcentrationOnDamage(
+      { kind: defenderCombatant.kind, characterId: defenderCombatant.characterId },
+      finalDamageDecline,
+    );
+
     return {
       ok: true,
       shieldCast: false,
-      newHp,
-      damageApplied: serverDamage,
+      newHp: newHpDecline,
+      damageApplied: finalDamageDecline,
+      ...(concCheckDecline.concentrating
+        ? { concentrationSave: concCheckDecline.save }
+        : {}),
     };
   }
 
@@ -461,6 +493,15 @@ export async function resolveCastReaction(
     });
 
     if (!txResult) return { ok: false, code: 'VERSION_CONFLICT' };
+
+    // B2d (cast-shield arm): call checkConcentrationOnDamage for symmetry.
+    // finalDamage=0 (Shield negates all MM damage) → helper returns {concentrating:false} immediately.
+    // No concentrationSave in response (key omitted — REQ-CB-08).
+    // TODO-saga: HP commit and concentration break are two separate atomic units (N/A here — damage=0).
+    await checkConcentrationOnDamage(
+      { kind: defenderCombatant.kind, characterId: defenderCombatant.characterId },
+      0,
+    );
 
     return {
       ok: true,
@@ -584,9 +625,12 @@ export async function resolveCastReaction(
   const countered = counterspellResult.countered;
 
   // Load target combatant for HP update (only needed when spell resolves).
+  // B2a: widen SELECT to include kind + characterId for checkConcentrationOnDamage.
   const [targetCombatant] = await db
     .select({
       id: encounterCombatants.id,
+      kind: encounterCombatants.kind,
+      characterId: encounterCombatants.characterId,
       hpCurrent: encounterCombatants.hpCurrent,
       encounterId: encounterCombatants.encounterId,
     })
@@ -601,8 +645,20 @@ export async function resolveCastReaction(
 
   // targetCombatant may be the same as defenderCombatant — that's fine (no row conflict).
   const targetHpCurrent = targetCombatant?.hpCurrent ?? defenderCombatant.hpCurrent;
-  const newTargetHp = countered ? targetHpCurrent : applyDamage(targetHpCurrent, serverDamage);
-  const damageApplied = countered ? 0 : serverDamage;
+  // B2c: resolveResistance replaces bare applyDamage (REQ-CB-07: resistance before concentration DC).
+  // On countered===true: damage=0, no resistance check needed (PHB p.281: "spell fails and has no effect").
+  const {
+    newHp: newTargetHp,
+    finalDamage: finalDamageCounter,
+  } = countered
+    ? { newHp: targetHpCurrent, finalDamage: 0 }
+    : await resolveResistance(
+        targetId,
+        serverDamage,
+        'force',
+        targetHpCurrent,
+      );
+  const damageApplied = finalDamageCounter;
 
   const txResult = await db.transaction(async (tx) => {
     // (a) counterspeller reaction_used=true (PHB p.190 — reaction expended regardless of outcome).
@@ -664,13 +720,29 @@ export async function resolveCastReaction(
 
   if (!txResult) return { ok: false, code: 'VERSION_CONFLICT' };
 
+  // B2d: wire checkConcentrationOnDamage post-HP-commit in COUNTERSPELL-RESOLVE arm.
+  // On countered===true: finalDamageCounter=0 → helper guard 2 returns {concentrating:false}.
+  // On countered===false (spell resolves): use finalDamageCounter (post-resistance).
+  // REQ-CB-06: all damage paths fire the check.
+  // TODO-saga: HP commit and concentration break are two separate atomic units.
+  // A crash between them leaves HP reduced but concentration intact — accepted V1 saga.
+  const concCheckCounter = targetCombatant
+    ? await checkConcentrationOnDamage(
+        { kind: targetCombatant.kind, characterId: targetCombatant.characterId },
+        finalDamageCounter,
+      )
+    : { concentrating: false as const };
+
   // SpellPhase.CANCELLED on countered===true (ADR-6): no damage to anyone.
-  // SpellPhase.RESOLVING on countered===false: spell resolves, full MM damage landed.
+  // SpellPhase.RESOLVING on countered===false: spell resolves, post-resistance damage landed.
   return {
     ok: true,
     shieldCast: false,
     spellCountered: countered,
     newHp: newTargetHp,
     damageApplied,
+    ...(concCheckCounter.concentrating
+      ? { concentrationSave: concCheckCounter.save }
+      : {}),
   };
 }
