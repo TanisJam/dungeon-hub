@@ -84,15 +84,31 @@ export interface PerformCastSpellApplyInput {
   userId: string;          // for audit (GM identity)
 }
 
+/**
+ * A reaction option offered in the cast-announced window.
+ *
+ * kind:'shield'       — the targeted defender can cast Shield (PHB p.275).
+ * kind:'counterspell' — one or more non-caster combatants can Counterspell (PHB p.281).
+ *
+ * ADR-4 (engine-counterspell): options[] generalizes the single-kind shape so one
+ * window can carry both reaction types simultaneously.
+ */
+export type CastAnnouncedOption =
+  | { kind: 'shield'; defenderCombatantId: string }
+  | { kind: 'counterspell'; eligibleCounterspellerIds: string[] };
+
 export type PerformCastSpellApplyResult =
   | {
       ok: true;
-      /** Returned when the defender triggers a reaction window (suspend path). */
+      /**
+       * Returned when at least one reaction option is available (suspend path).
+       * spellName + slotLevel are top-level; options[] carries per-reaction-type details.
+       * ADR-4 (engine-counterspell): replaces the former single-kind shape.
+       */
       castAnnounced?: {
-        kind: 'shield';
-        defenderCombatantId: string;
         spellName: 'Magic Missile';
         slotLevel: number;
+        options: CastAnnouncedOption[];
       };
       /** Returned on the atomic path (NPC / no slot / reaction used). */
       damage?: {
@@ -302,13 +318,13 @@ export async function performCastSpellApply(
     }
 
     // Return castAnnounced — NO dart damage values in response (C-1 server-authority — ADR-6).
+    // ADR-4 (engine-counterspell): options[] shape — Shield option only (canCounter added in T-3).
     return {
       ok: true,
       castAnnounced: {
-        kind: 'shield',
-        defenderCombatantId: targetId,
         spellName,
         slotLevel,
+        options: [{ kind: 'shield', defenderCombatantId: targetId }],
       },
     };
   }

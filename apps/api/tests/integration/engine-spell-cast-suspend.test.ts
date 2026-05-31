@@ -404,10 +404,12 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       const body = res.json();
 
       // castAnnounced is returned (suspension path — PHB p.275).
+      // ADR-4 (engine-counterspell): options[] shape replaces the former single-kind shape.
       expect(body.castAnnounced).toBeDefined();
-      expect(body.castAnnounced.kind).toBe('shield');
-      expect(body.castAnnounced.defenderCombatantId).toBe(defenderCombatantId);
       expect(body.castAnnounced.spellName).toBe('Magic Missile');
+      const shieldOption = body.castAnnounced.options?.find((o: { kind: string }) => o.kind === 'shield');
+      expect(shieldOption).toBeDefined();
+      expect(shieldOption?.defenderCombatantId).toBe(defenderCombatantId);
 
       // C-1: no dart damage values in the response (server-authority — ADR-6).
       expect(body.castAnnounced.total).toBeUndefined();
