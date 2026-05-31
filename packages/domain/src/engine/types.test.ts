@@ -94,15 +94,18 @@ describe('ReactionEffect — ac-bonus variant (REQ-ERB-TYPES-03)', () => {
     expect((effect as { kind: 'counter'; autoIfSlotGe: number }).autoIfSlotGe).toBe(3);
   });
 
-  it('exhaustive switch on ReactionEffect handles both arms (counter + ac-bonus)', () => {
-    // Compile-time: this function fails tsc if either arm is missing.
+  it('exhaustive switch on ReactionEffect handles all three arms (counter + ac-bonus + negate-spell-damage)', () => {
+    // Compile-time: this function fails tsc if any arm is missing.
     // Executed at runtime to verify narrowing works correctly.
+    // ADR-4 (engine-spell-cast-suspend): third arm 'negate-spell-damage' added additively.
     function handle(effect: ReactionEffect): string {
       switch (effect.kind) {
         case 'counter':
           return `counter-ge${effect.autoIfSlotGe}`;
         case 'ac-bonus':
           return `ac+${effect.value}`;
+        case 'negate-spell-damage':
+          return 'negate-spell-damage';
         default: {
           const _exhaustive: never = effect;
           return _exhaustive;
@@ -112,5 +115,6 @@ describe('ReactionEffect — ac-bonus variant (REQ-ERB-TYPES-03)', () => {
 
     expect(handle({ kind: 'counter', autoIfSlotGe: 2 })).toBe('counter-ge2');
     expect(handle({ kind: 'ac-bonus', value: 5 })).toBe('ac+5');
+    expect(handle({ kind: 'negate-spell-damage' })).toBe('negate-spell-damage');
   });
 });

@@ -92,7 +92,9 @@ export type Trigger =
   | 'on-hit'
   | 'on-damage'
   /** REQ-ERB-TYPES-02: reaction fires when this entity is the TARGET of an incoming attack. */
-  | 'on-incoming-attack';
+  | 'on-incoming-attack'
+  /** REQ-RB-01 (engine-spell-cast-suspend): reaction fires when this entity is TARGETED by an incoming spell (e.g. Magic Missile). PHB p.275 — Shield timing. */
+  | 'on-incoming-spell';
 
 // ── ResetTrigger ──────────────────────────────────────────────────────────────
 
@@ -135,13 +137,20 @@ export type EventKind = 'cast' | 'attacked' | 'damaged';
  * counter: cancel the triggering cast (Counterspell — PHB p.228).
  * ac-bonus: grant a numeric AC bonus to the reacting entity for this attack
  *   (Shield +5 AC — PHB p.275, additive circumstance mod, transient).
+ * negate-spell-damage: zero out incoming spell damage to the reacting entity
+ *   (Shield vs Magic Missile — PHB p.275: "you take no damage from magic missile").
+ *   This is trigger-dependent: fires on 'on-incoming-spell', NOT on 'on-incoming-attack'.
+ *   Distinct from 'counter' (which cancels the whole spell for ALL targets).
  *
  * REQ-ERB-TYPES-03: ac-bonus variant added (ADR-2, engine-reaction-bus). Additive —
  *   counter arm unchanged; existing exhaustive switches remain valid.
+ * ADR-4 (engine-spell-cast-suspend): negate-spell-damage third arm added. Additive —
+ *   counter + ac-bonus arms untouched; exhaustive switches must add a third case.
  */
 export type ReactionEffect =
   | { kind: 'counter'; autoIfSlotGe: number }
-  | { kind: 'ac-bonus'; value: number };
+  | { kind: 'ac-bonus'; value: number }
+  | { kind: 'negate-spell-damage' };
 
 // ── Modifier discriminated union (10 kinds, closed) ───────────────────────────
 

@@ -142,6 +142,12 @@ export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
 // Divine Smite damage helper (engine-divine-smite — PHB p.85)
 export { computeDivineSmiteDice } from './damage/compute-divine-smite-dice.js';
 
+// ── Spell helpers (engine-spell-cast-suspend — Front #4 Slice 0) ─────────────
+
+// Magic Missile roller (ADR-7 — pure, RNG-injected, auto-hit, force damage)
+export { rollMagicMissile } from './spell/magic-missile.js';
+export type { RollMagicMissileInput, RollMagicMissileResult } from './spell/magic-missile.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
