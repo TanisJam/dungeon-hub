@@ -45,6 +45,8 @@ export interface CreatedEncounter {
     hpMax: number;
     ac: number | null;
     insertionOrder: number;
+    /** engine-reaction-bus: PHB p.190 — one reaction per round. */
+    reactionUsed: boolean;
   }>;
 }
 
@@ -111,6 +113,7 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
         hpMax: c.hpMax,
         ac: c.ac,
         insertionOrder: c.insertionOrder,
+        reactionUsed: c.reactionUsed,
       })),
     };
   });

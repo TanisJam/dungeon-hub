@@ -29,6 +29,7 @@ import {
   deriveArmorClassModifiers,
   type EvaluationContext,
   type EntityId,
+  type ModifierInstance,
 } from '@dungeon-hub/domain/engine';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 import { loadItemDataMany } from '../characters/load-item-data.js';
@@ -57,13 +58,18 @@ export type ResolveTargetAcResult =
  * persisted mods). Accepted for V1 correctness. Cloak of Protection (+1 AC) is
  * captured via loadPersistedModifiers.
  *
- * Shield/reactions are OUT of scope (no reaction bus until a later slice).
+ * Shield/reactions: pass transient extraMods=[shieldNumMod(+5)] to apply the +5 bonus
+ * without persisting it (REQ-ERB-TYPES-04 / ADR-3 engine-reaction-bus).
+ * All existing callers that omit extraMods receive byte-identical behavior (default []).
  */
-export async function resolveTargetAc(target: {
-  kind: 'pc' | 'npc';
-  characterId: string | null;
-  ac: number | null;
-}): Promise<ResolveTargetAcResult> {
+export async function resolveTargetAc(
+  target: {
+    kind: 'pc' | 'npc';
+    characterId: string | null;
+    ac: number | null;
+  },
+  extraMods: ModifierInstance[] = [],
+): Promise<ResolveTargetAcResult> {
   // ── NPC path ─────────────────────────────────────────────────────────────────
   if (target.kind === 'npc') {
     if (target.ac === null) {
@@ -157,6 +163,11 @@ export async function resolveTargetAc(target: {
     charId,
   );
   for (const m of acMods) registry.register(m);
+
+  // Step 9b: Register transient extraMods LAST (after acMods, before resolveStat).
+  // engine-reaction-bus ADR-3: Shield +5 NumMod is ephemeral — registered here only,
+  // never persisted, exists only for this call. Default [] keeps all callers byte-identical.
+  for (const m of extraMods) registry.register(m);
 
   // Step 10: Resolve final AC. Base = 0 (same as route — deriveArmorClassModifiers
   // emits all structural AC NumMods including base 10 + DEX).

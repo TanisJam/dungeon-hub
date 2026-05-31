@@ -23,6 +23,7 @@ import { applyCombatantEffect } from '../../use-cases/encounters/apply-combatant
 import { removeCombatantEffect } from '../../use-cases/encounters/remove-combatant-effect.js';
 import { removeCombatantCondition } from '../../use-cases/encounters/remove-combatant-condition.js';
 import { performSpellHeal } from '../../use-cases/encounters/perform-spell-heal.js';
+import { resolveAttackReaction } from '../../use-cases/encounters/resolve-attack-reaction.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -405,6 +406,16 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
+      }
+
+      // REQ-ERB-FLOW-01: reactionOffered — suspend path, no commit.
+      // PHB p.275: "When you are hit by an attack, you can use your reaction."
+      // Client must call POST .../resolve-reaction to continue.
+      if ('reactionOffered' in result) {
+        return reply.code(200).send({
+          hit: true,
+          reactionOffered: result.reactionOffered,
+        });
       }
 
       // REQ-ROUTE-BODY-02: miss response — no damage fields.
@@ -822,6 +833,96 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         healed: result.healed,
         newHp: result.newHp,
         perDie: result.perDie,
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/attack/resolve-reaction ---------------
+  // engine-reaction-bus: two-step Shield reaction resolution.
+  // GM-only. Client echoes reactionDecision + defender + version + pre-rolled damage.
+  // REQ-ERB-RESOLVE-01/02: cast-shield commits Shield+5 re-resolution; decline commits original.
+  // REQ-ERB-ECON-01: REACTION_ALREADY_USED → 400 VALIDATION_FAILED.
+  // REQ-ERB-AUTH-01: GM-only (mirrors attack/apply).
+  const ResolveReactionBody = z.object({
+    reactionDecision: z.enum(['cast-shield', 'decline']),
+    defenderCombatantId: z.string().uuid(),
+    /** Client-echoed from reactionOffered.toHitTotal. */
+    toHitTotal: z.number().int(),
+    /** Client-echoed from reactionOffered.currentAc. */
+    currentAc: z.number().int(),
+    /** Client-echoed from reactionOffered.rolledDamage. */
+    rolledDamage: z.number().int().nonnegative(),
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/attack/resolve-reaction',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = ResolveReactionBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { reactionDecision, defenderCombatantId, toHitTotal, currentAc, rolledDamage, version } =
+        bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for campaign membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ERB-AUTH-01 — mirrors attack/apply).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await resolveAttackReaction({
+        encounterId: id,
+        reactionDecision,
+        defenderCombatantId,
+        toHitTotal,
+        currentAc,
+        rolledDamage,
+        version,
+        callerId: userId,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
+          case 'REACTION_ALREADY_USED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'REACTION_ALREADY_USED' }],
+            });
+          case 'SHIELD_NO_SLOT_AVAILABLE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'SHIELD_NO_SLOT_AVAILABLE' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({
+        hit: result.hit,
+        shieldCast: result.shieldCast,
+        newAc: result.newAc,
+        ...(result.newHp !== undefined ? { newHp: result.newHp } : {}),
       });
     },
   );

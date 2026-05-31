@@ -28,12 +28,14 @@ import {
   rollToHit,
   computeKiSaveDc,
   computeDivineSmiteDice,
+  isShieldableHit,
   type RngFn,
   type RollResult,
   type Source,
   type DiceExpr,
 } from '@dungeon-hub/domain/engine';
-import { consumeSpellSlot } from '@dungeon-hub/domain/character/spellcasting';
+import { consumeSpellSlot, computeSpellSlots } from '@dungeon-hub/domain/character/spellcasting';
+import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { buildAttackContext } from './build-attack-context.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
@@ -134,6 +136,24 @@ export type StunningStrikeBlock =
     };
 
 export type PerformWeaponAttackApplyResult =
+  // REACTION OFFERED: shieldable hit — no commit; client must call resolve-reaction.
+  // REQ-ERB-FLOW-01: no HP mutation, no version bump, no slot consumed.
+  // PHB p.275: "When you are hit by an attack... you can use your reaction."
+  // rolledDamage is pre-rolled (for the client to echo back in resolve-reaction body).
+  | {
+      ok: true;
+      hit: true;
+      reactionOffered: {
+        kind: 'shield';
+        defenderCombatantId: string;
+        toHitTotal: number;
+        currentAc: number;
+        /** Pre-rolled damage (client must echo in resolve-reaction body). */
+        rolledDamage: number;
+        /** Damage type for provenance. */
+        damageType: string;
+      };
+    }
   // MISS: no damage rolled, no HP mutation, no CAS bump (REQ-APPLY-FLOW-02).
   | {
       ok: true;
@@ -271,6 +291,7 @@ export async function performWeaponAttackApply(
       ac: encounterCombatants.ac,
       kind: encounterCombatants.kind,
       characterId: encounterCombatants.characterId,
+      reactionUsed: encounterCombatants.reactionUsed,
     })
     .from(encounterCombatants)
     .where(and(eq(encounterCombatants.id, targetId), eq(encounterCombatants.encounterId, encounterId)))
@@ -430,6 +451,88 @@ export async function performWeaponAttackApply(
       toHitBonus: toHitResult.toHitBonus,
       targetAc: toHitResult.targetAc,
     };
+  }
+
+  // ── Step 10b: Reaction window (ADR-1 engine-reaction-bus) ─────────────────────
+  // PHB p.275: Shield — "+5 bonus to AC until the start of your next turn,
+  //   including against the triggering attack." Triggered "when you are hit by an attack."
+  // Predicate: hit && !crit && gap<5 (domain pure check) && PC defender
+  //   && reaction_used===false && defender has ≥1 level-1+ slot.
+  //
+  // ADR-1: UX optimization — gap<5 means Shield could change the outcome.
+  // Gap≥5 slots falls through to commit (no reaction window opened).
+  // Crit bypasses Shield entirely (PHB p.194: nat-20 always hits regardless of AC).
+  if (
+    targetCombatant.kind === 'pc' &&
+    !targetCombatant.reactionUsed &&
+    isShieldableHit({
+      hit: toHitResult.hit,
+      crit: toHitResult.crit,
+      total: toHitResult.total,
+      targetAc,
+    })
+  ) {
+    // Check if defender PC has at least one 1st-level+ spell slot available.
+    // This is a PC check (characterId must exist from kind==='pc' guard above).
+    const defenderCharId = targetCombatant.characterId;
+    let defenderHasSlot = false;
+    if (defenderCharId) {
+      const [defCharRow] = await db
+        .select({ data: characters.data })
+        .from(characters)
+        .where(eq(characters.id, defenderCharId))
+        .limit(1);
+      if (defCharRow) {
+        const defData = (defCharRow.data as Record<string, unknown>) ?? {};
+        const { slots: defSlotsMax } = computeSpellSlots(
+          (defData['classes'] as AppliedClass[] | undefined) ?? [],
+        );
+        const defSlotsUsed = (defData['spellSlotsUsed'] as number[] | undefined) ?? new Array(9).fill(0);
+        // Has a free level-1+ slot if any slot index 0..8 has (max > used)
+        for (let lvl = 0; lvl < 9; lvl++) {
+          const slotMax = defSlotsMax[lvl] ?? 0;
+          const slotUsed = defSlotsUsed[lvl] ?? 0;
+          if (slotMax > slotUsed) {
+            defenderHasSlot = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (defenderHasSlot) {
+      // SUSPEND: pre-roll damage so resolve-reaction can commit without re-loading
+      // the attacker context. The client echoes rolledDamage back in the resolve body.
+      // crit=false here because isShieldableHit already requires !crit.
+      // We still roll with the current cryptoRng (same instance — ADR-3).
+      const breakdownWithSmite = (() => {
+        if (!runtimeDecisions?.['divineSmiteSpend'] || divineSmiteSlotLevel === undefined) {
+          return damage.breakdown;
+        }
+        const smiteDice = computeDivineSmiteDice(divineSmiteSlotLevel, divineSmiteUndead ?? false);
+        const smiteSource: Source = {
+          label: 'Divine Smite',
+          amount: smiteDice,
+          type: 'untyped',
+          origin: { id: charId, conditions: [] },
+        };
+        return [...damage.breakdown, smiteSource];
+      })();
+      const suspendRoll = rollDamageBreakdown(damage.dice, breakdownWithSmite, false, cryptoRng);
+
+      return {
+        ok: true,
+        hit: true,
+        reactionOffered: {
+          kind: 'shield',
+          defenderCombatantId: targetId,
+          toHitTotal: toHitResult.total,
+          currentAc: targetAc,
+          rolledDamage: suspendRoll.total,
+          damageType: weapon.damageType,
+        },
+      };
+    }
   }
 
   // ── Step 11: rollDamageBreakdown (crit SERVER-DERIVED — REQ-TOHIT-CRIT-01) ────

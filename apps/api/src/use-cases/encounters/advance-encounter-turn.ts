@@ -5,7 +5,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants } from '../../infra/db/schema.js';
 import { advanceTurn } from '@dungeon-hub/domain/encounter';
 import { loadEncounter, type LoadedEncounter } from './load-encounter.js';
 
@@ -80,6 +80,17 @@ export async function advanceEncounterTurn(
         AND turns_remaining > 0
     `);
     // turns_remaining - 1 arithmetic is static SQL text, not user input — injection-safe (ADR-2).
+
+    // Step 4: Reset reaction_used for the INCOMING combatant (ADR-5 engine-reaction-bus).
+    // PHB p.190: "You regain your expended reaction at the start of your turn."
+    // "Start of your turn" = when you become the INCOMING (active) combatant.
+    // CRITICAL: reset targets result.currentCombatantId (INCOMING), NOT oldCombatantId (OUTGOING).
+    // The outgoing combatant's reaction is NOT reset when their turn ends — it resets only
+    // when the pointer returns to them (their next turn start = when they become INCOMING again).
+    await tx
+      .update(encounterCombatants)
+      .set({ reactionUsed: false })
+      .where(eq(encounterCombatants.id, result.currentCombatantId));
 
     return { conflict: false as const };
   });

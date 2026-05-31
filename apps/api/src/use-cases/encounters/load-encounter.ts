@@ -40,6 +40,7 @@ export async function loadEncounter(id: string): Promise<LoadedEncounter | null>
       hpMax: c.hpMax,
       ac: c.ac,
       insertionOrder: c.insertionOrder,
+      reactionUsed: c.reactionUsed,
     })),
   };
 }
