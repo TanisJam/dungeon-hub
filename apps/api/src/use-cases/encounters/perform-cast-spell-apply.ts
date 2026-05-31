@@ -251,12 +251,18 @@ export async function performCastSpellApply(
   const nextCasterSlotsUsed = slotResult.slotsUsed;
 
   // ── Step 8: Determine suspend vs atomic branch ────────────────────────────────
-  // Suspend predicate: defender is PC + has ≥1 1st-level+ slot + reaction_used===false.
-  // (mirrors perform-weapon-attack-apply.ts:464-500 defender slot check)
+  // Suspend predicate: canShield || canCounter (ADR-3 engine-counterspell).
+  //
+  // canShield: defender is PC + reaction_used===false + has ≥1 1st-level+ slot (PHB p.275).
+  // canCounter: any non-caster PC combatant in encounter with reaction_used===false +
+  //             has ≥1 3rd-level+ slot (slot index ≥2, PHB p.281).
+  // When NEITHER holds → atomic path (byte-identical to Slice 0 — REQ-CS-10, REQ-SC-05).
+
+  // ── canShield check (mirrors L244-269 from Slice 0) ──────────────────────────
   const isDefenderPc = targetCombatant.kind === 'pc';
   const defenderNotUsedReaction = !targetCombatant.reactionUsed;
 
-  let defenderHasSlot = false;
+  let canShield = false;
   if (isDefenderPc && defenderNotUsedReaction && targetCombatant.characterId) {
     const [defCharRow] = await db
       .select({ data: characters.data })
@@ -277,14 +283,77 @@ export async function performCastSpellApply(
         const slotMax = defSlotsMax[lvl] ?? 0;
         const slotUsed = defSlotsUsed[lvl] ?? 0;
         if (slotMax > slotUsed) {
-          defenderHasSlot = true;
+          canShield = true;
           break;
         }
       }
     }
   }
 
-  const shouldSuspend = isDefenderPc && defenderNotUsedReaction && defenderHasSlot;
+  // ── canCounter check (ADR-3 engine-counterspell) ─────────────────────────────
+  // SELECT all non-caster PC combatants in encounter with reaction_used=false.
+  // For each, check if they have ≥1 free 3rd-level+ slot (slot index ≥2).
+  // PHB p.281: Counterspell requires a spell slot of 3rd level or higher.
+  const eligibleCounterspellerIds: string[] = [];
+
+  const otherCombatants = await db
+    .select({
+      id: encounterCombatants.id,
+      kind: encounterCombatants.kind,
+      characterId: encounterCombatants.characterId,
+      reactionUsed: encounterCombatants.reactionUsed,
+    })
+    .from(encounterCombatants)
+    .where(
+      and(
+        eq(encounterCombatants.encounterId, encounterId),
+      ),
+    );
+
+  for (const combatant of otherCombatants) {
+    // Must be non-caster (Counterspell is a reaction to ANOTHER creature's cast).
+    if (combatant.id === casterId) continue;
+    // Must be a PC (NPC counterspellers are out of scope — design #1386).
+    if (combatant.kind !== 'pc') continue;
+    // Must have reaction available.
+    if (combatant.reactionUsed) continue;
+    if (!combatant.characterId) continue;
+
+    const [charRow] = await db
+      .select({ data: characters.data })
+      .from(characters)
+      .where(eq(characters.id, combatant.characterId))
+      .limit(1);
+
+    if (!charRow) continue;
+
+    const data = (charRow.data as Record<string, unknown>) ?? {};
+    const { slots: slotsMax } = computeSpellSlots(
+      (data['classes'] as AppliedClass[] | undefined) ?? [],
+    );
+    const slotsUsed =
+      (data['spellSlotsUsed'] as number[] | undefined) ?? new Array(9).fill(0);
+
+    // Has a free 3rd-level+ slot: index ≥2 (index 0 = level 1, index 2 = level 3).
+    let hasThirdLevelSlot = false;
+    for (let lvl = 2; lvl < 9; lvl++) {
+      const slotMax = slotsMax[lvl] ?? 0;
+      const slotUsed = slotsUsed[lvl] ?? 0;
+      if (slotMax > slotUsed) {
+        hasThirdLevelSlot = true;
+        break;
+      }
+    }
+
+    if (hasThirdLevelSlot) {
+      eligibleCounterspellerIds.push(combatant.id);
+    }
+  }
+
+  const canCounter = eligibleCounterspellerIds.length > 0;
+
+  // shouldSuspend = canShield || canCounter (ADR-3).
+  const shouldSuspend = canShield || canCounter;
 
   // ── Step 9a: SUSPEND PATH ─────────────────────────────────────────────────────
   // Roll MM darts server-side (C-1). Write pending_cast with version guard (W-3).
@@ -317,14 +386,22 @@ export async function performCastSpellApply(
       return { ok: false, code: 'VERSION_CONFLICT' };
     }
 
-    // Return castAnnounced — NO dart damage values in response (C-1 server-authority — ADR-6).
-    // ADR-4 (engine-counterspell): options[] shape — Shield option only (canCounter added in T-3).
+    // Build options[] for castAnnounced (ADR-4 engine-counterspell).
+    // C-1: NO dart damage values in response (server-authority — ADR-6).
+    const castOptions: CastAnnouncedOption[] = [];
+    if (canShield) {
+      castOptions.push({ kind: 'shield', defenderCombatantId: targetId });
+    }
+    if (canCounter) {
+      castOptions.push({ kind: 'counterspell', eligibleCounterspellerIds });
+    }
+
     return {
       ok: true,
       castAnnounced: {
         spellName,
         slotLevel,
-        options: [{ kind: 'shield', defenderCombatantId: targetId }],
+        options: castOptions,
       },
     };
   }

@@ -1010,17 +1010,22 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
   );
 
   // ---- POST /encounters/:id/actions/cast-spell/resolve-reaction -----------
-  // engine-spell-cast-suspend: Shield-vs-MM reaction resolution.
+  // engine-spell-cast-suspend: Shield-vs-MM / Counterspell reaction resolution.
   // GM-only. Server reads damage from pending_cast (server-authoritative).
   // Body: { reactionDecision, defenderCombatantId, version } — NO damage fields (C-1).
+  // ADR-4 (engine-counterspell): adds 'cast-counterspell' arm with counterspellerCombatantId + slotLevel.
   // REQ-SC-06: cast-shield → 0 force damage, both slots consumed.
   // REQ-SC-07: decline → full server-rolled force damage, caster slot consumed.
   // REQ-SC-08: REACTION_ALREADY_USED → 400.
+  // REQ-CS-07: INSUFFICIENT_SLOT, COUNTERSPELLER_IS_CASTER, REACTION_ALREADY_USED → 400.
   const ResolveCastReactionBody = z.object({
-    reactionDecision: z.enum(['cast-shield', 'decline']),
+    reactionDecision: z.enum(['cast-shield', 'decline', 'cast-counterspell']),
     defenderCombatantId: z.string().uuid(),
     version: z.number().int().nonnegative(),
-    // Zod strips unknown keys — any client-injected damage field is silently dropped (C-1).
+    // cast-counterspell fields (optional for backward-compat; required when reactionDecision === 'cast-counterspell').
+    counterspellerCombatantId: z.string().uuid().optional(),
+    slotLevel: z.number().int().min(1).optional(),
+    // Zod strips unknown keys — any client-injected damage/roll field is silently dropped (C-1).
   });
 
   app.post(
@@ -1035,7 +1040,13 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { reactionDecision, defenderCombatantId, version } = bodyResult.data;
+      const {
+        reactionDecision,
+        defenderCombatantId,
+        version,
+        counterspellerCombatantId,
+        slotLevel,
+      } = bodyResult.data;
       const userId = request.user!.sub;
 
       const [encRow] = await db
@@ -1053,6 +1064,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         encounterId: id,
         reactionDecision,
         defenderCombatantId,
+        counterspellerCombatantId,
+        counterspellSlotLevel: slotLevel,
         version,
         callerId: userId,
       });
@@ -1074,6 +1087,16 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'SHIELD_NO_SLOT_AVAILABLE' }],
             });
+          case 'INSUFFICIENT_SLOT':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'INSUFFICIENT_SLOT', slotLevel: result.slotLevel }],
+            });
+          case 'COUNTERSPELLER_IS_CASTER':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'COUNTERSPELLER_IS_CASTER' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -1081,6 +1104,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
 
       return reply.code(200).send({
         shieldCast: result.shieldCast,
+        spelCountered: result.spelCountered,
         newHp: result.newHp,
         damageApplied: result.damageApplied,
       });
