@@ -24,6 +24,8 @@ import { removeCombatantEffect } from '../../use-cases/encounters/remove-combata
 import { removeCombatantCondition } from '../../use-cases/encounters/remove-combatant-condition.js';
 import { performSpellHeal } from '../../use-cases/encounters/perform-spell-heal.js';
 import { resolveAttackReaction } from '../../use-cases/encounters/resolve-attack-reaction.js';
+import { performCastSpellApply } from '../../use-cases/encounters/perform-cast-spell-apply.js';
+import { resolveCastReaction } from '../../use-cases/encounters/resolve-cast-reaction.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -914,6 +916,173 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         shieldCast: result.shieldCast,
         newAc: result.newAc,
         ...(result.newHp !== undefined ? { newHp: result.newHp } : {}),
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/cast-spell ----------------------------
+  // engine-spell-cast-suspend: interceptable Magic Missile cast action.
+  // GM-only. Server-authoritative: rolls MM darts server-side, suspends into pending_cast
+  // when defender can react with Shield (PC + free reaction + 1st-level slot), else atomic resolve.
+  // REQ-SC-01..05: cast + suspend flow.
+  // C-1: server-rolled damage NEVER in response body (stored in pending_cast server-side).
+  // W-3: pending_cast write is version-guarded (no version bump on suspend).
+  const CastSpellBody = z.object({
+    casterId: z.string().uuid(),
+    spellName: z.literal('Magic Missile'),
+    slotLevel: z.number().int().min(1).max(9),
+    targets: z.array(z.string().uuid()).min(1),
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/cast-spell',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = CastSpellBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { casterId, spellName, slotLevel, targets, version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (mirrors attack/apply — engine-spell-cast-suspend design).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await performCastSpellApply({
+        encounterId: id,
+        casterId,
+        spellName,
+        slotLevel,
+        targets,
+        version,
+        userId,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'NOT_YOUR_TURN':
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'MULTI_TARGET_NOT_SUPPORTED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'MULTI_TARGET_NOT_SUPPORTED' }],
+            });
+          case 'INSUFFICIENT_SLOT':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'INSUFFICIENT_SLOT' }],
+            });
+          case 'CASTER_NOT_SPELLCASTER':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'CASTER_NOT_SPELLCASTER' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // Suspend path: castAnnounced (no HP/slot/version committed — C-1 server-authority).
+      if (result.castAnnounced) {
+        return reply.code(200).send({ castAnnounced: result.castAnnounced });
+      }
+
+      // Atomic path: damage result (NPC target / no defender slot / reaction used).
+      return reply.code(200).send({ damage: result.damage });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/cast-spell/resolve-reaction -----------
+  // engine-spell-cast-suspend: Shield-vs-MM reaction resolution.
+  // GM-only. Server reads damage from pending_cast (server-authoritative).
+  // Body: { reactionDecision, defenderCombatantId, version } — NO damage fields (C-1).
+  // REQ-SC-06: cast-shield → 0 force damage, both slots consumed.
+  // REQ-SC-07: decline → full server-rolled force damage, caster slot consumed.
+  // REQ-SC-08: REACTION_ALREADY_USED → 400.
+  const ResolveCastReactionBody = z.object({
+    reactionDecision: z.enum(['cast-shield', 'decline']),
+    defenderCombatantId: z.string().uuid(),
+    version: z.number().int().nonnegative(),
+    // Zod strips unknown keys — any client-injected damage field is silently dropped (C-1).
+  });
+
+  app.post(
+    '/encounters/:id/actions/cast-spell/resolve-reaction',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = ResolveCastReactionBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { reactionDecision, defenderCombatantId, version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (mirrors attack/resolve-reaction — engine-reaction-bus pattern).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await resolveCastReaction({
+        encounterId: id,
+        reactionDecision,
+        defenderCombatantId,
+        version,
+        callerId: userId,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'REACTION_ALREADY_USED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'REACTION_ALREADY_USED' }],
+            });
+          case 'SHIELD_NO_SLOT_AVAILABLE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'SHIELD_NO_SLOT_AVAILABLE' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({
+        shieldCast: result.shieldCast,
+        newHp: result.newHp,
+        damageApplied: result.damageApplied,
       });
     },
   );
