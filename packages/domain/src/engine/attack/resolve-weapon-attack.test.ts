@@ -606,9 +606,11 @@ describe('resolveWeaponAttack — Scenario ONHIT-5: full_phase_still_resolves (R
       const topKeys = Object.keys(result).sort();
       expect(topKeys).toEqual(['action', 'damage', 'rollMode', 'toHit']);
 
-      // damage shape: exactly {dice, flatMods, breakdown}
+      // damage shape: exactly {dice, flatMods, breakdown, damageType}
+      // damageType added in REQ-RI-06 / ADR-2: echo weapon.damageType for downstream
+      // resist/immune resolution. Additive change — no removal of existing fields.
       const damageKeys = Object.keys(result.damage).sort();
-      expect(damageKeys).toEqual(['breakdown', 'dice', 'flatMods']);
+      expect(damageKeys).toEqual(['breakdown', 'damageType', 'dice', 'flatMods']);
     },
   );
 });
@@ -718,6 +720,59 @@ describe('resolveWeaponAttack — Scenario SA-CTX-01: enriched_ctx_resolvedRollM
       const riderSource = result.damage.breakdown.find((s) => s.label === 'Advantage Gated Rider');
       expect(riderSource).toBeDefined();
       expect(riderSource!.amount).toBe('2d6');
+    },
+  );
+});
+
+// ── Scenario RI-DMG-TYPE-01: damageType flows through WeaponAttackResult ─────
+// REQ-RI-06 / ADR-2 — weapon damageType surfaced on result.damage
+
+describe('resolveWeaponAttack — Scenario RI-DMG-TYPE-01: damageType on result (REQ-RI-06)', () => {
+  it(
+    'longsword (damageType: "slashing") → result.damage.damageType === "slashing" (PHB p.196)',
+    () => {
+      // PHB p.196: each damage instance carries one type.
+      // ADR-2: surface weapon.damageType on WeaponAttackResult.damage (echo from input).
+      // ZERO behavioral change — the type is already on the input; we just echo it.
+      const registry = makeEmptyRegistry();
+      const ctx = makeCtx(FIGHTER_ID);
+      const input: WeaponAttackInput = {
+        self: FIGHTER_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 1,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // damageType must be echoed from weapon input onto result.damage
+      expect((result.damage as { damageType?: string }).damageType).toBe('slashing');
+    },
+  );
+
+  it(
+    'piercing weapon (rapier) → result.damage.damageType === "piercing"',
+    () => {
+      const registry = makeEmptyRegistry();
+      const ctx = makeCtx(ROGUE_ID);
+      const input: WeaponAttackInput = {
+        self: ROGUE_ID,
+        ctx,
+        registry,
+        strMod: 0,
+        dexMod: 3,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: RAPIER,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      expect((result.damage as { damageType?: string }).damageType).toBe('piercing');
     },
   );
 });

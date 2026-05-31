@@ -91,6 +91,13 @@ export interface WeaponAttackResult {
     dice: DiceExpr;
     flatMods: Source[];
     breakdown: Source[];
+    /**
+     * Damage type of this weapon attack instance.
+     * Echoed from weapon.damageType input — no behavioral change.
+     * Required for downstream resist/immune resolution (REQ-RI-06 / ADR-2).
+     * PHB p.196: each damage instance carries one type.
+     */
+    damageType: string;
   };
   /** Roll mode resolved from active advantage/disadvantage mods (PHB p.173). */
   rollMode: RollModeResult;
@@ -266,6 +273,10 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
     dice: weapon.damageDice,
     flatMods: damageFlatMods,
     breakdown: damageBreakdown,
+    // ADR-2: echo weapon.damageType onto result so the use-case layer can pass
+    // it to resolveResistance without needing to look up the weapon again.
+    // No behavioral change — this is a descriptor field, not a dice modifier.
+    damageType: weapon.damageType,
   };
 
   // ── Phase sweep: DAMAGE → ON_DAMAGE_APPLIED ───────────────────────────────────

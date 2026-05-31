@@ -259,7 +259,35 @@ export type ProficiencyMod = {
   level?: 'proficient' | 'expertise';
 };
 
-/** Closed union of all 10 modifier kinds in this slice. */
+/**
+ * ResistMod — typed damage resistance or immunity.
+ *
+ * Encodes the post-roll number transform from PHB p.197 ("Damage Resistance
+ * and Immunity"). One kind, two modes:
+ *   half   — resistance: finalDamage = Math.floor(rolledDamage / 2)
+ *   immune — immunity:   finalDamage = 0
+ *
+ * damageType: specific damage type string (e.g. 'fire', 'poison') OR the
+ *   special literal 'all' which matches any incoming damage type.
+ *   PHB p.197: "resistance to a damage type"; PHB p.291: Petrified has
+ *   resistance to all damage (damageType: 'all').
+ *
+ * Resolution phase: AFTER all other modifiers, BEFORE HP loss (ADR-3).
+ * Trigger label: 'on-damage' (informative only; ResistMods are NOT
+ * resolved via the attacker-centric registry query path — they are
+ * resolved by the applyDamageWithResist pure helper).
+ *
+ * // TODO #513: immunity map and resistance pools → DB-injected resolver.
+ */
+export type ResistMod = {
+  kind: 'resist';
+  /** Specific damage type (e.g. 'fire', 'slashing') or 'all' (matches any type). */
+  damageType: string | 'all';
+  /** 'half' = resistance (floor halve once); 'immune' = immunity (zero). */
+  mode: 'half' | 'immune';
+};
+
+/** Closed union of all 11 modifier kinds in this slice. */
 export type Modifier =
   | NumMod
   | AdvantageMod
@@ -270,7 +298,8 @@ export type Modifier =
   | ReplaceMod
   | GmRulingMod
   | NoopMod
-  | ProficiencyMod;
+  | ProficiencyMod
+  | ResistMod;
 
 // ── Type guards ───────────────────────────────────────────────────────────────
 
@@ -312,4 +341,8 @@ export function isNoopMod(m: Modifier): m is NoopMod {
 
 export function isProficiencyMod(m: Modifier): m is ProficiencyMod {
   return m.kind === 'proficiency';
+}
+
+export function isResistMod(m: Modifier): m is ResistMod {
+  return m.kind === 'resist';
 }

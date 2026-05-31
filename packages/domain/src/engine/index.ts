@@ -26,6 +26,8 @@ export type {
   GmRulingMod,
   NoopMod,
   ProficiencyMod,
+  // engine-resist-immunity: 11th modifier kind (REQ-RI-06 / ADR-1)
+  ResistMod,
   // Supporting types
   DurationSpec,
   EndCondition,
@@ -56,6 +58,8 @@ export {
   isGmRulingMod,
   isNoopMod,
   isProficiencyMod,
+  // engine-resist-immunity: ResistMod type guard (REQ-RI-06 / ADR-1)
+  isResistMod,
 } from './types.js';
 
 // ── Provenance types ──────────────────────────────────────────────────────────
@@ -124,6 +128,17 @@ export { applyStacking } from './stacking/apply.js';
 export { resolveStat } from './resolve/stat.js';
 export { resolveRollMode } from './resolve/roll-mode.js';
 export type { RollModeResult } from './resolve/roll-mode.js';
+
+// ── Resist/Immune primitive (engine-resist-immunity — REQ-RI-01..06) ─────────
+
+export {
+  applyDamageWithResist,
+  STANDARD_DAMAGE_TYPES,
+} from '../encounter/apply-damage-with-resist.js';
+export type {
+  ApplyDamageWithResistInput,
+  ApplyDamageWithResistResult,
+} from '../encounter/apply-damage-with-resist.js';
 
 // ── Dice roller (engine-attack-apply-damage) ──────────────────────────────────
 
