@@ -13,7 +13,7 @@
  *   "The creature automatically fails Strength and Dexterity saving throws."
  *   Petrified implies Incapacitated.
  *
- * Tests (C-9 scenarios):
+ * Tests (C-9 scenarios + W-2 coverage):
  *
  *   RI-T1:  Weapon attack (slashing) vs Petrified target → finalDamage = floor(rolledDamage/2)
  *           (resist-all halves — REQ-RI-10).
@@ -35,6 +35,7 @@
  *   RI-T13: Server-authority — Petrified resistance resolved server-side from DB conditions
  *           (client cannot bypass via body — REQ-RI-07).
  *   RI-T14: Petrified is in CONDITION_CATALOG (apply Petrified via forced-check → 200, not UNKNOWN_CONDITION — REQ-RI-09).
+ *   RI-T15: Attack roll vs Petrified target → rollMode.mode='advantage' (REQ-RI-14, PHB p.291 — W-2 coverage).
  *
  * Known pre-existing failures (NOT ours): health.test.ts, auth-link-revoke.test.ts (GoTrue),
  *   SS-T5 (stunned-strike miss flake).
@@ -755,4 +756,49 @@ describe('engine-resist-immunity — Petrified resistance/immunity + forced-chec
 
     await clearConditions(npcCombatantId);
   });
+
+  // ── RI-T15: attack vs Petrified target → rollMode='advantage' (W-2 coverage) ───
+  // PHB p.291: "Attack rolls against the creature have advantage."
+  // REQ-RI-14: build-attack-context registers the attackers-of advantage grant from
+  //            buildPetrifiedModifiers; resolveRollMode returns 'advantage'.
+  // Mirrors the Stunned characterization test (FC-T10 in engine-forced-check.test.ts)
+  // but for Petrified. Uses the read-only /attack endpoint so no retry loop is needed.
+  it(
+    'RI-T15: attack vs Petrified target → rollMode.mode=advantage (REQ-RI-14, PHB p.291)',
+    async () => {
+      // PHB p.291: "Attack rolls against the creature have advantage."
+      // The build-attack-context.ts Petrified branch (L440-453) mirrors the Stunned branch —
+      // it registers buildPetrifiedModifiers instances into the registry. resolveRollMode
+      // then resolves 'advantage' for the attacking combatant.
+      const app = await getTestApp();
+      const { encounterId, fighterCombatantId, npcCombatantId } =
+        await makeEncounter('RI-T15', 50, 1);
+
+      // Insert Petrified directly (simulates prior application — same pattern as RI-T1/RI-T11/RI-T12).
+      await insertCondition(npcCombatantId, 'Petrified');
+
+      // POST /attack (read-only) — returns rollMode without committing damage.
+      // AC=1 ensures the context can resolve fully; /attack does not apply HP changes.
+      const attackRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${encounterId}/actions/attack`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId: fighterCombatantId,
+          targetId: npcCombatantId,
+          weaponInstanceId: longswordInstanceId,
+        },
+      });
+
+      expect(attackRes.statusCode, `RI-T15 status: ${attackRes.body}`).toBe(200);
+      const attackBody = attackRes.json();
+
+      // PHB p.291 — attack rolls against Petrified have advantage.
+      // REQ-RI-14: rollMode.mode must be 'advantage' when target is Petrified.
+      // Mirrors FC-T10 assertion shape (rollMode is a RollModeResult: {mode, breakdown}).
+      expect(attackBody.rollMode.mode, 'RI-T15: Petrified target gives attacker advantage').toBe('advantage');
+
+      await clearConditions(npcCombatantId);
+    },
+  );
 });
