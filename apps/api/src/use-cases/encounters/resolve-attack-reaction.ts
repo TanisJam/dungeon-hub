@@ -2,8 +2,10 @@
  * resolveAttackReaction — two-step Shield reaction resolution use-case.
  *
  * Called after `performWeaponAttackApply` returns `reactionOffered` with
- * { kind:'shield' }. The client echoes back `toHitTotal`, `defenderCombatantId`,
- * and `version`, plus the reaction decision.
+ * { kind:'shield' }. The server reads back the server-authoritative pending
+ * reaction state from `encounters.pending_reaction` — the client does NOT
+ * supply damage, toHitTotal, or currentAc. This ensures full server-authority
+ * over combat outcomes (C-1 fix: no client-echo trust for damage values).
  *
  * Design ref: sdd/engine-reaction-bus/design — ADR-4.
  *
@@ -14,14 +16,16 @@
  *
  * Validation order (fail-fast, cheapest first):
  *   1. Load encounter + CAS version pre-check (409 VERSION_CONFLICT)
- *   2. Defender combatant exists + auth check (403 if not DM or controller)
- *   3. `decline` path → commit original hit atomically (no slot, reaction_used unchanged)
- *   4. `cast-shield` path:
+ *   2. Load server-authoritative pending_reaction (409 VERSION_CONFLICT if missing/stale)
+ *   3. Defender combatant exists + auth check (403 if not DM or controller)
+ *   4. `decline` path → commit original hit atomically; clear pending_reaction in same tx
+ *   5. `cast-shield` path:
  *      a. reaction_used===false (400 REACTION_ALREADY_USED)
  *      b. consumeSpellSlot(level:1) available (400 SHIELD_NO_SLOT_AVAILABLE)
  *      c. build transient Shield NumMod → resolveTargetAc(defender, [shieldMod]) → newAc
- *      d. re-derive hit: toHitTotal >= newAc
- *      e. atomic CAS tx: UPDATE hp (if still hit) + jsonb_set spellSlotsUsed + reaction_used=true + version++
+ *      d. re-derive hit: toHitTotal >= newAc (using server-stored toHitTotal)
+ *      e. atomic CAS tx: UPDATE hp (if still hit) + jsonb_set spellSlotsUsed +
+ *         reaction_used=true + version++ + pending_reaction=NULL
  *
  * REQ-ERB-RESOLVE-01: cast-shield commits with +5 AC re-resolution.
  * REQ-ERB-RESOLVE-02: decline commits original hit.
@@ -47,18 +51,37 @@ import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { resolveTargetAc } from './resolve-target-ac.js';
 
+// ── Pending Reaction shape ─────────────────────────────────────────────────────
+
+interface PendingReaction {
+  defenderCombatantId: string;
+  attackerCombatantId: string;
+  toHitTotal: number;
+  targetAc: number;
+  rolledDamage: number;
+  damageType: string;
+  /** The encounter version at suspend time. Used to detect stale pending state. */
+  encVersion: number;
+}
+
+function isPendingReaction(v: unknown): v is PendingReaction {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o['defenderCombatantId'] === 'string' &&
+    typeof o['toHitTotal'] === 'number' &&
+    typeof o['targetAc'] === 'number' &&
+    typeof o['rolledDamage'] === 'number' &&
+    typeof o['encVersion'] === 'number'
+  );
+}
+
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
 export interface ResolveAttackReactionInput {
   encounterId: string;
   reactionDecision: 'cast-shield' | 'decline';
   defenderCombatantId: string;
-  /** Client-echoed to-hit total from the reactionOffered payload. */
-  toHitTotal: number;
-  /** Client-echoed original AC from the reactionOffered payload. */
-  currentAc: number;
-  /** Damage to apply if the hit still stands (pre-rolled, stored in suspend-state on client). */
-  rolledDamage: number;
   /** Client's known encounter version for CAS. */
   version: number;
   /** Caller's userId for auth check. */
@@ -89,9 +112,6 @@ export async function resolveAttackReaction(
     encounterId,
     reactionDecision,
     defenderCombatantId,
-    toHitTotal,
-    currentAc,
-    rolledDamage,
     version,
     callerId,
   } = input;
@@ -111,7 +131,32 @@ export async function resolveAttackReaction(
     return { ok: false, code: 'VERSION_CONFLICT' };
   }
 
-  // ── Step 2: Load defender combatant + auth check ────────────────────────────
+  // ── Step 2: Load server-authoritative pending reaction ────────────────────────
+  // The pending_reaction was stored by performWeaponAttackApply at suspend time.
+  // It carries the server-rolled toHitTotal, targetAc, and rolledDamage.
+  // If missing or stale (encVersion mismatch), reject with VERSION_CONFLICT.
+  const pendingRaw = encounterRow.pendingReaction;
+  if (!isPendingReaction(pendingRaw)) {
+    // No pending reaction exists — this call is out-of-order or was already consumed.
+    return { ok: false, code: 'VERSION_CONFLICT' };
+  }
+
+  const pending = pendingRaw;
+
+  // Bind-check: the pending state must be for this defender and this version epoch.
+  if (
+    pending.defenderCombatantId !== defenderCombatantId ||
+    pending.encVersion !== version
+  ) {
+    return { ok: false, code: 'VERSION_CONFLICT' };
+  }
+
+  // Use server-stored values — no client input for these:
+  const toHitTotal = pending.toHitTotal;
+  const currentAc = pending.targetAc;
+  const rolledDamage = pending.rolledDamage;
+
+  // ── Step 3: Load defender combatant + auth check ────────────────────────────
   const [defenderCombatant] = await db
     .select({
       id: encounterCombatants.id,
@@ -142,7 +187,7 @@ export async function resolveAttackReaction(
   // (REQ-ERB-AUTH-01 is enforced at the route layer — see encounters.ts)
   void callerId;
 
-  // ── Step 3: decline path ───────────────────────────────────────────────────
+  // ── Step 4: decline path ───────────────────────────────────────────────────
   if (reactionDecision === 'decline') {
     // Commit original hit at original AC (PHB: the attack hits at original AC, no Shield).
     // reaction_used is NOT set (player chose not to use their reaction).
@@ -161,11 +206,12 @@ export async function resolveAttackReaction(
           ),
         );
 
-      // CAS version bump
+      // CAS version bump + clear pending_reaction
       const updated = await tx
         .update(encounters)
         .set({
           version: sql`${encounters.version} + 1`,
+          pendingReaction: null,
           updatedAt: new Date(),
         })
         .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
@@ -186,15 +232,15 @@ export async function resolveAttackReaction(
     };
   }
 
-  // ── Step 4: cast-shield path ───────────────────────────────────────────────
+  // ── Step 5: cast-shield path ───────────────────────────────────────────────
 
-  // Step 4a: reaction availability (REQ-ERB-ECON-01)
+  // Step 5a: reaction availability (REQ-ERB-ECON-01)
   // PHB p.190: one reaction per round.
   if (defenderCombatant.reactionUsed) {
     return { ok: false, code: 'REACTION_ALREADY_USED' };
   }
 
-  // Step 4b: load defender's character + spell slots
+  // Step 5b: load defender's character + spell slots
   if (!defenderCombatant.characterId) {
     return { ok: false, code: 'NOT_FOUND', target: 'character' };
   }
@@ -229,7 +275,7 @@ export async function resolveAttackReaction(
 
   const nextSlotsUsed = slotResult.slotsUsed as number[];
 
-  // Step 4c: build transient Shield NumMod + re-resolve AC (REQ-ERB-PURE-01)
+  // Step 5c: build transient Shield NumMod + re-resolve AC (REQ-ERB-PURE-01)
   // ADR-3: transient mod — passed via extraMods to resolveTargetAc; never persisted.
   // category='circumstance' stacks with existing mods (types.ts StackCategory).
   const shieldMod: ModifierInstance = {
@@ -264,10 +310,11 @@ export async function resolveAttackReaction(
 
   const newAc = acResult.ac;
 
-  // Step 4d: re-derive hit (PHB p.275: "+5 AC including against the triggering attack")
+  // Step 5d: re-derive hit (PHB p.275: "+5 AC including against the triggering attack")
+  // Uses server-stored toHitTotal — no client input.
   const hit = toHitTotal >= newAc;
 
-  // Step 4e: atomic CAS tx
+  // Step 5e: atomic CAS tx
   const newHp = hit ? applyDamage(defenderCombatant.hpCurrent, rolledDamage) : defenderCombatant.hpCurrent;
 
   const txResult = await db.transaction(async (tx) => {
@@ -305,11 +352,12 @@ export async function resolveAttackReaction(
       })
       .where(eq(characters.id, defenderCombatant.characterId!));
 
-    // CAS version bump
+    // CAS version bump + clear pending_reaction atomically
     const updated = await tx
       .update(encounters)
       .set({
         version: sql`${encounters.version} + 1`,
+        pendingReaction: null,
         updatedAt: new Date(),
       })
       .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))

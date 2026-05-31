@@ -839,19 +839,14 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
 
   // ---- POST /encounters/:id/actions/attack/resolve-reaction ---------------
   // engine-reaction-bus: two-step Shield reaction resolution.
-  // GM-only. Client echoes reactionDecision + defender + version + pre-rolled damage.
+  // GM-only. Server-authoritative: damage/toHitTotal/AC are read from server-stored
+  // pending_reaction; the client supplies only reactionDecision + defenderCombatantId + version.
   // REQ-ERB-RESOLVE-01/02: cast-shield commits Shield+5 re-resolution; decline commits original.
   // REQ-ERB-ECON-01: REACTION_ALREADY_USED → 400 VALIDATION_FAILED.
   // REQ-ERB-AUTH-01: GM-only (mirrors attack/apply).
   const ResolveReactionBody = z.object({
     reactionDecision: z.enum(['cast-shield', 'decline']),
     defenderCombatantId: z.string().uuid(),
-    /** Client-echoed from reactionOffered.toHitTotal. */
-    toHitTotal: z.number().int(),
-    /** Client-echoed from reactionOffered.currentAc. */
-    currentAc: z.number().int(),
-    /** Client-echoed from reactionOffered.rolledDamage. */
-    rolledDamage: z.number().int().nonnegative(),
     version: z.number().int().nonnegative(),
   });
 
@@ -867,8 +862,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           .code(400)
           .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
       }
-      const { reactionDecision, defenderCombatantId, toHitTotal, currentAc, rolledDamage, version } =
-        bodyResult.data;
+      const { reactionDecision, defenderCombatantId, version } = bodyResult.data;
       const userId = request.user!.sub;
 
       // Load encounter for campaign membership check.
@@ -887,9 +881,6 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         encounterId: id,
         reactionDecision,
         defenderCombatantId,
-        toHitTotal,
-        currentAc,
-        rolledDamage,
         version,
         callerId: userId,
       });

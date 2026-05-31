@@ -139,7 +139,8 @@ export type PerformWeaponAttackApplyResult =
   // REACTION OFFERED: shieldable hit — no commit; client must call resolve-reaction.
   // REQ-ERB-FLOW-01: no HP mutation, no version bump, no slot consumed.
   // PHB p.275: "When you are hit by an attack... you can use your reaction."
-  // rolledDamage is pre-rolled (for the client to echo back in resolve-reaction body).
+  // Server-authoritative: rolled damage is persisted server-side in encounters.pending_reaction.
+  // The client does NOT echo damage — only reactionDecision + defenderCombatantId + version.
   | {
       ok: true;
       hit: true;
@@ -148,9 +149,7 @@ export type PerformWeaponAttackApplyResult =
         defenderCombatantId: string;
         toHitTotal: number;
         currentAc: number;
-        /** Pre-rolled damage (client must echo in resolve-reaction body). */
-        rolledDamage: number;
-        /** Damage type for provenance. */
+        /** Damage type for provenance only — actual damage is stored server-side. */
         damageType: string;
       };
     }
@@ -501,8 +500,10 @@ export async function performWeaponAttackApply(
     }
 
     if (defenderHasSlot) {
-      // SUSPEND: pre-roll damage so resolve-reaction can commit without re-loading
-      // the attacker context. The client echoes rolledDamage back in the resolve body.
+      // SUSPEND: server pre-rolls damage and persists it as server-authoritative pending
+      // reaction state on the encounter row. The client does NOT supply damage in
+      // resolve-reaction — the server reads it back from pending_reaction. This is the
+      // C-1 fix: server-authority is fully preserved (no client-echo trust).
       // crit=false here because isShieldableHit already requires !crit.
       // We still roll with the current cryptoRng (same instance — ADR-3).
       const breakdownWithSmite = (() => {
@@ -520,6 +521,26 @@ export async function performWeaponAttackApply(
       })();
       const suspendRoll = rollDamageBreakdown(damage.dice, breakdownWithSmite, false, cryptoRng);
 
+      // Persist server-rolled pending state to the DB (does NOT bump version — this is
+      // bookkeeping, not a game-state change). encVersion binds the pending state to this
+      // CAS epoch; a concurrent commit before resolve-reaction will cause a version mismatch
+      // and the CAS guard in resolveAttackReaction will reject the stale state.
+      await db
+        .update(encounters)
+        .set({
+          pendingReaction: {
+            defenderCombatantId: targetId,
+            attackerCombatantId: attackerId,
+            toHitTotal: toHitResult.total,
+            targetAc,
+            rolledDamage: suspendRoll.total,
+            damageType: weapon.damageType,
+            encVersion: version,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(encounters.id, encounterId));
+
       return {
         ok: true,
         hit: true,
@@ -528,7 +549,9 @@ export async function performWeaponAttackApply(
           defenderCombatantId: targetId,
           toHitTotal: toHitResult.total,
           currentAc: targetAc,
-          rolledDamage: suspendRoll.total,
+          // rolledDamage is intentionally NOT included in the reactionOffered response —
+          // it is stored server-side in pending_reaction only. The client supplies NO
+          // damage value in resolve-reaction; it only supplies reactionDecision + defenderCombatantId + version.
           damageType: weapon.damageType,
         },
       };
