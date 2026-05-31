@@ -1330,7 +1330,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     //   Counterspell L3 vs spell L4 → DC = 10+4 = 14. Wizard L5 INT 16 (+3) → d20+3 ≥ 14
     //   → d20 ≥ 11 → P(fail, countered=false) ≈ 50%. Retry loop until we see countered=false.
     //
-    // REQ-CB-06: COUNTERSPELL-RESOLVE arm wires checkConcentrationOnDamage (B2d wiring).
+    // REQ-CB-06: COUNTERSPELL-RESOLVE arm wires prepareConcentrationCheck / resolveConcentrationCheck (B4.2 in-tx wiring).
     // Setup: wizardTargetCharId (Wizard L1, concentrating) as target.
     //        counterspellerL5CharId (Wizard L5, INT 16) as counterspeller.
     //        casterL7CharId (Wizard L7) as caster — Wizard L7 has 1 L4 slot (PHB table) needed by spellLevel=4.
@@ -1430,7 +1430,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     //
     // PHB p.281: "If the creature is casting a spell of 3rd level or lower, its spell fails
     //   and has no effect." Counterspell L3 vs MM L1 → auto-counter (no DC check).
-    //   countered=true → finalDamage=0 → checkConcentrationOnDamage guard 2: return early.
+    //   countered=true → finalDamage=0 → prepareConcentrationCheck guard 4 (zero-damage): returns null.
     //
     // REQ-CB-08: finalDamage=0 → concentrationSave absent (omit-not-null — backward-compat).
     // Setup: wizardTargetCharId (Wizard L1, concentrating) as target.
@@ -1767,9 +1767,20 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     });
 
     // CBR-07: REQ-CID-04 atomicity — VERSION_CONFLICT path returns error but NO break.
-    // Verifies that the CAS guard fires before resolveConcentrationCheck is called:
-    // if the tx rolls back, concentration is NOT broken.
-    // We test this by sending a stale version and confirming the concentration row remains intact.
+    //
+    // SCOPE NOTE: This test covers the CAS PRE-CHECK rejection path.
+    // A stale version (version=0) triggers the CAS guard BEFORE the db.transaction closure
+    // is entered → 409 VERSION_CONFLICT → concentration row untouched.
+    //
+    // This is NOT a mid-transaction rollback test (i.e. a failure inside the tx after the
+    // HP UPDATE but before resolveConcentrationCheck). That path is not practical to cover
+    // in integration tests without DB-level fault injection.
+    //
+    // The true atomicity guarantee (REQ-CID-04) is enforced STRUCTURALLY:
+    //   resolveConcentrationCheck(concPlan, tx) runs INSIDE the db.transaction closure,
+    //   AFTER the CAS guard, using the same tx handle as the HP UPDATE.
+    //   Any failure inside the closure causes the entire tx (including the concentration
+    //   DELETE) to roll back. Verified by code inspection in verify #1461.
     it('CBR-07: VERSION_CONFLICT → concentration NOT broken (atomicity REQ-CID-04)', async () => {
       // Create an encounter with fighter as target.
       const enc2 = await (await getTestApp())

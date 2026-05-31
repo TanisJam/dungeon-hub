@@ -498,9 +498,10 @@ export async function resolveCastReaction(
     if (!txResult) return { ok: false, code: 'VERSION_CONFLICT' };
 
     // cast-shield arm: finalDamage=0 (Shield negates all MM damage — PHB p.275).
-    // prepareConcentrationCheck(target, finalDamage=0, newHp>0) → null (zero-damage guard 4).
-    // No concentration check needed. No concentrationSave in response (key omitted — REQ-CB-08).
-    // The symmetry call to checkConcentrationOnDamage(..., 0) was a dead no-op and is removed.
+    // prepareConcentrationCheck(target, finalDamage=0, newHp>0) → null (zero-damage guard 4 fires).
+    // resolveConcentrationCheck is never called (plan===null). No concentrationSave in response
+    // (key omitted — REQ-CB-08). The old symmetry call to checkConcentrationOnDamage(..., 0)
+    // was a dead no-op removed in Batch B (B4.3).
 
     return {
       ok: true,
@@ -624,7 +625,7 @@ export async function resolveCastReaction(
   const countered = counterspellResult.countered;
 
   // Load target combatant for HP update (only needed when spell resolves).
-  // B2a: widen SELECT to include kind + characterId for checkConcentrationOnDamage.
+  // B2a: widen SELECT to include kind + characterId for prepareConcentrationCheck (B4.2).
   const [targetCombatant] = await db
     .select({
       id: encounterCombatants.id,
