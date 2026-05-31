@@ -1118,3 +1118,49 @@ export const modifierInstances = pgTable(
     index('idx_mi_conc_token').on(t.concentrationToken),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// character_concentration — per-caster concentration registry (Slice 1).
+//
+// PHB p.203: "You lose concentration on a spell if you cast another spell that
+// requires concentration." ONE row per concentrating CHARACTER (PK = characterId),
+// holding the active server-minted token + which store holds the live rows.
+//
+// Design decisions (SDD sdd/engine-concentration-authority/design #1430):
+//   ADR-1: Dedicated table over a derived view — PK on characterId is a physical
+//          invariant that guarantees at most ONE concentration row per caster.
+//          A derived view cannot enforce or represent "the current one" cleanly
+//          without scanning both stores with different caster key columns.
+//   ADR-5: store column drives cross-store drop dispatch: modifier_instances vs
+//          encounter_combatant_effects. Dispatch-by-store is precise; the registry
+//          row names exactly which store holds the live rows.
+//   ADR-6: Legacy rows in either store (client-supplied tokens, no registry row)
+//          are read-tolerated and removable — the registry is write-side only.
+//   NPC gap: Registry keyed by CHARACTER id (PC only). NPC casters (characterId=null
+//            on encounter_combatants) are NOT tracked in Slice 1. Deferred.
+//
+// FK: CASCADE on character delete — when a character is removed all their
+//     concentration tracking is gone too.
+// ---------------------------------------------------------------------------
+export const characterConcentration = pgTable(
+  'character_concentration',
+  {
+    // ONE row per concentrating character → PK = characterId is the invariant.
+    characterId: uuid('character_id')
+      .primaryKey()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    // Server-minted token (crypto.randomUUID). Links back to store rows.
+    concentrationToken: text('concentration_token').notNull(),
+    // Which store holds the live child rows for this concentration.
+    store: text('store', {
+      enum: ['modifier_instances', 'encounter_combatant_effects'],
+    }).notNull(),
+    // Open text — no DB enum (§1.2 homebrew support, e.g. custom concentration spells).
+    spellName: text('spell_name').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Secondary index so the service can look up "who owns this token" efficiently.
+    index('idx_cc_token').on(t.concentrationToken),
+  ],
+);

@@ -190,6 +190,13 @@
       "when": 1780194234197,
       "tag": "0027_tiny_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1780250383443,
+      "tag": "0028_sudden_rick_jones",
+      "breakpoints": true
     }
   ]
 }
