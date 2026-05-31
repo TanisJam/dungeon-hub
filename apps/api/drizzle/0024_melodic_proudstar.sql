@@ -1,0 +1,1 @@
+ALTER TABLE "encounter_combatants" ADD COLUMN "reaction_used" boolean DEFAULT false NOT NULL;

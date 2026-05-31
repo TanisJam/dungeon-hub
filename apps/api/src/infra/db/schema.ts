@@ -919,6 +919,10 @@ export const encounterCombatants = pgTable(
     hpMax: integer('hp_max').notNull(),
     ac: integer('ac'),
     insertionOrder: integer('insertion_order').notNull(),
+    // engine-reaction-bus: reaction economy tracking.
+    // PHB p.190 — "You can take only one reaction per round."
+    // DEFAULT false backfills legacy rows; read-path tolerant (REQ-ERB-ECON-02).
+    reactionUsed: boolean('reaction_used').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],
