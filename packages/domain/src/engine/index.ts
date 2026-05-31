@@ -217,6 +217,10 @@ export { BLINDED_CONDITION_DEF } from './conditions/blinded.js';
 export { INVISIBLE_CONDITION_DEF } from './conditions/invisible.js';
 export { POISONED_CONDITION_DEF } from './conditions/poisoned.js';
 
+// engine-resist-immunity — Petrified condition def + immunity predicate (REQ-RI-09..17)
+export { PETRIFIED_CONDITION_DEF } from './conditions/petrified.js';
+export { isImmuneToCondition } from './conditions/condition-immunity.js';
+
 // ── Authoring DSL ─────────────────────────────────────────────────────────────
 
 export { parseRule } from './authoring/parse.js';
@@ -258,6 +262,10 @@ export type { BuildStunnedResult } from './rules/stunned.js';
 // conditions-catalog Slice 1 — Blinded, Invisible, Poisoned rule builders
 export { buildBlindedModifiers } from './rules/blinded.js';
 export type { BuildBlindedResult } from './rules/blinded.js';
+
+// engine-resist-immunity — Petrified rule builder (REQ-RI-10..14 / ADR-5)
+export { buildPetrifiedModifiers } from './rules/petrified.js';
+export type { BuildPetrifiedResult } from './rules/petrified.js';
 
 export { buildInvisibleModifiers } from './rules/invisible.js';
 export type { BuildInvisibleResult } from './rules/invisible.js';

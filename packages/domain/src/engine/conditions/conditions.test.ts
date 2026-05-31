@@ -21,6 +21,7 @@ import { STUNNED_CONDITION_DEF } from './stunned.js';
 import { BLINDED_CONDITION_DEF } from './blinded.js';
 import { INVISIBLE_CONDITION_DEF } from './invisible.js';
 import { POISONED_CONDITION_DEF } from './poisoned.js';
+import { PETRIFIED_CONDITION_DEF } from './petrified.js';
 
 describe('INCAPACITATED_CONDITION_DEF', () => {
   it(
@@ -192,6 +193,54 @@ describe('isIncapacitated', () => {
     // NOTE: Stunned-includes-Incapacitated composition is OUT of scope;
     // this predicate matches the literal name only.
     expect(isIncapacitated([{ name: 'Stunned' }, { name: 'Incapacitated' }])).toBe(true);
+  });
+});
+
+describe('PETRIFIED_CONDITION_DEF (REQ-RI-09 / ADR-5)', () => {
+  // PHB p.291 — Petrified:
+  //   "A petrified creature is transformed... along with any nonmagical objects
+  //    it is wearing or carrying."
+  //   "The creature has resistance to all damage."
+  //   "The creature is immune to poison and disease..."
+  //   "Attack rolls against the creature have advantage."
+  //   "The creature automatically fails Strength and Dexterity saving throws."
+  //   "The creature is incapacitated."
+
+  it('has name="Petrified" (PHB p.291)', () => {
+    // PHB p.291: condition name is "Petrified"
+    expect(PETRIFIED_CONDITION_DEF.name).toBe('Petrified');
+  });
+
+  it('selfMod is present (encodes Petrified incapacitated placeholder)', () => {
+    // ADR-5: selfMod stays AdvantageMod — no ConditionDefinition type change
+    expect(PETRIFIED_CONDITION_DEF.selfMod).toBeDefined();
+  });
+
+  it('selfMod.kind is "advantage" (ADR-5 — NO ConditionDefinition type change)', () => {
+    // ADR-5: selfMod STAYS AdvantageMod. ResistMods come through buildPetrifiedModifiers.
+    expect(PETRIFIED_CONDITION_DEF.selfMod.kind).toBe('advantage');
+  });
+
+  it('outgoingMod is present — attackers-of grant (PHB p.291 — attack rolls have advantage)', () => {
+    // PHB p.291: "Attack rolls against the creature have advantage."
+    expect(PETRIFIED_CONDITION_DEF.outgoingMod).toBeDefined();
+    expect(PETRIFIED_CONDITION_DEF.outgoingMod.grantPredicate).toBeDefined();
+    expect(PETRIFIED_CONDITION_DEF.outgoingMod.imposePredicate).toBeDefined();
+  });
+
+  it('outgoingMod.grantPredicate is alwaysTrue() — unconditional advantage (PHB p.291)', () => {
+    // PHB p.291: "Attack rolls against the creature have advantage." — unconditional
+    // alwaysTrue() = { op: 'and', nodes: [] }
+    expect(PETRIFIED_CONDITION_DEF.outgoingMod.grantPredicate).toEqual({ op: 'and', nodes: [] });
+  });
+
+  it('outgoingMod.imposePredicate is dead (never disadvantages attackers)', () => {
+    // PHB p.291: Petrified grants advantage to attackers but never disadvantage
+    // Dead predicate = not(alwaysTrue()) = always-false
+    expect(PETRIFIED_CONDITION_DEF.outgoingMod.imposePredicate).toEqual({
+      op: 'not',
+      node: { op: 'and', nodes: [] },
+    });
   });
 });
 
