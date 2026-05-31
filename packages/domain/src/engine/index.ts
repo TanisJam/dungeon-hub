@@ -148,6 +148,14 @@ export { computeDivineSmiteDice } from './damage/compute-divine-smite-dice.js';
 export { rollMagicMissile } from './spell/magic-missile.js';
 export type { RollMagicMissileInput, RollMagicMissileResult } from './spell/magic-missile.js';
 
+// Counterspell outcome resolver (engine-counterspell — Front #4 Slice 1 — PHB p.281)
+export { resolveCounterspell } from './spell/counterspell.js';
+export type {
+  ResolveCounterspellInput,
+  ResolveCounterspellResult,
+  CounterspellCheck,
+} from './spell/counterspell.js';
+
 // ── Action pipeline ───────────────────────────────────────────────────────────
 
 export type { AttackPhase, SpellPhase } from './pipeline/phases.js';
