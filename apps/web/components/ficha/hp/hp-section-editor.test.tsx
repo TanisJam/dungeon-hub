@@ -44,6 +44,14 @@ describe('HPSectionEditor', () => {
     expect(btn).toBeTruthy();
   });
 
+  it('T1b: pencil button has min-h-[44px] and min-w-[44px] class for 44px touch target (a11y mobile lock)', () => {
+    render(<HPSectionEditor {...defaultProps} />);
+    const btn = screen.getByRole('button', { name: 'Editar HP' });
+    // Lock: touch target must be ≥44px. Class min-h-[44px] + min-w-[44px] enforces this.
+    expect(btn.className).toContain('min-h-[44px]');
+    expect(btn.className).toContain('min-w-[44px]');
+  });
+
   it('T2: click pencil → HPEditor mounts inside dialog', () => {
     render(<HPSectionEditor {...defaultProps} />);
 

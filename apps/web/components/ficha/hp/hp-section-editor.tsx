@@ -27,7 +27,7 @@ export function HPSectionEditor({ characterId, currentHp, isDmHere }: HPSectionE
         type="button"
         aria-label="Editar HP"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
       >
         <Icon name="edit" size={16} />
       </button>

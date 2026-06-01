@@ -28,6 +28,14 @@ describe('RestActions', () => {
     expect(screen.getByText('Descanso largo')).toBeTruthy();
   });
 
+  it('both buttons have min-h-[44px] class for mobile touch target (a11y mobile lock)', () => {
+    render(<RestActions charId="char-1" />);
+    const shortBtn = screen.getByRole('button', { name: 'Descanso corto' });
+    const longBtn = screen.getByRole('button', { name: 'Descanso largo' });
+    expect(shortBtn.className).toContain('min-h-[44px]');
+    expect(longBtn.className).toContain('min-h-[44px]');
+  });
+
   it('clicking short rest calls shortRest with charId', async () => {
     const { shortRest } = await import('./actions');
     render(<RestActions charId="char-1" />);
