@@ -11,7 +11,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HeroNextSession } from './hero-next-session';
-import type { NextCampaign } from './mock-data';
+import type { NextCampaign } from './types';
 
 const mockCampaign: NextCampaign = {
   id: 'mock-camp-1',

@@ -7,7 +7,12 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { QuestsSinTocarList } from './quests-sin-tocar-list';
-import { MOCK_QUESTS_SIN_TOCAR } from '../dm-mock-data';
+import type { QuestSinTocar } from '../types';
+
+const MOCK_QUESTS_SIN_TOCAR: QuestSinTocar[] = [
+  { id: 'q1', title: 'El correo perdido', lastChange: 'hace 3 días' },
+  { id: 'q2', title: 'La torre del pacto', lastChange: 'hace 5 días' },
+];
 
 describe('QuestsSinTocarList', () => {
   it('T1: renders "Quests sin tocar" heading and correct row count', () => {

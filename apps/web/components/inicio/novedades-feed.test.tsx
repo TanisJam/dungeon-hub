@@ -11,7 +11,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NovedadesFeed } from './novedades-feed';
-import type { Novedad } from './mock-data';
+import type { Novedad } from './types';
 
 const mixedItems: Novedad[] = [
   { id: 'n1', ttl: 'Mara subió a nivel 4',          sub: 'Druida',  when: 'hace 2h', fresh: true  },

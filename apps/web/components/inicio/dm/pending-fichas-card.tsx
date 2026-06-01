@@ -1,4 +1,4 @@
-import type { PendingFichaSummary } from '../dm-mock-data';
+import type { PendingFichaSummary } from '../types';
 
 interface PendingFichasCardProps {
   fichas: PendingFichaSummary[];

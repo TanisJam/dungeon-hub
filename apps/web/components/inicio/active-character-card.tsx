@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Pill, SectionHead } from '@/components/ui';
-import type { ActiveCharacter } from './mock-data';
+import type { ActiveCharacter } from './types';
 
 interface ActiveCharacterCardProps {
   char: ActiveCharacter;

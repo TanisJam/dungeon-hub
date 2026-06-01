@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { V3Sheet } from '@/components/ui/sheet';
 import { PendingFichasCard } from './pending-fichas-card';
 import { PendientesSheetContent } from './pendientes-sheet-content';
-import type { PendingFichaSummary, QuestSinTocar } from '../dm-mock-data';
+import type { PendingFichaSummary, QuestSinTocar } from '../types';
 
 type Props = {
   fichas: PendingFichaSummary[];

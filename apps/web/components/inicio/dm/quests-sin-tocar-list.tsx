@@ -1,5 +1,5 @@
 import { SectionHead } from '@/components/ui/section-head';
-import type { QuestSinTocar } from '../dm-mock-data';
+import type { QuestSinTocar } from '../types';
 
 interface QuestsSinTocarListProps {
   quests: QuestSinTocar[];

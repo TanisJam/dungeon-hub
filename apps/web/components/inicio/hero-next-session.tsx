@@ -1,5 +1,5 @@
 import { Pill, Icon } from '@/components/ui';
-import type { NextCampaign } from './mock-data';
+import type { NextCampaign } from './types';
 
 interface HeroNextSessionProps {
   campaign: NextCampaign;
@@ -12,9 +12,11 @@ export function HeroNextSession({ campaign }: HeroNextSessionProps) {
       <h2 className="mt-1.5 font-display text-[22px] font-bold leading-tight tracking-tight text-ink">
         {campaign.name}
       </h2>
-      <p className="mt-1 font-script text-[13px] text-ink-soft">
-        {campaign.tagline}
-      </p>
+      {campaign.tagline && (
+        <p className="mt-1 font-script text-[13px] text-ink-soft">
+          {campaign.tagline}
+        </p>
+      )}
       <div className="mt-3.5 flex items-center gap-2.5 border-t border-accent/20 pt-3.5">
         <span className="font-display text-[30px] font-bold leading-none text-accent inicio-stat-glow tabular-nums">
           {campaign.daysToSession}

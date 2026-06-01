@@ -1,5 +1,5 @@
 import { SectionHead, V3Empty } from '@/components/ui';
-import type { Novedad } from './mock-data';
+import type { Novedad } from './types';
 
 interface NovedadesFeedProps {
   items: Novedad[];

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PendientesFichaCard } from './pendientes-ficha-card';
-import type { PendingFichaSummary } from '../dm-mock-data';
+import type { PendingFichaSummary } from '../types';
 
 vi.mock('@/app/inicio/actions', () => ({
   approveFichaFromInicio: vi.fn(),

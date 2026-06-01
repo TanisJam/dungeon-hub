@@ -1,5 +1,5 @@
 import { SectionHead } from '@/components/ui/section-head';
-import type { PendingFichaSummary, QuestSinTocar } from '../dm-mock-data';
+import type { PendingFichaSummary, QuestSinTocar } from '../types';
 import { PendientesFichaCard } from './pendientes-ficha-card';
 
 type Props = {

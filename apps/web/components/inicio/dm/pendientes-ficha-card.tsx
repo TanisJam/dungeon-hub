@@ -1,5 +1,5 @@
 import { Pill } from '@/components/ui/pill';
-import type { PendingFichaSummary } from '../dm-mock-data';
+import type { PendingFichaSummary } from '../types';
 import { PendientesActionButtons } from './pendientes-action-buttons';
 
 type Props = {

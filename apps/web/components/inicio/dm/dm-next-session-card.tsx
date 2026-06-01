@@ -1,4 +1,4 @@
-import type { DMCampaignNextSession } from '../dm-mock-data';
+import type { DMCampaignNextSession } from '../types';
 
 interface DMNextSessionCardProps {
   campaign: DMCampaignNextSession;
@@ -7,7 +7,8 @@ interface DMNextSessionCardProps {
 /**
  * DMNextSessionCard — DM view of the next campaign session.
  *
- * Shows campaign name, tagline, player count, quest count, and session number.
+ * Shows campaign name, player count, and session number.
+ * tagline and pendingQuests have no backend source — rendered only when provided.
  * The "Dirigís" pill is absolutely positioned to mark DM identity.
  *
  * REQ-IDM-NEXT-SESSION-CARD-04
@@ -27,19 +28,23 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
         {name}
       </h2>
 
-      {/* Tagline */}
-      <p className="font-script text-sm text-ink-mute mt-0.5 mb-4">
-        {tagline}
-      </p>
+      {/* Tagline — optional; no backend field */}
+      {tagline && (
+        <p className="font-script text-sm text-ink-mute mt-0.5 mb-4">
+          {tagline}
+        </p>
+      )}
 
       {/* Stats pills row */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap mt-4">
         <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
           {players} jugadores
         </span>
-        <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
-          {pendingQuests} quests activas
-        </span>
+        {pendingQuests !== undefined && (
+          <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
+            {pendingQuests} quests activas
+          </span>
+        )}
         <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
           Sesión {sessions + 1}
         </span>

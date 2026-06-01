@@ -10,7 +10,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ActiveCharacterCard } from './active-character-card';
-import type { ActiveCharacter } from './mock-data';
+import type { ActiveCharacter } from './types';
 
 const mockChar: ActiveCharacter = {
   id: 'mock-char-1',
