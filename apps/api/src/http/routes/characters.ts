@@ -4321,8 +4321,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const access = await getCharacterAccess(character, userId);
 
-    // Owner: may set current + temp; must NOT set max
-    if (access === 'owner') {
+    // Determine GM status. A user may be both owner AND GM (GM+owner scenario).
+    // For max edits, GM takes precedence: a world GM may always set max regardless
+    // of ownership. Owner-only (non-GM) is forbidden from setting max.
+    const gmCheck = await assertWorldGm(character.worldId, userId);
+    const isGm = gmCheck.ok;
+
+    if (access === 'owner' && !isGm) {
+      // Owner-non-GM: may set current + temp; must NOT set max
       if (max !== undefined) {
         return reply.code(403).send({
           error: 'FORBIDDEN',
@@ -4342,14 +4348,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           issues: [{ code: 'HP_TEMP_NEGATIVE' }],
         });
       }
-    } else {
-      // Check DM access — assertWorldGm(worldId, userId)
-      const gmCheck = await assertWorldGm(character.worldId, userId);
-      if (!gmCheck.ok) {
-        return reply.code(403).send({ error: 'FORBIDDEN', issues: [{ code: 'WORLD_GM_REQUIRED' }] });
-      }
-
-      // Validate field ranges for DM too
+    } else if (isGm) {
+      // GM (including GM+owner): may set all three fields
       if (max !== undefined && max < 1) {
         return reply.code(400).send({
           error: 'VALIDATION_FAILED',
@@ -4368,6 +4368,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
           issues: [{ code: 'HP_TEMP_NEGATIVE' }],
         });
       }
+    } else {
+      // Non-owner, non-GM: no write access
+      return reply.code(403).send({ error: 'FORBIDDEN', issues: [{ code: 'WORLD_GM_REQUIRED' }] });
     }
 
     const charData = (character.data as Record<string, unknown> | null) ?? {};
