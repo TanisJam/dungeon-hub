@@ -297,6 +297,14 @@ export interface SpellSheetRef {
   componentsM: boolean;
   /** gp cost in gp when material component is costly; null otherwise */
   componentsMCost: number | null;
+  /**
+   * Only present for Wizard spellbook casters (wizardSpellbookSize != null).
+   * True when the spell is currently prepared (in the prepared bucket).
+   * Absent for non-spellbook prepared casters (Cleric, Druid, Paladin).
+   * PHB p.114 — spellbook = all learned; prepared = daily subset from spellbook.
+   * REQ-SP-WIZARD-02.
+   */
+  prepared?: boolean;
 }
 
 export interface ClassSpellSummary {

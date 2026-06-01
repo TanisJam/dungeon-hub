@@ -81,29 +81,58 @@ function ClassSpellSection({
   const spells = summary?.spells ?? { cantrips: [], leveled: [] };
   const isEmpty = spells.cantrips.length === 0 && spells.leveled.length === 0;
 
-  // Label mapping: prepared casters → "Preparados"; known casters → "Conocidos".
-  // Driven by ClassSpellSummary.spellsPrepared !== null (design §6).
-  const leveledLabel = summary?.spellsPrepared != null ? 'Preparados' : 'Conocidos';
-
   // Prep pencil: only for prepared casters (SPELL-PREP-01).
   const isPreparedCaster = summary?.spellsPrepared != null;
-  const existingPrepared = spells.leveled
-    .filter((s) => s.level > 0)
-    .map((s) => ({ slug: s.slug, source: s.source }));
   const existingCantrips = spells.cantrips.map((s) => ({ slug: s.slug, source: s.source }));
 
-  // Spellbook casters (Wizard/EK/AT): prep universe = spellbook intersection.
-  // Identified by wizardSpellbookSize being set. PHB p.114.
-  // SPELL-PREP-02: derive knownUniverseSlugs from the character's current leveled spells.
+  // Spellbook casters (Wizard/EK/AT): spells.leveled now contains the FULL spellbook
+  // (known bucket), each entry annotated with `prepared: boolean`. PHB p.114.
+  // REQ-SP-WIZARD-01, REQ-SP-WIZARD-02: FIX 1 — domain now surfaces spellbook correctly.
   const isSpellbookCaster = summary?.wizardSpellbookSize != null;
+
+  // existingPrepared: spells currently prepared.
+  // For spellbook casters: filter leveled by prepared===true (correct after FIX 1).
+  // For other prepared casters: all leveled entries are already prepared.
+  const existingPrepared = isSpellbookCaster
+    ? spells.leveled
+        .filter((s) => s.level > 0 && s.prepared === true)
+        .map((s) => ({ slug: s.slug, source: s.source }))
+    : spells.leveled
+        .filter((s) => s.level > 0)
+        .map((s) => ({ slug: s.slug, source: s.source }));
+
+  // existingKnown: full spellbook for Wizard (critical — prevents prep-save from wiping known).
+  // Non-spellbook casters: empty (known not used in their PUT payload context).
+  // FIX 1 — corruption root cause: was hardcoded [] → PUT sent known:[] → wiped spellbook.
+  const existingKnown: Array<{ slug: string; source: string }> = isSpellbookCaster
+    ? spells.leveled
+        .filter((s) => s.level > 0)
+        .map((s) => ({ slug: s.slug, source: s.source }))
+    : [];
+
+  // knownUniverseSlugs: Wizard prep universe = spellbook. SPELL-PREP-02.
+  // Correct now that leveled IS the full spellbook (FIX 1).
   const knownUniverseSlugs: ReadonlySet<string> | undefined = isSpellbookCaster
     ? new Set(spells.leveled.filter((s) => s.level > 0).map((s) => s.slug))
     : undefined;
 
-  // DM known-editor affordance: derive currentKnown from leveled spells.
+  // DM known-editor affordance: derives currentKnown from leveled (for SpellKnownSectionEditor).
   const currentKnown = spells.leveled
     .filter((s) => s.level > 0)
     .map((s) => ({ slug: s.slug, source: s.source }));
+
+  // Display label for the leveled group.
+  // Spellbook casters: show two groups (Preparados + Grimoario unprepared).
+  // Other prepared casters: "Preparados". Known casters: "Conocidos".
+  const leveledLabel = summary?.spellsPrepared != null ? 'Preparados' : 'Conocidos';
+
+  // For spellbook casters: split into prepared / spellbook-only.
+  const leveledPrepared = isSpellbookCaster
+    ? spells.leveled.filter((s) => s.prepared === true)
+    : spells.leveled;
+  const leveledSpellbookOnly = isSpellbookCaster
+    ? spells.leveled.filter((s) => s.prepared !== true)
+    : [];
 
   return (
     <Card variant="surface" className="p-4">
@@ -121,7 +150,7 @@ function ClassSpellSection({
               initialPrepared={existingPrepared}
               prepLimit={summary!.spellsPrepared!.max}
               existingCantrips={existingCantrips}
-              existingKnown={[]}
+              existingKnown={existingKnown}
               knownUniverseSlugs={knownUniverseSlugs}
             />
           )}
@@ -164,6 +193,13 @@ function ClassSpellSection({
         <div className="mt-3 rounded-md bg-paper-soft px-3 py-4 text-center">
           <p className="text-xs text-ink-mute">Sin hechizos seleccionados</p>
         </div>
+      ) : isSpellbookCaster ? (
+        <>
+          {/* Wizard: cantrips + prepared + spellbook-only (unprepared) in separate groups */}
+          <SpellGroup label="Trucos" spells={spells.cantrips} />
+          <SpellGroup label="Preparados" spells={leveledPrepared} />
+          <SpellGroup label="Grimoario" spells={leveledSpellbookOnly} />
+        </>
       ) : (
         <>
           <SpellGroup label="Trucos" spells={spells.cantrips} />

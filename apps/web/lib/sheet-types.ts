@@ -146,6 +146,13 @@ export interface SpellSheetRef {
   componentsM: boolean;
   /** gp cost when material component is costly; null otherwise */
   componentsMCost: number | null;
+  /**
+   * Only present for Wizard spellbook casters (wizardSpellbookSize != null).
+   * True when the spell is currently prepared; false when it is in the spellbook
+   * but NOT currently prepared. Absent for non-spellbook prepared casters.
+   * PHB p.114. REQ-SP-WIZARD-02.
+   */
+  prepared?: boolean;
 }
 
 /**

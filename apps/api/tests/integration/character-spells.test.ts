@@ -668,4 +668,66 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
       tooMany.json().issues.find((i: { code: string }) => i.code === 'PREPARED_LIMIT_EXCEEDED'),
     ).toBeDefined();
   });
+
+  // FIX 1 regression guard — spellbook must NOT be wiped on prep-save.
+  // Root cause: prep-save PUT was sending known:[] → API replaced the class spell record
+  // and wiped the Wizard's spellbook. This test locks that round-trip.
+  it('FIX1-REGRESSION: Wizard prep-save with same known + changed prepared → known unchanged', async () => {
+    const app = await getTestApp();
+
+    // 1. Set up initial spellbook: 6 spells, 2 prepared.
+    const initialKnown = [
+      { slug: 'magic-missile', source: 'PHB' },
+      { slug: 'shield', source: 'PHB' },
+      { slug: 'mage-armor', source: 'PHB' },
+      { slug: 'detect-magic', source: 'PHB' },
+      { slug: 'sleep', source: 'PHB' },
+      { slug: 'burning-hands', source: 'PHB' },
+    ];
+    const initialPrepared = [
+      { slug: 'magic-missile', source: 'PHB' },
+      { slug: 'shield', source: 'PHB' },
+    ];
+
+    const setup = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${wizardCharId}/classes/wizard/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { cantrips: [], known: initialKnown, prepared: initialPrepared },
+    });
+    expect(setup.statusCode).toBe(200);
+
+    // 2. Simulate prep-save: same cantrips + same known (passed correctly) + different prepared.
+    // Before FIX 1, hechizos.tsx sent known:[] → this would wipe the spellbook.
+    const newPrepared = [
+      { slug: 'mage-armor', source: 'PHB' },
+      { slug: 'detect-magic', source: 'PHB' },
+      { slug: 'sleep', source: 'PHB' },
+    ];
+
+    const prepSave = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${wizardCharId}/classes/wizard/spells`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: { cantrips: [], known: initialKnown, prepared: newPrepared },
+    });
+    expect(prepSave.statusCode).toBe(200);
+
+    // 3. GET and assert spellbook is intact (all 6 spells) + new prepared applied.
+    const get = await app.inject({
+      method: 'GET',
+      url: `/api/v1/characters/${wizardCharId}`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+    });
+    expect(get.statusCode).toBe(200);
+
+    const wizardSpells = get.json().data.spells?.wizard;
+    expect(wizardSpells).toBeDefined();
+    // Spellbook intact — 6 spells (NOT wiped)
+    expect(wizardSpells.known).toHaveLength(6);
+    // Prepared updated to the new set
+    expect(wizardSpells.prepared).toHaveLength(3);
+    const prepSlugs = wizardSpells.prepared.map((s: { slug: string }) => s.slug).sort();
+    expect(prepSlugs).toEqual(['detect-magic', 'mage-armor', 'sleep']);
+  });
 });

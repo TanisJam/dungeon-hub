@@ -602,18 +602,43 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
         .filter((r): r is SpellSheetRef => r !== undefined)
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      // Leveled: prepared casters use prepared bucket; known casters use known bucket.
-      // Prepared: Cleric, Druid, Paladin, Wizard (lim.spellsPrepared !== null).
-      // Known: Bard, Ranger, Sorcerer, Warlock, EK, AT (lim.spellsKnown !== null).
-      const leveledSource: Array<{ slug: string; source: string }> =
-        lim.spellsPrepared !== null
-          ? (spellsForClass?.prepared ?? [])
-          : (spellsForClass?.known ?? []);
+      // Leveled: spellbook casters (Wizard) surface ALL known spells (the spellbook)
+      // annotated with `prepared: boolean`; other prepared casters surface only the
+      // prepared bucket; known casters surface the known bucket (no prepared flag).
+      //
+      // Wizard distinction (PHB p.114):
+      //   known = spellbook (all learned spells, can be re-scribed; NOT prep-limited)
+      //   prepared = daily subset ≤ INT mod + Wizard level chosen FROM the spellbook
+      //
+      // REQ-SP-WIZARD-01: Wizard leveled = full spellbook (known bucket).
+      // REQ-SP-WIZARD-02: each Wizard leveled entry carries `prepared: boolean`.
+      const isSpellbookCaster = lim.wizardSpellbookSize != null;
 
-      const leveled: SpellSheetRef[] = leveledSource
-        .map(resolveRef)
-        .filter((r): r is SpellSheetRef => r !== undefined)
-        .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+      let leveled: SpellSheetRef[];
+      if (isSpellbookCaster) {
+        // Wizard: surface spellbook (known) with prepared annotation.
+        const preparedSet = new Set(
+          (spellsForClass?.prepared ?? []).map((e) => `${e.slug}|${e.source}`),
+        );
+        leveled = (spellsForClass?.known ?? [])
+          .map((entry): SpellSheetRef | undefined => {
+            const ref = resolveRef(entry);
+            if (!ref) return undefined;
+            return { ...ref, prepared: preparedSet.has(`${entry.slug}|${entry.source}`) };
+          })
+          .filter((r): r is SpellSheetRef => r !== undefined)
+          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+      } else {
+        // Non-spellbook: prepared casters show prepared; known casters show known.
+        const leveledSource: Array<{ slug: string; source: string }> =
+          lim.spellsPrepared !== null
+            ? (spellsForClass?.prepared ?? [])
+            : (spellsForClass?.known ?? []);
+        leveled = leveledSource
+          .map(resolveRef)
+          .filter((r): r is SpellSheetRef => r !== undefined)
+          .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+      }
 
       const view: ClassSpellSummary = {
         classSlug: c.slug,

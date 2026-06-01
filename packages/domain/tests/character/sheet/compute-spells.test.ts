@@ -193,10 +193,12 @@ describe('REQ-SP04-04: prepared casters use prepared bucket', () => {
     ]);
   });
 
-  // ─── C1-2.5: Wizard prepared vs spellbook (SP04-D-01) ────────────────────
-  // PHB p.114: "You can prepare a number of spells equal to your Intelligence
-  // modifier + your wizard level."
-  it('wizard L3 with 10 known (spellbook) and 4 prepared → spells.leveled has 4 entries; wizardSpellbookSize 10', () => {
+  // ─── C1-2.5: Wizard spellbook (SP04-D-01, REQ-SP-WIZARD-01, REQ-SP-WIZARD-02) ──
+  // PHB p.114: Wizard has a spellbook (known = all learned spells).
+  // "You can prepare a number of spells equal to your Intelligence modifier + your wizard level."
+  // FIX 1: leveled now surfaces the FULL spellbook (known), NOT just the prepared subset.
+  // Each entry carries `prepared: boolean` so the UI can show which are active.
+  it('wizard L3 with 10 known (spellbook) and 4 prepared → spells.leveled has 10 entries (full spellbook); wizardSpellbookSize 10', () => {
     const spellbookSpells = Array.from({ length: 10 }, (_, i) =>
       makeSpellRef(`spell-${i}`, i < 3 ? 1 : 2),
     );
@@ -215,8 +217,18 @@ describe('REQ-SP04-04: prepared casters use prepared bucket', () => {
 
     const sheet = computeCharacterSheet({ character: char, spellRefsBySlug: map });
     const summary = sheet.spellsByClass[0];
-    expect(summary.spells.leveled).toHaveLength(4);
+    // Full spellbook surfaced (REQ-SP-WIZARD-01)
+    expect(summary.spells.leveled).toHaveLength(10);
     expect(summary.wizardSpellbookSize).toBe(10);
+    // prepared flag present on each entry (REQ-SP-WIZARD-02)
+    const preparedSlugs = new Set(preparedSpells.map((s) => s.slug));
+    for (const entry of summary.spells.leveled as Array<SpellSheetRef & { prepared?: boolean }>) {
+      if (preparedSlugs.has(entry.slug)) {
+        expect(entry.prepared).toBe(true);
+      } else {
+        expect(entry.prepared).toBe(false);
+      }
+    }
   });
 });
 
@@ -357,6 +369,8 @@ describe('Design §2: spell sort order — level asc then name asc', () => {
 // ─── C1-2.10: Source disambiguation ─────────────────────────────────────────
 
 describe('SP04-D-03: source-aware lookup — resolves correct entry', () => {
+  // Use Cleric (prepared caster without spellbook) to test source disambiguation.
+  // Wizard would require fireball in `known` (spellbook); Cleric prepared bucket suffices.
   it('two map entries share same slug across sources → character picks slug|PHB → resolves to PHB entry only', () => {
     const phbFireball = makeSpellRef('fireball', 3);
     const uaFireball: SpellSheetRef = {
@@ -374,9 +388,9 @@ describe('SP04-D-03: source-aware lookup — resolves correct entry', () => {
       ['fireball|UA', uaFireball],
     ]);
     const char: CharacterSnapshot = {
-      ...WIZARD_L3_BASE,
+      ...CLERIC_L3_BASE,
       spells: {
-        wizard: {
+        cleric: {
           cantrips: [],
           known: [],
           prepared: [{ slug: 'fireball', source: 'PHB' }],
