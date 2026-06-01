@@ -2,6 +2,10 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq, ilike, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
+import {
+  EQUIPMENT_TYPE_QUERY_MAP,
+  type EquipmentType,
+} from '@dungeon-hub/domain/character/starting-equipment';
 import { db } from '../../infra/db/client.js';
 import {
   compendiumRaces,
@@ -441,13 +445,31 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
   });
 
   // ---- ITEMS ---------------------------------------------------------------
+  const EquipmentTypeEnum = z.enum([
+    'weaponMartial',
+    'weaponSimple',
+    'weaponMartialMelee',
+    'weaponSimpleMelee',
+    'focusSpellcastingArcane',
+    'focusSpellcastingHoly',
+    'focusSpellcastingDruidic',
+    'instrumentMusical',
+  ] as [EquipmentType, ...EquipmentType[]]);
+
   const ItemsQuery = PaginationQuery.extend({
     type: z.string().min(1).optional(),
+    // REQ-SEQUIP-08, ADR-4: category picker source for equipment wizard step.
+    // Maps EquipmentType values to JSONB / type-column predicates.
+    category: EquipmentTypeEnum.optional(),
   });
   app.get('/compendium/items', { preHandler: app.authenticate }, async (request, reply) => {
     const campaign = await resolveProfile(request, reply);
     if (!campaign) return;
-    const { limit, offset, q, type } = ItemsQuery.parse(request.query);
+    const parsed = ItemsQuery.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+    }
+    const { limit, offset, q, type, category } = parsed.data;
 
     const filter = profileFilterConditions({
       profile: campaign.rulesProfile,
@@ -460,6 +482,15 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     const where: SQL[] = [filter];
     if (q) where.push(ilike(compendiumItems.name, `%${q}%`));
     if (type) where.push(eq(compendiumItems.type, type));
+    if (category) {
+      // ADR-4: map EquipmentType to SQL predicates using the canonical query map.
+      // typeCondition and jsonbCondition are raw SQL strings (verified against live DB).
+      const spec = EQUIPMENT_TYPE_QUERY_MAP[category];
+      where.push(sql.raw(spec.typeCondition));
+      if (spec.jsonbCondition) {
+        where.push(sql.raw(spec.jsonbCondition));
+      }
+    }
     const conds = and(...where)!;
 
     const [rows, totalRow] = await Promise.all([
