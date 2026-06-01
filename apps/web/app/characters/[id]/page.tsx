@@ -150,7 +150,8 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   const rightAction = isGm ? (
     <div className="flex items-center gap-2">
       {isActive && <Pill tone="green" size="sm">Activo</Pill>}
-      <RoleSwitcher />
+      {/* defaultRole='dm' ensures DM affordances are shown by default on first visit */}
+      <RoleSwitcher defaultRole="dm" />
     </div>
   ) : isActive ? (
     <Pill tone="green" size="sm">Activo</Pill>

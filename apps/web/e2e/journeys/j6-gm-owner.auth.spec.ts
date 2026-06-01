@@ -128,8 +128,9 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       const roleSwitcher = dmPage.locator('[data-value]');
       await expect(roleSwitcher).toBeVisible({ timeout: 10_000 });
 
-      // Ensure we start in DM mode by clicking the DM button
-      const dmButton = dmPage.getByRole('button', { name: 'DM' });
+      // Ensure we start in DM mode by clicking the DM button.
+      // Use exact:true to match the role-switcher pill button, not "Otorgar recompensa de DM".
+      const dmButton = dmPage.getByRole('button', { name: 'DM', exact: true });
       await expect(dmButton).toBeVisible({ timeout: 5_000 });
       await dmButton.click();
 
@@ -138,7 +139,7 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       await expect(otorgarBtn).toBeVisible({ timeout: 10_000 });
 
       // Toggle to "Jugador" (player) mode
-      const jugadorButton = dmPage.getByRole('button', { name: 'Jugador' });
+      const jugadorButton = dmPage.getByRole('button', { name: 'Jugador', exact: true });
       await expect(jugadorButton).toBeVisible({ timeout: 5_000 });
       await jugadorButton.click();
 

@@ -32,7 +32,9 @@ export function HpEditorSlot({
   characterId,
   currentHp,
 }: HpEditorSlotProps) {
-  const [clientRole] = useRole();
+  // GMs default to 'dm' mode (same default as DmAwareAffordances).
+  const defaultRole = serverCallerRole === 'gm' ? 'dm' : 'player';
+  const [clientRole] = useRole(defaultRole);
 
   const isDmMode = serverCallerRole === 'gm' && clientRole === 'dm';
   const showEditor = isOwner || isDmMode;

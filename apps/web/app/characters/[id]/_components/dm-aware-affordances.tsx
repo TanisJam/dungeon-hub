@@ -39,7 +39,10 @@ export function DmAwareAffordances({
   worldId,
   status,
 }: DmAwareAffordancesProps) {
-  const [clientRole] = useRole();
+  // GMs default to 'dm' mode so DM affordances are visible on first load.
+  // A real player (serverCallerRole !== 'gm') defaults to 'player' (no DM mode possible).
+  const defaultRole = serverCallerRole === 'gm' ? 'dm' : 'player';
+  const [clientRole] = useRole(defaultRole);
 
   // isDmMode: only true when the server confirmed GM role AND client selected 'dm'.
   // A non-GM player can never reach isDmMode=true.

@@ -1,13 +1,23 @@
 'use client';
 
+import type { Role } from '@/lib/use-role';
 import { useRole } from '@/lib/use-role';
+
+interface RoleSwitcherProps {
+  /**
+   * Initial/default role when no stored value is found in localStorage.
+   * Pass 'dm' for GM users so the switcher shows DM selected on first visit.
+   * Defaults to 'player'.
+   */
+  defaultRole?: Role;
+}
 
 /**
  * RoleSwitcher — animated pill toggling between Jugador and DM.
  * Thumb slides via `left` transition; gradient + glow swap by role.
  */
-export function RoleSwitcher() {
-  const [role, setRole] = useRole();
+export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
+  const [role, setRole] = useRole(defaultRole);
 
   const thumbClass =
     role === 'player'

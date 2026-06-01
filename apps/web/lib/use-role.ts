@@ -25,8 +25,8 @@ function writeCookie(value: Role): void {
   document.cookie = `${COOKIE_NAME}=${value}; path=/; SameSite=Lax`;
 }
 
-function readStored(): Role {
-  if (typeof window === 'undefined') return 'player';
+function readStored(defaultRole: Role = 'player'): Role {
+  if (typeof window === 'undefined') return defaultRole;
   try {
     const ls = window.localStorage.getItem(STORAGE_KEY);
     if (ls === 'dm' || ls === 'player') return ls;
@@ -36,22 +36,25 @@ function readStored(): Role {
       window.localStorage.setItem(STORAGE_KEY, ck);
       return ck;
     }
-    return 'player';
+    return defaultRole;
   } catch {
-    return 'player';
+    return defaultRole;
   }
 }
 
 /**
  * useRole — client-side role state synced across components via localStorage + a
- * window event. Returns [role, setRole]. SSR renders 'player'; the client hydrates
- * to the stored value on mount.
+ * window event. Returns [role, setRole]. SSR renders the defaultRole; the client
+ * hydrates to the stored value on mount.
+ *
+ * @param defaultRole - Role to use when no stored value is found (default: 'player').
+ *   Pass 'dm' for GM users so DM affordances show by default on first visit.
  */
-export function useRole(): [Role, (next: Role) => void] {
-  const [role, setRoleState] = useState<Role>('player');
+export function useRole(defaultRole: Role = 'player'): [Role, (next: Role) => void] {
+  const [role, setRoleState] = useState<Role>(defaultRole);
 
   useEffect(() => {
-    setRoleState(readStored());
+    setRoleState(readStored(defaultRole));
     function onChange(e: Event) {
       const detail = (e as CustomEvent<Role>).detail;
       if (detail === 'player' || detail === 'dm') setRoleState(detail);
