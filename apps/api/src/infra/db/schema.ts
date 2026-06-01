@@ -959,6 +959,15 @@ export const encounterCombatants = pgTable(
     actionUsed: boolean('action_used').notNull().default(false),
     bonusActionUsed: boolean('bonus_action_used').notNull().default(false),
     attacksRemaining: integer('attacks_remaining').notNull().default(0),
+    // engine-rage: Rage event ledger — single-reset-point (advance-encounter-turn).
+    // DEFAULT false ensures legacy rows load as non-raging (REQ-RAGE-11).
+    // raged_attacked_hostile: set TRUE when this combatant makes an attack against
+    //   a hostile target this turn. Reset at this combatant's turn-end.
+    // raged_took_damage: set TRUE when this combatant takes any damage (since last turn).
+    //   Spans inter-turn boundary; reset at this combatant's turn-end.
+    // PHB p.48: end-early if neither attacked hostile nor took damage since last turn.
+    ragedAttackedHostile: boolean('raged_attacked_hostile').notNull().default(false),
+    ragedTookDamage: boolean('raged_took_damage').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],
