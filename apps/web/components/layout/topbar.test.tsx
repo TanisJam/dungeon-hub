@@ -34,6 +34,16 @@ vi.mock('next/navigation', () => ({
 import { TopBar } from './topbar';
 import { AppShell } from './app-shell';
 
+describe('TopBar — semantic heading', () => {
+  it('T7: title renders as <h1> — semantic page heading (a11y lock Bug 4)', () => {
+    render(<TopBar title="Mundo de Prueba" />);
+    // World name (and every page title) must be an <h1> so AT users can jump to the page heading.
+    const heading = screen.getByRole('heading', { level: 1, name: 'Mundo de Prueba' });
+    expect(heading).toBeTruthy();
+    expect(heading.tagName).toBe('H1');
+  });
+});
+
 describe('TopBar', () => {
   it('T1: backHref + canBeDM=true → arrow-left link renders AND RoleSwitcher is visible', () => {
     render(<TopBar title="Ficha" backHref="/personajes" canBeDM={true} />);

@@ -53,9 +53,9 @@ export function TopBar({
         <CrowMark />
       )}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        <span className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate">
+        <h1 className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
-        </span>
+        </h1>
         {subtitle && (
           <span className="font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none">
             {subtitle}
