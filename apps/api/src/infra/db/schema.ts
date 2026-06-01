@@ -950,6 +950,15 @@ export const encounterCombatants = pgTable(
     // PHB p.190 — "You can take only one reaction per round."
     // DEFAULT false backfills legacy rows; read-path tolerant (REQ-ERB-ECON-02).
     reactionUsed: boolean('reaction_used').notNull().default(false),
+    // engine-action-economy: per-turn action budget tracking (REQ-AE-01, REQ-AE-09).
+    // PHB p.189 — one action and one bonus action per turn.
+    // DEFAULT false/0 backfills legacy rows; read-path tolerant (REQ-AE-10).
+    // attacks_remaining: additional weapon attacks still allowed under the Attack action
+    // currently in progress. 0 = resting state (no Attack action in progress, or spent).
+    // action_used disambiguates "0 = haven't attacked" vs "0 = action spent".
+    actionUsed: boolean('action_used').notNull().default(false),
+    bonusActionUsed: boolean('bonus_action_used').notNull().default(false),
+    attacksRemaining: integer('attacks_remaining').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],
