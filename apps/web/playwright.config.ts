@@ -29,7 +29,7 @@ export default defineConfig({
     //    guarda storageState en e2e/.auth/user.json.
     {
       name: 'setup',
-      testMatch: /.*\.setup\.ts$/,
+      testMatch: /auth\.setup\.ts$/,
     },
 
     // 2. Unauthenticated tests — no dependen del setup.
@@ -48,6 +48,24 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: /.*\.auth\.spec\.ts$/,
+    },
+
+    // 4. Fixture setup: signs in the 4 seeded fixture users and saves their
+    //    storageState to e2e/.auth/{dm,player1,player2,player3}.json.
+    //    Run: playwright test --project=fixture-setup
+    {
+      name: 'fixture-setup',
+      testMatch: /fixture\.setup\.ts$/,
+    },
+
+    // 5. Multi-role journey specs — each spec creates its own browser context
+    //    via browser.newContext({ storageState }) so it can pick the right role.
+    //    No project-level storageState is set here intentionally.
+    {
+      name: 'journeys',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['fixture-setup'],
+      testMatch: /journeys\/.*\.spec\.ts$/,
     },
   ],
 });
