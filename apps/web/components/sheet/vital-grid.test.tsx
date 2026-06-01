@@ -1,21 +1,18 @@
 /**
- * Tests for VitalGrid — ficha-* class assertions + HPSectionEditor threading.
+ * Tests for VitalGrid — ficha-* class assertions + hpEditorSlot slot threading.
  *
  * T1: HP tile has class ficha-vital-hp.
  * T2: AC tile has class ficha-vital-ac.
- * T3: characterId + isDmHere=true → HPSectionEditor mounts.
- * T4: isDmHere=false → HPSectionEditor not mounted.
+ * T3: hpEditorSlot provided → slot renders inside HP tile.
+ * T4: no hpEditorSlot → HP editor absent.
+ *
+ * NOTE: VitalGrid is now a pure presentational component — HP editor gating moved to
+ * HpEditorSlot (client component) + DmAwareAffordances. VitalGrid accepts an
+ * optional `hpEditorSlot` ReactNode rendered inside the HP cell. (FIX B)
  */
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-
-// Mock HPSectionEditor — avoid 'use client' island in server-component context
-vi.mock('@/components/ficha/hp/hp-section-editor', () => ({
-  HPSectionEditor: ({ isDmHere }: { isDmHere: boolean }) => (
-    <div data-testid="hp-section-editor" data-isdmhere={String(isDmHere)} />
-  ),
-}));
 
 import { VitalGrid } from './vital-grid';
 
@@ -38,13 +35,11 @@ describe('VitalGrid', () => {
     expect(acTile).toBeTruthy();
   });
 
-  it('T3: characterId + isDmHere=true → HPSectionEditor mounts', () => {
+  it('T3: hpEditorSlot provided → slot renders inside HP tile', () => {
     render(
       <VitalGrid
         {...defaultProps}
-        characterId="char-1"
-        isDmHere={true}
-        tempHp={3}
+        hpEditorSlot={<div data-testid="hp-section-editor" data-isdmhere="true" />}
       />,
     );
     const editor = screen.getByTestId('hp-section-editor');
@@ -52,8 +47,8 @@ describe('VitalGrid', () => {
     expect(editor.getAttribute('data-isdmhere')).toBe('true');
   });
 
-  it('T4: no characterId → HPSectionEditor absent', () => {
-    render(<VitalGrid {...defaultProps} isDmHere={false} />);
+  it('T4: no hpEditorSlot → HP editor absent', () => {
+    render(<VitalGrid {...defaultProps} />);
     expect(screen.queryByTestId('hp-section-editor')).toBeNull();
   });
 

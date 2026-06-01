@@ -1,4 +1,4 @@
-import { HPSectionEditor } from '@/components/ficha/hp/hp-section-editor';
+import type { ReactNode } from 'react';
 
 interface VitalGridProps {
   hp: { current: number | null; max: number | null };
@@ -6,18 +6,12 @@ interface VitalGridProps {
   initiative: number | null;
   armorFormula?: string;
   walkSpeed?: number;
-  /** When set, mounts the HP editor affordance. */
-  characterId?: string;
-  /** When true, DM edit controls are shown inside HPSectionEditor. */
-  isDmHere?: boolean;
-  /** Temp HP (from character.data.hp.temp). Defaults to 0 if undefined. */
-  tempHp?: number;
   /**
-   * Whether the current viewer is the character owner.
-   * HP editor is only mounted when isOwner || isDmHere (FIX 3).
-   * Defaults to false when absent (defensive: non-owner viewers see read-only).
+   * Optional slot rendered inside the HP cell (absolute top-1 right-1).
+   * Used by character sheet page to inject the role-reactive HPSectionEditor
+   * via DmAwareAffordances (FIX B). When absent, no editor affordance is shown.
    */
-  isOwner?: boolean;
+  hpEditorSlot?: ReactNode;
 }
 
 function dash(value: number | null): string {
@@ -35,10 +29,7 @@ export function VitalGrid({
   initiative,
   armorFormula,
   walkSpeed,
-  characterId,
-  isDmHere,
-  tempHp = 0,
-  isOwner = false,
+  hpEditorSlot,
 }: VitalGridProps) {
   const effectiveCurrent = hp.current ?? hp.max;
   const hpDisplay =
@@ -69,22 +60,9 @@ export function VitalGrid({
             />
           </div>
         )}
-        {/* HP edit affordance — owner can edit current/temp HP; DM can also set max.
-            FIX 3: gate on isOwner || isDmHere to prevent non-owner world members
-            from seeing the pencil (they would get 403 on submit). */}
-        {characterId !== undefined && (isOwner || isDmHere === true) && (
-          <div className="absolute top-1 right-1">
-            <HPSectionEditor
-              characterId={characterId}
-              currentHp={{
-                current: hp.current ?? 0,
-                max: hp.max ?? 1,
-                temp: tempHp,
-              }}
-              isDmHere={isDmHere ?? false}
-            />
-          </div>
-        )}
+        {/* HP editor slot — injected by parent (DmAwareAffordances for character sheet).
+            Uses absolute positioning inside this relative container. */}
+        {hpEditorSlot}
       </div>
 
       {/* AC — ficha-vital-ac adds cyan glow ring */}

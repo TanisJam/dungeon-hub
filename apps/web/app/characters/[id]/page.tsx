@@ -18,8 +18,8 @@ import { NotasTab } from './_tabs/notas';
 import { RecursosTab } from './_tabs/recursos';
 import { DeleteCharacterButton } from './_delete-button';
 import { RestActions } from './_rest-actions';
-import { ApprovalActions } from './_components/approval-actions';
-import { DmGrantPanel } from './_components/dm-grant-panel';
+import { DmAwareAffordances } from './_components/dm-aware-affordances';
+import { HpEditorSlot } from './_components/hp-editor-slot';
 import { LevelUpEntryPoint } from './_components/level-up-entry-point';
 import { RecentGrants } from './_components/recent-grants';
 
@@ -114,6 +114,8 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   const statusLocked = (['active', 'retired', 'dead'] as CharacterStatus[]).includes(
     character.status,
   );
+  // isDmHere: server-side GM role used by non-reactive DM affordances (ResumenTab, HechizosTab wand).
+  // For reactive gating (HP max, ApprovalActions, DmGrantPanel), use DmAwareAffordances / HpEditorSlot.
   const isDmHere = callerRole === 'gm';
 
   // Derive ability scores from the sheet (pre-racial ASIs already folded in)
@@ -136,6 +138,10 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   const xpCurrent = character.xp;
   const xpNextThreshold = xpForLevel(totalLevel + 1);
 
+  // Role switcher is shown for GMs only — a real player toggling it can never reach
+  // isDmMode=true so the toggle would be a no-op. Hide it for non-GMs (FIX B).
+  const isGm = callerRole === 'gm';
+
   return (
     <AppShell
       title={identity.name}
@@ -147,7 +153,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         ) : undefined
       }
       constructorHref={`/characters/${id}/wizard/stats`}
-      canBeDM={false}
+      canBeDM={isGm}
     >
       <div className="space-y-4">
         {statusBanner && (
@@ -170,25 +176,28 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           initiative={sheet.initiative}
           armorFormula={sheet.armorClass.formula}
           walkSpeed={sheet.speed.walk}
-          characterId={id}
-          isDmHere={isDmHere}
-          tempHp={data.tempHp}
-          isOwner={character.userId === session.user.id}
+          hpEditorSlot={
+            <HpEditorSlot
+              serverCallerRole={callerRole}
+              isOwner={character.userId === session.user.id}
+              characterId={id}
+              currentHp={{
+                current: currentHp ?? 0,
+                max: sheet.hitPoints.max ?? 1,
+                temp: data.tempHp ?? 0,
+              }}
+            />
+          }
         />
 
         <RestActions charId={id} />
 
-        <ApprovalActions
-          characterId={id}
-          callerRole={callerRole}
-          status={character.status}
-        />
-
-        <DmGrantPanel
+        <DmAwareAffordances
+          serverCallerRole={callerRole}
           characterId={id}
           characterName={identity.name}
-          callerRole={callerRole}
           worldId={character.worldId}
+          status={character.status}
         />
 
         <LevelUpEntryPoint
