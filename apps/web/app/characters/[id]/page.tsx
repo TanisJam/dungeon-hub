@@ -22,6 +22,7 @@ import { DmAwareAffordances } from './_components/dm-aware-affordances';
 import { HpEditorSlot } from './_components/hp-editor-slot';
 import { LevelUpEntryPoint } from './_components/level-up-entry-point';
 import { RecentGrants } from './_components/recent-grants';
+import { RoleSwitcher } from '@/components/layout/role-switcher';
 
 type WorldCallerRole = 'gm' | 'player' | null;
 type WorldDetailLite = { callerRole: WorldCallerRole };
@@ -142,18 +143,27 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   // isDmMode=true so the toggle would be a no-op. Hide it for non-GMs (FIX B).
   const isGm = callerRole === 'gm';
 
+  // rightAction: for GMs we always include the RoleSwitcher alongside the Activo pill.
+  // This ensures the role switcher is never suppressed when rightAction replaces the
+  // default TopBar right cluster (which contains canBeDM={isGm} → RoleSwitcher).
+  // For non-GMs: show Activo pill alone when active, nothing otherwise.
+  const rightAction = isGm ? (
+    <div className="flex items-center gap-2">
+      {isActive && <Pill tone="green" size="sm">Activo</Pill>}
+      <RoleSwitcher />
+    </div>
+  ) : isActive ? (
+    <Pill tone="green" size="sm">Activo</Pill>
+  ) : undefined;
+
   return (
     <AppShell
       title={identity.name}
       subtitle={classSummary.toUpperCase()}
       backHref="/personajes"
-      rightAction={
-        isActive ? (
-          <Pill tone="green" size="sm">Activo</Pill>
-        ) : undefined
-      }
+      rightAction={rightAction}
       constructorHref={`/characters/${id}/wizard/stats`}
-      canBeDM={isGm}
+      canBeDM={false}
     >
       <div className="space-y-4">
         {statusBanner && (

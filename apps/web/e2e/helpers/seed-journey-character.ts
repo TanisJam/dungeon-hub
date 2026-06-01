@@ -216,3 +216,58 @@ export async function grantItemApi(
     item: { slug, source },
   });
 }
+
+/**
+ * Find a character ID by name in the caller's character list.
+ * Returns the first active character with the given name, or null.
+ */
+export async function findCharacterIdByName(name: string, jwt: string): Promise<string | null> {
+  const data = await apiCall<{ data: Array<{ id: string; name: string; status: string }> }>(
+    'GET',
+    '/api/v1/characters',
+    jwt,
+  );
+  const chars = data.data ?? [];
+  const found = chars.find((c) => c.name === name && c.status === 'active');
+  return found?.id ?? null;
+}
+
+/**
+ * Get a character's HP data via API.
+ * Returns { current, max, temp } or null if not available.
+ */
+export async function getCharacterHp(
+  charId: string,
+  jwt: string,
+): Promise<{ current: number | null; max: number | null; temp: number } | null> {
+  const char = await apiCall<{ data?: { hp?: { current?: number; max?: number; temp?: number } } }>(
+    'GET',
+    `/api/v1/characters/${charId}`,
+    jwt,
+  );
+  const hp = char.data?.hp;
+  if (!hp) return null;
+  return {
+    current: hp.current ?? null,
+    max: hp.max ?? null,
+    temp: hp.temp ?? 0,
+  };
+}
+
+/**
+ * Get the character sheet spellsByClass data.
+ */
+export async function getCharacterSheetSpells(
+  charId: string,
+  jwt: string,
+): Promise<Array<{ classSlug: string; spells: { leveled: Array<{ slug: string; prepared?: boolean }> } }>> {
+  const data = await apiCall<{
+    sheet: {
+      spellsByClass?: Array<{
+        classSlug: string;
+        spells: { leveled: Array<{ slug: string; prepared?: boolean }> };
+      }>;
+    };
+  }>('GET', `/api/v1/characters/${charId}/sheet`, jwt);
+  return data.sheet.spellsByClass ?? [];
+}
