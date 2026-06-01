@@ -684,4 +684,149 @@ describe('POST /characters/:id/resources/use|restore + rest hooks', () => {
       .then((r) => r.json());
     expect(reloaded.data.classResourcesUsed['monk:ki-points']).toBe(0);
   });
+
+  // --- Barbarian Rage Uses (PHB p.48) ---
+  // REQ-RU-01..03: level-scaled max, long-rest recovery, server-enforced limit.
+  async function setupBarbarian(level: number, name: string): Promise<string> {
+    const app = await getTestApp();
+    const b = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+        payload: { worldId, name },
+      })
+      .then((r) => r.json());
+    const charId = b.id;
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/characters/${charId}`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {
+        data: {
+          classes: [
+            {
+              slug: 'barbarian',
+              source: 'PHB',
+              level,
+              hitDie: 'd12',
+              subclass: null,
+              savingThrows: ['str', 'con'],
+              armorProficiencies: [],
+              weaponProficiencies: [],
+              toolProficiencies: [],
+              skillChoices: [],
+            },
+          ],
+          baseStats: { str: 18, dex: 14, con: 16, int: 8, wis: 12, cha: 8 },
+        },
+      },
+    });
+    return charId;
+  }
+
+  it('Barbarian L1 → spends 2 rage uses (both 200), 3rd → 400 RESOURCE_OVER_LIMIT (PHB p.48)', async () => {
+    const app = await getTestApp();
+    // L1 Barbarian: max rage uses = 2 (PHB p.48 table)
+    const barbarianId = await setupBarbarian(1, 'Barbarian L1 rage limit');
+
+    // First spend → should succeed (used: 0 → 1)
+    const res1 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+    expect(res1.statusCode).toBe(200);
+    expect(res1.json().classResourcesUsed['barbarian:rage-uses']).toBe(1);
+
+    // Second spend → should succeed (used: 1 → 2, exhausted)
+    const res2 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+    expect(res2.statusCode).toBe(200);
+    expect(res2.json().classResourcesUsed['barbarian:rage-uses']).toBe(2);
+
+    // Third spend → over limit, must reject
+    const res3 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+    expect(res3.statusCode).toBe(400);
+    expect(res3.json().issues[0].code).toBe('RESOURCE_OVER_LIMIT');
+  });
+
+  it('Barbarian L1 → long rest resets rage-uses to 0 (PHB p.48)', async () => {
+    const app = await getTestApp();
+    const barbarianId = await setupBarbarian(1, 'Barbarian L1 long rest reset');
+
+    // Exhaust rage uses (max 2)
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+
+    // Long rest → resets rage-uses to 0
+    const restRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/rest/long`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: {},
+    });
+    expect(restRes.statusCode).toBe(200);
+
+    // Next spend must succeed (reset confirmed)
+    const afterRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+    expect(afterRes.statusCode).toBe(200);
+    expect(afterRes.json().classResourcesUsed['barbarian:rage-uses']).toBe(1);
+  });
+
+  it('Barbarian L1 → short rest does NOT reset rage-uses (PHB p.48)', async () => {
+    const app = await getTestApp();
+    const barbarianId = await setupBarbarian(1, 'Barbarian L1 short rest no-reset');
+
+    // Use 1 rage
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/resources/use`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { slug: 'barbarian:rage-uses' },
+    });
+
+    // Short rest → must NOT restore rage uses
+    const shortRestRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianId}/rest/short`,
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+      payload: { hitDiceToSpend: {} },
+    });
+    expect(shortRestRes.statusCode).toBe(200);
+
+    const reloaded = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${barbarianId}`,
+        headers: { authorization: `Bearer ${owner.accessToken}` },
+      })
+      .then((r) => r.json());
+    expect(reloaded.data.classResourcesUsed['barbarian:rage-uses']).toBe(1);
+  });
 });
