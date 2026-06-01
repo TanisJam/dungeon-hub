@@ -13,14 +13,18 @@
  * Data flow:
  *   1. Row button tap → event bubbles → island root onClick
  *   2. Island reads data-instance-id from closest [data-instance-id] ancestor
- *   3. Cache check → HIT: render immediately; MISS: fetch from API
+ *   3. Cache check → HIT: render immediately; MISS: fetch via Server Action
  *   4. V3Sheet mounts with InventoryDetailShell
  *   5. Sheet close → openInstanceId = null
+ *
+ * FIX 2: replaced raw client fetch (broken: relative URL + no auth header → 404/401)
+ * with fetchInventoryDetail Server Action (server-side auth, correct Fastify base URL).
  */
 import { useState, useRef, useCallback, type ReactNode, type MouseEvent } from 'react';
 import type { InventoryDetailResponse } from '@/lib/sheet-types';
 import { V3Sheet } from '@/components/ui/sheet';
 import { InventoryDetailShell } from './inventory-detail-shell';
+import { fetchInventoryDetail } from '../../../actions';
 
 interface InventoryDetailIslandProps {
   characterId: string;
@@ -32,37 +36,20 @@ export function InventoryDetailIsland({ characterId, children }: InventoryDetail
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const detailCacheRef = useRef<Map<string, InventoryDetailResponse>>(new Map());
-  const abortRef = useRef<AbortController | null>(null);
 
   const fetchDetail = useCallback(
     async (instanceId: string) => {
-      // Cancel any in-flight fetch
-      abortRef.current?.abort();
-      abortRef.current = new AbortController();
-
       setLoading(true);
       setError(null);
       setOpenInstanceId(instanceId);
 
-      try {
-        const res = await fetch(
-          `/api/v1/characters/${characterId}/inventory/${instanceId}/detail`,
-          {
-            signal: abortRef.current.signal,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        );
-        if (!res.ok) {
-          throw new Error(`Error ${res.status}`);
-        }
-        const body = (await res.json()) as { detail: InventoryDetailResponse };
-        detailCacheRef.current.set(instanceId, body.detail);
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return; // Cancelled — noop
-        setError((err as Error).message ?? 'Error al cargar el detalle');
-      } finally {
-        setLoading(false);
+      const result = await fetchInventoryDetail(characterId, instanceId);
+      if (result.ok) {
+        detailCacheRef.current.set(instanceId, result.detail);
+      } else {
+        setError(result.error);
       }
+      setLoading(false);
     },
     [characterId],
   );
@@ -92,7 +79,6 @@ export function InventoryDetailIsland({ characterId, children }: InventoryDetail
   const handleClose = useCallback(() => {
     setOpenInstanceId(null);
     setError(null);
-    abortRef.current?.abort();
   }, []);
 
   const currentDetail = openInstanceId ? (detailCacheRef.current.get(openInstanceId) ?? null) : null;

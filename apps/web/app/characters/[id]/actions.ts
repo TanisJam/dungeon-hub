@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import type { InventoryDetailResponse } from '@/lib/sheet-types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -529,4 +530,48 @@ export async function deleteCharacter(characterId: string): Promise<DeleteState>
 
   revalidatePath('/characters');
   redirect('/');
+}
+
+// ── FIX 2: Inventory item detail fetch via Server Action ─────────────────────
+
+export type FetchInventoryDetailResult =
+  | { ok: true; detail: InventoryDetailResponse }
+  | { ok: false; error: string };
+
+/**
+ * Fetch inventory item detail via the Fastify API with server-side auth.
+ * Replaces the client-side relative fetch in InventoryDetailIsland that caused
+ * 404 (wrong base URL) + 401 (no auth header).
+ *
+ * Maps to GET /characters/:id/inventory/:instanceId/detail (Fastify :4000).
+ * FIX 2 — WIDI-ISLAND-01 (spec #1070).
+ */
+export async function fetchInventoryDetail(
+  characterId: string,
+  instanceId: string,
+): Promise<FetchInventoryDetailResult> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+  if (!UUID_RE.test(instanceId)) {
+    return { ok: false, error: 'ID de instancia inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    const res = await api.get<{ detail: InventoryDetailResponse }>(
+      `/characters/${characterId}/inventory/${instanceId}/detail`,
+      session.access_token,
+    );
+    return { ok: true, detail: res.detail };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `Error ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
 }
