@@ -182,7 +182,7 @@ async function PlayerView({ token }: { token?: string }) {
   }
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO">
+    <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player">
       <div className="flex flex-col gap-4">
         {heroData ? (
           <HeroNextSession campaign={heroData} />
@@ -273,7 +273,7 @@ async function DMView({ token }: { token?: string }) {
   const pendingCount = gmCampaign?.pendingFichas ?? fichasData.length;
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO — DM">
+    <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm">
       <div className="flex flex-col gap-4">
         <PendingFichasCardTrigger
           fichas={fichasData}

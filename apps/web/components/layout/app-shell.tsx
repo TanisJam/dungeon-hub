@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Role } from '@/lib/use-role';
 import { TopBar } from './topbar';
 import { TabBar } from './tabbar';
 
@@ -21,6 +22,9 @@ type AppShellProps = {
    * SDD ficha-dm-affordances overrides old suppression: RoleSwitcher visible in sub-screens when canBeDM=true.
    */
   backHref?: string;
+  /** Server-resolved current role (dh:role cookie) forwarded to the RoleSwitcher
+   * so it renders the correct pill on first paint (no Jugador→DM flash). */
+  roleDefault?: Role;
   children: ReactNode;
 };
 
@@ -37,6 +41,7 @@ export function AppShell({
   hasNotif = false,
   showTabBar = true,
   backHref,
+  roleDefault = 'player',
   children,
 }: AppShellProps) {
   return (
@@ -48,6 +53,7 @@ export function AppShell({
         canBeDM={canBeDM}
         hasNotif={hasNotif}
         backHref={backHref}
+        roleDefault={roleDefault}
       />
       <main className="mx-auto max-w-sm px-4 py-4 pb-28">{children}</main>
       {showTabBar && <TabBar />}

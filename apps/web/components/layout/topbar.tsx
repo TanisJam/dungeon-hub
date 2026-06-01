@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { CrowMark } from '@/components/ui/crow-mark';
 import { Icon } from '@/components/ui/icon';
+import type { Role } from '@/lib/use-role';
 import { RoleSwitcher } from './role-switcher';
 
 interface TopBarProps {
@@ -19,6 +20,13 @@ interface TopBarProps {
    * Design: docs/design_handoff_dungeon_hub/README.md § State management.
    */
   backHref?: string;
+  /**
+   * Server-resolved current role (from the dh:role cookie). Forwarded to the
+   * RoleSwitcher as its initial value so it renders the correct pill on first
+   * paint — avoids the "loads as Jugador then flips to DM" flash. Defaults to
+   * 'player'.
+   */
+  roleDefault?: Role;
 }
 
 /**
@@ -34,6 +42,7 @@ export function TopBar({
   canBeDM = true,
   hasNotif = false,
   backHref,
+  roleDefault = 'player',
 }: TopBarProps) {
   return (
     <header
@@ -67,7 +76,7 @@ export function TopBar({
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* RoleSwitcher visible in all screens (including sub-screens) when canBeDM=true */}
           {/* SDD ficha-dm-affordances: removed !backHref guard per spec override of design README §State management */}
-          {canBeDM && <RoleSwitcher />}
+          {canBeDM && <RoleSwitcher defaultRole={roleDefault} />}
           <button
             type="button"
             aria-label="Notificaciones"

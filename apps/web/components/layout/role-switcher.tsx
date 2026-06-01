@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import type { Role } from '@/lib/use-role';
 import { useRole } from '@/lib/use-role';
 
@@ -18,6 +19,16 @@ interface RoleSwitcherProps {
  */
 export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
   const [role, setRole] = useRole(defaultRole);
+  const router = useRouter();
+
+  // Toggling writes the dh:role cookie (in setRole). Server Components gated on
+  // that cookie (e.g. the /inicio player/DM trees) only re-render on a refresh,
+  // so trigger one here — otherwise the view stays stale until navigation.
+  const select = (next: Role) => {
+    if (next === role) return;
+    setRole(next);
+    router.refresh();
+  };
 
   const thumbClass =
     role === 'player'
@@ -35,7 +46,7 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
       />
       <button
         type="button"
-        onClick={() => setRole('player')}
+        onClick={() => select('player')}
         aria-pressed={role === 'player'}
         className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap transition-colors duration-300 ease-out ${
           role === 'player' ? 'text-[#1A1208]' : 'text-ink-mute'
@@ -45,7 +56,7 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
       </button>
       <button
         type="button"
-        onClick={() => setRole('dm')}
+        onClick={() => select('dm')}
         aria-pressed={role === 'dm'}
         className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap transition-colors duration-300 ease-out ${
           role === 'dm' ? 'text-[#1A1208]' : 'text-ink-mute'
