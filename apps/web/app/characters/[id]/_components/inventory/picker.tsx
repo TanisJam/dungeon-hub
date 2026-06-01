@@ -32,6 +32,15 @@ export function Picker({ characterId, worldId }: PickerProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const reqIdRef = useRef(0);
 
+  // Listen for the EmptyState CTA custom event so the empty-state button can
+  // open this picker without prop-drilling through server-component boundaries.
+  // REQ-INV-A11Y-SINGLE-CTA: EmptyState fires 'dh:inventory:open-picker'; Picker opens.
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    document.addEventListener('dh:inventory:open-picker', handler);
+    return () => document.removeEventListener('dh:inventory:open-picker', handler);
+  }, []);
+
   // Focus the search input when the modal opens — mobile UX expects the
   // keyboard up immediately when the bottom-sheet appears.
   useEffect(() => {
