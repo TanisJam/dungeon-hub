@@ -283,15 +283,75 @@ describe('CLASS_RESOURCES — Druid Natural Recovery (PHB p.68, subclass-gated)'
   });
 });
 
+describe('CLASS_RESOURCES — Barbarian Rage Uses (PHB p.48)', () => {
+  // PHB p.48 Barbarian table — Rages column:
+  //   L1-2 → 2, L3-5 → 3, L6-11 → 4, L12-16 → 5, L17-19 → 6, L20 → Unlimited (sentinel 999)
+  // Recovery: long rest (PHB p.48 "you regain all expended uses when you finish a long rest")
+
+  it('slug barbarian:rage-uses exists in registry', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    expect(def).toBeDefined();
+  });
+
+  it('L1 Barbarian → max 2 (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(1))).toBe(2);
+  });
+
+  it('L3 Barbarian → max 3 (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(3))).toBe(3);
+  });
+
+  it('L6 Barbarian → max 4 (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(6))).toBe(4);
+  });
+
+  it('L12 Barbarian → max 5 (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(12))).toBe(5);
+  });
+
+  it('L17 Barbarian → max 6 (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(17))).toBe(6);
+  });
+
+  it('L20 Barbarian → 999 sentinel for UNLIMITED (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(20))).toBe(999);
+  });
+
+  it('L0 (non-barbarian / not yet unlocked) → null', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.maxFor(ctx(0))).toBeNull();
+  });
+
+  it('recovery trigger is "long" (PHB p.48)', () => {
+    const def = classResourceBySlug('barbarian:rage-uses');
+    if (!def) throw new Error('barbarian:rage-uses missing');
+    expect(def.recoveryTriggerFor(ctx(1))).toBe('long');
+  });
+});
+
 describe('classResourceBySlug — lookup', () => {
   it('returns undefined for unknown slug', () => {
     expect(classResourceBySlug('monk:bogus')).toBeUndefined();
     expect(classResourceBySlug('fighter:nonexistent')).toBeUndefined();
   });
 
-  it('CLASS_RESOURCES contains all R-07 entries (10 total)', () => {
+  it('CLASS_RESOURCES contains all R-07 entries + barbarian:rage-uses (11 total)', () => {
     const slugs = CLASS_RESOURCES.map((d) => d.slug).sort();
     expect(slugs).toEqual([
+      'barbarian:rage-uses',
       'bard:bardic-inspiration',
       'cleric:channel-divinity',
       'druid:natural-recovery',

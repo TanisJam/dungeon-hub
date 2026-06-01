@@ -106,6 +106,28 @@ describe('resetClassResourcesForRest — subclass-gated (Druid Natural Recovery)
   });
 });
 
+describe('resetClassResourcesForRest — barbarian:rage-uses (PHB p.48 / p.186)', () => {
+  // PHB p.48: "you regain all expended uses when you finish a long rest"
+  // PHB p.186: long rest restores all rest-gated feature uses
+  const BARBARIAN_L1: AppliedClass = {
+    slug: 'barbarian', source: 'PHB', level: 1, subclass: null, hitDie: 'd12',
+    savingThrows: ['str', 'con'], armorProficiencies: [], weaponProficiencies: [],
+    toolProficiencies: [], skillChoices: [],
+  };
+
+  it('long rest resets barbarian:rage-uses to 0', () => {
+    const used = { 'barbarian:rage-uses': 2 };
+    const next = resetClassResourcesForRest(used, [BARBARIAN_L1], 'long', mods());
+    expect(next['barbarian:rage-uses']).toBe(0);
+  });
+
+  it('short rest leaves barbarian:rage-uses UNCHANGED (long-only trigger)', () => {
+    const used = { 'barbarian:rage-uses': 2 };
+    const next = resetClassResourcesForRest(used, [BARBARIAN_L1], 'short', mods());
+    expect(next['barbarian:rage-uses']).toBe(2);
+  });
+});
+
 describe('resetClassResourcesForRest — Bard Bardic Inspiration (PHB p.53-54)', () => {
   const BARD_L4: AppliedClass = {
     slug: 'bard', source: 'PHB', level: 4, subclass: null, hitDie: 'd8',

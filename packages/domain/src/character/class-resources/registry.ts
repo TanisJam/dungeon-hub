@@ -136,6 +136,26 @@ const DRUID_NATURAL_RECOVERY: ClassResourceDef = {
   recoveryTriggerFor: () => 'long',
 };
 
+/**
+ * Barbarian — Rage Uses (PHB p.48). Level-scaled, long rest only.
+ * 2/3/4/5/6 at L1/3/6/12/17; UNLIMITED at L20 (sentinel 999).
+ * // TODO #513: hardcoded registry data — migrate to DB + DI when runtime reference data lands.
+ */
+const BARBARIAN_RAGE_USES: ClassResourceDef = {
+  slug: 'barbarian:rage-uses',
+  classSlug: 'barbarian',
+  maxFor: ({ classLevel }) =>
+    classLevel >= 20
+      ? 999 // TODO #unlimited PHB p.48 — L20 is unlimited; 999 is a sentinel placeholder, not a real cap
+      : classLevel >= 17 ? 6
+      : classLevel >= 12 ? 5
+      : classLevel >= 6  ? 4
+      : classLevel >= 3  ? 3
+      : classLevel >= 1  ? 2
+      : null,
+  recoveryTriggerFor: () => 'long',
+};
+
 export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
   FIGHTER_SECOND_WIND,
   MONK_KI_POINTS,
@@ -147,6 +167,7 @@ export const CLASS_RESOURCES: readonly ClassResourceDef[] = [
   WIZARD_ARCANE_RECOVERY,
   SORCERER_SORCERY_POINTS,
   DRUID_NATURAL_RECOVERY,
+  BARBARIAN_RAGE_USES,
 ];
 
 /**
