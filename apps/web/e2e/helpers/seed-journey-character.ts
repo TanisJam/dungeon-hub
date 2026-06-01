@@ -179,6 +179,16 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
 }
 
 /**
+ * Fetch a character's current status via the API (authoritative).
+ * Used to assert state transitions (e.g. reject → 'draft') deterministically,
+ * instead of relying on transient UI state subject to revalidatePath timing.
+ */
+export async function getCharacterStatus(charId: string, jwt: string): Promise<string> {
+  const char = await apiCall<{ status: string }>('GET', `/api/v1/characters/${charId}`, jwt);
+  return char.status;
+}
+
+/**
  * Grant XP to a character via the DM token.
  * Used by journeys that need a specific XP total post-creation.
  */

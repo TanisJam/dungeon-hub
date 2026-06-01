@@ -22,6 +22,7 @@ import {
   getJwt,
   getFixtureWorldId,
   seedJourneyCharacter,
+  getCharacterStatus,
 } from '../helpers/seed-journey-character';
 
 const AUTH_DIR = path.join(__dirname, '../.auth');
@@ -86,51 +87,47 @@ test.describe('J5 — DM moderation: reject/return-to-draft + DM chrome @ 375px'
       expect(scrollWidth, 'horizontal scroll at 375px on pending char page').toBeLessThanOrEqual(375);
 
       // ── Step 3: DM clicks "Rechazar" ────────────────────────────────────
-      // "Rechazar" calls rejectCharacter which returns status to 'draft'.
-      // The button may trigger window.confirm — handle it.
-      dmPage.on('dialog', async (dialog) => {
-        if (dialog.type() === 'confirm') await dialog.accept();
-      });
-
+      // "Rechazar" calls rejectCharacter directly (NO window.confirm — that
+      // confirm only guards the active→draft "Devolver a borrador" path, see
+      // approval-actions.tsx:handleReject). rejectCharacter → POST /reject →
+      // status 'draft' (characters.ts:1303).
       await rechazarBtn.click();
 
-      // ── Step 4: Wait for post-rejection state ───────────────────────────
-      // Expected: Aprobar/Rechazar buttons disappear (only rendered on pending_approval).
-      // Or: page shows a different status indicator.
-      await expect(async () => {
-        const aprobarGone = !(await aprobarBtn.isVisible().catch(() => false));
-        const rechazarGone = !(await rechazarBtn.isVisible().catch(() => false));
-        expect(
-          aprobarGone || rechazarGone,
-          'Post-reject: Aprobar or Rechazar buttons should disappear',
-        ).toBe(true);
-      }).toPass({ timeout: 15_000 });
+      // ── Step 4: AUTHORITATIVE assertion — status transitions to 'draft' ──
+      // Poll the API (deterministic) rather than the transient button visibility,
+      // which is subject to revalidatePath re-render timing and is flaky.
+      await expect
+        .poll(async () => getCharacterStatus(char.id, dmJwt), {
+          message: 'rejected character status should become "draft"',
+          timeout: 15_000,
+        })
+        .toBe('draft');
 
-      // ── Step 5: player1 verifies character is now draft ──────────────────
-      // Draft characters redirect to wizard when accessed via /characters/[id].
-      // We check via the dashboard that the character appears as draft, OR
-      // we check the API sheet directly.
+      // ── Step 5: UI reflects the transition (best-effort, non-flaky) ─────
+      // The Aprobar/Rechazar buttons only render for pending_approval, so after
+      // the page re-validates they should be gone. Reload to force a clean read
+      // (avoids racing the soft-nav revalidation from the server action).
+      await dmPage.reload({ waitUntil: 'domcontentloaded' });
+      await expect(aprobarBtn).toBeHidden({ timeout: 10_000 });
+      await expect(rechazarBtn).toBeHidden({ timeout: 5_000 });
+
+      // ── Step 6: player1's view confirms it is no longer active ──────────
+      // Draft characters redirect to the wizard when opened via /characters/[id].
       await p1Page.goto(charPath, { waitUntil: 'domcontentloaded' });
-
-      // Draft redirects to wizard/stats. Active stays on sheet. Check URL.
-      await p1Page.waitForURL(
-        (url) =>
-          url.pathname.includes('/wizard') || url.pathname.match(/\/characters\/[a-f0-9-]+$/) !== null,
-        { timeout: 10_000 },
-      ).catch(() => {});
-
-      const currentUrl = p1Page.url();
-      const isDraftRedirect = currentUrl.includes('/wizard');
-      const isOnSheet = /\/characters\/[a-f0-9-]+$/.test(new URL(currentUrl).pathname);
-
-      if (isDraftRedirect) {
-        // GOOD: draft redirects to wizard — state transition confirmed
-        expect(isDraftRedirect, 'Rejected char should redirect to wizard (draft state)').toBe(true);
-      } else if (isOnSheet) {
-        // On sheet — check for absence of Activo pill (should be draft/pending)
-        const activoVisible = await p1Page.getByText('Activo', { exact: true }).first().isVisible({ timeout: 2_000 }).catch(() => false);
-        expect(!activoVisible, 'Rejected character should not show Activo status').toBe(true);
-      }
+      await p1Page
+        .waitForURL(
+          (url) =>
+            url.pathname.includes('/wizard') ||
+            url.pathname.match(/\/characters\/[a-f0-9-]+$/) !== null,
+          { timeout: 10_000 },
+        )
+        .catch(() => {});
+      const activoVisible = await p1Page
+        .getByText('Activo', { exact: true })
+        .first()
+        .isVisible({ timeout: 2_000 })
+        .catch(() => false);
+      expect(activoVisible, 'Rejected character must not show Activo status').toBe(false);
     } finally {
       await dmCtx.close();
       await p1Ctx.close();
