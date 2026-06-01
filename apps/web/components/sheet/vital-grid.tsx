@@ -87,7 +87,7 @@ export function VitalGrid({
           {dash(ac)}
         </span>
         {armorFormula && (
-          <span className="mt-1 text-[9px] text-ink-mute leading-tight truncate max-w-full">
+          <span className="mt-1 text-[9px] text-ink-mute leading-tight break-words w-full">
             {armorFormula}
           </span>
         )}

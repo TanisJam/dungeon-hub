@@ -56,4 +56,22 @@ describe('VitalGrid', () => {
     render(<VitalGrid {...defaultProps} isDmHere={false} />);
     expect(screen.queryByTestId('hp-section-editor')).toBeNull();
   });
+
+  it('T5: armorFormula renders without truncate class — readable at 375px (a11y mobile lock)', () => {
+    const { container } = render(
+      <VitalGrid {...defaultProps} armorFormula="Unarmored (base 10) + DEX +2" />,
+    );
+    // Formula span must be present and must NOT carry the truncate class
+    // (which cuts off text at small viewports — Bug 3 regression lock).
+    // The AC tile has two spans: the label ("Clase Armadura") and the value.
+    // The formula is the LAST span inside .ficha-vital-ac.
+    const acTile = container.querySelector('.ficha-vital-ac');
+    expect(acTile).toBeTruthy();
+    const allSpans = acTile!.querySelectorAll('span');
+    const formulaSpan = Array.from(allSpans).find(
+      (s) => s.textContent === 'Unarmored (base 10) + DEX +2',
+    );
+    expect(formulaSpan, 'armorFormula span not found in AC tile').toBeTruthy();
+    expect(formulaSpan!.className).not.toContain('truncate');
+  });
 });
