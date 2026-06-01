@@ -44,17 +44,16 @@ async function createCharacterAndReachBackground(page: Page, charName: string) {
   await page.getByRole('button', { name: /^siguiente/i }).click();
   await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
 
-  // Race: Human PHB (2 choose blocks: +2 / +1)
+  // Race: Tiefling PHB (fixed CHA+2/INT+1, no ASI choose blocks, no language choices).
+  // Using Tiefling avoids the Human PHB ASI-choose interaction (current compendium
+  // data has Human PHB as purelyFixed — no choose blocks render).
   await page
     .locator('[class*="rounded-md border"]')
-    .filter({ hasText: 'Human' })
+    .filter({ hasText: 'Tiefling' })
     .filter({ hasText: 'PHB' })
     .first()
     .click();
-  await page.getByRole('button', { name: 'STR', exact: true }).first().click();
-  await page.getByRole('button', { name: 'CON', exact: true }).last().click();
-  // Race language picker — Human PHB grants Common fixed + 1 standard of choice
-  await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
+  // Tiefling has no ASI choose blocks and no language choice — advance directly.
   await page.getByRole('button', { name: /^siguiente/i }).click();
   await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
 
@@ -113,6 +112,12 @@ test.describe('Custom Background — full wizard E2E', () => {
     await expect(page.locator('select').last()).toHaveValue('acolyte-shelter-of-the-faithful');
 
     await page.getByRole('button', { name: /^siguiente/i }).click();
+    // Batch D (starting-equipment): equipment step inserted between background and spells.
+    await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+    await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+    // Equipment: package path is selected by default — just advance.
+    await page.getByRole('button', { name: /^siguiente/i }).click();
     await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
 
     // Spells: Fighter non-caster
@@ -156,6 +161,12 @@ test.describe('Custom Background — full wizard E2E', () => {
     await page.locator('select').last().selectOption('acolyte-shelter-of-the-faithful');
 
     await page.getByRole('button', { name: /^siguiente/i }).click();
+    // Batch D (starting-equipment): equipment step inserted between background and spells.
+    await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+    await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+    // Equipment: package path is selected by default — just advance.
+    await page.getByRole('button', { name: /^siguiente/i }).click();
     await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
 
     // Continue through spells + review
@@ -196,6 +207,12 @@ test.describe('Custom Background — full wizard E2E', () => {
     await page.locator('select').last().selectOption('acolyte-shelter-of-the-faithful');
 
     await page.getByRole('button', { name: /^siguiente/i }).click();
+    // Batch D (starting-equipment): equipment step inserted between background and spells.
+    await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+    await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+    // Equipment: package path is selected by default — just advance.
+    await page.getByRole('button', { name: /^siguiente/i }).click();
     await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
   });
 
@@ -216,7 +233,13 @@ test.describe('Custom Background — full wizard E2E', () => {
     await page.getByRole('searchbox', { name: /filtrar caracter/i }).fill('Shelter');
     await page.locator('select').last().selectOption('acolyte-shelter-of-the-faithful');
 
-    // Continue → spells
+    // Continue → equipment → spells
+    // Batch D (starting-equipment): equipment step inserted between background and spells.
+    await page.getByRole('button', { name: /^siguiente/i }).click();
+    await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+    await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+    // Equipment: package path is selected by default — just advance.
     await page.getByRole('button', { name: /^siguiente/i }).click();
     await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
 

@@ -28,8 +28,8 @@ export function Stepper({ characterId }: { characterId: string }) {
   const active = useSelectedLayoutSegment();
 
   return (
-    <nav aria-label="Pasos del personaje">
-      <ol className="flex items-center gap-1.5">
+    <nav aria-label="Pasos del personaje" className="overflow-x-auto scrollbar-none">
+      <ol className="flex items-center gap-1.5 min-w-max">
         {STEPS.map((step, i) => {
           const state = statusOf(step, active);
           const isActive = state === 'active';

@@ -39,5 +39,5 @@ export async function saveBackground(
     return { error: err instanceof Error ? err.message : 'Unknown error' };
   }
 
-  redirect(`/characters/${characterId}/wizard/spells`);
+  redirect(`/characters/${characterId}/wizard/equipment`);
 }

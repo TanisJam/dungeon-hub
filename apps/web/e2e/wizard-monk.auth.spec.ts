@@ -58,18 +58,17 @@ test.describe('character builder wizard — Monk L1 happy path @ 375px', () => {
       await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
-    await test.step('linaje: Human PHB → guardar y seguir', async () => {
+    await test.step('linaje: Tiefling PHB → guardar y seguir', async () => {
+      // Tiefling PHB: fixed CHA+2/INT+1, no ASI choose blocks, no language choices.
+      // Using Tiefling avoids the Human PHB ASI-choose interaction (current compendium
+      // data has Human PHB as purelyFixed — no choose blocks).
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Human' })
+        .filter({ hasText: 'Tiefling' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
-      // Human PHB: +2 choice → STR, +1 choice → DEX
-      await page.getByRole('button', { name: 'STR', exact: true }).first().click();
-      await page.getByRole('button', { name: 'DEX', exact: true }).last().click();
-      // Language choice: pick Dwarvish
-      await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
+      // Tiefling has no ASI choose blocks and no language choice — advance directly.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
       await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
@@ -106,6 +105,14 @@ test.describe('character builder wizard — Monk L1 happy path @ 375px', () => {
         .click();
       await page.getByRole('button', { name: 'Elvish', exact: true }).click();
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+    });
+
+    await test.step('equipo: package path (default) → Siguiente', async () => {
+      // Package path is selected by default (REQ-SEQUIP-09). No mandatory choice-row
+      // selection required for the package path — just advance.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
       await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });

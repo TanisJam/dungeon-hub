@@ -85,7 +85,7 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
     });
 
-    await test.step('complete wizard (class → background → review → publish)', async () => {
+    await test.step('complete wizard (class → background → equipment → spells → review → publish)', async () => {
       // Class: Fighter (non-caster) — E2E-RS-1 focuses on the race cantrip picker, not
       // class spells. Using Fighter means the spells step shows the no-picks panel and
       // siguiente is enabled immediately, avoiding the need to fill Wizard spell picks.
@@ -111,6 +111,12 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       // Pick 2 standard languages (PHB p.127 — "Two of your choice")
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: 'Halfling', exact: true }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      // Batch D (starting-equipment): equipment step now inserted between background and spells.
+      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+      // Equipment step: package path is selected by default — just advance.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
 
@@ -211,6 +217,14 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
       // Pick 2 standard languages (PHB p.127 — "Two of your choice")
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: 'Halfling', exact: true }).click();
+      await page.getByRole('button', { name: /^siguiente/i }).click();
+      // Batch D (starting-equipment): equipment step inserted between background and spells.
+      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+    });
+
+    await test.step('equipo: package path (default) → Siguiente', async () => {
+      // Package path is selected by default (REQ-SEQUIP-09). No mandatory picks required.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
     });

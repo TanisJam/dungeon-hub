@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 // End-to-end del character builder wizard.
-// Cubre: create draft → atributos → linaje → clase → trasfondo → hechizos (no-picks) → revisión → activar.
+// Cubre: create draft → atributos → linaje → clase → trasfondo → equipo → hechizos (no-picks) → revisión → activar.
+//
+// Batch D (starting-equipment): added equipment step (index 4) between background and spells.
+// Minimal interaction: default package path is pre-selected, click Siguiente to advance.
 //
 // Combinación elegida para evitar overlap entre class skills y background skills
 // (validación cross-step):
@@ -48,25 +51,18 @@ test.describe('character builder wizard', () => {
       await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
-    await test.step('linaje: Human PHB (MPMM-style) → guardar y seguir', async () => {
-      // Human PHB en 5etools 2024+ no tiene `ability` field — el picker
-      // sintetiza 2 slots de choose (+2 y +1). Buen test para ese path.
-      // New ChoiceList pattern: tap the card button to expand inline detail.
+    await test.step('linaje: Tiefling PHB → guardar y seguir', async () => {
+      // Tiefling PHB: fixed CHA+2/INT+1, no ASI choose blocks, no language choices.
+      // Using Tiefling avoids the Human PHB ASI-choose interaction (current compendium
+      // data for Human PHB has fixed +1 to all 6 abilities — purelyFixed path — so
+      // STR/CON choose-block buttons do not appear).
       await page
         .locator('[class*="rounded-md border"]')
-        .filter({ hasText: 'Human' })
+        .filter({ hasText: 'Tiefling' })
         .filter({ hasText: 'PHB' })
         .first()
         .click();
-      // 2 bloques de choose en DOM order: primero +2, después +1. Cada bloque
-      // tiene los 6 buttons STR/DEX/CON/INT/WIS/CHA. Picamos:
-      //   - STR del primer bloque (+2)
-      //   - CON del segundo bloque (+1)
-      await page.getByRole('button', { name: 'STR', exact: true }).first().click();
-      await page.getByRole('button', { name: 'CON', exact: true }).last().click();
-      // Race language picker (added in 1d3e594): Human PHB grants Common fixed
-      // + 1 standard language of choice. Pick Dwarvish (no overlap with anything).
-      await page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
+      // Tiefling has no ASI choose blocks and no language choice — advance directly.
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
       await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
@@ -97,6 +93,14 @@ test.describe('character builder wizard', () => {
       // Tool choice: anyGamingSet → pick "Dice Set"
       await page.getByRole('button', { name: 'Dice Set', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+    });
+
+    await test.step('equipo: package path (default) → Siguiente', async () => {
+      // Package path is selected by default (REQ-SEQUIP-09). No mandatory choice-row
+      // selection required for the package path — just advance.
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
       await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });
@@ -121,7 +125,7 @@ test.describe('character builder wizard', () => {
       await expect(page.locator('text=Revisión').first()).toBeVisible();
       await expect(page.locator('text=Atributos').first()).toBeVisible();
       await expect(page.getByText(charName, { exact: false }).first()).toBeVisible();
-      await expect(page.locator('text=human').first()).toBeVisible();
+      await expect(page.locator('text=tiefling').first()).toBeVisible();
       await expect(page.locator('text=fighter').first()).toBeVisible();
       await expect(page.locator('text=soldier').first()).toBeVisible();
       // Spells review card (num "05") must be visible for Fighter (non-caster)

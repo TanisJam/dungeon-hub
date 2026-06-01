@@ -155,7 +155,15 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 8_000 });
       await p3Page.getByRole('button', { name: /^siguiente/i }).click();
 
-      // ── Step 7: Spells — Fighter is non-caster, skip panel ───────────────
+      // ── Step 7: Equipment — package path (default), advance ──────────────
+      // Batch D (starting-equipment): equipment step inserted between background and spells.
+      await expect(p3Page).toHaveURL(/\/wizard\/equipment$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+
+      // Package path is selected by default (REQ-SEQUIP-09). No mandatory picks required.
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 8: Spells — Fighter is non-caster, skip panel ───────────────
       await expect(p3Page).toHaveURL(/\/wizard\/spells$/, { timeout: 15_000 });
       await expect(p3Page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
       // Non-caster shows "no picks needed" panel
@@ -167,7 +175,7 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 10_000 });
       await p3Page.getByRole('button', { name: /^siguiente/i }).click();
 
-      // ── Step 8: Review ───────────────────────────────────────────────────
+      // ── Step 9: Review ───────────────────────────────────────────────────
       await expect(p3Page).toHaveURL(/\/wizard\/review$/, { timeout: 15_000 });
       await expect(p3Page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
       // Basic content assertions
@@ -176,7 +184,7 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       await expect(p3Page.locator('text=fighter').first()).toBeVisible();
       await expect(p3Page.locator('text=soldier').first()).toBeVisible();
 
-      // ── Step 9: Publish (send for approval) ──────────────────────────────
+      // ── Step 10: Publish (send for approval) ─────────────────────────────
       await p3Page.getByRole('button', { name: /^publicar/i }).click();
 
       // Splash — "Ir al perfil" link navigates to the character sheet
@@ -196,7 +204,7 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       const pendienteBanner = p3Page.getByText(/pendiente de aprobaci/i).first();
       await expect(pendienteBanner).toBeVisible({ timeout: 8_000 });
 
-      // ── Step 10: DM approves from the character sheet ────────────────────
+      // ── Step 11: DM approves from the character sheet ────────────────────
       // Navigate the DM to the same character page
       await dmPage.goto(charHref, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
@@ -226,7 +234,7 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
         expect(aprobarGone || activoBadge, 'Post-approve: Aprobar gone or activo visible').toBe(true);
       }).toPass({ timeout: 15_000 });
 
-      // ── Step 11: player3 reloads the sheet and sees Activo ───────────────
+      // ── Step 12: player3 reloads the sheet and sees Activo ───────────────
       await p3Page.goto(charHref, { waitUntil: 'domcontentloaded' });
       await expect(p3Page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 

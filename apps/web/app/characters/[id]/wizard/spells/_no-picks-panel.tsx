@@ -10,9 +10,11 @@ type Props = {
   variant: 'non-caster' | 'too-early';
   className: string;
   level: number;
+  /** Override the back href. Defaults to /wizard/equipment (inserted between background and spells in Batch D). */
+  backHref?: string;
 };
 
-export function NoPicksPanel({ characterId, variant, className, level }: Props) {
+export function NoPicksPanel({ characterId, variant, className, level, backHref }: Props) {
   const [pending, startTransition] = useTransition();
 
   function handleSkip() {
@@ -36,7 +38,7 @@ export function NoPicksPanel({ characterId, variant, className, level }: Props) 
       </Card>
 
       <WizardFooterNav
-        backHref={`/characters/${characterId}/wizard/background`}
+        backHref={backHref ?? `/characters/${characterId}/wizard/equipment`}
         onNext={handleSkip}
         pending={pending}
       />
