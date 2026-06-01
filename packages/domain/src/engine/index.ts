@@ -225,6 +225,9 @@ export { POISONED_CONDITION_DEF } from './conditions/poisoned.js';
 export { PETRIFIED_CONDITION_DEF } from './conditions/petrified.js';
 export { isImmuneToCondition } from './conditions/condition-immunity.js';
 
+// engine-rage — isRaging predicate (REQ-RAGE-06, PHB p.48)
+export { isRaging } from './conditions/rage.js';
+
 // ── Authoring DSL ─────────────────────────────────────────────────────────────
 
 export { parseRule } from './authoring/parse.js';
@@ -270,6 +273,10 @@ export type { BuildBlindedResult } from './rules/blinded.js';
 // engine-resist-immunity — Petrified rule builder (REQ-RI-10..14 / ADR-5)
 export { buildPetrifiedModifiers } from './rules/petrified.js';
 export type { BuildPetrifiedResult } from './rules/petrified.js';
+
+// engine-rage — buildRageModifiers rule builder (REQ-RAGE-03..05, PHB p.48)
+export { buildRageModifiers } from './rules/rage.js';
+export type { BuildRageResult } from './rules/rage.js';
 
 export { buildInvisibleModifiers } from './rules/invisible.js';
 export type { BuildInvisibleResult } from './rules/invisible.js';
