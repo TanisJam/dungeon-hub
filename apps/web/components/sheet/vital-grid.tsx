@@ -12,6 +12,12 @@ interface VitalGridProps {
   isDmHere?: boolean;
   /** Temp HP (from character.data.hp.temp). Defaults to 0 if undefined. */
   tempHp?: number;
+  /**
+   * Whether the current viewer is the character owner.
+   * HP editor is only mounted when isOwner || isDmHere (FIX 3).
+   * Defaults to false when absent (defensive: non-owner viewers see read-only).
+   */
+  isOwner?: boolean;
 }
 
 function dash(value: number | null): string {
@@ -32,6 +38,7 @@ export function VitalGrid({
   characterId,
   isDmHere,
   tempHp = 0,
+  isOwner = false,
 }: VitalGridProps) {
   const effectiveCurrent = hp.current ?? hp.max;
   const hpDisplay =
@@ -62,8 +69,10 @@ export function VitalGrid({
             />
           </div>
         )}
-        {/* HP edit affordance — only mounted when characterId provided */}
-        {characterId !== undefined && isDmHere !== undefined && (
+        {/* HP edit affordance — owner can edit current/temp HP; DM can also set max.
+            FIX 3: gate on isOwner || isDmHere to prevent non-owner world members
+            from seeing the pencil (they would get 403 on submit). */}
+        {characterId !== undefined && (isOwner || isDmHere === true) && (
           <div className="absolute top-1 right-1">
             <HPSectionEditor
               characterId={characterId}
@@ -72,7 +81,7 @@ export function VitalGrid({
                 max: hp.max ?? 1,
                 temp: tempHp,
               }}
-              isDmHere={isDmHere}
+              isDmHere={isDmHere ?? false}
             />
           </div>
         )}

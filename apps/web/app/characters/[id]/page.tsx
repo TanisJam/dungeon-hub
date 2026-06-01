@@ -147,6 +147,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         ) : undefined
       }
       constructorHref={`/characters/${id}/wizard/stats`}
+      canBeDM={false}
     >
       <div className="space-y-4">
         {statusBanner && (
@@ -172,6 +173,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           characterId={id}
           isDmHere={isDmHere}
           tempHp={data.tempHp}
+          isOwner={character.userId === session.user.id}
         />
 
         <RestActions charId={id} />
