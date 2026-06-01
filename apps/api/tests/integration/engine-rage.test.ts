@@ -45,7 +45,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
   let campaignId: string;
   let worldId: string;
 
-  // ── Barbarian L1 character: STR 16 (+3), CON 14 (+2), DEX 10 (+0)
+  // ── Barbarian L1 character: STR 15 (+2), CON 14 (+2), DEX 10 (+0), WIS 12, CHA 13
   // With longsword (melee, non-finesse → always STR) and plate-armor (HA, for RAGE-T4).
   let barbarianCharId: string;
   let longswordInstanceId: string;
@@ -305,7 +305,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
       method: 'PUT',
       url: `/api/v1/characters/${barbarianCharId}/stats`,
       headers: { authorization: `Bearer ${gm.accessToken}` },
-      payload: { method: 'standard-array', scores: { str: 16, dex: 10, con: 14, int: 8, wis: 10, cha: 8 } },
+      payload: { method: 'standard-array', scores: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 } },
     });
     await expectOk(
       'set-barbarian-class',
@@ -358,7 +358,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
   });
 
   afterAll(async () => {
-    await deleteTestUser(gm.userId);
+    await deleteTestUser(gm.id);
     await closeTestApp();
   });
 
@@ -602,12 +602,12 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     expect(await isRaging(barbarianCombatantId), 'Raging must be active after activation').toBe(true);
 
     // Attack the NPC with longsword while Raging.
-    // L1 Barbarian: STR 16 → mod+3. Longsword 1d8+3 base. Rage adds +2 → expect 1d8+5 total.
-    // With AC=1 and STR 16 → hit very likely. On a hit: 1d8 + STR(+3) + rage(+2) ≥ 6.
+    // L1 Barbarian: STR 15 → mod+2. Longsword 1d8+2 base. Rage adds +2 → expect 1d8+4 total.
+    // With AC=1 and STR 15 → hit very likely. On a hit: 1d8 + STR(+2) + rage(+2) ≥ 5.
     const attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2);
 
     if (attackRes.statusCode === 200 && attackRes.body.hit === true && attackRes.body.rolledDamage !== undefined) {
-      expect(attackRes.body.rolledDamage).toBeGreaterThanOrEqual(6);
+      expect(attackRes.body.rolledDamage).toBeGreaterThanOrEqual(5);
     }
     expect([200]).toContain(attackRes.statusCode);
   });
