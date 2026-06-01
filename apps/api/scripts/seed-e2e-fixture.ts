@@ -219,8 +219,41 @@ async function ensureWorldMember(worldId: string, userId: string): Promise<void>
 
 /**
  * Look up characters by userId in the given world and return the matching
- * character id if a character with the given name already exists.
+ * character id if a character with the given name already exists AND is active.
+ * Returns null if not found OR if found in a non-active status (so caller rebuilds it).
  */
+async function findActiveCharacterByName(
+  worldId: string,
+  userId: string,
+  name: string,
+): Promise<string | null> {
+  const { db } = await import('../src/infra/db/client.js');
+  const { characters } = await import('../src/infra/db/schema.js');
+
+  const rows = await db
+    .select({ id: characters.id, status: characters.status })
+    .from(characters)
+    .where(
+      and(
+        eq(characters.worldId, worldId),
+        eq(characters.userId, userId),
+        eq(characters.name, name),
+      ),
+    )
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+  // Only treat as existing if it's fully built and active.
+  // A partial build (draft/pending) means a prior run failed → rebuild.
+  if (row.status !== 'active') {
+    console.log(`  [char] found "${name}" in status=${row.status} — will rebuild`);
+    return null;
+  }
+  return row.id;
+}
+
+/** @deprecated Use findActiveCharacterByName. Kept for non-active fixtures (P1 Draft, P1 Pending). */
 async function findCharacterByName(
   worldId: string,
   userId: string,
@@ -278,16 +311,20 @@ async function buildFighterCharacter(
   });
 
   // 4. Class (Fighter — non-caster, no spells required)
+  //    Soldier background has FIXED skills: athletics + intimidation.
+  //    Fighter picks MUST NOT overlap → use acrobatics + survival (PHB Fighter pool, PHB p.72).
   await apiCall('PUT', `/api/v1/characters/${charId}/class`, ownerJwt, {
     class: { slug: 'fighter', source: 'PHB' },
     level: 1,
-    skillChoices: ['athletics', 'perception'],
+    skillChoices: ['acrobatics', 'survival'],
   });
 
   // 5. Background (soldier — no language/tool slot ambiguity)
+  //    Soldier fixed skills (not chosen): athletics + intimidation (PHB p.140).
+  //    Pass empty skillChoices — fixed skills are granted automatically.
   await apiCall('PUT', `/api/v1/characters/${charId}/background`, ownerJwt, {
     background: { slug: 'soldier', source: 'PHB' },
-    skillChoices: ['athletics', 'intimidation'],
+    skillChoices: [],
     toolChoices: { anyGamingSet: ['dice-set'] },
   });
 
@@ -309,7 +346,18 @@ async function buildFighterCharacter(
   return charId;
 }
 
-/** Build a Wizard character through the API up to active status with spells. */
+/** Build a Wizard character through the API up to active status with spells.
+ *
+ * SKILL/LANGUAGE STRATEGY (prevents SKILL_DUPLICATE_WITH_CLASS):
+ *   - Wizard class skills: insight + religion (PHB Wizard pool; PHB p.112)
+ *   - Sage background fixed skills: arcana + history — no overlap with insight/religion
+ *   - Human language choice: elvish (PHB p.30 — 1 extra language)
+ *   - Sage language choices: draconic + dwarvish — no overlap with elvish
+ *
+ * Previously used investigation+medicine for wizard + elvish+dwarvish for sage.
+ * That caused SKILL_DUPLICATE_WITH_CLASS when the DB had arcana+history stored
+ * (from an earlier seed run). Fixed by using insight+religion for wizard.
+ */
 async function buildWizardCharacter(
   worldId: string,
   ownerJwt: string,
@@ -336,20 +384,22 @@ async function buildWizardCharacter(
     languageChoices: ['elvish'],
   });
 
-  // 4. Class (Wizard L1 — pick skills that don't overlap with Sage background's arcana+history)
+  // 4. Class (Wizard L1 — insight+religion: no overlap with Sage's arcana+history)
+  //    Wizard skill pool: Arcana, History, Insight, Investigation, Medicine, Religion (PHB p.112).
   await apiCall('PUT', `/api/v1/characters/${charId}/class`, ownerJwt, {
     class: { slug: 'wizard', source: 'PHB' },
     level: 1,
-    skillChoices: ['investigation', 'medicine'],
+    skillChoices: ['insight', 'religion'],
   });
 
-  // 5. Background (sage — fixed skills arcana+history; PHB p.138 — 2 languages chosen)
+  // 5. Background (sage — fixed skills arcana+history; PHB p.138 — 2 language choices).
+  //    draconic+dwarvish: neither overlaps with the human-granted elvish.
   await apiCall('PUT', `/api/v1/characters/${charId}/background`, ownerJwt, {
     background: { slug: 'sage', source: 'PHB' },
-    languageChoices: ['elvish', 'dwarvish'],
+    languageChoices: ['draconic', 'dwarvish'],
   });
 
-  // 6. Spells — Wizard L1: 3 cantrips + 6 known spells (spellbook)
+  // 6. Spells — Wizard L1: 3 cantrips + 6 known spells (spellbook).
   //    PHB p.114: wizards start with 6 spells in spellbook + 3 cantrips.
   //    We pick a minimal set known to exist in the PHB compendium.
   await apiCall(
@@ -378,7 +428,7 @@ async function buildWizardCharacter(
     status: 'pending_approval',
   });
 
-  // 8. Approve
+  // 8. Approve (DM approves; may be the owner themselves if DM created the character)
   await apiCall('POST', `/api/v1/characters/${charId}/approve`, dmJwt);
 
   console.log(`  [char] created  "${name}" (active/wizard, id: ${charId})`);
@@ -436,7 +486,7 @@ async function main(): Promise<void> {
 
   // player1 → P1 Hero (active, XP ≥ 300, gold, inventory item)
   const p1HeroName = 'P1 Hero';
-  let p1HeroId = await findCharacterByName(worldId, player1.id, p1HeroName);
+  let p1HeroId = await findActiveCharacterByName(worldId, player1.id, p1HeroName);
   if (p1HeroId) {
     console.log(`  [char] exists   "${p1HeroName}" (id: ${p1HeroId})`);
   } else {
@@ -459,7 +509,7 @@ async function main(): Promise<void> {
 
   // player2 → P2 Mage (active Wizard with spells)
   const p2MageName = 'P2 Mage';
-  let p2MageId = await findCharacterByName(worldId, player2.id, p2MageName);
+  let p2MageId = await findActiveCharacterByName(worldId, player2.id, p2MageName);
   if (p2MageId) {
     console.log(`  [char] exists   "${p2MageName}" (id: ${p2MageId})`);
   } else {
@@ -468,6 +518,65 @@ async function main(): Promise<void> {
 
   // player3 → no characters (intentional)
   console.log(`  [char] player3@dh.test — no characters (intentional)`);
+
+  // ── DM-owned characters (GM+owner scenario) ──────────────────────────────────
+  // The DM creates characters in their OWN world → they are simultaneously GM and owner.
+  // These fixtures allow J6 (and future tests) to exercise the GM+owner simultaneous role.
+  //
+  // "DM Hero" — Fighter, active. Tests GM+owner HP max write (FIX A).
+  // "DM Mage" — Wizard, active, with spellbook + some prepared. Tests GM+owner spell prep (FIX C).
+  const dmHeroName = 'DM Hero';
+  let dmHeroId = await findActiveCharacterByName(worldId, dm.id, dmHeroName);
+  if (dmHeroId) {
+    console.log(`  [char] exists   "${dmHeroName}" (id: ${dmHeroId})`);
+  } else {
+    // DM creates + builds the fighter, then approves their own character as GM
+    dmHeroId = await buildFighterCharacter(worldId, dm.jwt, dmHeroName, 'active', dm.jwt);
+    // Seed a known HP state for J6: current=20, max=20
+    await apiCall('PUT', `/api/v1/characters/${dmHeroId}/hp`, dm.jwt, {
+      current: 20,
+      max: 20,
+      temp: 0,
+    });
+    console.log(`  [hp]   seeded   20/20 HP → "${dmHeroName}"`);
+  }
+
+  const dmMageName = 'DM Mage';
+  let dmMageId = await findActiveCharacterByName(worldId, dm.id, dmMageName);
+  if (dmMageId) {
+    console.log(`  [char] exists   "${dmMageName}" (id: ${dmMageId})`);
+  } else {
+    // DM creates + builds the wizard (owns it, also GM → self-approval works)
+    dmMageId = await buildWizardCharacter(worldId, dm.jwt, dmMageName, dm.jwt);
+    // Prepare 2 spells from the spellbook so J6 can verify the full book + some prepared
+    // Uses PUT /characters/:id/classes/:slug/spells with a `prepared` subset
+    await apiCall(
+      'PUT',
+      `/api/v1/characters/${dmMageId}/classes/wizard/spells`,
+      dm.jwt,
+      {
+        // Re-send the same known spells — required to keep spellbook intact (PUT replaces)
+        cantrips: [
+          { slug: 'fire-bolt', source: 'PHB' },
+          { slug: 'mage-hand', source: 'PHB' },
+          { slug: 'prestidigitation', source: 'PHB' },
+        ],
+        known: [
+          { slug: 'magic-missile', source: 'PHB' },
+          { slug: 'shield', source: 'PHB' },
+          { slug: 'burning-hands', source: 'PHB' },
+          { slug: 'charm-person', source: 'PHB' },
+          { slug: 'sleep', source: 'PHB' },
+          { slug: 'thunderwave', source: 'PHB' },
+        ],
+        prepared: [
+          { slug: 'magic-missile', source: 'PHB' },
+          { slug: 'burning-hands', source: 'PHB' },
+        ],
+      },
+    );
+    console.log(`  [spells] seeded 2 prepared spells → "${dmMageName}"`);
+  }
 
   // ── 4. Summary ──────────────────────────────────────────────────────────────
 
@@ -486,7 +595,7 @@ async function main(): Promise<void> {
 ║  WORLD                                                       ║
 ║  worldId: ${worldId.padEnd(40)}║
 ╠══════════════════════════════════════════════════════════════╣
-║  CHARACTERS                                                  ║
+║  CHARACTERS — players                                        ║
 ║  "${p1DraftName}"  →  draft        (player1)                       ║
 ║    id: ${p1DraftId!.padEnd(43)}║
 ║  "${p1PendingName}" →  pending_approval (player1)              ║
@@ -495,6 +604,12 @@ async function main(): Promise<void> {
 ║    id: ${p1HeroId!.padEnd(43)}║
 ║  "${p2MageName}"   →  active  wizard+spells (player2)         ║
 ║    id: ${p2MageId!.padEnd(43)}║
+╠══════════════════════════════════════════════════════════════╣
+║  CHARACTERS — DM-owned (GM+owner scenario)                   ║
+║  "${dmHeroName}"   →  active  fighter, hp 20/20 (dm)          ║
+║    id: ${dmHeroId!.padEnd(43)}║
+║  "${dmMageName}"   →  active  wizard+spellbook+prep (dm)      ║
+║    id: ${dmMageId!.padEnd(43)}║
 ╚══════════════════════════════════════════════════════════════╝
 `);
 }
