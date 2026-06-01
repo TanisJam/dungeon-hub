@@ -15,7 +15,8 @@
     "db:push": "drizzle-kit push",
     "import:5etools": "tsx scripts/import-5etools.ts",
     "seed-test-character": "tsx scripts/seed-test-character.ts",
-    "seed-modifier-definitions": "tsx scripts/seed-modifier-definitions.ts"
+    "seed-modifier-definitions": "tsx scripts/seed-modifier-definitions.ts",
+    "db:seed:e2e": "tsx scripts/seed-e2e-fixture.ts"
   },
   "dependencies": {
     "@dungeon-hub/compendium-import": "workspace:*",
