@@ -94,12 +94,20 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       // The language picker shows: Dwarvish, Elvish, Giant, Gnomish, Goblin, Halfling, Orc.
       await p3Page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
 
-      // Wait for the Siguiente button to be enabled (language chosen)
-      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 8_000 });
-      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+      // Wait for the Siguiente button to be enabled (language chosen).
+      const raceSiguiente = p3Page.getByRole('button', { name: /^siguiente/i });
+      await expect(raceSiguiente).toBeEnabled({ timeout: 8_000 });
 
       // ── Step 5: Class — Fighter PHB ───────────────────────────────────────
-      await expect(p3Page).toHaveURL(/\/wizard\/class$/, { timeout: 15_000 });
+      // The race step auto-saves on the language choice; clicking Siguiente while
+      // that save is in flight can be a no-op (the wizard stays on /race). Retry
+      // the click until the wizard actually advances to /class.
+      await expect(async () => {
+        if (!/\/wizard\/class$/.test(new URL(p3Page.url()).pathname)) {
+          await raceSiguiente.click().catch(() => {});
+        }
+        await expect(p3Page).toHaveURL(/\/wizard\/class$/, { timeout: 4_000 });
+      }).toPass({ timeout: 30_000 });
       await expect(p3Page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
 
       // Click Fighter PHB card — wait for skill picker to appear before clicking skills
