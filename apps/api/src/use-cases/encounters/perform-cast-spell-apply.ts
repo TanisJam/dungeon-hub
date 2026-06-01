@@ -34,6 +34,7 @@ import { eq, and, sql, inArray } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters, encounterCombatantConditions } from '../../infra/db/schema.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import { isCombatantRaging } from './load-combatant-raging.js';
 import {
   rollMagicMissile,
   type RngFn,
@@ -142,7 +143,9 @@ export type PerformCastSpellApplyResult =
   // engine-incapacitated-gating — REQ-INC-03 (PHB p.290: can't take actions).
   | { ok: false; code: 'ACTOR_INCAPACITATED' }
   // engine-action-economy: caster's action budget exhausted for this turn (REQ-AE-02, PHB p.257).
-  | { ok: false; code: 'ACTION_ALREADY_USED' };
+  | { ok: false; code: 'ACTION_ALREADY_USED' }
+  // engine-rage: caster is Raging — can't cast spells while raging (REQ-RAGE-06, PHB p.48).
+  | { ok: false; code: 'ACTOR_RAGING' };
 
 // ── perform-cast-spell-apply ──────────────────────────────────────────────────
 
@@ -227,6 +230,13 @@ export async function performCastSpellApply(
   // casterCombatant loaded via select() in Step 2 — actionUsed column available.
   if (casterCombatant.actionUsed) {
     return { ok: false, code: 'ACTION_ALREADY_USED' };
+  }
+
+  // ── Step 4c: Raging gate (REQ-RAGE-06, PHB p.48 — can't cast spells while raging) ──
+  // Fail-fast BEFORE character sheet load and slot math.
+  // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
+  if (await isCombatantRaging(casterId)) {
+    return { ok: false, code: 'ACTOR_RAGING' };
   }
 
   // ── Step 6: Load target combatant ─────────────────────────────────────────────
@@ -520,9 +530,13 @@ export async function performCastSpellApply(
 
   const txResult = await db.transaction(async (tx) => {
     // a. Update defender HP (apply force damage — PHB p.257).
+    // B-11: set raged_took_damage=true when finalDamageCast > 0 (REQ-RAGE-09, PHB p.48).
     await tx
       .update(encounterCombatants)
-      .set({ hpCurrent: newDefenderHp })
+      .set({
+        hpCurrent: newDefenderHp,
+        ...(finalDamageCast > 0 ? { ragedTookDamage: true } : {}),
+      })
       .where(
         and(
           eq(encounterCombatants.id, targetId),
@@ -554,6 +568,19 @@ export async function performCastSpellApply(
 
     if (updated.length === 0) {
       return false;
+    }
+
+    // B-12: 0-HP auto-end — DELETE 'Raging' when target drops to 0 HP (REQ-RAGE-08, PHB p.48).
+    // PHB p.48: "Your rage ends early if... you are knocked unconscious."
+    if (newDefenderHp === 0) {
+      await tx
+        .delete(encounterCombatantConditions)
+        .where(
+          and(
+            eq(encounterCombatantConditions.combatantId, targetId),
+            eq(encounterCombatantConditions.conditionName, 'Raging'),
+          ),
+        );
     }
 
     // c. Consume caster spell slot atomically.

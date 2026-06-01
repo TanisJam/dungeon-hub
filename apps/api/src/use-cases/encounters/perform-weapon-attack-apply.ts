@@ -21,7 +21,7 @@
 
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants, characters, encounterCombatantConditions } from '../../infra/db/schema.js';
 import {
   resolveWeaponAttack,
   rollDamageBreakdown,
@@ -714,9 +714,15 @@ export async function performWeaponAttackApply(
   // REQ-CID-04: RESOLVE runs INSIDE the tx closure, after the CAS guard.
   // breakConcentration receives the same tx → covered by rollback (saga closed).
   const txResult = await db.transaction(async (tx) => {
+    // Build the HP update set — may also include raged_took_damage (B-11).
+    // B-11: set raged_took_damage=true on the TARGET when finalDamage > 0 (REQ-RAGE-09).
+    // Write unconditionally on target row alongside hpCurrent UPDATE — no extra query.
     await tx
       .update(encounterCombatants)
-      .set({ hpCurrent: newHp })
+      .set({
+        hpCurrent: newHp,
+        ...(finalDamage > 0 ? { ragedTookDamage: true } : {}),
+      })
       .where(
         and(
           eq(encounterCombatants.id, targetId),
@@ -736,6 +742,35 @@ export async function performWeaponAttackApply(
     if (updated.length === 0) {
       // CAS conflict — rollback entire tx (ki NOT decremented, concentration NOT broken).
       return false;
+    }
+
+    // B-10: set raged_attacked_hostile=true on ATTACKER when target is opposite kind (REQ-RAGE-09).
+    // Hostility approximation: attacker.kind !== target.kind (pc→npc or npc→pc).
+    // Write unconditionally (1 extra column) — harmless when not raging.
+    if (attackerCombatant.kind !== targetCombatant.kind) {
+      await tx
+        .update(encounterCombatants)
+        .set({ ragedAttackedHostile: true })
+        .where(
+          and(
+            eq(encounterCombatants.id, attackerId),
+            eq(encounterCombatants.encounterId, encounterId),
+          ),
+        );
+    }
+
+    // B-12: 0-HP auto-end — DELETE 'Raging' in the 0-HP branch (REQ-RAGE-08).
+    // PHB p.48: "Your rage ends early if... you are knocked unconscious."
+    // Runs alongside concentration break (below) in the same tx.
+    if (newHp === 0) {
+      await tx
+        .delete(encounterCombatantConditions)
+        .where(
+          and(
+            eq(encounterCombatantConditions.combatantId, targetId),
+            eq(encounterCombatantConditions.conditionName, 'Raging'),
+          ),
+        );
     }
 
     // ── Step 12b: Ki decrement (Slice 3b-ii, REQ-SS-ATOMICITY-01) ────────────────

@@ -34,6 +34,7 @@ import {
 } from '@dungeon-hub/domain/engine';
 import { resolveTargetSave, type Ability } from './resolve-target-save.js';
 import { breakConcentration } from '../engine/concentration-service.js';
+import { isRaging } from '@dungeon-hub/domain/engine';
 
 // ── Crypto RNG (mirrors perform-weapon-attack-apply.ts) ───────────────────────
 
@@ -264,6 +265,22 @@ export async function performForcedCheck(
     };
   }
 
+  // ── Step 5b: Raging STR-save advantage (REQ-RAGE-04, PHB p.48 — ADR-6 Option A) ──
+  // PHB p.48: "You have advantage on Strength checks and Strength saving throws."
+  // Pre-compute rollMode upgrade: if the TARGET is Raging and the ability is 'str',
+  // upgrade rollMode → 'advantage' (explicit caller-supplied rollMode still wins if provided,
+  // unless the caller left it at the default 'normal').
+  // ADR-6: derive INSIDE performForcedCheck so every caller benefits without duplication.
+  // NOTE: existingConditionNames is already loaded in Step 4 — no additional DB query needed.
+  let resolvedRollMode = rollMode;
+  if (
+    resolvedRollMode === 'normal' &&
+    ability === 'str' &&
+    isRaging(existingConditionRows.map((r) => ({ name: r.conditionName })))
+  ) {
+    resolvedRollMode = 'advantage';
+  }
+
   // ── Step 6: Resolve target save modifier ──────────────────────────────────────
   const saveResult = await resolveTargetSave(
     {
@@ -284,7 +301,8 @@ export async function performForcedCheck(
   const { saveMod } = saveResult;
 
   // ── Step 7: Roll the saving throw ─────────────────────────────────────────────
-  const saveRoll = rollSavingThrow(saveMod, dc, rollMode, cryptoRng);
+  // Use resolvedRollMode (may be upgraded to 'advantage' by Step 5b Raging gate).
+  const saveRoll = rollSavingThrow(saveMod, dc, resolvedRollMode, cryptoRng);
 
   // ── Step 8: On fail, apply conditions idempotently ───────────────────────────
   if (!saveRoll.success) {

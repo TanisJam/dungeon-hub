@@ -5,7 +5,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters, encounterCombatants } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants, encounterCombatantConditions } from '../../infra/db/schema.js';
 import { advanceTurn } from '@dungeon-hub/domain/encounter';
 import { loadEncounter, type LoadedEncounter } from './load-encounter.js';
 
@@ -57,6 +57,41 @@ export async function advanceEncounterTurn(
       // CAS conflict → abort sweep (no double-decrement on lost update — REQ-TAS-03).
       return { conflict: true as const };
     }
+
+    // Step 2.5: END-EARLY CHECK (engine-rage — REQ-RAGE-09, ADR-4).
+    // PHB p.48: "Your rage ends early if... your turn ends and you haven't attacked
+    //   a hostile creature since your last turn or taken any damage since then."
+    //
+    // CRITICAL ORDERING: Read flags FIRST, check condition SECOND, reset flags THIRD.
+    // Resetting BEFORE reading would always drop Rage (silent correctness bug).
+    // This runs BEFORE the turnsRemaining sweep so a rage that already expired at
+    // turnsRemaining=0 is cleaned up by the sweep after this gate (order-independent
+    // because the WHERE conditions are disjoint: end-early checks raged_* flags while
+    // sweep checks turns_remaining; they can only both fire if turnsRemaining=0 AND
+    // ledger flags are both false, in which case DELETE is idempotent).
+    //
+    // Uses raw SQL to read-check-delete atomically in one statement:
+    //   DELETE 'Raging' WHERE the outgoing combatant has it AND neither ledger flag is true.
+    // This is the SINGLE RESET POINT for both flags (ADR-4).
+    await tx.execute(sql`
+      DELETE FROM encounter_combatant_conditions
+      WHERE combatant_id = ${oldCombatantId}
+        AND condition_name = 'Raging'
+        AND EXISTS (
+          SELECT 1 FROM encounter_combatants ec
+          WHERE ec.id = ${oldCombatantId}
+            AND ec.raged_attacked_hostile = false
+            AND ec.raged_took_damage = false
+        )
+    `);
+
+    // Step 2.6: FLAG RESET for the OUTGOING combatant (single reset point — ADR-4).
+    // Reset AFTER the end-early check above (step 2.5) — NOT before.
+    // These flags reset at the rager's own turn-end so they are fresh next turn.
+    await tx
+      .update(encounterCombatants)
+      .set({ ragedAttackedHostile: false, ragedTookDamage: false })
+      .where(eq(encounterCombatants.id, oldCombatantId));
 
     // Step 2: DELETE expired rows (turns_remaining=0, boundary='end') — DELETE-FIRST (ADR-2).
     // REQ-TAS-04: DELETE before DECREMENT is correctness-critical — decrement-first would

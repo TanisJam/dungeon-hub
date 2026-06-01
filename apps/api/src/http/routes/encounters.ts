@@ -26,6 +26,8 @@ import { performSpellHeal } from '../../use-cases/encounters/perform-spell-heal.
 import { resolveAttackReaction } from '../../use-cases/encounters/resolve-attack-reaction.js';
 import { performCastSpellApply } from '../../use-cases/encounters/perform-cast-spell-apply.js';
 import { resolveCastReaction } from '../../use-cases/encounters/resolve-cast-reaction.js';
+import { activateRage } from '../../use-cases/encounters/activate-rage.js';
+import { deactivateRage } from '../../use-cases/encounters/deactivate-rage.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -1079,6 +1081,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTION_ALREADY_USED' }],
             });
+          case 'ACTOR_RAGING':
+            // engine-rage — REQ-RAGE-06 (PHB p.48). Can't cast spells while raging.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_RAGING' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -1204,6 +1212,127 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         damageApplied: result.damageApplied,
         ...(result.concentrationSave !== undefined ? { concentrationSave: result.concentrationSave } : {}),
       });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/activate-rage -------------------------
+  // engine-rage: Barbarian Rage activation (PHB p.48). GM-only.
+  // Costs one bonus action + one barbarian:rage-uses charge. Breaks concentration.
+  // REQ-RAGE-01, REQ-RAGE-02.
+  const ActivateRageBody = z.object({
+    ragerId: z.string().uuid(),
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/activate-rage',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = ActivateRageBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { ragerId, version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await activateRage({ encounterId: id, ragerId, version });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'NOT_YOUR_TURN':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'ACTOR_INCAPACITATED':
+          case 'BONUS_ACTION_ALREADY_USED':
+          case 'RESOURCE_OVER_LIMIT':
+          case 'RAGE_NOT_AVAILABLE':
+          case 'RAGE_BLOCKED_BY_HEAVY_ARMOR':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: result.code }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({ ok: true });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/deactivate-rage -----------------------
+  // engine-rage: Barbarian voluntary Rage end (PHB p.48). GM-only.
+  // Costs one bonus action. Removes 'Raging' condition.
+  // REQ-RAGE-10.
+  const DeactivateRageBody = z.object({
+    ragerId: z.string().uuid(),
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/deactivate-rage',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = DeactivateRageBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { ragerId, version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await deactivateRage({ encounterId: id, ragerId, version });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'NOT_YOUR_TURN':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          case 'BONUS_ACTION_ALREADY_USED':
+          case 'NOT_RAGING':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: result.code }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send({ ok: true });
     },
   );
 

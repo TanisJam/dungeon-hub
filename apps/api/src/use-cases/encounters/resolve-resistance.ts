@@ -31,6 +31,7 @@ import {
   applyDamageWithResist,
   buildPetrifiedModifiers,
   PETRIFIED_CONDITION_DEF,
+  buildRageModifiers,
   type ResistMod,
 } from '@dungeon-hub/domain/engine';
 import type { EntityId } from '@dungeon-hub/domain/engine';
@@ -67,7 +68,15 @@ export async function loadTargetResistMods(targetCombatantId: string): Promise<R
         resistMods.push(...result.resistMods);
       }
     }
-    // Future: add Rage, other resist-bearing conditions here following the same pattern.
+    // engine-rage: Raging barbarian has resistance to bludgeoning, piercing, slashing (PHB p.48).
+    // resistMods are level-independent — pass barbarianLevel=1 (constant; numMod ignored here).
+    // REQ-RAGE-03.
+    if (conditionName === 'Raging') {
+      const result = buildRageModifiers(1, targetCombatantId as EntityId);
+      if (result.ok) {
+        resistMods.push(...result.resistMods);
+      }
+    }
   }
 
   return resistMods;
