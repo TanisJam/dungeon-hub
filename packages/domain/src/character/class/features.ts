@@ -8,23 +8,13 @@
 
 import type { ClassCompendiumData } from './types.js';
 import { parseFeatureRef } from '../../compendium/parse-feature-ref.js';
+import { slugify } from '../../compendium/slugify.js';
 
 export interface ClassFeatureEntry {
   classSlug: string;
   level: number;
   featureSlug: string;
   featureName: string;
-}
-
-/**
- * Converts a feature name to a URL-safe kebab-case slug.
- * e.g. "Action Surge" → "action-surge"
- */
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
 }
 
 /**
