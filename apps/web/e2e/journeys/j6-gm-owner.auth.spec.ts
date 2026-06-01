@@ -138,6 +138,22 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       const otorgarBtn = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
       await expect(otorgarBtn).toBeVisible({ timeout: 10_000 });
 
+      // ── UI FLOW (the REAL user path): set HP max via the editor in DM mode ──
+      // This is what the user actually does — NOT a direct API call. Reproduces
+      // "no puedo pasar el máximo como DM".
+      await dmPage.getByRole('button', { name: 'Editar HP' }).click();
+      const maxInput = dmPage.getByRole('spinbutton', { name: 'HP máximo' });
+      await expect(maxInput, 'max input must be editable in DM mode').toBeEditable({ timeout: 5_000 });
+      await maxInput.fill('27');
+      await dmPage.getByRole('button', { name: /^guardar$/i }).click();
+      // No "Sin permiso." error, and the new max persists (API-authoritative).
+      await expect(async () => {
+        const hp = await getCharacterHp(heroId, dmJwt);
+        expect(hp?.max, 'hp.max should be 27 after UI save in DM mode').toBe(27);
+      }).toPass({ timeout: 10_000 });
+      // Restore to 20/20 for future runs.
+      await putHp(heroId, { current: 20, max: 20, temp: 0 }, dmJwt);
+
       // Toggle to "Jugador" (player) mode
       const jugadorButton = dmPage.getByRole('button', { name: 'Jugador', exact: true });
       await expect(jugadorButton).toBeVisible({ timeout: 5_000 });
