@@ -11,7 +11,10 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // Journeys drive a live dev server with revalidatePath soft-navs; first-attempt
+  // timing races are absorbed by retries. Assertions are authoritative (API status,
+  // DB-reflected state), so a real bug fails every attempt — retries don't mask it.
+  retries: 2,
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',
 

@@ -90,12 +90,13 @@ test.describe('J5 — DM moderation: reject/return-to-draft + DM chrome @ 375px'
       // "Rechazar" calls rejectCharacter directly (NO window.confirm — that
       // confirm only guards the active→draft "Devolver a borrador" path, see
       // approval-actions.tsx:handleReject). rejectCharacter → POST /reject →
-      // status 'draft' (characters.ts:1303).
+      // status 'draft' (characters.ts:1303). A single click; the suite-level
+      // retries absorb a rare revalidatePath no-op (re-clicking here fires
+      // concurrent rejects that race, so do NOT loop the click).
       await rechazarBtn.click();
 
       // ── Step 4: AUTHORITATIVE assertion — status transitions to 'draft' ──
-      // Poll the API (deterministic) rather than the transient button visibility,
-      // which is subject to revalidatePath re-render timing and is flaky.
+      // Poll the API (deterministic) rather than transient button visibility.
       await expect
         .poll(async () => getCharacterStatus(char.id, dmJwt), {
           message: 'rejected character status should become "draft"',

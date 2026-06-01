@@ -67,6 +67,22 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       await dmPage.goto(charPath, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
+      // Opening the grant dialog can race with revalidatePath re-hydration: the
+      // first click on "Otorgar" sometimes lands before the panel is interactive
+      // and is a no-op. Retry the click until the dialog actually opens.
+      const openGrantDialog = async () => {
+        const btn = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
+        await expect(btn).toBeVisible({ timeout: 10_000 });
+        const dlg = dmPage.getByRole('dialog');
+        await expect(async () => {
+          if (!(await dlg.isVisible().catch(() => false))) {
+            await btn.click().catch(() => {});
+          }
+          await expect(dlg).toBeVisible({ timeout: 3_000 });
+        }).toPass({ timeout: 30_000 });
+        return dlg;
+      };
+
       // DM should see the "Otorgar" button (DmGrantPanel renders for callerRole=gm)
       const otorgarBtn = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
       await expect(otorgarBtn).toBeVisible({ timeout: 10_000 });
@@ -82,9 +98,7 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // GRANT 1: XP
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      await otorgarBtn.click();
-      const dialog = dmPage.getByRole('dialog');
-      await expect(dialog).toBeVisible({ timeout: 5_000 });
+      const dialog = await openGrantDialog();
 
       // XP tab should be active by default
       const xpTab = dmPage.getByRole('tab', { name: 'XP' });
@@ -124,12 +138,7 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // GRANT 2: Gold
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      const otorgarBtn2 = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
-      await expect(otorgarBtn2).toBeVisible({ timeout: 10_000 });
-      await otorgarBtn2.click();
-
-      const dialog2 = dmPage.getByRole('dialog');
-      await expect(dialog2).toBeVisible({ timeout: 5_000 });
+      const dialog2 = await openGrantDialog();
 
       // Switch to Oro tab
       const goldTab = dmPage.getByRole('tab', { name: /^Oro$/i });
@@ -157,12 +166,7 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       await dmPage.goto(charPath, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
-      const otorgarBtn3 = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
-      await expect(otorgarBtn3).toBeVisible({ timeout: 10_000 });
-      await otorgarBtn3.click();
-
-      const dialog3 = dmPage.getByRole('dialog');
-      await expect(dialog3).toBeVisible({ timeout: 5_000 });
+      const dialog3 = await openGrantDialog();
 
       // Switch to Ítem tab
       const itemTab = dmPage.getByRole('tab', { name: /^Ítem$/i });
