@@ -503,7 +503,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       expect(csOption?.eligibleCounterspellerIds).toContain(counterspellerCombatantId);
 
       // C-1 proof: plant a known serverRolledDamage.total=99 in pending_cast.
-      // If server-authority holds, target HP must remain UNCHANGED (spell is cancelled).
+      // engine-action-economy (B-13): suspend bumped version+1, so encVersion=version+1.
+      const postSuspendV1 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -511,16 +512,16 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 99, perDart: [33, 33, 33] },
-        encVersion: version,
+        encVersion: postSuspendV1,
       });
 
-      // Resolve: cast-counterspell with 3rd-level slot.
+      // Resolve: cast-counterspell — send postSuspendV1 as the CAS version.
       const resolveRes = await doCounterspell(
         encounterId,
         targetCombatantId,
         counterspellerCombatantId,
         3,
-        version,
+        postSuspendV1,
       );
       expect(resolveRes.statusCode).toBe(200);
       const resolveBody = resolveRes.json();
@@ -547,9 +548,9 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       const pendingCastAfter = await getPendingCast(encounterId);
       expect(pendingCastAfter).toBeNull();
 
-      // Version bumped (CAS commit).
+      // Version bumped: +1 (suspend action) + 1 (resolve CAS) = +2 total.
       const versionAfter = await getEncounterVersion(encounterId);
-      expect(versionAfter).toBe(version + 1);
+      expect(versionAfter).toBe(version + 2);
     },
   );
 
@@ -577,7 +578,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       expect(castRes.statusCode).toBe(200);
       expect(castRes.json().castAnnounced).toBeDefined();
 
-      // Plant known damage for decline verification (C-1 check).
+      // Plant known damage — engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV2 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -585,13 +587,13 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: version,
+        encVersion: postSuspendV2,
       });
 
       const targetHpBefore = await getCombatantHp(encounterId, targetCombatantId);
 
-      // Resolve: decline (no counterspell — MM resolves).
-      const resolveRes = await doDecline(encounterId, targetCombatantId, version);
+      // Resolve: decline — send postSuspendV2 (version+1) as the CAS version.
+      const resolveRes = await doDecline(encounterId, targetCombatantId, postSuspendV2);
       expect(resolveRes.statusCode).toBe(200);
       const body = resolveRes.json();
       expect(body.damageApplied).toBe(9); // planted value governs (C-1)
@@ -600,9 +602,9 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       const targetHpAfter = await getCombatantHp(encounterId, targetCombatantId);
       expect(targetHpAfter).toBe(targetHpBefore - 9);
 
-      // Version bumped.
+      // Version bumped: +1 (suspend) + 1 (resolve) = +2 total.
       const versionAfter = await getEncounterVersion(encounterId);
-      expect(versionAfter).toBe(version + 1);
+      expect(versionAfter).toBe(version + 2);
     },
   );
 
@@ -634,7 +636,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       // Wizard L5 has 2 third-level slots (index 2 = level 3).
       await setSlotsUsed(counterspellerCharId, [0, 0, 2, 1, 0, 0, 0, 0, 0]);
 
-      // Manually plant a pending_cast at the CURRENT version (no version bump on suspend).
+      // Manually plant pending_cast — engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV3 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -642,16 +645,16 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: version,
+        encVersion: postSuspendV3,
       });
 
-      // Attempt to counterspell with 3rd slot (but they have none left).
+      // Attempt to counterspell with 3rd slot (but they have none left) — send postSuspendV3.
       const resolveRes = await doCounterspell(
         encounterId,
         targetCombatantId,
         counterspellerCombatantId,
         3,
-        version,
+        postSuspendV3,
       );
       expect(resolveRes.statusCode).toBe(400);
       const body = resolveRes.json();
@@ -679,6 +682,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       });
       expect(castRes.statusCode).toBe(200);
 
+      // engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV4 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -686,16 +691,16 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: version,
+        encVersion: postSuspendV4,
       });
 
-      // Attempt to cast Counterspell with a 2nd-level slot.
+      // Attempt to cast Counterspell with a 2nd-level slot — send postSuspendV4.
       const resolveRes = await doCounterspell(
         encounterId,
         targetCombatantId,
         counterspellerCombatantId,
         2, // below minimum
-        version,
+        postSuspendV4,
       );
       expect(resolveRes.statusCode).toBe(400);
       const body = resolveRes.json();
@@ -723,6 +728,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       });
       expect(castRes.statusCode).toBe(200);
 
+      // engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV5 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -730,16 +737,16 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: version,
+        encVersion: postSuspendV5,
       });
 
-      // Counterspeller ID == casterCombatantId — invalid.
+      // Counterspeller ID == casterCombatantId — invalid. Send postSuspendV5.
       const resolveRes = await doCounterspell(
         encounterId,
         targetCombatantId,
         casterCombatantId, // same as caster!
         3,
-        version,
+        postSuspendV5,
       );
       expect(resolveRes.statusCode).toBe(400);
       const body = resolveRes.json();
@@ -766,6 +773,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       });
       expect(castRes.statusCode).toBe(200);
 
+      // engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV6 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -773,7 +782,7 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: version,
+        encVersion: postSuspendV6,
       });
 
       // Mark counterspeller reaction as already used (simulate previous reaction this round).
@@ -784,7 +793,7 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targetCombatantId,
         counterspellerCombatantId,
         3,
-        version,
+        postSuspendV6,
       );
       expect(resolveRes.statusCode).toBe(400);
       const body = resolveRes.json();
@@ -952,7 +961,8 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
       expect(castRes.statusCode).toBe(200);
       expect(castRes.json().castAnnounced).toBeDefined();
 
-      // Plant a specific serverRolledDamage so we can assert server uses it (not client).
+      // Plant a specific serverRolledDamage — engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendV10 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -960,7 +970,7 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
         targets: [targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 42, perDart: [14, 14, 14] },
-        encVersion: version,
+        encVersion: postSuspendV10,
       });
 
       // Send counterspell body with extra roll fields that should be stripped by Zod.
@@ -974,7 +984,7 @@ describe('engine-counterspell — POST /encounters/:id/actions/cast-spell + reso
           defenderCombatantId: targetCombatantId,
           counterspellerCombatantId,
           slotLevel: 3,
-          version,
+          version: postSuspendV10,
           // These fields should be stripped by Zod and IGNORED by server (C-1).
           d20: 1,
           total: 1,

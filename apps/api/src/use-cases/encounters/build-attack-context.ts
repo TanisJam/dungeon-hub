@@ -122,6 +122,12 @@ export type BuildAttackContextResult =
         damageDice: string;
         damageType: string;
       };
+      /**
+       * Attacker's class array (slug + level).
+       * engine-action-economy: used by extraAttacksPerAction to compute the Attack action
+       * allowance (REQ-AE-08, PHB p.198). Exposed here to avoid a second DB query.
+       */
+      classes: AppliedClass[];
     }
   | { ok: false; code: 'NOT_FOUND'; target: 'character' | 'weapon' }
   | { ok: false; code: 'FORBIDDEN' }; // character userId mismatch (unused by GM callers)
@@ -517,5 +523,7 @@ export async function buildAttackContext(
     attackerSlotsMax,
     attackerSlotsUsed,
     weapon,
+    // engine-action-economy: classes exposed for extraAttacksPerAction (REQ-AE-08).
+    classes: (charData['classes'] as AppliedClass[] | undefined) ?? [],
   };
 }

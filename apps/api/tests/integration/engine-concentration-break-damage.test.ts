@@ -264,6 +264,30 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
   let casterL7CharId: string;
   let longswordInstanceId: string;
 
+  /**
+   * Advance turn twice on the encounter (INCOMING combatant cycles: A→B→A).
+   * Used to reset action_used=false for the original attacker after a miss.
+   * engine-action-economy (B-12): after any non-hit, action_used=true blocks retries.
+   * Scoped at the outer describe so B6 tests can use it too.
+   */
+  const advanceTurnTwice = async (encounterId: string): Promise<void> => {
+    const app = await getTestApp();
+    let v = await getEncounterVersion(encounterId, gm.accessToken);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    });
+    v = await getEncounterVersion(encounterId, gm.accessToken);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    });
+  };
+
   beforeAll(async () => {
     const app = await getTestApp();
     gm = await createTestUser();
@@ -629,6 +653,8 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
   describe('Path A — perform-weapon-attack-apply (CBW)', () => {
     /**
      * Attack until we get a HIT (not a miss, not a reactionOffered).
+     * engine-action-economy (B-12): after each non-hit, advance turn twice to reset
+     * action_used for the attacker (PHB p.190 — budget resets at start of your turn).
      * Returns the response body on a hit with HP committed.
      */
     const attackUntilHit = async (
@@ -645,12 +671,17 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: { attackerId, targetId, weaponInstanceId: longswordInstanceId, version },
         });
-        if (res.statusCode !== 200) continue;
+        if (res.statusCode !== 200) {
+          // ACTION_ALREADY_USED or other gate — advance turn twice to reset action_used.
+          await advanceTurnTwice(encounterId);
+          continue;
+        }
         const body = res.json<Record<string, unknown>>();
         if (body['hit'] === true && !body['reactionOffered']) {
           return { body, version };
         }
-        // If reactionOffered (shouldn't happen with NPC target), or miss: loop.
+        // Miss (hit=false) — advance turn twice to reset action_used for next attempt.
+        await advanceTurnTwice(encounterId);
       }
       throw new Error('Could not land a hit in 40 attempts');
     };
@@ -770,6 +801,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
       await insertConcentrationRow(casterCharId);
 
       // Attempt attacks and wait for one where broke=false.
+      // engine-action-economy (B-12): advance turn twice after each non-hit to reset action_used.
       const app = await getTestApp();
       let sawSuccess = false;
       for (let i = 0; i < 80; i++) {
@@ -780,12 +812,18 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
         });
-        if (res.statusCode !== 200) continue;
+        if (res.statusCode !== 200) {
+          await advanceTurnTwice(enc2.id);
+          continue;
+        }
         const body = res.json<Record<string, unknown>>();
-        if (body['hit'] !== true || body['reactionOffered']) continue;
+        if (body['hit'] !== true || body['reactionOffered']) {
+          await advanceTurnTwice(enc2.id);
+          continue;
+        }
 
         const cs = body['concentrationSave'] as Record<string, unknown> | undefined;
-        if (!cs) continue;
+        if (!cs) { await advanceTurnTwice(enc2.id); continue; }
 
         if (cs['success'] === true && cs['broke'] === false) {
           sawSuccess = true;
@@ -797,6 +835,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
         if (cs['broke'] === true) {
           await insertConcentrationRow(casterCharId);
         }
+        await advanceTurnTwice(enc2.id);
       }
 
       expect(sawSuccess).toBe(true);
@@ -850,6 +889,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
 
       await insertConcentrationRow(casterCharId);
 
+      // engine-action-economy (B-12): advance turn twice after each non-hit to reset action_used.
       const app = await getTestApp();
       let sawFail = false;
       for (let i = 0; i < 80; i++) {
@@ -860,12 +900,12 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
         });
-        if (res.statusCode !== 200) continue;
+        if (res.statusCode !== 200) { await advanceTurnTwice(enc2.id); continue; }
         const body = res.json<Record<string, unknown>>();
-        if (body['hit'] !== true || body['reactionOffered']) continue;
+        if (body['hit'] !== true || body['reactionOffered']) { await advanceTurnTwice(enc2.id); continue; }
 
         const cs = body['concentrationSave'] as Record<string, unknown> | undefined;
-        if (!cs) continue;
+        if (!cs) { await advanceTurnTwice(enc2.id); continue; }
 
         if (cs['broke'] === true) {
           sawFail = true;
@@ -875,6 +915,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
         }
         // Success: row still intact, try again.
         expect(await hasConcentrationRow(casterCharId)).toBe(true);
+        await advanceTurnTwice(enc2.id);
       }
 
       expect(sawFail).toBe(true);
@@ -1368,7 +1409,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
 
         // Plant spellLevel=4 in pending_cast so DC-check path fires (L4 > CS slot L3).
         // PHB p.281: "If it is casting a spell of 4th level or higher, make an ability check."
-        // serverRolledDamage.total: 9 (deterministic, matches CBR-01 style).
+        // engine-action-economy (B-13): suspend bumped version+1, so encVersion=freshEnc.version+1.
         await plantPendingCast(freshEnc.encounterId, {
           casterCombatantId: freshEnc.casterCombatantId,
           spellName: 'Magic Missile',
@@ -1376,7 +1417,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           targets: [freshEnc.targetCombatantId],
           dartCount: 3,
           serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-          encVersion: freshEnc.version,
+          encVersion: freshEnc.version + 1,
         });
 
         const resolveVersion = await getEncounterVersion(freshEnc.encounterId, gm.accessToken);
@@ -1471,7 +1512,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
       }
 
       // Plant spellLevel=1 (Magic Missile L1) → Counterspell L3 auto-counters (PHB p.281).
-      // serverRolledDamage set to a non-zero value to prove it's NEVER applied when countered=true.
+      // engine-action-economy (B-13): suspend bumped version+1, so encVersion=freshEnc.version+1.
       await plantPendingCast(freshEnc.encounterId, {
         casterCombatantId: freshEnc.casterCombatantId,
         spellName: 'Magic Missile',
@@ -1479,7 +1520,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
         targets: [freshEnc.targetCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 9, perDart: [3, 3, 3] },
-        encVersion: freshEnc.version,
+        encVersion: freshEnc.version + 1,
       });
 
       const resolveVersion = await getEncounterVersion(freshEnc.encounterId, gm.accessToken);
@@ -1572,6 +1613,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
       expect(await hasConcentrationRow(casterCharId)).toBe(true);
 
       // Attack until we get a hit that kills the target (newHp=0).
+      // engine-action-economy (B-12): advance turn twice after miss/non-hit to reset action_used.
       const app = await getTestApp();
       let sawOutrightBreak = false;
       for (let attempt = 0; attempt < 50; attempt++) {
@@ -1582,9 +1624,9 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
         });
-        if (res.statusCode !== 200) continue;
+        if (res.statusCode !== 200) { await advanceTurnTwice(enc2.id); continue; }
         const body = res.json<Record<string, unknown>>();
-        if (body['hit'] !== true || body['reactionOffered']) continue;
+        if (body['hit'] !== true || body['reactionOffered']) { await advanceTurnTwice(enc2.id); continue; }
 
         // On a hit: newHp should be 0 (target had 1 HP, min longsword damage = 3 > 1).
         // REQ-CID-02: concentrationSave MUST be the outright-break shape.

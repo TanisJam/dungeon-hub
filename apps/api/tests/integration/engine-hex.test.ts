@@ -185,9 +185,43 @@ describe('engine-hex — POST /encounters/:id/actions/attack/apply (Hex +1d6 nec
   };
 
   /**
+   * Advance encounter turn until the given combatant becomes current (action_used reset).
+   * engine-action-economy (B-12): after any attack (hit or miss), action_used=true.
+   * Must advance AT LEAST ONCE to move off the attacker, then continue until back.
+   */
+  const advanceUntilCurrent = async (encounterId: string, attackerId: string): Promise<void> => {
+    const app = await getTestApp();
+    const getEnc = async () => {
+      const r = await app.inject({
+        method: 'GET', url: `/api/v1/encounters/${encounterId}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+      return r.json() as { version: number; currentCombatantId: string };
+    };
+    // Advance at least once (moves off current attacker).
+    let enc = await getEnc();
+    await app.inject({
+      method: 'POST', url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: enc.version },
+    });
+    // Continue advancing until attacker becomes current (their next turn).
+    for (let i = 0; i < 10; i++) {
+      enc = await getEnc();
+      if (enc.currentCombatantId === attackerId) return;
+      await app.inject({
+        method: 'POST', url: `/api/v1/encounters/${encounterId}/advance-turn`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { version: enc.version },
+      });
+    }
+  };
+
+  /**
    * Retry loop: fire the attack until a hit is recorded.
    * npcAc=1 makes hits overwhelmingly likely; nat-1 auto-misses even at AC 1 (PHB p.194).
-   * Reloads encounter version for each retry (encounter version bumps on hit).
+   * engine-action-economy (B-12): after each non-hit, advance turn twice to reset action_used
+   * for the attacker (PHB p.190 — budget resets at start of your turn).
    */
   const retryUntilHit = async (
     encounterId: string,
@@ -204,7 +238,8 @@ describe('engine-hex — POST /encounters/:id/actions/attack/apply (Hex +1d6 nec
       if (statusCode === 200 && body['hit'] === true) {
         return body;
       }
-      // Reload version after miss (version unchanged on miss in most impls) or fresh enc for retry.
+      // After miss or non-200 (ACTION_ALREADY_USED), advance turn until attacker is current.
+      await advanceUntilCurrent(encounterId, attackerId);
       const encRes = await app.inject({
         method: 'GET',
         url: `/api/v1/encounters/${encounterId}`,

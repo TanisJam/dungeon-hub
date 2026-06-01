@@ -95,7 +95,11 @@ export type PerformSpellHealResult =
   | { ok: false; code: 'HEALER_NOT_SPELLCASTER' }
   | { ok: false; code: 'SLOT_NOT_AVAILABLE' }
   // engine-incapacitated-gating — REQ-INC-04 (PHB p.290: can't take actions).
-  | { ok: false; code: 'ACTOR_INCAPACITATED' };
+  | { ok: false; code: 'ACTOR_INCAPACITATED' }
+  // engine-action-economy: budget exhausted (REQ-AE-02, REQ-AE-03).
+  // Cure Wounds = action (PHB p.230); Healing Word = bonus action (PHB p.250).
+  | { ok: false; code: 'ACTION_ALREADY_USED' }
+  | { ok: false; code: 'BONUS_ACTION_ALREADY_USED' };
 
 // ── perform-spell-heal ─────────────────────────────────────────────────────────
 
@@ -176,6 +180,17 @@ export async function performSpellHeal(
   // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
   if (await isCombatantIncapacitated(healerCombatantId)) {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
+  // ── Step 4b: Action / bonus-action budget gate (REQ-AE-02, REQ-AE-03) ─────────
+  // Branch on spellName (ADR-5 engine-action-economy — no new input field).
+  // Cure Wounds = action (PHB p.230); Healing Word = bonus action (PHB p.250).
+  // healerCombatant loaded via select() in Step 2 — actionUsed/bonusActionUsed available.
+  if (spellName === 'Cure Wounds' && healerCombatant.actionUsed) {
+    return { ok: false, code: 'ACTION_ALREADY_USED' };
+  }
+  if (spellName === 'Healing Word' && healerCombatant.bonusActionUsed) {
+    return { ok: false, code: 'BONUS_ACTION_ALREADY_USED' };
   }
 
   // ── Step 5: Load target combatant ─────────────────────────────────────────────
@@ -302,6 +317,13 @@ export async function performSpellHeal(
   // REQ-H-07: slot consumed even when target is at full HP (cast occurred).
   // REQ-H-12: self-heal safe — target (encounter_combatants) and slot (characters) are
   //           different tables; no row conflict when healerCombatantId === targetCombatantId.
+  // Determine which budget flag to consume (ADR-5 engine-action-economy).
+  // Cure Wounds = action; Healing Word = bonus action.
+  const budgetUpdate: { actionUsed?: boolean; bonusActionUsed?: boolean } =
+    spellName === 'Cure Wounds'
+      ? { actionUsed: true }
+      : { bonusActionUsed: true };
+
   const txResult = await db.transaction(async (tx) => {
     // a. Update target HP.
     await tx
@@ -310,6 +332,19 @@ export async function performSpellHeal(
       .where(
         and(
           eq(encounterCombatants.id, targetCombatantId),
+          eq(encounterCombatants.encounterId, encounterId),
+        ),
+      );
+
+    // a2. Consume healer action / bonus-action budget atomically (REQ-AE-02, REQ-AE-03).
+    // When self-heal (healerCombatantId === targetCombatantId), this is a second UPDATE on
+    // the same row — safe in Postgres, target HP write above used different columns.
+    await tx
+      .update(encounterCombatants)
+      .set(budgetUpdate)
+      .where(
+        and(
+          eq(encounterCombatants.id, healerCombatantId),
           eq(encounterCombatants.encounterId, encounterId),
         ),
       );
@@ -325,7 +360,7 @@ export async function performSpellHeal(
       .returning({ version: encounters.version });
 
     if (updated.length === 0) {
-      // Version conflict — full rollback (HP + slot unchanged).
+      // Version conflict — full rollback (HP + slot + budget unchanged).
       return false;
     }
 

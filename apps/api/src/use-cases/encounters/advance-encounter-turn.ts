@@ -81,15 +81,16 @@ export async function advanceEncounterTurn(
     `);
     // turns_remaining - 1 arithmetic is static SQL text, not user input — injection-safe (ADR-2).
 
-    // Step 4: Reset reaction_used for the INCOMING combatant (ADR-5 engine-reaction-bus).
+    // Step 4: Reset reaction_used + action budget for the INCOMING combatant.
     // PHB p.190: "You regain your expended reaction at the start of your turn."
+    // PHB p.189: action and bonus action also regained each turn (REQ-AE-09).
     // "Start of your turn" = when you become the INCOMING (active) combatant.
     // CRITICAL: reset targets result.currentCombatantId (INCOMING), NOT oldCombatantId (OUTGOING).
-    // The outgoing combatant's reaction is NOT reset when their turn ends — it resets only
+    // The outgoing combatant's budget is NOT reset when their turn ends — it resets only
     // when the pointer returns to them (their next turn start = when they become INCOMING again).
     await tx
       .update(encounterCombatants)
-      .set({ reactionUsed: false })
+      .set({ reactionUsed: false, actionUsed: false, bonusActionUsed: false, attacksRemaining: 0 })
       .where(eq(encounterCombatants.id, result.currentCombatantId));
 
     return { conflict: false as const };

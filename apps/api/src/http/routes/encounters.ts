@@ -417,6 +417,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
+          case 'ACTION_ALREADY_USED':
+            // engine-action-economy — REQ-AE-06 (PHB p.198). Attack action already spent this turn.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTION_ALREADY_USED' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -870,6 +876,18 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
+          case 'ACTION_ALREADY_USED':
+            // engine-action-economy — REQ-AE-02 (PHB p.230). Cure Wounds action already spent.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTION_ALREADY_USED' }],
+            });
+          case 'BONUS_ACTION_ALREADY_USED':
+            // engine-action-economy — REQ-AE-03 (PHB p.250). Healing Word bonus action already spent.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'BONUS_ACTION_ALREADY_USED' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }
@@ -1054,6 +1072,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
+            });
+          case 'ACTION_ALREADY_USED':
+            // engine-action-economy — REQ-AE-02 (PHB p.257). Cast action already spent this turn.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTION_ALREADY_USED' }],
             });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });

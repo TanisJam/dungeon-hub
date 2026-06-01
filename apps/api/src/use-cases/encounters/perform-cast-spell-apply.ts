@@ -140,7 +140,9 @@ export type PerformCastSpellApplyResult =
   | { ok: false; code: 'INSUFFICIENT_SLOT' }
   | { ok: false; code: 'MULTI_TARGET_NOT_SUPPORTED' }
   // engine-incapacitated-gating — REQ-INC-03 (PHB p.290: can't take actions).
-  | { ok: false; code: 'ACTOR_INCAPACITATED' };
+  | { ok: false; code: 'ACTOR_INCAPACITATED' }
+  // engine-action-economy: caster's action budget exhausted for this turn (REQ-AE-02, PHB p.257).
+  | { ok: false; code: 'ACTION_ALREADY_USED' };
 
 // ── perform-cast-spell-apply ──────────────────────────────────────────────────
 
@@ -218,6 +220,13 @@ export async function performCastSpellApply(
   // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
   if (await isCombatantIncapacitated(casterId)) {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
+  // ── Step 4b: Action budget gate (REQ-AE-02, PHB p.257 — casting costs the action) ──
+  // Fail-fast: reject if this caster already spent their action this turn.
+  // casterCombatant loaded via select() in Step 2 — actionUsed column available.
+  if (casterCombatant.actionUsed) {
+    return { ok: false, code: 'ACTION_ALREADY_USED' };
   }
 
   // ── Step 6: Load target combatant ─────────────────────────────────────────────
@@ -407,32 +416,60 @@ export async function performCastSpellApply(
 
   // ── Step 9a: SUSPEND PATH ─────────────────────────────────────────────────────
   // Roll MM darts server-side (C-1). Write pending_cast with version guard (W-3).
-  // NO version bump on suspend. NO slot consumed yet (slot consumed at resolve — ADR-1).
+  // engine-action-economy (B-9, ADR-5): the caster declared the spell — the action is spent
+  // at ANNOUNCE time (PHB p.281: counterspell that negates the spell still spent the action).
+  // The suspend write is converted to a tx: UPDATE caster actionUsed=true + bump version,
+  // capture nextVersion, write pending_cast{encVersion:nextVersion}.
+  // VERSION RE-THREAD SITE 5: pending_cast.encVersion MUST be nextVersion (the post-consume epoch).
+  // If encVersion stays at the old version, resolve-cast-reaction's bind-check rejects valid state.
   if (shouldSuspend) {
     const rollResult = rollMagicMissile({ slotLevel, rng: cryptoRng });
 
-    // Version-guarded UPDATE — mirrors pending_reaction posture in perform-weapon-attack-apply.
-    // If 0 rows updated (concurrent commit changed version), return VERSION_CONFLICT.
-    const pendingCast: PendingCast = {
-      casterCombatantId: casterId,
-      spellName,
-      spellLevel: slotLevel,
-      targets: [targetId],
-      dartCount: rollResult.dartCount,
-      serverRolledDamage: { total: rollResult.total, perDart: rollResult.perDart },
-      encVersion: version,
-    };
+    // Suspend tx: consume caster action + bump version (serializes concurrent applies) + write pending_cast.
+    let suspendNextVersion = version;
+    const suspendTxResult = await db.transaction(async (tx) => {
+      // a. Consume caster action atomically.
+      await tx
+        .update(encounterCombatants)
+        .set({ actionUsed: true })
+        .where(
+          and(
+            eq(encounterCombatants.id, casterId),
+            eq(encounterCombatants.encounterId, encounterId),
+          ),
+        );
 
-    const suspendUpdated = await db
-      .update(encounters)
-      .set({
-        pendingCast,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
-      .returning({ id: encounters.id });
+      // b. Bump encounter version (CAS guard).
+      const bumped = await tx
+        .update(encounters)
+        .set({ version: sql`${encounters.version} + 1`, updatedAt: new Date() })
+        .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
+        .returning({ version: encounters.version });
 
-    if (suspendUpdated.length === 0) {
+      if (bumped.length === 0) return false;
+
+      suspendNextVersion = bumped[0]!.version;
+
+      // c. Write pending_cast with encVersion = nextVersion (VERSION RE-THREAD SITE 5).
+      const pendingCast: PendingCast = {
+        casterCombatantId: casterId,
+        spellName,
+        spellLevel: slotLevel,
+        targets: [targetId],
+        dartCount: rollResult.dartCount,
+        serverRolledDamage: { total: rollResult.total, perDart: rollResult.perDart },
+        encVersion: suspendNextVersion,
+      };
+
+      await tx
+        .update(encounters)
+        .set({ pendingCast, updatedAt: new Date() })
+        .where(eq(encounters.id, encounterId));
+
+      return true;
+    });
+
+    if (!suspendTxResult) {
       return { ok: false, code: 'VERSION_CONFLICT' };
     }
 
@@ -489,6 +526,17 @@ export async function performCastSpellApply(
       .where(
         and(
           eq(encounterCombatants.id, targetId),
+          eq(encounterCombatants.encounterId, encounterId),
+        ),
+      );
+
+    // a2. Consume caster action budget (REQ-AE-02 — atomic with HP + version).
+    await tx
+      .update(encounterCombatants)
+      .set({ actionUsed: true })
+      .where(
+        and(
+          eq(encounterCombatants.id, casterId),
           eq(encounterCombatants.encounterId, encounterId),
         ),
       );

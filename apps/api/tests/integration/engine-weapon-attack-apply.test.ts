@@ -273,8 +273,8 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
       );
       expect(goblinAfter?.hpCurrent).toBe(expectedNewHp);
 
-      // REQ-ATK-VERSION-01.1: version incremented on hit
-      expect(afterEnc.version).toBe(versionBefore + 1);
+      // REQ-ATK-VERSION-01.1: version bumped by +2 on hit (budget tx + damage tx — ADR-4 engine-action-economy).
+      expect(afterEnc.version).toBe(versionBefore + 2);
     },
   );
 
@@ -515,8 +515,8 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
       const afterEnc = await getEncounter(freshEnc.id);
       const npcAfter = afterEnc.combatants.find((c: { id: string }) => c.id === npcId);
       expect(npcAfter?.hpCurrent).toBe(body.newHp);
-      // version bumped
-      expect(afterEnc.version).toBe(freshEnc.version + 1);
+      // version bumped by +2 (budget tx + HP tx — ADR-4 engine-action-economy)
+      expect(afterEnc.version).toBe(freshEnc.version + 2);
     },
   );
 
@@ -695,7 +695,7 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
   // ── APPLY-T11: miss → hit:false, no HP mutation, no version bump ──────────────
 
   it(
-    'APPLY-T11: attack misses → 200 with hit:false; no HP mutation; no version bump (REQ-APPLY-FLOW-02, REQ-ROUTE-BODY-02)',
+    'APPLY-T11: attack misses → 200 with hit:false; no HP mutation; version bumped +1 (budget tx — ADR-4, REQ-APPLY-FLOW-02, REQ-ROUTE-BODY-02)',
     async () => {
       // PHB p.194: a miss causes no damage.
       // Use an impossibly high AC (30) so the attack always misses.
@@ -772,8 +772,9 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
           const afterEnc = await getEncounter(freshEnc.id);
           const npcAfter = afterEnc.combatants.find((c: { id: string }) => c.id === targetId);
           expect(npcAfter?.hpCurrent).toBe(npcHpBefore);
-          // No version bump (REQ-APPLY-FLOW-02: miss is a no-op mutation)
-          expect(afterEnc.version).toBe(versionBefore);
+          // Version bumped by +1 (budget tx consumes action pre-roll — ADR-4 engine-action-economy).
+          // No HP mutation (REQ-APPLY-FLOW-02: miss causes no damage).
+          expect(afterEnc.version).toBe(versionBefore + 1);
         }
         // If hit=true (nat-20), loop again for another attempt.
       }

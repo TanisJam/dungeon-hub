@@ -300,56 +300,82 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
 
   /**
    * Retry loop: attack Fighter vs Wizard until we get reactionOffered.
-   * Reloads version from DB each attempt. Returns { body, version } on success.
-   * Max 100 attempts (AC 12, to-hit +7 → gap<5 occurs when d20=5..9, ~25% chance).
+   * engine-action-economy (B-12): each attempt uses a FRESH encounter so that
+   * action_used is always false at the start of the attempt. The old pattern of
+   * reusing the same encounter broke with the pre-roll budget tx: after the first
+   * attack (hit or miss), action_used=true and subsequent calls return ACTION_ALREADY_USED.
    *
-   * W-1 fix: encounters used here should be created with wizardHp=200 so that
-   * retries from hits/crits before the reactionOffered scenario can't kill the wizard.
+   * Returns { body, encounterId, fighterId, wizardId, version } where version is the
+   * post-budget-tx DB version (incoming version + 1) — callers use this for the resolve.
    */
   const retryUntilReactionOffered = async (
-    encounterId: string,
-    fighterId: string,
-    wizardId: string,
-    initialVersion: number,
-    maxAttempts = 100,
-  ): Promise<{ body: Record<string, unknown>; version: number } | null> => {
-    let version = initialVersion;
+    _encounterId: string,
+    _fighterId: string,
+    _wizardId: string,
+    _initialVersion: number,
+    maxAttempts = 200,
+  ): Promise<{ body: Record<string, unknown>; version: number; encounterId: string; wizardId: string } | null> => {
+    const app = await getTestApp();
     for (let i = 0; i < maxAttempts; i++) {
-      const { statusCode, body } = await doAttackFighterVsWizard(encounterId, fighterId, wizardId, version);
+      // Fresh encounter per attempt: Fighter (init=30) vs Wizard (init=20, hp=200, AC=12)
+      // hp=200 ensures we never accidentally kill the wizard across attempts.
+      const { encounterId: freshEncId, fighterId: freshFighterId, wizardId: freshWizardId, version: freshVersion } =
+        await makeFreshEncounter(app, `retry-reactionOffered-${i}`, { wizardHp: 200 });
+      await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+      const { statusCode, body } = await doAttackFighterVsWizard(freshEncId, freshFighterId, freshWizardId, freshVersion);
       if (statusCode === 200 && body['reactionOffered']) {
-        return { body, version };
+        // After the budget tx + pending_reaction write, the DB version is freshVersion + 1.
+        const postSuspendVersion = await getEncounterVersion(freshEncId);
+        return { body, version: postSuspendVersion, encounterId: freshEncId, wizardId: freshWizardId };
       }
-      // If the attack committed (hit or miss), reload version
-      version = await getEncounterVersion(encounterId);
     }
     return null;
   };
 
   /**
-   * Retry loop: get a simple hit (no reaction offered — gap≥5 or miss flipped to hit).
-   * Uses NPC target (ac=1) to guarantee gap≥5 (to-hit +7, ac=1, always gap≥5).
+   * Retry loop: get a simple hit (no reaction offered — NPC target, gap≥5).
+   * engine-action-economy (B-12): uses fresh encounters per attempt so action_used
+   * is always false. The original encounter args are ignored; NPC (ac=1) combatants
+   * are created fresh each attempt.
    */
   const retryUntilHit = async (
-    encounterId: string,
-    attackerId: string,
-    targetId: string,
-    initialVersion: number,
+    _encounterId: string,
+    _attackerId: string,
+    _targetId: string,
+    _initialVersion: number,
     maxAttempts = 30,
   ): Promise<Record<string, unknown> | null> => {
-    let version = initialVersion;
+    const app = await getTestApp();
     for (let i = 0; i < maxAttempts; i++) {
-      const app = await getTestApp();
+      const enc = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `retryUntilHit-${i}`,
+            combatants: [
+              { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
+              { name: 'Rat NPC', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 1 },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const freshFighterId = enc.currentCombatantId as string;
+      const freshNpcId = (enc.combatants.find((c: { name: string }) => c.name === 'Rat NPC')?.id as string) ?? '';
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/encounters/${encounterId}/actions/attack/apply`,
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: { attackerId, targetId, weaponInstanceId: longswordInstanceId, version },
+        payload: { attackerId: freshFighterId, targetId: freshNpcId, weaponInstanceId: longswordInstanceId, version: enc.version },
       });
       const body = res.json() as Record<string, unknown>;
       if (res.statusCode === 200 && body['hit'] === true) {
         return body;
       }
-      version = await getEncounterVersion(encounterId);
     }
     return null;
   };
@@ -484,43 +510,36 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   //
   // C-1 fix verification: reactionOffered must NOT expose rolledDamage (it is stored server-side).
   // ────────────────────────────────────────────────────────────────────────────────
-  it('ERB-T1: shieldable hit → reactionOffered returned; HP + version unchanged; no slot consumed; no rolledDamage in response', async () => {
-    const app = await getTestApp();
-    await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    // Use wizardHp=200 so retry loop cannot kill wizard before reactionOffered (W-1 fix)
-    const { encounterId, fighterId, wizardId, version } = await makeFreshEncounter(app, 'ERB-T1 enc', { wizardHp: 200 });
+  it('ERB-T1: shieldable hit → reactionOffered returned; HP unchanged; no slot consumed; no rolledDamage in response', async () => {
+    // engine-action-economy (B-12): retryUntilReactionOffered now uses fresh encounters per
+    // attempt (action_used resets per encounter). The budget tx bumps version by +1 on the
+    // suspend path (pre-roll consume, ADR-4). HP remains unchanged (no damage committed).
+    const result = await retryUntilReactionOffered('', '', '', 0);
+    expect(result, 'Expected to get reactionOffered within 200 attempts').not.toBeNull();
 
-    const result = await retryUntilReactionOffered(encounterId, fighterId, wizardId, version);
-    expect(result, 'Expected to get reactionOffered within 100 attempts').not.toBeNull();
-
-    const { body } = result!;
+    const { body, encounterId: freshEncId, wizardId: freshWizardId, version: suspendVersion } = result!;
     expect(body['reactionOffered']).toBeDefined();
     const offered = body['reactionOffered'] as Record<string, unknown>;
     expect(offered['kind']).toBe('shield');
-    expect(offered['defenderCombatantId']).toBe(wizardId);
+    expect(offered['defenderCombatantId']).toBe(freshWizardId);
     expect(typeof offered['toHitTotal']).toBe('number');
     expect(typeof offered['currentAc']).toBe('number');
     // C-1 fix: rolledDamage MUST NOT be in the reactionOffered response.
     // It is stored server-side in encounters.pending_reaction only.
     expect(offered['rolledDamage']).toBeUndefined();
 
-    // Read HP + version AFTER we have the reactionOffered (some prior attacks may have
-    // committed hits/misses before this one — that's fine, the suspend path commits NOTHING).
-    // Verify that the CURRENT HP+version didn't change from BEFORE THIS specific attack.
-    // We capture these snapshots RIGHT AFTER getting reactionOffered.
-    const hpSnapshot = await getCombatantHp(encounterId, wizardId);
-    const versionSnapshot = await getEncounterVersion(encounterId);
-    const slotsSnapshot = await getSlotsUsed(wizardCharId);
-
-    // HP and version MUST be unchanged from the snapshot (no commit on suspend — REQ-ERB-FLOW-01).
-    // Get again to confirm no background commit happened.
-    const hpAfter = await getCombatantHp(encounterId, wizardId);
-    const versionAfter = await getEncounterVersion(encounterId);
+    // HP UNCHANGED: no damage committed on suspend path (REQ-ERB-FLOW-01).
+    // Version IS bumped by the pre-roll budget tx (ADR-4 engine-action-economy).
+    // Defender slot NOT consumed (consumed at resolve, not at suspend).
+    const hpAfter = await getCombatantHp(freshEncId, freshWizardId);
+    const versionAfter = await getEncounterVersion(freshEncId);
     const slotsAfter = await getSlotsUsed(wizardCharId);
 
-    expect(hpAfter).toBe(hpSnapshot);
-    expect(versionAfter).toBe(versionSnapshot);
-    expect(slotsAfter[0]).toBe(slotsSnapshot[0]!); // no slot consumed
+    // HP should be unchanged (same as fresh encounter initial value — no damage commit).
+    expect(hpAfter).toBe(200); // wizardHp=200 from retryUntilReactionOffered
+    // Version is suspendVersion (freshVersion + 1 from the budget tx).
+    expect(versionAfter).toBe(suspendVersion);
+    expect(slotsAfter[0]).toBe(0); // no slot consumed (slot consumed at resolve)
   });
 
   // ────────────────────────────────────────────────────────────────────────────────
@@ -529,32 +548,28 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // Setup: get reactionOffered where toHitTotal < AC+5 → newAc = AC+5 > toHitTotal → miss.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T2: cast-shield → newAc=AC+5, hit becomes miss when toHitTotal < newAc; HP unchanged, slot consumed, reaction_used=true', async () => {
-    const app = await getTestApp();
+    // engine-action-economy (B-12): uses retryUntilReactionOffered with fresh encounters per attempt.
+    // Returns post-budget-tx version (freshVersion + 1). Resolve sends that version.
     await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    // Use wizardHp=200 so retry loop cannot kill wizard before reactionOffered (W-1 fix)
-    const { encounterId, fighterId, wizardId, version } = await makeFreshEncounter(app, 'ERB-T2 enc', { wizardHp: 200 });
 
-    // Find a reactionOffered where toHitTotal < currentAc + 5 (so Shield flips to miss)
-    // Fighter to-hit +7, Wizard AC=12. Gap<5 → toHitTotal ∈ [12..16]. Shield newAc=17.
-    // Only toHitTotal in [12..16] where toHitTotal < 17 → toHitTotal ∈ [12..16], all < 17.
-    // So ANY reactionOffered scenario is a potential miss-flip. Retry until we get one.
-    const reactionResult = await retryUntilReactionOffered(encounterId, fighterId, wizardId, version);
+    const reactionResult = await retryUntilReactionOffered('', '', '', 0);
     expect(reactionResult, 'Expected reactionOffered').not.toBeNull();
 
-    const { body: reactionBody, version: reactionVersion } = reactionResult!;
+    const { body: reactionBody, version: reactionVersion, encounterId: freshEncId, wizardId: freshWizardId } = reactionResult!;
     const offeredPayload = reactionBody['reactionOffered'] as Record<string, unknown>;
     const toHitTotal = offeredPayload['toHitTotal'] as number;
     const currentAc = offeredPayload['currentAc'] as number;
     const newAc = currentAc + 5;
 
-    const hpBefore = await getCombatantHp(encounterId, wizardId);
+    const hpBefore = await getCombatantHp(freshEncId, freshWizardId);
     const slotsBefore = await getSlotsUsed(wizardCharId);
 
-    // Server-authoritative: no damage/toHitTotal echoed in body
+    // Server-authoritative: no damage/toHitTotal echoed in body.
+    // Use reactionVersion (= freshVersion + 1 from budget tx) as the CAS version.
     const { statusCode, body: resolveBody } = await doResolveReaction(
-      encounterId,
+      freshEncId,
       'cast-shield',
-      wizardId,
+      freshWizardId,
       reactionVersion,
     );
 
@@ -569,16 +584,16 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
     expect(slotsAfter[0]).toBe(slotsBefore[0]! + 1);
 
     // reaction_used = true
-    const reactionUsed = await getReactionUsed(wizardId);
+    const reactionUsed = await getReactionUsed(freshWizardId);
     expect(reactionUsed).toBe(true);
 
-    // version bumped
-    const versionAfter = await getEncounterVersion(encounterId);
+    // version bumped by resolve tx (reactionVersion + 1 = freshVersion + 2)
+    const versionAfter = await getEncounterVersion(freshEncId);
     expect(versionAfter).toBe(reactionVersion + 1);
 
     // If miss: HP unchanged
     if (!expectedHit) {
-      const hpAfter = await getCombatantHp(encounterId, wizardId);
+      const hpAfter = await getCombatantHp(freshEncId, freshWizardId);
       expect(hpAfter).toBe(hpBefore);
     }
   });
@@ -658,29 +673,22 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // W-1 fix: wizardHp=200 so retryUntilReactionOffered cannot kill wizard.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T4: decline → original hit committed; reaction_used not set; no slot consumed; version bumped', async () => {
-    const app = await getTestApp();
+    // engine-action-economy (B-12): uses retryUntilReactionOffered with fresh encounters.
     await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    // W-1 fix: use wizardHp=200 so retryUntilReactionOffered can loop many times
-    // without killing the wizard (previously wizardHp=30 → hpBefore=0 possible)
-    const { encounterId, fighterId, wizardId, version } = await makeFreshEncounter(
-      app,
-      'ERB-T4 enc',
-      { wizardHp: 200 },
-    );
 
-    const reactionResult = await retryUntilReactionOffered(encounterId, fighterId, wizardId, version);
+    const reactionResult = await retryUntilReactionOffered('', '', '', 0);
     expect(reactionResult, 'Expected reactionOffered').not.toBeNull();
 
-    const { version: reactionVersion } = reactionResult!;
+    const { version: reactionVersion, encounterId: freshEncId, wizardId: freshWizardId } = reactionResult!;
 
-    const hpBefore = await getCombatantHp(encounterId, wizardId);
+    const hpBefore = await getCombatantHp(freshEncId, freshWizardId);
     const slotsBefore = await getSlotsUsed(wizardCharId);
 
-    // Decline — no echoed fields needed
+    // Decline — use reactionVersion (post-budget-tx version) as the CAS version.
     const { statusCode, body } = await doResolveReaction(
-      encounterId,
+      freshEncId,
       'decline',
-      wizardId,
+      freshWizardId,
       reactionVersion,
     );
 
@@ -689,19 +697,19 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
     expect(body['hit']).toBe(true);
 
     // HP decreased (damage applied at original AC using server-stored rolledDamage)
-    const hpAfter = await getCombatantHp(encounterId, wizardId);
+    const hpAfter = await getCombatantHp(freshEncId, freshWizardId);
     expect(hpAfter).toBeLessThan(hpBefore);
 
     // reaction_used NOT set
-    const reactionUsed = await getReactionUsed(wizardId);
+    const reactionUsed = await getReactionUsed(freshWizardId);
     expect(reactionUsed).toBe(false);
 
     // No slot consumed
     const slotsAfter = await getSlotsUsed(wizardCharId);
     expect(slotsAfter[0]).toBe(slotsBefore[0]!);
 
-    // Version bumped
-    const versionAfter = await getEncounterVersion(encounterId);
+    // Version bumped by decline resolve tx (reactionVersion + 1)
+    const versionAfter = await getEncounterVersion(freshEncId);
     expect(versionAfter).toBe(reactionVersion + 1);
   });
 
@@ -710,32 +718,22 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // REQ-ERB-ECON-01: PHB p.190 — one reaction per round.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T5: REACTION_ALREADY_USED → 400 when reaction_used=true', async () => {
-    const app = await getTestApp();
+    // engine-action-economy (B-12): uses retryUntilReactionOffered with fresh encounters.
+    // After getting the offer, force reaction_used=true on the fresh encounter's wizard,
+    // then try to cast-shield → should get 400 REACTION_ALREADY_USED.
     await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    const { encounterId, fighterId, wizardId, version } = await makeFreshEncounter(app, 'ERB-T5 enc', { wizardHp: 200 });
 
-    // Force reaction_used=true on the wizard combatant before the attack
-    await setReactionUsed(wizardId, true);
-
-    // Attack should NOT produce reactionOffered (reaction already used)
-    // so it should commit a normal hit if it hits.
-    // But we want to test the resolve-reaction path directly.
-    // Instead: get a reactionOffered from a fresh attack (with reaction_used=false first),
-    // then force reaction_used=true and try to cast-shield.
-
-    // Reset to false so we can get an offer
-    await setReactionUsed(wizardId, false);
-    const reactionResult = await retryUntilReactionOffered(encounterId, fighterId, wizardId, version);
+    const reactionResult = await retryUntilReactionOffered('', '', '', 0);
     expect(reactionResult, 'Expected reactionOffered').not.toBeNull();
-    const { version: reactionVersion } = reactionResult!;
+    const { version: reactionVersion, encounterId: freshEncId, wizardId: freshWizardId } = reactionResult!;
 
-    // Now force reaction_used=true to simulate already-used reaction
-    await setReactionUsed(wizardId, true);
+    // Force reaction_used=true on the fresh encounter's wizard (simulate already-used reaction)
+    await setReactionUsed(freshWizardId, true);
 
     const { statusCode, body } = await doResolveReaction(
-      encounterId,
+      freshEncId,
       'cast-shield',
-      wizardId,
+      freshWizardId,
       reactionVersion,
     );
 
@@ -813,49 +811,45 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // PHB p.194: "A natural 20 always hits regardless of AC." Shield cannot stop a crit.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T7: crit → no reactionOffered; crit committed atomically (byte-compat)', async () => {
+    // engine-action-economy (B-12): use a fresh encounter per attempt so action_used
+    // is always false. A single attack per encounter; retry until nat-20.
     const app = await getTestApp();
-    await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    // Use NPC target (ac=1) to ensure hits, not wizard for this test.
-    // We need to test crit → no reactionOffered. Fighter vs NPC (ac=1).
-    // We need to retry until a crit occurs (nat-20, ~5% chance).
-
-    // Create a 2-combatant encounter (Fighter vs NPC only for crit test)
-    const enc = await app
-      .inject({
-        method: 'POST',
-        url: '/api/v1/encounters',
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: {
-          campaignId,
-          name: 'ERB-T7 crit test',
-          combatants: [
-            { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
-            { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 1 },
-          ],
-        },
-      })
-      .then((r) => r.json());
-
-    const encounterId = enc.id as string;
-    const fighterId = enc.currentCombatantId as string;
-    const npcId = (enc.combatants.find((c: { name: string }) => c.name === 'Goblin')?.id as string) ?? '';
-    let version = enc.version as number;
 
     // Retry until we get a crit (nat-20 on to-hit). Max 200 attempts (~10x expected).
     let critBody: Record<string, unknown> | null = null;
     for (let i = 0; i < 200; i++) {
+      const enc = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `ERB-T7 crit attempt ${i}`,
+            combatants: [
+              { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
+              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 1 },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const freshEncId = enc.id as string;
+      const freshFighterId = enc.currentCombatantId as string;
+      const freshNpcId = (enc.combatants.find((c: { name: string }) => c.name === 'Goblin')?.id as string) ?? '';
+      const freshVersion = enc.version as number;
+
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/encounters/${encounterId}/actions/attack/apply`,
+        url: `/api/v1/encounters/${freshEncId}/actions/attack/apply`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: { attackerId: fighterId, targetId: npcId, weaponInstanceId: longswordInstanceId, version },
+        payload: { attackerId: freshFighterId, targetId: freshNpcId, weaponInstanceId: longswordInstanceId, version: freshVersion },
       });
       const body = res.json() as Record<string, unknown>;
       if (res.statusCode === 200 && body['hit'] === true && body['crit'] === true) {
         critBody = body;
         break;
       }
-      version = await getEncounterVersion(encounterId);
     }
 
     expect(critBody, 'Expected a crit within 200 attempts (~5% per roll)').not.toBeNull();
@@ -872,44 +866,45 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // PHB logic: you can only react "when hit", not on a miss.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T8: miss → no reactionOffered; miss response byte-compat', async () => {
+    // engine-action-economy (B-12): use a fresh encounter per attempt so action_used
+    // is always false. A single attack per encounter; retry until miss.
     const app = await getTestApp();
-    // Use NPC with very high AC to force a miss.
-    const enc = await app
-      .inject({
-        method: 'POST',
-        url: '/api/v1/encounters',
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: {
-          campaignId,
-          name: 'ERB-T8 miss test',
-          combatants: [
-            { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
-            { name: 'Iron Golem', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 25 },
-          ],
-        },
-      })
-      .then((r) => r.json());
 
-    const encounterId = enc.id as string;
-    const fighterId = enc.currentCombatantId as string;
-    const npcId = (enc.combatants.find((c: { name: string }) => c.name === 'Iron Golem')?.id as string) ?? '';
-    let version = enc.version as number;
-
-    // Retry until a miss occurs (AC=25, Fighter to-hit+7 → need d20<18 → ~85% chance per roll)
     let missBody: Record<string, unknown> | null = null;
     for (let i = 0; i < 30; i++) {
+      const enc = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: `ERB-T8 miss attempt ${i}`,
+            combatants: [
+              { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
+              // AC=25: Fighter to-hit+7, d20<18 → miss (~85% chance per roll)
+              { name: 'Iron Golem', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 25 },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const freshEncId = enc.id as string;
+      const freshFighterId = enc.currentCombatantId as string;
+      const freshNpcId = (enc.combatants.find((c: { name: string }) => c.name === 'Iron Golem')?.id as string) ?? '';
+      const freshVersion = enc.version as number;
+
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/encounters/${encounterId}/actions/attack/apply`,
+        url: `/api/v1/encounters/${freshEncId}/actions/attack/apply`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: { attackerId: fighterId, targetId: npcId, weaponInstanceId: longswordInstanceId, version },
+        payload: { attackerId: freshFighterId, targetId: freshNpcId, weaponInstanceId: longswordInstanceId, version: freshVersion },
       });
       const body = res.json() as Record<string, unknown>;
       if (res.statusCode === 200 && body['hit'] === false) {
         missBody = body;
         break;
       }
-      version = await getEncounterVersion(encounterId);
     }
 
     expect(missBody, 'Expected a miss within 30 attempts').not.toBeNull();
@@ -928,28 +923,8 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // Gap = toHitTotal - 1. Almost always gap≥5 (d20≥1 → gap≥7). Always hits unless nat-1.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T9: gap≥5 (NPC ac=1) → no reactionOffered; hit committed atomically', async () => {
-    const app = await getTestApp();
-    const enc = await app
-      .inject({
-        method: 'POST',
-        url: '/api/v1/encounters',
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: {
-          campaignId,
-          name: 'ERB-T9 gap test',
-          combatants: [
-            { name: 'Fighter', kind: 'pc', characterId: fighterCharId, initiative: 30, hpCurrent: 50, hpMax: 50 },
-            { name: 'Rat NPC', kind: 'npc', initiative: 5, hpCurrent: 200, hpMax: 200, ac: 1 },
-          ],
-        },
-      })
-      .then((r) => r.json());
-
-    const encounterId = enc.id as string;
-    const fighterId = enc.currentCombatantId as string;
-    const npcId = (enc.combatants.find((c: { name: string }) => c.name === 'Rat NPC')?.id as string) ?? '';
-
-    const hitBody = await retryUntilHit(encounterId, fighterId, npcId, enc.version as number);
+    // engine-action-economy (B-12): retryUntilHit creates fresh encounters per attempt.
+    const hitBody = await retryUntilHit('', '', '', 0);
     expect(hitBody, 'Expected a hit on ac=1 NPC within 30 attempts').not.toBeNull();
 
     // No reactionOffered — NPC defender is not a PC (gap≥5 also but NPC is the primary gate)
@@ -1005,19 +980,18 @@ describe('engine-reaction-bus — Shield reaction two-step flow (PHB p.275)', ()
   // REQ-ERB-AUTH-01: only DM or defender's controller may declare reaction.
   // ────────────────────────────────────────────────────────────────────────────────
   it('ERB-T11: non-DM non-controller → 403 on resolve-reaction', async () => {
-    const app = await getTestApp();
+    // engine-action-economy (B-12): uses retryUntilReactionOffered with fresh encounters.
     await setSlotsUsed(wizardCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    const { encounterId, fighterId, wizardId, version } = await makeFreshEncounter(app, 'ERB-T11 auth test', { wizardHp: 200 });
 
-    const reactionResult = await retryUntilReactionOffered(encounterId, fighterId, wizardId, version);
+    const reactionResult = await retryUntilReactionOffered('', '', '', 0);
     expect(reactionResult, 'Expected reactionOffered').not.toBeNull();
-    const { version: reactionVersion } = reactionResult!;
+    const { version: reactionVersion, encounterId: freshEncId, wizardId: freshWizardId } = reactionResult!;
 
     // Use player (non-DM, not in campaign) token
     const { statusCode } = await doResolveReaction(
-      encounterId,
+      freshEncId,
       'cast-shield',
-      wizardId,
+      freshWizardId,
       reactionVersion,
       player.accessToken,
     );

@@ -29,6 +29,7 @@ import {
   computeKiSaveDc,
   computeDivineSmiteDice,
   isShieldableHit,
+  extraAttacksPerAction,
   type RngFn,
   type RollResult,
   type Source,
@@ -228,7 +229,10 @@ export type PerformWeaponAttackApplyResult =
   // NOTHING committed (no to-hit roll, no HP change, no slot change) — pure pre-validation.
   | { ok: false; code: 'DIVINE_SMITE_NOT_AVAILABLE' }    // not a Paladin L≥2 (PHB p.85)
   | { ok: false; code: 'DIVINE_SMITE_NOT_MELEE' }        // ranged weapon (PHB p.85: melee only)
-  | { ok: false; code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' }; // slot exhausted / level too high
+  | { ok: false; code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' } // slot exhausted / level too high
+  // engine-action-economy: per-turn Attack action budget (REQ-AE-04, REQ-AE-06).
+  // action_used===true && attacks_remaining===0 → action fully spent for this turn (PHB p.198).
+  | { ok: false; code: 'ACTION_ALREADY_USED' };
 
 // ── perform-weapon-attack-apply ────────────────────────────────────────────────
 
@@ -363,6 +367,7 @@ export async function performWeaponAttackApply(
     attackerSlotsMax,
     attackerSlotsUsed,
     weapon,
+    classes,
   } = ctxResult;
 
   // ── Step 6b: Stunning Strike pre-roll validation (FAIL-FAST — Slice 3b-ii) ────
@@ -454,6 +459,58 @@ export async function performWeaponAttackApply(
   }
 
   const targetAc = acResult.ac;
+
+  // ── Step 8b: Action-budget state machine + pre-roll budget tx (ADR-3, ADR-4 engine-action-economy) ─
+  // PHB p.198: "You take the Attack action" — DECLARATION spends the action, regardless of outcome.
+  // Three-branch machine (computed pre-roll, fail-fast before rollToHit):
+  //   1. action_used===false → first attack: consume action, set attacks_remaining = N-1.
+  //   2. action_used===true && attacks_remaining>0 → multiattack continuation: decrement.
+  //   3. action_used===true && attacks_remaining===0 → reject ACTION_ALREADY_USED (REQ-AE-06).
+  // The budget tx bumps version (+1) BEFORE the roll so the version re-thread below is correct.
+  // VERSION RE-THREAD: capture nextVersion from this tx; use it for all downstream writes
+  //   (miss echo, suspend pending_reaction.encVersion, HIT CAS tx) so the client always has
+  //   the correct epoch and resolveAttackReaction's bind-check passes. (ADR-4.)
+  const totalAttacks = extraAttacksPerAction(classes);
+  const { actionUsed: currentActionUsed, attacksRemaining: currentAttacksRemaining } = attackerCombatant;
+
+  // Branch 3: reject pre-roll — no tx, no roll.
+  if (currentActionUsed && currentAttacksRemaining === 0) {
+    return { ok: false, code: 'ACTION_ALREADY_USED' };
+  }
+
+  // Branches 1 & 2: compute planned next state.
+  const nextActionUsed = true;
+  const nextAttacksRemaining = currentActionUsed
+    ? currentAttacksRemaining - 1              // continuation: decrement allowance
+    : totalAttacks - 1;                         // first attack: set full allowance minus 1
+
+  // Atomic budget tx: UPDATE combatant budget + bump encounter version.
+  // If concurrent apply already consumed the action, CAS fails → VERSION_CONFLICT (serialized).
+  const budgetTxRows = await db.transaction(async (tx) => {
+    await tx
+      .update(encounterCombatants)
+      .set({ actionUsed: nextActionUsed, attacksRemaining: nextAttacksRemaining })
+      .where(
+        and(
+          eq(encounterCombatants.id, attackerId),
+          eq(encounterCombatants.encounterId, encounterId),
+        ),
+      );
+
+    return tx
+      .update(encounters)
+      .set({ version: sql`${encounters.version} + 1`, updatedAt: new Date() })
+      .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
+      .returning({ version: encounters.version });
+  });
+
+  if (budgetTxRows.length === 0) {
+    return { ok: false, code: 'VERSION_CONFLICT' };
+  }
+
+  // nextVersion is the authoritative version after the budget tx.
+  // ALL downstream version-guarded writes MUST use nextVersion, not the client's `version`.
+  const nextVersion = budgetTxRows[0]!.version;
 
   // ── Step 9: rollToHit → hit/crit/autoMiss (ADR-3 — single RNG instance) ──────
   // The SAME cryptoRng is passed here and then (on hit) to rollDamageBreakdown.
@@ -551,11 +608,11 @@ export async function performWeaponAttackApply(
       // CAS epoch; a concurrent commit before resolve-reaction will cause a version mismatch
       // and the CAS guard in resolveAttackReaction will reject the stale state.
       //
-      // W-3 fix: version guard on the suspend UPDATE. If the encounter version changed
-      // between the pre-check (Step 1) and this write (e.g. another CAS commit landed
-      // concurrently), 0 rows are updated and we return VERSION_CONFLICT rather than
-      // overwriting a valid pending_reaction belonging to a different attack.
-      // Pattern mirrors the CAS tx in Step 12 (lines below) and in resolveAttackReaction.
+      // VERSION RE-THREAD SITE 3 (B-6, ADR-4 engine-action-economy): the budget tx in Step 8b
+      // already bumped version to nextVersion. The pending_reaction write MUST use nextVersion
+      // as both the WHERE guard AND the encVersion payload — otherwise resolveAttackReaction's
+      // bind-check (pending.encVersion !== version) rejects every valid shielded attack with
+      // a spurious VERSION_CONFLICT. W-3 pattern still applies: 0 rows → VERSION_CONFLICT.
       const suspendUpdated = await db
         .update(encounters)
         .set({
@@ -566,11 +623,11 @@ export async function performWeaponAttackApply(
             targetAc,
             rolledDamage: suspendRoll.total,
             damageType: weapon.damageType,
-            encVersion: version,
+            encVersion: nextVersion,
           },
           updatedAt: new Date(),
         })
-        .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
+        .where(and(eq(encounters.id, encounterId), eq(encounters.version, nextVersion)))
         .returning({ id: encounters.id });
 
       if (suspendUpdated.length === 0) {
@@ -649,7 +706,9 @@ export async function performWeaponAttackApply(
   );
 
   // Transaction: UPDATE target HP + CAS version bump (ADR-10).
-  // UPDATE encounters WHERE id=$id AND version=$incoming → 0 rows = VERSION_CONFLICT.
+  // VERSION RE-THREAD SITE 4 (B-7, ADR-4 engine-action-economy): the budget tx in Step 8b
+  // already bumped version to nextVersion. This HIT CAS tx MUST use nextVersion as the
+  // WHERE guard so it bumps nextVersion → nextVersion+1 (net +2 from client's original).
   // On stunningStrikeSpend=true: ALSO decrement ki via jsonb_set INSIDE this tx
   // so that HP + version + ki are atomic (REQ-SS-ATOMICITY-01, ADR-2).
   // REQ-CID-04: RESOLVE runs INSIDE the tx closure, after the CAS guard.
@@ -671,7 +730,7 @@ export async function performWeaponAttackApply(
         version: sql`${encounters.version} + 1`,
         updatedAt: new Date(),
       })
-      .where(and(eq(encounters.id, encounterId), eq(encounters.version, version)))
+      .where(and(eq(encounters.id, encounterId), eq(encounters.version, nextVersion)))
       .returning({ version: encounters.version });
 
     if (updated.length === 0) {

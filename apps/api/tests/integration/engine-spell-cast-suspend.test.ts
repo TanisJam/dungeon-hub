@@ -422,9 +422,10 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       const hpAfter = await getCombatantHp(encounterId, defenderCombatantId);
       expect(hpAfter).toBe(hpBefore);
 
-      // Version UNCHANGED (no version bump on suspend — W-3).
+      // Version bumped by +1 on suspend (action budget tx — B-9, ADR-5 engine-action-economy).
+      // The caster's action is consumed at ANNOUNCE time (PHB p.281).
       const versionAfter = await getEncounterVersion(encounterId);
-      expect(versionAfter).toBe(versionBefore);
+      expect(versionAfter).toBe(versionBefore + 1);
 
       // Caster slot NOT consumed (slot consumed at resolve, not at suspend — ADR-1).
       const casterSlotsAfter = await getSlotsUsed(casterCharId);
@@ -462,9 +463,10 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       expect(castRes.statusCode).toBe(200);
       expect(castRes.json().castAnnounced).toBeDefined();
 
-      // Plant a known serverRolledDamage.total=50 directly in DB after suspend
-      // (overrides whatever the server actually rolled — proves server uses DB value, not client input).
+      // Plant a known serverRolledDamage.total=50 directly in DB after suspend.
+      // engine-action-economy (B-13): suspend now bumps version +1, so encVersion must be version+1.
       // C-1 PROOF: if server-authority holds for the negate-spell-damage path, defender HP stays at hpBefore.
+      const postSuspendVersion = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -472,11 +474,11 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
         targets: [defenderCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 50, perDart: [17, 17, 16] },
-        encVersion: version,
+        encVersion: postSuspendVersion,
       });
 
-      // Resolve: cast-shield (PHB p.275 — defender uses reaction to cast Shield against MM).
-      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'cast-shield', version);
+      // Resolve: cast-shield — send postSuspendVersion (version+1) as the CAS version.
+      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'cast-shield', postSuspendVersion);
       expect(resolveRes.statusCode).toBe(200);
 
       // Defender HP UNCHANGED — 0 damage (negate-spell-damage, PHB p.275).
@@ -495,9 +497,9 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       const reactionUsed = await getReactionUsed(defenderCombatantId);
       expect(reactionUsed).toBe(true);
 
-      // Version bumped at resolve (CAS tx committed).
+      // Version bumped: +1 (suspend action consume) + 1 (resolve CAS) = +2 total.
       const versionAfter = await getEncounterVersion(encounterId);
-      expect(versionAfter).toBe(version + 1);
+      expect(versionAfter).toBe(version + 2);
 
       // pending_cast cleared (null) after resolve.
       const pendingCastAfter = await getPendingCast(encounterId);
@@ -533,7 +535,8 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       expect(castRes.statusCode).toBe(200);
       expect(castRes.json().castAnnounced).toBeDefined();
 
-      // Plant known damage=15 in the DB (the C-1 test value).
+      // Plant known damage=15 in the DB — engine-action-economy (B-13): encVersion=version+1.
+      const postSuspendVersionT3 = version + 1;
       await plantPendingCast(encounterId, {
         casterCombatantId,
         spellName: 'Magic Missile',
@@ -541,11 +544,11 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
         targets: [defenderCombatantId],
         dartCount: 3,
         serverRolledDamage: { total: 15, perDart: [5, 5, 5] },
-        encVersion: version,
+        encVersion: postSuspendVersionT3,
       });
 
-      // Resolve: decline (defender does not react — full damage applied).
-      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'decline', version);
+      // Resolve: decline — send postSuspendVersionT3 (version+1) as the CAS version.
+      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'decline', postSuspendVersionT3);
       expect(resolveRes.statusCode).toBe(200);
 
       // C-1 PROOF: defender HP decreases by exactly 15 (the server-planted value).
@@ -561,9 +564,9 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       const reactionUsed = await getReactionUsed(defenderCombatantId);
       expect(reactionUsed).toBe(false);
 
-      // Version bumped.
+      // Version bumped: +1 (suspend action consume) + 1 (resolve CAS) = +2 total.
       const versionAfter = await getEncounterVersion(encounterId);
-      expect(versionAfter).toBe(version + 1);
+      expect(versionAfter).toBe(version + 2);
 
       // pending_cast cleared.
       const pendingCastAfter = await getPendingCast(encounterId);
@@ -652,8 +655,8 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       // Mark reaction as already used (simulate they already reacted this round).
       await setReactionUsed(defenderCombatantId, true);
 
-      // Attempt to cast-shield → should fail.
-      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'cast-shield', version);
+      // engine-action-economy (B-13): suspend bumped version+1. Resolve sends version+1.
+      const resolveRes = await doResolve(encounterId, defenderCombatantId, 'cast-shield', version + 1);
       expect(resolveRes.statusCode).toBe(400);
       const body = resolveRes.json();
       expect(body.error).toBe('VALIDATION_FAILED');
