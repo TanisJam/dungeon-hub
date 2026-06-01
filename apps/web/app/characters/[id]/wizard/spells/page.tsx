@@ -256,7 +256,7 @@ export default async function SpellsStepPage({ params }: Props) {
             limits={limits}
             availableSpells={options.availableSpells}
             subclassGrantedSlugs={options.subclassGrantedSlugs}
-            backHref={`/characters/${id}/wizard/background`}
+            backHref={`/characters/${id}/wizard/equipment`}
             initialPicks={initialPicks}
           />
         </div>
