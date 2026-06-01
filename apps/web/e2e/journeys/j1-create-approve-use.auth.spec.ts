@@ -1,0 +1,239 @@
+/**
+ * J1 — Create → Approve → Use (cross-role)
+ *
+ * player3 (no seeded characters) creates a character through the FULL wizard UI
+ * (Human Fighter, non-caster), submits for approval. DM approves it from the
+ * character sheet. player3 reloads the sheet and confirms it's Activo.
+ *
+ * Cross-role: two browser contexts (player3 + dm) in one test.
+ * Mobile-first: 375×667 viewport per CLAUDE.md §2.
+ *
+ * REPLACES the stale wizard.auth.spec.ts single-user smoke — this version
+ * exercises the FULL approval loop with real, separate role contexts.
+ */
+import { test, expect, type Browser } from '@playwright/test';
+import path from 'node:path';
+
+const AUTH_DIR = path.join(__dirname, '../.auth');
+const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
+
+const VIEWPORT = { width: 375, height: 667 };
+
+test.describe('J1 — player creates character, DM approves, player sees Activo', () => {
+  test('full create-approve-use loop @ 375px', async ({ browser }: { browser: Browser }) => {
+    // ── Contexts ──────────────────────────────────────────────────────────────
+    const p3Ctx = await browser.newContext({
+      storageState: path.join(AUTH_DIR, 'player3.json'),
+      viewport: VIEWPORT,
+      baseURL: BASE_URL,
+    });
+    const dmCtx = await browser.newContext({
+      storageState: path.join(AUTH_DIR, 'dm.json'),
+      viewport: VIEWPORT,
+      baseURL: BASE_URL,
+    });
+
+    const p3Page = await p3Ctx.newPage();
+    const dmPage = await dmCtx.newPage();
+
+    let charName: string = '';
+    let charHref: string = '';
+
+    try {
+      // ── Step 1: player3 navigates to new character form ───────────────────
+      charName = `J1 Fighter ${Date.now()}`;
+
+      await p3Page.goto('/characters/new', { waitUntil: 'domcontentloaded' });
+      await expect(p3Page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
+
+      // ── Step 2: Fill name + world, submit ────────────────────────────────
+      // World selector: the fixture world is 'E2E Fixture (World)'
+      await p3Page.selectOption('select[name="worldId"]', { label: 'E2E Fixture (World)' });
+      await p3Page.fill('input[name="name"]', charName);
+      await p3Page.getByRole('button', { name: /crear personaje/i }).click();
+
+      // Land on stats step
+      await expect(p3Page).toHaveURL(/\/wizard\/stats$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Atributos').first()).toBeVisible({ timeout: 5_000 });
+
+      // ── Step 3: Stats — standard array ───────────────────────────────────
+      // The stats form defaults to standard-array for the E2E Fixture world.
+      // Click each of the 6 ability tile buttons by EXACT aria-label.
+      // Each click cycles: null → first available standard-array value.
+      // Clicking in order assigns: FUE=15, DES=14, CON=13, INT=12, SAB=10, CAR=8.
+      const tileAbbrMap: Array<string> = ['FUE', 'DES', 'CON', 'INT', 'SAB', 'CAR'];
+      for (const abbr of tileAbbrMap) {
+        const tileBtn = p3Page.locator(`button[aria-label="${abbr} assign value"]`);
+        await expect(tileBtn).toBeVisible({ timeout: 5_000 });
+        await tileBtn.click();
+        // Small wait between tile clicks to ensure React state updates
+        await p3Page.waitForTimeout(100);
+      }
+      // All 6 tiles assigned → standardArrayValid = true → button enabled
+      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 10_000 });
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 4: Race — Human PHB ──────────────────────────────────────────
+      await expect(p3Page).toHaveURL(/\/wizard\/race$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
+
+      // Pick Human PHB card
+      await p3Page
+        .locator('[class*="rounded-md border"]')
+        .filter({ hasText: 'Human' })
+        .filter({ hasText: 'PHB' })
+        .first()
+        .click();
+
+      // Human PHB in this world has FIXED +1 to all 6 abilities (purelyFixed path,
+      // no ASI choice buttons rendered). The race detail shows only a language picker.
+      // Do NOT try to click STR/CON buttons — they don't exist and waiting for them
+      // would consume 30s each.
+      //
+      // Language choice: Human PHB grants Common fixed + 1 extra standard language.
+      // The language picker shows: Dwarvish, Elvish, Giant, Gnomish, Goblin, Halfling, Orc.
+      await p3Page.getByRole('button', { name: 'Dwarvish', exact: true }).click();
+
+      // Wait for the Siguiente button to be enabled (language chosen)
+      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 8_000 });
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 5: Class — Fighter PHB ───────────────────────────────────────
+      await expect(p3Page).toHaveURL(/\/wizard\/class$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
+
+      // Click Fighter PHB card — wait for skill picker to appear before clicking skills
+      await p3Page
+        .locator('[class*="rounded-md border"]')
+        .filter({ hasText: 'Fighter' })
+        .filter({ hasText: 'PHB' })
+        .first()
+        .click();
+
+      // Wait for the skill section to appear after Fighter is selected
+      await expect(p3Page.getByText(/habilidades/i).first()).toBeVisible({ timeout: 5_000 });
+
+      // Fighter PHB: pick 2 skills. Acrobatics and Survival are available (not disabled).
+      // Athletics and others may be disabled due to prior grants from race/background.
+      await p3Page.getByRole('button', { name: 'Acrobatics', exact: true }).click();
+      await p3Page.getByRole('button', { name: 'Survival', exact: true }).click();
+
+      // Wait for Siguiente to be enabled (2 skills selected)
+      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 8_000 });
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 6: Background — Soldier PHB ─────────────────────────────────
+      await expect(p3Page).toHaveURL(/\/wizard\/background$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
+
+      // Find and click Soldier PHB card
+      await p3Page
+        .locator('[class*="rounded-md border"]')
+        .filter({ hasText: 'Soldier' })
+        .filter({ hasText: 'PHB' })
+        .first()
+        .click();
+
+      // Wait for the Soldier detail to expand (tool choice section appears)
+      // Soldier has a "anyGamingSet" tool choice — wait for the section to render
+      await expect(p3Page.getByRole('button', { name: 'Dice Set', exact: true })).toBeVisible({
+        timeout: 8_000,
+      });
+
+      // Soldier tool choice: anyGamingSet → Dice Set (required for form to be valid)
+      await p3Page.getByRole('button', { name: 'Dice Set', exact: true }).click();
+
+      // Wait for Siguiente to be enabled (background complete with tool choice)
+      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 8_000 });
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 7: Spells — Fighter is non-caster, skip panel ───────────────
+      await expect(p3Page).toHaveURL(/\/wizard\/spells$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
+      // Non-caster shows "no picks needed" panel
+      await expect(
+        p3Page.locator('text=Tu clase no utiliza hechizos.').first(),
+      ).toBeVisible({ timeout: 5_000 });
+      // The NoPicksPanel auto-saves (empty spells). Wait for "Guardando..." to resolve
+      // before clicking Siguiente (button stays disabled while saving).
+      await expect(p3Page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({ timeout: 10_000 });
+      await p3Page.getByRole('button', { name: /^siguiente/i }).click();
+
+      // ── Step 8: Review ───────────────────────────────────────────────────
+      await expect(p3Page).toHaveURL(/\/wizard\/review$/, { timeout: 15_000 });
+      await expect(p3Page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
+      // Basic content assertions
+      await expect(p3Page.getByText(charName, { exact: false }).first()).toBeVisible();
+      await expect(p3Page.locator('text=human').first()).toBeVisible();
+      await expect(p3Page.locator('text=fighter').first()).toBeVisible();
+      await expect(p3Page.locator('text=soldier').first()).toBeVisible();
+
+      // ── Step 9: Publish (send for approval) ──────────────────────────────
+      await p3Page.getByRole('button', { name: /^publicar/i }).click();
+
+      // Splash — "Ir al perfil" link navigates to the character sheet
+      const irAlPerfilLink = p3Page.getByRole('link', { name: /ir al perfil/i });
+      await expect(irAlPerfilLink).toBeVisible({ timeout: 10_000 });
+      charHref = (await irAlPerfilLink.getAttribute('href')) ?? '';
+      await irAlPerfilLink.click();
+
+      await expect(p3Page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
+
+      // Grab the char URL from the final page
+      if (!charHref || !charHref.startsWith('/')) {
+        charHref = new URL(p3Page.url()).pathname;
+      }
+
+      // Player3 sees "Pendiente de aprobación" banner on the sheet
+      const pendienteBanner = p3Page.getByText(/pendiente de aprobaci/i).first();
+      await expect(pendienteBanner).toBeVisible({ timeout: 8_000 });
+
+      // ── Step 10: DM approves from the character sheet ────────────────────
+      // Navigate the DM to the same character page
+      await dmPage.goto(charHref, { waitUntil: 'domcontentloaded' });
+      await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+
+      // DM should see Aprobar + Rechazar buttons (pending_approval × gm)
+      const aprobarBtn = dmPage.getByRole('button', { name: /^aprobar$/i });
+      await expect(aprobarBtn).toBeVisible({ timeout: 10_000 });
+
+      // FLAG: Touch-target bug — Aprobar button has min-h-[44px] per approval-actions.tsx:90.
+      // Verified in code: class includes "min-h-[44px]" — should pass the 44px target check.
+      const aprobarBox = await aprobarBtn.boundingBox();
+      if (aprobarBox) {
+        // KNOWN BUG (from prior QA tour): some approval buttons render <44px — FLAG if so.
+        if (aprobarBox.height < 44) {
+          console.warn(
+            `[J1] REAL BUG: Aprobar button height=${aprobarBox.height}px < 44px touch target. See sdd/mobile-qa-sweep findings.`,
+          );
+        }
+      }
+
+      await aprobarBtn.click();
+
+      // Wait for post-approve state: Aprobar gone OR activo badge visible
+      await expect(async () => {
+        const aprobarGone = !(await aprobarBtn.isVisible().catch(() => false));
+        const activoBadge = await dmPage.getByText(/activo/i).first().isVisible().catch(() => false);
+        expect(aprobarGone || activoBadge, 'Post-approve: Aprobar gone or activo visible').toBe(true);
+      }).toPass({ timeout: 15_000 });
+
+      // ── Step 11: player3 reloads the sheet and sees Activo ───────────────
+      await p3Page.goto(charHref, { waitUntil: 'domcontentloaded' });
+      await expect(p3Page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+
+      // The AppShell right-action Pill shows "Activo" for active characters.
+      // Also confirmed by the absence of the pending banner.
+      const activoPill = p3Page.getByText('Activo', { exact: true }).first();
+      await expect(activoPill).toBeVisible({ timeout: 10_000 });
+
+      // Pending banner should be gone
+      const pendingBannerAfter = p3Page.getByText(/pendiente de aprobaci/i).first();
+      const bannerStillVisible = await pendingBannerAfter.isVisible({ timeout: 1_000 }).catch(() => false);
+      expect(bannerStillVisible, 'Pending banner should be gone after approval').toBe(false);
+    } finally {
+      await p3Ctx.close();
+      await dmCtx.close();
+    }
+  });
+});
