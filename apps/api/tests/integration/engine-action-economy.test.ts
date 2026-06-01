@@ -581,16 +581,13 @@ describe('engine-action-economy — per-turn budget + Extra Attack (PHB p.189, p
     expect(issues.some((i) => i.code === 'ACTION_ALREADY_USED')).toBe(true);
   });
 
-  // ── AE-T6: Magic Missile then weapon attack → ACTION_ALREADY_USED ──────────────
-  // REQ-AE-02 + REQ-AE-04: casting MM spends the action; weapon attack then rejected.
+  // ── AE-T6: Magic Missile then a second action-cost spell → ACTION_ALREADY_USED ──
+  // REQ-AE-02: casting MM spends the action; a second action-cost spell is then rejected.
+  // (Exercised via MM→MM since the Wizard fixture has no equipped weapon — the gate
+  // under test is "action already spent on a cast", which is weapon-agnostic.)
 
-  it('AE-T6: Magic Missile (action) → weapon attack rejected 400 ACTION_ALREADY_USED (REQ-AE-02)', async () => {
-    // Set up Wizard with weapon... actually we need the wizard to also have a weapon.
-    // But perform-weapon-attack-apply requires an equipped weapon. Simpler: use the Fighter L1
-    // with both a slot and a weapon. But Fighter L1 isn't a spellcaster.
-    // Use two separate combatants or just test the cast-spell → action-blocked check.
-    // Approach: create a encounter with Wizard (caster) and NPC target.
-    // First: cast MM (action), then try to cast again → ACTION_ALREADY_USED.
+  it('AE-T6: Magic Missile (action) → second action spell rejected 400 ACTION_ALREADY_USED (REQ-AE-02)', async () => {
+    // Wizard caster + NPC target. Cast MM (action), then cast MM again → ACTION_ALREADY_USED.
     const { encounterId, casterCombatantId, targetCombatantId, version } =
       await makeFreshSpellEncounter('AE-T6 MM then action', wizardCharId);
 
