@@ -864,37 +864,32 @@ describe('POST /characters/:id/rest/long — REST-03 + REST-04 (#826)', () => {
     expect(ageMs).toBeLessThan(60_000); // written within the last minute
   });
 
-  it('R03-S2: second long rest within 24h → 400 LONG_REST_TOO_SOON', async () => {
+  it('R03-S2: long rest is freely repeatable within 24h (cooldown gate disabled)', async () => {
     const app = await getTestApp();
-    // Prior test left lastLongRestAt ≈ now; the retry must be rejected.
+    // Prior test left lastLongRestAt ≈ now. The REST-03 24h cooldown gate is
+    // DISABLED (deferred to the campaign-clock SDD), so a second long rest within
+    // 24h is now accepted.
     const res = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${cooldownCharId}/rest/long`,
       headers: { authorization: `Bearer ${owner.accessToken}` },
       payload: {},
     });
-    expect(res.statusCode).toBe(400);
-    expect(res.json().issues[0].code).toBe('LONG_REST_TOO_SOON');
+    expect(res.statusCode).toBe(200);
   });
 
-  it('R03-S3: cooldown reject does NOT mutate hp (idempotent on reject)', async () => {
+  it('R03-S3: a repeated long rest within 24h restores HP to full', async () => {
     const app = await getTestApp();
     const { db } = await import('../../src/infra/db/client.js');
     const { characters } = await import('../../src/infra/db/schema.js');
 
-    // Damage HP so we can detect mutation after a cooldown-rejected long rest.
+    // Damage HP, then long rest again within 24h — should heal to max (no cooldown).
     await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${cooldownCharId}/hp`,
       headers: { authorization: `Bearer ${owner.accessToken}` },
       payload: { delta: -5 },
     });
-    const [before] = await db
-      .select()
-      .from(characters)
-      .where(eq(characters.id, cooldownCharId))
-      .limit(1);
-    const hpBefore = (before?.data as { hp?: { current?: number } }).hp?.current;
 
     const res = await app.inject({
       method: 'POST',
@@ -902,15 +897,15 @@ describe('POST /characters/:id/rest/long — REST-03 + REST-04 (#826)', () => {
       headers: { authorization: `Bearer ${owner.accessToken}` },
       payload: {},
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(200);
 
     const [after] = await db
       .select()
       .from(characters)
       .where(eq(characters.id, cooldownCharId))
       .limit(1);
-    const hpAfter = (after?.data as { hp?: { current?: number } }).hp?.current;
-    expect(hpAfter).toBe(hpBefore);
+    const hp = (after?.data as { hp?: { current?: number; max?: number } }).hp;
+    expect(hp?.current).toBe(hp?.max);
   });
 
   it('R03-S4: lastLongRestAt > 24h ago → next long rest accepted', async () => {

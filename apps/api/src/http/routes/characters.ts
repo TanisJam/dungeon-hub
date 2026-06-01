@@ -388,8 +388,6 @@ const LongRestBody = z.object({
     .optional(),
 });
 
-/** REST-03 (#826): 24h server-clock cooldown on long rests per PHB p.186. */
-const LONG_REST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const HpDeltaBody = z.object({
   /** Delta signado. Negativo daña (consume temp HP primero), positivo cura. */
@@ -3416,28 +3414,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: eligibility.issues });
     }
 
-    // REST-03 (#826): 24h cooldown gate. PHB p.186 — "A character must finish a
-    // long rest at least once every 24 hours". Server-clock approximation per
-    // proposal #738 D-03. Gate runs BEFORE any state mutation so a reject
-    // preserves class-resource state (REQ-RC-COOLDOWN-GATE scenario).
-    const lastLongRestAt = charData['lastLongRestAt'] as string | undefined;
-    if (lastLongRestAt) {
-      const elapsedMs = Date.now() - new Date(lastLongRestAt).getTime();
-      if (elapsedMs < LONG_REST_COOLDOWN_MS) {
-        const remainingMs = LONG_REST_COOLDOWN_MS - elapsedMs;
-        return reply.code(400).send({
-          error: 'VALIDATION_FAILED',
-          issues: [
-            {
-              code: 'LONG_REST_TOO_SOON',
-              expected: new Date(Date.now() + remainingMs).toISOString(),
-              got: new Date().toISOString(),
-            },
-          ],
-        });
-      }
-    }
-
+    // REST-03 24h cooldown gate DISABLED (2026-06-01, per product decision):
+    // the time-based "one long rest per 24h" requirement (PHB p.186) is deferred
+    // until the campaign-clock SDD lands — without an in-game clock it only blocks
+    // dev/play. Long rest is freely repeatable for now. (Was: LONG_REST_TOO_SOON.)
     const classes = (charData['classes'] as AppliedClass[] | undefined) ?? [];
 
     // CON mod para auto-init de HP si falta.
