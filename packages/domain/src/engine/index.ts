@@ -183,6 +183,10 @@ export type { CastEvent, AttackEvent } from './pipeline/events.js';
 export { resolveWeaponAttack } from './attack/resolve-weapon-attack.js';
 export type { WeaponAttackInput, WeaponAttackResult } from './attack/resolve-weapon-attack.js';
 
+// Extra Attack + per-turn budget predicates (engine-action-economy — REQ-AE-08, REQ-AE-02/03)
+export { extraAttacksPerAction, isActionAvailable, isBonusActionAvailable } from './attack/extra-attacks.js';
+export type { ClassWithLevel } from './attack/extra-attacks.js';
+
 export { rollToHit } from './attack/roll-to-hit.js';
 export type { RollToHitResult, RollMode } from './attack/roll-to-hit.js';
 
