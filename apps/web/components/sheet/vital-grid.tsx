@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 interface VitalGridProps {
-  hp: { current: number | null; max: number | null };
+  hp: { current: number | null; max: number | null; temp?: number };
   ac: number | null;
   initiative: number | null;
   armorFormula?: string;
@@ -52,6 +52,11 @@ export function VitalGrid({
         <span className="font-display text-lg font-bold text-ink leading-tight mt-0.5">
           {hpDisplay}
         </span>
+        {hp.temp !== undefined && hp.temp > 0 && (
+          <span className="text-[10px] font-bold text-amber-400 leading-tight" data-testid="hp-temp">
+            +{hp.temp} temporal
+          </span>
+        )}
         {hp.max !== null && hp.max > 0 && (
           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-accent/20">
             <div

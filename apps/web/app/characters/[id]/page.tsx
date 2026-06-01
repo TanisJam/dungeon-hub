@@ -182,7 +182,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         />
 
         <VitalGrid
-          hp={{ current: currentHp, max: sheet.hitPoints.max }}
+          hp={{ current: currentHp, max: sheet.hitPoints.max, temp: data.tempHp ?? 0 }}
           ac={sheet.armorClass.value}
           initiative={sheet.initiative}
           armorFormula={sheet.armorClass.formula}

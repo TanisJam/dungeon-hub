@@ -174,6 +174,59 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PART A2 — REPRODUCE user bug: default load (NO switch click), HP editor in DM
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('J6A2 — GM+owner default load: HP editor must be in DM mode without clicking the switch', () => {
+  test('on first load (default dm), Otorgar shows AND HP máximo is editable (no read-only hint)', async ({
+    browser,
+  }: {
+    browser: Browser;
+  }) => {
+    const dmJwt = await getJwt('dm@dh.test');
+    const heroId = await findCharacterIdByName('DM Hero', dmJwt);
+    expect(heroId).toBeTruthy();
+    if (!heroId) return;
+
+    const dmCtx = await browser.newContext({
+      storageState: path.join(AUTH_DIR, 'dm.json'),
+      viewport: VIEWPORT,
+      baseURL: BASE_URL,
+    });
+    const dmPage = await dmCtx.newPage();
+    try {
+      // Fresh load — DO NOT click the role switcher (mirrors the user relying on default).
+      await dmPage.goto(`/characters/${heroId}`, { waitUntil: 'domcontentloaded' });
+      await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+
+      // Affordances side: Otorgar should be visible by default (GM defaults to dm).
+      const otorgarVisible = await dmPage
+        .getByRole('button', { name: 'Otorgar recompensa de DM' })
+        .isVisible({ timeout: 10_000 })
+        .catch(() => false);
+
+      // HP editor side: open it, check the max field is EDITABLE (not the player hint).
+      await dmPage.getByRole('button', { name: 'Editar HP' }).click();
+      const maxInput = dmPage.getByRole('spinbutton', { name: 'HP máximo' });
+      await maxInput.waitFor({ timeout: 5_000 });
+      const maxEditable = await maxInput.isEditable().catch(() => false);
+      const playerHintVisible = await dmPage
+        .getByText('Solo el DM puede ajustar el máximo')
+        .isVisible({ timeout: 1_000 })
+        .catch(() => false);
+
+      // The bug: Otorgar visible (DM) but HP máximo read-only with the player hint.
+      expect(
+        { otorgarVisible, maxEditable, playerHintVisible },
+        'On default load: if Otorgar is DM-visible, HP máximo must be editable (no player hint)',
+      ).toEqual({ otorgarVisible: true, maxEditable: true, playerHintVisible: false });
+    } finally {
+      await dmCtx.close();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PART B — DM Mage spell prep (full spellbook + prep change persists)
 // ─────────────────────────────────────────────────────────────────────────────
 
