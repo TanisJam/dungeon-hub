@@ -476,10 +476,10 @@ export const factions = pgTable(
 // ---------------------------------------------------------------------------
 // npcs — personajes no-jugadores del mundo.
 //
-// `factionId` y `hexId` son FK opcionales:
-//   - factionId NULL = NPC independiente (no afiliado).
-//   - factionId → faction: ON DELETE SET NULL (borrar facción no borra al NPC,
-//     el NPC sobrevive sin afiliación).
+// Re-parented from campaign_id → world_id (world-first-model Slice 2b).
+// faction_id direct FK dropped; NPC↔Faction membership now lives in npc_factions
+// join table (N:M). hexId remains optional: última ubicación conocida.
+//
 //   - hexId = última ubicación conocida. ON DELETE SET NULL (si el DM borra
 //     el hex, el NPC queda "sin ubicación", no se pierde el NPC).
 //
@@ -490,14 +490,13 @@ export const npcs = pgTable(
   'npcs',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: uuid('campaign_id')
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     race: text('race'),
     description: text('description'),
     dmNotes: text('dm_notes'),
-    factionId: uuid('faction_id').references(() => factions.id, { onDelete: 'set null' }),
     hexId: uuid('hex_id').references(() => hexes.id, { onDelete: 'set null' }),
     status: text('status', {
       enum: ['alive', 'dead', 'missing', 'unknown'],
@@ -510,10 +509,52 @@ export const npcs = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index('idx_npcs_campaign').on(t.campaignId),
-    index('idx_npcs_faction').on(t.factionId),
+    index('idx_npcs_world').on(t.worldId),
     index('idx_npcs_hex').on(t.hexId),
   ],
+);
+
+// ---------------------------------------------------------------------------
+// npc_factions — join table for NPC↔Faction N:M membership.
+//
+// An NPC may belong to 0..N factions; a faction may have 0..N NPCs.
+// Both npc and faction MUST belong to the same world (enforced at use-case layer).
+// Composite PK prevents duplicate membership.
+// ON DELETE CASCADE on both ends: removing either npc or faction removes membership rows.
+// ---------------------------------------------------------------------------
+export const npcFactions = pgTable(
+  'npc_factions',
+  {
+    npcId: uuid('npc_id')
+      .notNull()
+      .references(() => npcs.id, { onDelete: 'cascade' }),
+    factionId: uuid('faction_id')
+      .notNull()
+      .references(() => factions.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.npcId, t.factionId] })],
+);
+
+// ---------------------------------------------------------------------------
+// character_faction_reputation — per-(character×faction) reputation value.
+//
+// Signed integer; NO domain cap (any integer valid — world-first-model ADR-6).
+// Both character and faction MUST belong to the same world (enforced at use-case layer).
+// PK (character_id, faction_id) → upsert semantics: one row per pair.
+// ON DELETE CASCADE on both ends: removing character or faction removes reputation rows.
+// ---------------------------------------------------------------------------
+export const characterFactionReputation = pgTable(
+  'character_faction_reputation',
+  {
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    factionId: uuid('faction_id')
+      .notNull()
+      .references(() => factions.id, { onDelete: 'cascade' }),
+    value: integer('value').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.characterId, t.factionId] })],
 );
 
 // ---------------------------------------------------------------------------
