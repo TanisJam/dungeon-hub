@@ -66,12 +66,12 @@ const COLORS: ColorToken[] = [
   { name: 'on-secondary',       hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
 ];
 
-type TypographyToken = { name: string; stack: string };
+type TypographyToken = { name: string; stack: string; cls: string };
 const FONT_FAMILIES: TypographyToken[] = [
-  { name: 'display (font-display)', stack: 'Noto Serif Georgian, Georgia, serif' },
-  { name: 'sans (font-sans)',       stack: 'Inter, ui-sans-serif, system-ui, sans-serif' },
-  { name: 'script (font-script)',   stack: 'M PLUS Rounded, system-ui, sans-serif' },
-  { name: 'mono (font-mono)',       stack: 'JetBrains Mono, ui-monospace, SF Mono, Menlo, monospace' },
+  { name: 'display (font-display)', stack: 'Noto Serif Georgian, Georgia, serif', cls: 'font-display' },
+  { name: 'sans (font-sans)',       stack: 'Inter, ui-sans-serif, system-ui, sans-serif', cls: 'font-sans' },
+  { name: 'script (font-script)',   stack: 'M PLUS Rounded, system-ui, sans-serif', cls: 'font-script' },
+  { name: 'mono (font-mono)',       stack: 'JetBrains Mono, ui-monospace, SF Mono, Menlo, monospace', cls: 'font-mono' },
 ];
 
 type ScaleEntry = { name: string; size: string; utility: string };
@@ -189,25 +189,34 @@ export default function TokensPage() {
       {/* ── Typography ── */}
       <SectionHead title="Typography — Font Families" />
       <div className="space-y-2">
-        {FONT_FAMILIES.map(({ name, stack }) => (
-          <div key={name} className="py-2 border-b border-line-soft">
+        {FONT_FAMILIES.map(({ name, stack, cls }) => (
+          <div key={name} className="py-3 border-b border-line-soft">
             <div className="font-mono text-xs text-ink font-semibold">{name}</div>
             <div className="font-mono text-[10px] text-ink-mute mt-0.5">{stack}</div>
+            {/* Live sample rendered in the actual family */}
+            <p className={`${cls} text-ink text-xl mt-2`}>
+              El veloz murciélago hindú · Aa Gg 0123
+            </p>
           </div>
         ))}
       </div>
 
       <SectionHead title="Typography — @utility Scale" />
-      <div className="space-y-2">
+      <div className="space-y-3">
         {TYPE_SCALE.map(({ name, size, utility }) => (
-          <div key={name} className="py-2 border-b border-line-soft flex items-baseline gap-4">
-            <code className="font-mono text-xs text-ink font-semibold w-32 flex-shrink-0">{name}</code>
-            <span className="font-mono text-[10px] text-accent">{size}</span>
-            <span className="text-[10px] text-ink-mute">{utility}</span>
+          <div key={name} className="py-2 border-b border-line-soft">
+            <div className="flex items-baseline gap-3 mb-1">
+              <code className="font-mono text-[10px] text-accent font-semibold">{name}</code>
+              <span className="font-mono text-[10px] text-ink-mute">{size}</span>
+              <span className="text-[9px] text-ink-mute">{utility}</span>
+            </div>
+            {/* Live sample with the actual utility class applied */}
+            <p className={`${name} text-ink`}>El veloz murciélago — Aa 123</p>
           </div>
         ))}
         <p className="text-[10px] text-ink-mute italic mt-2">
-          All 9 named scale entries (text-micro → text-display) added in Slice 4. Migration of text-[Npx] arbitraries is a follow-up.
+          Live samples render with the actual <code className="font-mono text-ink-soft">@utility</code> class applied.
+          Migration of existing <code className="font-mono text-ink-soft">text-[Npx]</code> arbitraries to these names is a follow-up.
         </p>
       </div>
 
@@ -247,27 +256,41 @@ export default function TokensPage() {
 
       {/* ── Motion ── */}
       <SectionHead title="Motion" />
-      <div className="space-y-2">
-        {MOTION.map(({ name, type, value }) => (
-          <div key={name} className="py-2 border-b border-line-soft">
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0 ${
-                  type === 'duration'
-                    ? 'bg-primary-soft text-primary-deep'
-                    : 'bg-secondary-soft text-secondary-deep'
-                }`}
-              >
-                {type}
-              </span>
-              <code className="font-mono text-xs text-ink font-semibold">{name}</code>
-              <span className="font-mono text-xs text-accent">{value}</span>
+      <div className="space-y-3">
+        {MOTION.map(({ name, type, value }) => {
+          // Durations: sweep at the token's own duration (linear) → shows speed.
+          // Easings: sweep at a fixed 1.2s with the token's curve → shows shape.
+          const anim =
+            type === 'duration'
+              ? `wizard-loading ${value} linear infinite`
+              : `wizard-loading 1.2s ${value} infinite`;
+          return (
+            <div key={name} className="py-2 border-b border-line-soft">
+              <div className="flex items-center gap-3 mb-1.5">
+                <span
+                  className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded flex-shrink-0 ${
+                    type === 'duration'
+                      ? 'bg-primary-soft text-primary-deep'
+                      : 'bg-secondary-soft text-secondary-deep'
+                  }`}
+                >
+                  {type}
+                </span>
+                <code className="font-mono text-xs text-ink font-semibold">{name}</code>
+                <span className="font-mono text-xs text-accent">{value}</span>
+              </div>
+              {/* Live demo: a bar sweeping across the track */}
+              <div className="relative h-2 w-full overflow-hidden rounded-pill bg-surface-soft">
+                <div
+                  className="absolute inset-y-0 w-1/4 rounded-pill bg-gradient-to-r from-primary to-accent"
+                  style={{ animation: anim }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <p className="text-[10px] text-ink-mute italic mt-2">
-          Note: <code className="font-mono text-ink-soft">--dur-*</code> tokens are CSS custom properties only.
-          Dedicated <code className="font-mono text-ink-soft">@utility</code> helpers are a follow-up item.
+          Durations sweep at their own speed; easings sweep at a fixed 1.2s so the curve is visible.
         </p>
       </div>
     </div>

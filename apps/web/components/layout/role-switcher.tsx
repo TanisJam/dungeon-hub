@@ -38,7 +38,7 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
   return (
     <div
       data-value={role}
-      className="relative inline-flex p-[3px] rounded-pill border border-line bg-surface"
+      className="relative inline-grid grid-cols-2 p-[3px] rounded-pill border border-line bg-surface"
     >
       <span
         aria-hidden="true"
@@ -48,8 +48,8 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
         type="button"
         onClick={() => select('player')}
         aria-pressed={role === 'player'}
-        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap transition-colors duration-300 ease-out ${
-          role === 'player' ? 'text-[#1A1208]' : 'text-ink-mute'
+        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap text-center transition-colors duration-300 ease-out ${
+          role === 'player' ? 'text-on-accent' : 'text-ink-mute'
         }`}
       >
         Jugador
@@ -58,8 +58,8 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
         type="button"
         onClick={() => select('dm')}
         aria-pressed={role === 'dm'}
-        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap transition-colors duration-300 ease-out ${
-          role === 'dm' ? 'text-[#1A1208]' : 'text-ink-mute'
+        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap text-center transition-colors duration-300 ease-out ${
+          role === 'dm' ? 'text-on-secondary' : 'text-ink-mute'
         }`}
       >
         DM
