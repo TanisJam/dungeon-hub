@@ -1,7 +1,7 @@
 'use client';
 
-import * as HoverCard from '@radix-ui/react-hover-card';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TermCard } from './TermCard';
 import type { TermEntry } from './types';
 
@@ -10,7 +10,7 @@ export interface TermProps {
   open: boolean;
   /**
    * The active [data-compendium-ref] element.
-   * Used for positioning the floating card via a hidden overlay trigger.
+   * Used to compute viewport-relative position for the floating card.
    */
   anchorEl: Element | null;
   /** Current resolution state */
@@ -23,17 +23,56 @@ export interface TermProps {
   onCardPointerLeave?: () => void;
 }
 
+/** Card width in px — must match the w-80 class on TermCard (320px). */
+const CARD_WIDTH = 320;
+/** Horizontal margin kept from viewport edges (px). */
+const VIEWPORT_MARGIN = 8;
+/** Vertical gap between anchor and card (px). */
+const SIDE_OFFSET = 4;
+/** Minimum top space before the card flips to below-anchor placement. */
+const MIN_TOP_SPACE = 80;
+
+interface CardPosition {
+  top: number;
+  left: number;
+  /** true = card sits above anchor, false = below */
+  above: boolean;
+}
+
+function computePosition(anchorEl: Element): CardPosition {
+  const rect = anchorEl.getBoundingClientRect();
+  const vw = window.innerWidth;
+
+  // Prefer above the anchor; flip to below if there is not enough space.
+  const above = rect.top > MIN_TOP_SPACE;
+
+  // Vertical: anchor top edge minus offset (for above), or anchor bottom edge plus offset (for below).
+  // We don't know card height at compute time — use a safe estimate for above placement.
+  const top = above
+    ? rect.top - SIDE_OFFSET  // translateY(-100%) in CSS handles the actual shift
+    : rect.bottom + SIDE_OFFSET;
+
+  // Horizontal: align start to anchor left, clamped inside viewport.
+  const left = Math.max(
+    VIEWPORT_MARGIN,
+    Math.min(rect.left, vw - CARD_WIDTH - VIEWPORT_MARGIN),
+  );
+
+  return { top, left, above };
+}
+
 /**
- * Controlled Radix HoverCard.
+ * Controlled floating card, portaled to document.body.
  *
- * HoverCard v1.x has no virtualRef Anchor — we use a hidden Trigger
- * (aria-hidden, pointer-events:none) positioned near the anchor span.
- * The provider state machine drives open/closed; Radix only handles the
- * floating content portal and animation.
- *
- * Positioning uses an absolute-positioned hidden span rendered inside a
- * fixed-position overlay div that sits atop the anchor element. In jsdom
- * getBoundingClientRect returns zeros, so positioning is a browser-only concern.
+ * Why portal-to-body instead of Radix HoverCard:
+ *   The V3Sheet panel has `animation: v3-sheet-slide-up … fill-mode:both`,
+ *   whose `to` state is `transform: translateY(0)`. CSS transforms create a
+ *   new containing block for `position:fixed` descendants, breaking any fixed
+ *   child's viewport-relative coordinates. Portaling to document.body (outside
+ *   the transformed sheet panel) and computing position from
+ *   anchorEl.getBoundingClientRect() gives correct viewport-relative placement
+ *   on both desktop and mobile, regardless of any scroll or transform on
+ *   ancestor elements.
  */
 export function Term({
   open,
@@ -44,73 +83,55 @@ export function Term({
   onCardPointerEnter,
   onCardPointerLeave,
 }: TermProps) {
-  const triggerRef = useRef<HTMLAnchorElement>(null);
+  const [pos, setPos] = useState<CardPosition | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Sync trigger position to anchorEl in the browser (no-op in jsdom)
+  // SSR guard — createPortal must not run on the server.
   useEffect(() => {
-    const trigger = triggerRef.current;
-    const container = trigger?.parentElement;
-    if (!trigger || !container || !anchorEl) return;
+    setMounted(true);
+  }, []);
 
-    const rect = anchorEl.getBoundingClientRect();
-    container.style.position = 'fixed';
-    container.style.pointerEvents = 'none';
-    container.style.left = `${rect.left}px`;
-    container.style.top = `${rect.top}px`;
-    container.style.width = `${Math.max(rect.width, 1)}px`;
-    container.style.height = `${Math.max(rect.height, 1)}px`;
-  }, [anchorEl, open]);
+  // Recompute position whenever the anchor or open state changes.
+  useEffect(() => {
+    if (!open || !anchorEl) {
+      setPos(null);
+      return;
+    }
+    setPos(computePosition(anchorEl));
+  }, [open, anchorEl]);
 
-  return (
-    <HoverCard.Root open={open} openDelay={0} closeDelay={0}>
-      {/*
-       * Trigger is visually hidden and not interactive — the provider state
-       * machine manages open/close, so we don't need Radix's built-in hover.
-       */}
-      <div
-        style={{
-          position: 'fixed',
-          pointerEvents: 'none',
-          width: 0,
-          height: 0,
-          overflow: 'hidden',
-        }}
-        aria-hidden
-      >
-        <HoverCard.Trigger
-          ref={triggerRef}
-          asChild
-          aria-hidden
-          tabIndex={-1}
-          style={{ display: 'inline-block', width: '100%', height: '100%', pointerEvents: 'none' }}
-        >
-          {/* eslint-disable-next-line jsx-a11y/anchor-has-content */}
-          <a />
-        </HoverCard.Trigger>
-      </div>
-      <HoverCard.Portal>
-        <HoverCard.Content
-          role="dialog"
-          side="top"
-          align="start"
-          sideOffset={4}
-          className="z-50"
-          data-term-card
-          onPointerEnter={(e) => {
-            // Touch: pointerleave fires immediately after touchend, which
-            // would close the card. Skip enter→start cycle on touch.
-            if (e.pointerType === 'touch') return;
-            onCardPointerEnter?.();
-          }}
-          onPointerLeave={(e) => {
-            if (e.pointerType === 'touch') return;
-            onCardPointerLeave?.();
-          }}
-        >
-          <TermCard state={state} entry={entry} error={error} />
-          <HoverCard.Arrow className="fill-line" />
-        </HoverCard.Content>
-      </HoverCard.Portal>
-    </HoverCard.Root>
+  if (!mounted || !open || pos === null) return null;
+
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: pos.top,
+    left: pos.left,
+    // Translate upward when placed above anchor so the card bottom aligns with anchor top.
+    transform: pos.above ? 'translateY(-100%)' : 'translateY(0)',
+    zIndex: 9999,
+    // Prevent the card itself from triggering pointer-leave on the anchor.
+    pointerEvents: 'auto',
+  };
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="false"
+      data-term-card
+      style={style}
+      onPointerEnter={(e) => {
+        // Touch: pointerleave fires immediately after touchend, which
+        // would close the card. Skip enter→start cycle on touch.
+        if (e.pointerType === 'touch') return;
+        onCardPointerEnter?.();
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'touch') return;
+        onCardPointerLeave?.();
+      }}
+    >
+      <TermCard state={state} entry={entry} error={error} />
+    </div>,
+    document.body,
   );
 }
