@@ -49,8 +49,11 @@ test('Mapa stub renders without 404', async ({ page }) => {
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('Codex stub renders without 404', async ({ page }) => {
+test('Codex redirects to /codex/facciones and renders content', async ({ page }) => {
   await page.goto('/codex', { waitUntil: 'domcontentloaded' });
+  // /codex redirects to /codex/facciones (ADR-1, REQ-FAC-04)
+  await expect(page).toHaveURL(/\/codex\/facciones/, { timeout: 10_000 });
+  // Page renders without 404 — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
