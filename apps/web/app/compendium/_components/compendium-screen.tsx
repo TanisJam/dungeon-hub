@@ -9,6 +9,10 @@ interface CompendiumScreenProps {
   counts: Record<CategoryId, number | '—' | '∞'>;
   /** Active campaign name from the API, or null if no active campaign. */
   campaignName: string | null;
+  /** Active campaign UUID for category-grid hrefs. REQ-CBROWSE-01. */
+  campaignId: string | null;
+  /** World UUID for CompendiumEntriesWithTerms hover cards (REQ-CBROWSE-06). */
+  worldId: string | null;
 }
 
 /**
@@ -16,17 +20,17 @@ interface CompendiumScreenProps {
  * WCS-SCOPE-01: outer .compendium-init wrapper.
  * Composes: search trigger (via island), category grid, curated row, recents empty state.
  */
-export function CompendiumScreen({ counts, campaignName }: CompendiumScreenProps) {
+export function CompendiumScreen({ counts, campaignName, campaignId, worldId }: CompendiumScreenProps) {
   return (
     <div className="compendium-init">
       {/* Client island: search trigger */}
-      <CompendiumDemoIsland />
+      <CompendiumDemoIsland campaignId={campaignId} />
 
       {/* Category grid — server rendered */}
       <div>
         <SectionHead title="Categorías" />
         <div className="mt-3">
-          <CompendiumCategoryGrid counts={counts} />
+          <CompendiumCategoryGrid counts={counts} campaignId={campaignId} />
         </div>
       </div>
 

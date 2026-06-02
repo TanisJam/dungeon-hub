@@ -1,75 +1,40 @@
-import { Icon } from '@/components/ui';
-import type { SpellDetail } from './types';
+// REQ-CBROWSE-08: SpellDetailBody refactored to accept the real API response shape.
+// The old SpellDetail/SpellMeta types and paragraphs: string[] rendering are gone.
+// Now composed as: SpellHeader (meta) + CompendiumEntriesWithTerms (description body).
+// ADR-6: mandatory Batch 1 refactor before any live data is wired.
+
+import { CompendiumEntriesWithTerms } from '@/components/compendium/term/CompendiumEntriesWithTerms';
+import type { Entry } from '@/components/compendium/types';
+import { SpellHeader } from './spell-header';
+import type { SpellApiRow } from './types';
 
 interface SpellDetailBodyProps {
-  spell: SpellDetail;
+  data: SpellApiRow;
+  /** World UUID for CompendiumEntriesWithTerms hover-card term resolution. */
+  worldId?: string | null;
+  /** Supabase access token for CompendiumEntriesWithTerms. */
+  accessToken?: string | null;
 }
 
 /**
- * SpellDetailBody — pure presentational spell detail.
- * WCDS-FIREBALL-01: renders all PHB-validated Fireball fields.
- * WCDS-CTA-04: Preparar + Favorito ghost button stubs.
+ * SpellDetailBody — spell detail composed of SpellHeader + CompendiumEntriesWithTerms body.
+ * REQ-CBROWSE-08: accepts the real Drizzle row shape (extracted cols + raw data JSONB).
+ * REQ-CBROWSE-07: header renders all 6 PHB p.201–203 spell meta fields.
+ *
+ * The "Preparar" and "Favorito" ghost-button stubs are removed — they were demo stubs
+ * (WCDS-CTA-04) not in V1 scope per ADR-6.
  */
-export function SpellDetailBody({ spell }: SpellDetailBodyProps) {
+export function SpellDetailBody({ data, worldId, accessToken }: SpellDetailBodyProps) {
+  const entries = (data.data.entries ?? []) as Entry[];
   return (
-    <div className="compendium-init-detail spell">
-      <div className="lvl-stamp">{spell.level}</div>
-      <div className="eyebrow">{spell.eyebrow}</div>
-      <div className="name">{spell.name}</div>
-      <div className="school">{spell.school}</div>
-
-      <div className="grid">
-        {spell.meta.map((m) => (
-          <div key={m.k} className="meta-row">
-            <div className="k">{m.k}</div>
-            <div className="v">{m.v}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="desc">
-        {spell.paragraphs.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-        <button
-          type="button"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            background: 'none',
-            border: '1px solid var(--color-line)',
-            borderRadius: '0.375rem',
-            color: 'var(--color-ink-soft)',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="plus" size={14} />
-          Preparar
-        </button>
-        <button
-          type="button"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            background: 'none',
-            border: '1px solid var(--color-line)',
-            borderRadius: '0.375rem',
-            color: 'var(--color-ink-soft)',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="star" size={14} />
-          Favorito
-        </button>
+    <div>
+      <SpellHeader data={data} />
+      <div className="desc mt-4">
+        <CompendiumEntriesWithTerms
+          entries={entries}
+          worldId={worldId}
+          accessToken={accessToken}
+        />
       </div>
     </div>
   );

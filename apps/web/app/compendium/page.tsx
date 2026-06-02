@@ -8,6 +8,7 @@ import type { CategoryId } from './_components/types';
 type CampaignRow = {
   id: string;
   name: string;
+  worldId: string;
   memberRole: 'gm' | 'player';
 };
 
@@ -38,38 +39,46 @@ export default async function CompendiumPage() {
 
   if (activeCampaign) {
     const id = activeCampaign.id;
-    // Parallel fetch of 5 category counts — per-card .catch(() => null) fallback (ER3)
-    const [spellsRes, itemsRes, racesRes, classesRes, monstersRes] = await Promise.all([
+    // Parallel fetch of 6 category counts — per-card .catch(() => null) fallback (ER3)
+    const [spellsRes, itemsRes, racesRes, classesRes, monstersRes, backgroundsRes] = await Promise.all([
       api.get<CountResult>(`/compendium/spells?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/items?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/races?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/classes?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/monsters?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
+      api.get<CountResult>(`/compendium/backgrounds?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
     ]);
 
     counts = {
-      spells:   spellsRes?.total   ?? '—',
-      items:    itemsRes?.total    ?? '—',
-      races:    racesRes?.total    ?? '—',
-      classes:  classesRes?.total  ?? '—',
-      monsters: monstersRes?.total ?? '—',
-      lore:     '∞',
+      spells:      spellsRes?.total      ?? '—',
+      items:       itemsRes?.total       ?? '—',
+      races:       racesRes?.total       ?? '—',
+      classes:     classesRes?.total     ?? '—',
+      monsters:    monstersRes?.total    ?? '—',
+      backgrounds: backgroundsRes?.total ?? '—',
+      lore:        '∞',
     };
   } else {
     // No campaign: all counts degrade to '—', Lore stays '∞' (ER2)
     counts = {
-      spells:   '—',
-      items:    '—',
-      races:    '—',
-      classes:  '—',
-      monsters: '—',
-      lore:     '∞',
+      spells:      '—',
+      items:       '—',
+      races:       '—',
+      classes:     '—',
+      monsters:    '—',
+      backgrounds: '—',
+      lore:        '∞',
     };
   }
 
   return (
     <AppShell title="Compendium" subtitle="REGLAS Y OBJETOS">
-      <CompendiumScreen counts={counts} campaignName={activeCampaign?.name ?? null} />
+      <CompendiumScreen
+        counts={counts}
+        campaignName={activeCampaign?.name ?? null}
+        campaignId={activeCampaign?.id ?? null}
+        worldId={activeCampaign?.worldId ?? null}
+      />
     </AppShell>
   );
 }

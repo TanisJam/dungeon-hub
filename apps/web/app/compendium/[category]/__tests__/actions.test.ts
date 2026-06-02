@@ -1,0 +1,147 @@
+// Tests for searchCompendium and getCompendiumDetail Server Actions.
+// ADR-3 (list search) + ADR-4 (detail fetch).
+// Mocks api.get and Supabase createClient.
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ---------------------------------------------------------------------------
+// Mocks — must be hoisted above imports
+// ---------------------------------------------------------------------------
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(),
+}));
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    get: vi.fn(),
+  },
+}));
+
+// Registry mock — ensure CATEGORY_CONFIG is available
+vi.mock('@/app/compendium/[category]/_config/registry', () => ({
+  CATEGORY_CONFIG: {
+    spells: { endpoint: 'spells', label: 'Hechizos', RowView: () => null, Header: () => null },
+    items: { endpoint: 'items', label: 'Items', RowView: () => null, Header: () => null },
+    races: { endpoint: 'races', label: 'Razas', RowView: () => null, Header: () => null },
+    classes: { endpoint: 'classes', label: 'Clases', RowView: () => null, Header: () => null },
+    backgrounds: { endpoint: 'backgrounds', label: 'Trasfondos', RowView: () => null, Header: () => null },
+    monsters: { endpoint: 'monsters', label: 'Monstruos', RowView: () => null, Header: () => null },
+  },
+}));
+
+import { searchCompendium, getCompendiumDetail } from '../actions';
+import { api } from '@/lib/api';
+import { createClient } from '@/lib/supabase/server';
+
+const CAMPAIGN_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+const SESSION_TOKEN = 'test-access-token';
+
+function mockSession() {
+  vi.mocked(createClient).mockResolvedValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { access_token: SESSION_TOKEN } },
+      }),
+    },
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+}
+
+// ---------------------------------------------------------------------------
+// searchCompendium tests — ADR-3
+// ---------------------------------------------------------------------------
+
+describe('searchCompendium', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSession();
+  });
+
+  it('returns rows and total on success with correct URL (campaign + q + offset)', async () => {
+    const mockRows = [{ slug: 'fireball', name: 'Fireball', level: 3, school: 'E', source: 'PHB' }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockRows, total: 1 });
+
+    const result = await searchCompendium('spells', CAMPAIGN_ID, 'fire', 0);
+
+    expect(result).toEqual({ rows: mockRows, total: 1 });
+    // Assert URL contains campaign, q, and offset
+    const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
+    expect(calledUrl).toContain('/compendium/spells');
+    expect(calledUrl).toContain(`campaign=${CAMPAIGN_ID}`);
+    expect(calledUrl).toContain('q=fire');
+    expect(calledUrl).toContain('offset=0');
+  });
+
+  it('returns { rows: [], total: 0 } when api.get throws', async () => {
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('Network error'));
+
+    const result = await searchCompendium('spells', CAMPAIGN_ID, 'fire', 0);
+
+    expect(result).toEqual({ rows: [], total: 0 });
+  });
+
+  it('returns { rows: [], total: 0 } for invalid campaignId', async () => {
+    const result = await searchCompendium('spells', 'not-a-uuid', 'fire', 0);
+    expect(result).toEqual({ rows: [], total: 0 });
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('returns { rows: [], total: 0 } when no session', async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+
+    const result = await searchCompendium('spells', CAMPAIGN_ID, 'fire', 0);
+    expect(result).toEqual({ rows: [], total: 0 });
+  });
+
+  it('omits ?q= param when query is empty', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [], total: 0 });
+
+    await searchCompendium('spells', CAMPAIGN_ID, '', 0);
+
+    const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
+    expect(calledUrl).not.toContain('q=');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCompendiumDetail tests — ADR-4
+// ---------------------------------------------------------------------------
+
+describe('getCompendiumDetail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSession();
+  });
+
+  it('calls the correct URL with BOTH ?campaign= and ?source= params', async () => {
+    const mockDetail = { slug: 'fireball', source: 'PHB', name: 'Fireball', level: 3 };
+    vi.mocked(api.get).mockResolvedValueOnce(mockDetail);
+
+    const result = await getCompendiumDetail('spells', CAMPAIGN_ID, 'fireball', 'PHB');
+
+    expect(result).toEqual(mockDetail);
+    const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
+    // ADR-4 CRITICAL: BOTH campaign and source must be present
+    expect(calledUrl).toContain('/compendium/spells/fireball');
+    expect(calledUrl).toContain(`campaign=${CAMPAIGN_ID}`);
+    expect(calledUrl).toContain('source=PHB');
+  });
+
+  it('returns null when api.get throws (404 / network error)', async () => {
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('Not found'));
+
+    const result = await getCompendiumDetail('spells', CAMPAIGN_ID, 'fake-slug', 'PHB');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for invalid campaignId', async () => {
+    const result = await getCompendiumDetail('spells', 'bad-id', 'fireball', 'PHB');
+    expect(result).toBeNull();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+});

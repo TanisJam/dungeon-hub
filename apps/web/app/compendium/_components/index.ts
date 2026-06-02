@@ -1,10 +1,10 @@
-export type { CategoryId, CategoryDef, RecentDef, SpellDetail, SpellMeta } from './types';
+export type { CategoryId, CompendiumCategory, CategoryDef, RecentDef, SpellApiRow, SpellListHit } from './types';
 export { V3_COMPENDIUM_CATS } from './data';
 export { CompendiumCategoryGrid } from './compendium-category-grid';
 export { CompendiumCuratedRow } from './compendium-curated-row';
 export { CompendiumRecentsList } from './compendium-recents-list';
 export { SpellDetailBody } from './spell-detail-body';
-export { SpellDetailSheet } from './spell-detail-sheet';
+export { SpellHeader } from './spell-header';
 export { CompendiumSearchTrigger } from './compendium-search-trigger';
 export { CompendiumDemoIsland } from './compendium-demo-island';
 export { CompendiumScreen } from './compendium-screen';

@@ -1,15 +1,32 @@
 'use client';
 
-import { CompendiumSearchTrigger } from './compendium-search-trigger';
+// REQ-CBROWSE-10: CompendiumSearchTrigger no-op replaced with an honest Link
+// to the spells browse (default category). ADR-7.
+// If no campaignId, renders a non-navigating trigger (still not a no-op — shows intent).
+
+import Link from 'next/link';
+
+interface CompendiumDemoIslandProps {
+  /** Active campaign UUID for the search trigger href. REQ-CBROWSE-10. */
+  campaignId: string | null;
+}
 
 /**
- * CompendiumDemoIsland — client island for the search trigger.
- * SpellDetailSheet removed: no real spell-list/search UI exists yet on /compendium.
- * A real "open spell → detail" flow requires a spell-list/search feature (separate SDD).
- * The detail API (GET /compendium/spells/:slug) exists but has no caller here.
+ * CompendiumDemoIsland — converts the old no-op search trigger to a real nav link.
+ * REQ-CBROWSE-10: trigger MUST NOT remain a no-op after this change lands.
+ * ADR-7: honest minimal V1 = navigate to /compendium/spells?campaign=...
  */
-export function CompendiumDemoIsland() {
+export function CompendiumDemoIsland({ campaignId }: CompendiumDemoIslandProps) {
+  const href = campaignId ? `/compendium/spells?campaign=${campaignId}` : '/compendium/spells';
+
   return (
-    <CompendiumSearchTrigger onOpen={() => {/* TODO: open real search when spell-list feature lands */}} />
+    <Link
+      href={href}
+      className="compendium-init-search"
+      aria-label="Buscar en el compendium"
+    >
+      <span className="ph">Hechizo, item, monstruo…</span>
+      <span className="kbd">⌘K</span>
+    </Link>
   );
 }
