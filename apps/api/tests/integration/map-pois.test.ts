@@ -1,45 +1,42 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
+import { addWorldMember } from '../helpers/add-world-member.js';
 
 /**
- * Hexcrawl Map — Slice 2 (POIs).
+ * Hexcrawl Map — POIs (world-first-model Slice 1).
  *
- * POI CRUD bajo hex con visibility cascade (hex parent + POI status).
+ * POI CRUD under hex with visibility cascade (hex parent + POI status).
+ * POI world-scope is derived via pois.hex_id → hexes.id → hexes.world_id.
+ * No direct world_id column on pois table (REQ-MAP-02).
+ *
+ * REQ-MAP-02, REQ-MAP-04, REQ-CROSS-02
  */
-describe('pois — Slice 2', () => {
+describe('pois — world-scoped (world-first-model Slice 1)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let outsider: TestUser;
-  let campaignId: string;
+  let worldId: string;
   let hexExploredId: string;
   let hexUnexploredId: string;
 
   beforeAll(async () => {
-    const app = await getTestApp();
     dm = await createTestUser();
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'POI Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const result = await createWorldWithGm(dm.id);
+    worldId = result.worldId;
+    await addWorldMember(worldId, alice.id, 'player');
 
-    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
-    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    const app = await getTestApp();
 
     hexExploredId = (
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${campaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0, status: 'explored', name: 'Visible hex' },
         })
@@ -50,7 +47,7 @@ describe('pois — Slice 2', () => {
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${campaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 1, r: 0, name: 'Hidden hex' },
         })
@@ -77,20 +74,22 @@ describe('pois — Slice 2', () => {
     return res.json();
   }
 
-  // ---- POST -------------------------------------------------------------
+  // ---- POST /hexes/:hexId/pois -------------------------------------------
   describe('POST /hexes/:hexId/pois', () => {
-    it('GM crea POI con name + description + dmNotes', async () => {
+    it('GM creates POI with name + description + dmNotes', async () => {
       const poi = await createPoi(hexExploredId, {
-        name: 'Ruinas de Kelthara',
-        description: 'Una antigua fortaleza',
-        dmNotes: 'Hay un lich abajo',
+        name: 'Ruins of Kelthara',
+        description: 'An ancient fortress',
+        dmNotes: 'There is a lich below',
       });
       expect(poi.status).toBe('unknown');
-      expect(poi.name).toBe('Ruinas de Kelthara');
-      expect(poi.dmNotes).toBe('Hay un lich abajo');
+      expect(poi.name).toBe('Ruins of Kelthara');
+      expect(poi.dmNotes).toBe('There is a lich below');
+      // REQ-MAP-02: no direct world_id column on POI
+      expect(poi.worldId).toBeUndefined();
     });
 
-    it('player NO puede crear', async () => {
+    it('player cannot create', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
@@ -101,7 +100,7 @@ describe('pois — Slice 2', () => {
       expect(res.statusCode).toBe(403);
     });
 
-    it('outsider NO puede crear', async () => {
+    it('outsider cannot create', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
@@ -113,7 +112,7 @@ describe('pois — Slice 2', () => {
     });
   });
 
-  // ---- GET / visibility -------------------------------------------------
+  // ---- GET / visibility --------------------------------------------------
   describe('GET /hexes/:hexId/pois visibility', () => {
     let pUnknown: string;
     let pDiscovered: string;
@@ -129,13 +128,13 @@ describe('pois — Slice 2', () => {
       const d = await createPoi(hexExploredId, {
         name: 'Town square',
         status: 'discovered',
-        description: 'Plaza central del pueblo',
-        dmNotes: 'NPC clave acá',
+        description: 'Central plaza',
+        dmNotes: 'Key NPC here',
       });
       pDiscovered = d.id;
     });
 
-    it('GM ve todos los POIs (incluye unknown + dmNotes)', async () => {
+    it('GM sees all POIs (including unknown + dmNotes)', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -144,10 +143,10 @@ describe('pois — Slice 2', () => {
       });
       const data = res.json().data;
       expect(data.find((p: any) => p.id === pUnknown)).toBeDefined();
-      expect(data.find((p: any) => p.id === pDiscovered).dmNotes).toBe('NPC clave acá');
+      expect(data.find((p: any) => p.id === pDiscovered).dmNotes).toBe('Key NPC here');
     });
 
-    it('player NO ve POIs unknown, ni dmNotes en los visibles', async () => {
+    it('player does not see unknown POIs, nor dmNotes on visible ones', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -161,7 +160,7 @@ describe('pois — Slice 2', () => {
       expect(visiblePoi.dmNotes).toBeUndefined();
     });
 
-    it('GET POI individual unknown → 404 para player', async () => {
+    it('GET individual unknown POI → 404 for player', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -171,7 +170,7 @@ describe('pois — Slice 2', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('GET POI individual unknown → OK para GM, con dmNotes', async () => {
+    it('GET individual unknown POI → 200 for GM with dmNotes', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -182,14 +181,14 @@ describe('pois — Slice 2', () => {
       expect(res.json().dmNotes).toBe('secret stash');
     });
 
-    it('cascade: POI discovered en hex unexplored → invisible al player', async () => {
+    it('cascade: discovered POI in unexplored hex is invisible to player', async () => {
       const poi = await createPoi(hexUnexploredId, {
         name: 'In hidden hex',
         status: 'discovered',
       });
       const app = await getTestApp();
 
-      // GET list del hex → 404 (el hex es invisible).
+      // GET list of hex POIs → 404 (hex is invisible).
       const list = await app.inject({
         method: 'GET',
         url: `/api/v1/hexes/${hexUnexploredId}/pois`,
@@ -197,7 +196,7 @@ describe('pois — Slice 2', () => {
       });
       expect(list.statusCode).toBe(404);
 
-      // GET POI individual → 404 (cascade del hex).
+      // GET individual POI → 404 (cascade from hex).
       const det = await app.inject({
         method: 'GET',
         url: `/api/v1/pois/${poi.id}`,
@@ -206,7 +205,7 @@ describe('pois — Slice 2', () => {
       expect(det.statusCode).toBe(404);
     });
 
-    it('outsider → 403', async () => {
+    it('REQ-MAP-04: non-member → 403', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -217,22 +216,41 @@ describe('pois — Slice 2', () => {
     });
   });
 
-  // ---- PATCH ------------------------------------------------------------
+  // ---- REQ-MAP-02: POI world resolution via hex cascade -------------------
+  describe('REQ-MAP-02: POI world resolution via hex cascade', () => {
+    it('POI inherits world scope via hex_id → hex.world_id (no direct worldId column)', async () => {
+      const poi = await createPoi(hexExploredId, { name: 'Cascade test POI', status: 'discovered' });
+      // The POI should be visible from the world-scoped hex, not via a worldId on the POI.
+      expect(poi.worldId).toBeUndefined();
+      expect(poi.hexId).toBe(hexExploredId);
+
+      // Confirm the hex itself carries worldId.
+      const app = await getTestApp();
+      const hexRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/hexes/${hexExploredId}`,
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+      });
+      expect(hexRes.json().worldId).toBe(worldId);
+    });
+  });
+
+  // ---- PATCH /pois/:poiId ------------------------------------------------
   describe('PATCH /pois/:poiId', () => {
-    it('GM cambia status unknown → discovered', async () => {
+    it('GM changes status unknown → discovered', async () => {
       const app = await getTestApp();
       const poi = await createPoi(hexExploredId, { name: 'Statue', status: 'unknown' });
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/pois/${poi.id}`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
-        payload: { status: 'discovered', description: 'Una estatua antigua' },
+        payload: { status: 'discovered', description: 'An ancient statue' },
       });
       expect(res.statusCode).toBe(200);
       expect(res.json().status).toBe('discovered');
     });
 
-    it('player NO puede editar', async () => {
+    it('player cannot edit', async () => {
       const app = await getTestApp();
       const poi = await createPoi(hexExploredId, { name: 'Pillar' });
       const res = await app.inject({
@@ -245,9 +263,9 @@ describe('pois — Slice 2', () => {
     });
   });
 
-  // ---- DELETE -----------------------------------------------------------
+  // ---- DELETE /pois/:poiId -----------------------------------------------
   describe('DELETE /pois/:poiId', () => {
-    it('GM borra POI', async () => {
+    it('GM deletes POI', async () => {
       const app = await getTestApp();
       const poi = await createPoi(hexExploredId, { name: 'Doomed' });
       const del = await app.inject({
@@ -264,13 +282,13 @@ describe('pois — Slice 2', () => {
       expect(after.statusCode).toBe(404);
     });
 
-    it('cascade desde hex: borrar el hex borra sus POIs', async () => {
+    it('cascade from hex: deleting the hex deletes its POIs', async () => {
       const app = await getTestApp();
       const tempHex = (
         await app
           .inject({
             method: 'POST',
-            url: `/api/v1/campaigns/${campaignId}/hexes`,
+            url: `/api/v1/worlds/${worldId}/hexes`,
             headers: { authorization: `Bearer ${dm.accessToken}` },
             payload: { q: 99, r: 99 },
           })

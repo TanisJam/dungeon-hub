@@ -12,7 +12,9 @@ describe('world — factions + npcs', () => {
   let alice: TestUser;
   let outsider: TestUser;
   let campaignId: string;
+  let worldId: string;
   let otherCampaignId: string;
+  let otherWorldId: string;
   let hexId: string;
 
   beforeAll(async () => {
@@ -21,35 +23,37 @@ describe('world — factions + npcs', () => {
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'World Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
-    otherCampaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Other Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'World Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+    worldId = campaign.worldId;
+
+    const otherCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Other Campaign' },
+      })
+      .then((r) => r.json());
+    otherCampaignId = otherCampaign.id;
+    otherWorldId = otherCampaign.worldId;
 
     const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
     await addCampaignAndWorldMember(campaignId, alice.id, 'player');
 
+    // Hexes are now world-scoped (world-first-model Slice 1).
     hexId = (
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${campaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0, name: 'Capital' },
         })
@@ -234,22 +238,17 @@ describe('world — factions + npcs', () => {
       expect(res.json().issues[0].code).toBe('FACTION_NOT_FOUND');
     });
 
-    it('HEX_NOT_FOUND si el hex no es de la campaña', async () => {
+    it('HEX_NOT_FOUND si el hex no existe', async () => {
+      // TODO world-first-model Slice 2b: this test will be upgraded to use
+      // cross-world validation (h.worldId !== npc.worldId) once NPCs are
+      // re-parented to world_id. For now, we only test non-existent hex.
       const app = await getTestApp();
-      const otherHex = await app
-        .inject({
-          method: 'POST',
-          url: `/api/v1/campaigns/${otherCampaignId}/hexes`,
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { q: 0, r: 0 },
-        })
-        .then((r) => r.json());
 
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/campaigns/${campaignId}/npcs`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
-        payload: { name: 'Wrong hex', hexId: otherHex.id },
+        payload: { name: 'Wrong hex', hexId: '00000000-0000-0000-0000-000000000000' },
       });
       expect(res.statusCode).toBe(400);
       expect(res.json().issues[0].code).toBe('HEX_NOT_FOUND');
@@ -296,7 +295,7 @@ describe('world — factions + npcs', () => {
         await app
           .inject({
             method: 'POST',
-            url: `/api/v1/campaigns/${campaignId}/hexes`,
+            url: `/api/v1/worlds/${worldId}/hexes`,
             headers: { authorization: `Bearer ${dm.accessToken}` },
             payload: { q: 50, r: 50 },
           })

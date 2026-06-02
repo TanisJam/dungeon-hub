@@ -3,15 +3,20 @@ import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 
 /**
- * Hexcrawl Map — Slice 3.
+ * Hexcrawl Map — Session auto-events (world-first-model Slice 1).
  *
- * Auto-events cuando el GM modifica hex/POI durante una sesión active.
- * Detección automática de single-session; ambigüedad → ?sessionId.
+ * Auto-events when GM modifies hex/POI during an active session.
+ * After Slice 1, hex routes are /worlds/:worldId/hexes. The auto-log
+ * resolves the active session via findActiveSessionForGmInWorld (JOIN
+ * sessions→campaigns by worldId — ADR-4).
+ *
+ * REQ-MAP-05: recordSessionEventForWorld continues to auto-log after re-parent.
  */
-describe('hexcrawl — Slice 3 (session auto-events)', () => {
+describe('hexcrawl — session auto-events (world-first-model Slice 1)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let campaignId: string;
+  let worldId: string;
   let sessionId: string;
   let hexId: string;
 
@@ -20,32 +25,34 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     dm = await createTestUser();
     alice = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Map+Session Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    // Creating a campaign also creates a world and adds the DM as world GM.
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Map+Session Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+    worldId = campaign.worldId;
 
     const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
     await addCampaignAndWorldMember(campaignId, alice.id, 'player');
 
+    // Create hex under the world (world-scoped URL — REQ-MAP-03).
     hexId = (
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${campaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0, name: 'Start hex' },
         })
         .then((r) => r.json())
     ).id;
 
-    // Sesión active.
+    // Active session (campaign-scoped — sessions stay campaign-scoped).
     sessionId = (
       await app
         .inject({
@@ -82,8 +89,9 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     ).data;
   }
 
-  // ---- Hex status transitions ------------------------------------------
-  it('PATCH hex unexplored → rumored genera hex_revealed', async () => {
+  // ---- REQ-MAP-05: auto-log fires after hex re-parent --------------------
+
+  it('PATCH hex unexplored → rumored generates hex_revealed (ADR-4 join resolves session)', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'PATCH',
@@ -99,7 +107,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(ev.payload.to).toBe('rumored');
   });
 
-  it('PATCH hex rumored → explored genera hex_explored', async () => {
+  it('PATCH hex rumored → explored generates hex_explored', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'PATCH',
@@ -111,7 +119,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'hex_explored')).toBeDefined();
   });
 
-  it('PATCH hex explored → cleared genera hex_cleared', async () => {
+  it('PATCH hex explored → cleared generates hex_cleared', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'PATCH',
@@ -123,7 +131,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'hex_cleared')).toBeDefined();
   });
 
-  it('PATCH hex reverse transition (cleared → explored) genera hex_status_changed', async () => {
+  it('PATCH hex reverse transition (cleared → explored) generates hex_status_changed', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'PATCH',
@@ -135,8 +143,9 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'hex_status_changed')).toBeDefined();
   });
 
-  // ---- POI status transitions ------------------------------------------
-  it('PATCH poi unknown → discovered genera poi_discovered', async () => {
+  // ---- POI status transitions ---------------------------------------------
+
+  it('PATCH poi unknown → discovered generates poi_discovered', async () => {
     const app = await getTestApp();
     const poi = (
       await app
@@ -161,7 +170,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(ev.payload.poiId).toBe(poi.id);
   });
 
-  it('PATCH poi discovered → cleared genera poi_cleared', async () => {
+  it('PATCH poi discovered → cleared generates poi_cleared', async () => {
     const app = await getTestApp();
     const poi = (
       await app
@@ -183,12 +192,13 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'poi_cleared')).toBeDefined();
   });
 
-  // ---- Creation events --------------------------------------------------
-  it('POST hex con status non-default genera hex_created', async () => {
+  // ---- Creation events ---------------------------------------------------
+
+  it('POST hex with non-default status generates hex_created', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/hexes`,
+      url: `/api/v1/worlds/${worldId}/hexes`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload: { q: 10, r: 10, name: 'New visible hex', status: 'rumored' },
     });
@@ -196,20 +206,20 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'hex_created')).toBeDefined();
   });
 
-  it('POST hex con status unexplored (default) NO genera event (es prep)', async () => {
+  it('POST hex with unexplored status (default) does NOT generate event (prep)', async () => {
     const app = await getTestApp();
     const before = (await getEvents(sessionId)).length;
     await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/hexes`,
+      url: `/api/v1/worlds/${worldId}/hexes`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
-      payload: { q: 11, r: 11, name: 'Prep hex' }, // status default
+      payload: { q: 11, r: 11, name: 'Prep hex' },
     });
     const after = (await getEvents(sessionId)).length;
     expect(after).toBe(before);
   });
 
-  it('POST poi con status non-default genera poi_created', async () => {
+  it('POST poi with non-default status generates poi_created', async () => {
     const app = await getTestApp();
     await app.inject({
       method: 'POST',
@@ -221,32 +231,33 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(events.find((e) => e.eventType === 'poi_created')).toBeDefined();
   });
 
-  // ---- No active session → no log --------------------------------------
-  it('PATCH hex sin sesión active del GM → no log', async () => {
+  // ---- REQ-MAP-05 Scenario: no active session → no log -------------------
+
+  it('PATCH hex with no active session → 200, no event logged', async () => {
     const app = await getTestApp();
-    // Crear nueva campaña sin sesiones active.
-    const cId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'No-Session Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    // Create a new campaign (+ world) with no active sessions.
+    const newCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'No-Session Campaign' },
+      })
+      .then((r) => r.json());
+    const newWorldId = newCampaign.worldId;
+
     const hId = (
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${cId}/hexes`,
+          url: `/api/v1/worlds/${newWorldId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0 },
         })
         .then((r) => r.json())
     ).id;
 
-    // No debería tirar; el PATCH simplemente no logguea.
+    // Should not throw; the PATCH simply doesn't log an event.
     const res = await app.inject({
       method: 'PATCH',
       url: `/api/v1/hexes/${hId}`,
@@ -256,20 +267,21 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  // ---- Multi-session disambiguation ------------------------------------
-  it('GM con 2 sesiones active sin ?sessionId → no log (ambiguo)', async () => {
+  // ---- Multi-session disambiguation (ADR-4) ------------------------------
+
+  it('GM with 2 active sessions and no ?sessionId → no log (ambiguous)', async () => {
     const app = await getTestApp();
-    // Crear campaña fresca con 2 sesiones active.
-    const cId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'MultiSession Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const newCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'MultiSession Campaign' },
+      })
+      .then((r) => r.json());
+    const cId = newCampaign.id;
+    const wId = newCampaign.worldId;
+
     const s1 = (
       await app
         .inject({
@@ -304,14 +316,14 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${cId}/hexes`,
+          url: `/api/v1/worlds/${wId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0 },
         })
         .then((r) => r.json())
     ).id;
 
-    // PATCH sin sessionId → ambiguo → no log.
+    // PATCH without sessionId → ambiguous → no log.
     await app.inject({
       method: 'PATCH',
       url: `/api/v1/hexes/${hId}`,
@@ -323,7 +335,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(e1.find((e) => e.eventType === 'hex_revealed')).toBeUndefined();
     expect(e2.find((e) => e.eventType === 'hex_revealed')).toBeUndefined();
 
-    // PATCH con ?sessionId=s2 → debería loggear en s2.
+    // PATCH with ?sessionId=s2 → should log in s2.
     await app.inject({
       method: 'PATCH',
       url: `/api/v1/hexes/${hId}?sessionId=${s2}`,
@@ -336,19 +348,21 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
     expect(e2After.find((e) => e.eventType === 'hex_explored')).toBeDefined();
   });
 
-  // ---- Paused session → no log -----------------------------------------
-  it('PATCH hex con sesión paused (no active) → no log', async () => {
+  // ---- Paused session → no log ------------------------------------------
+
+  it('PATCH hex with paused session → no log', async () => {
     const app = await getTestApp();
-    const cId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Paused Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const newCampaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Paused Campaign' },
+      })
+      .then((r) => r.json());
+    const cId = newCampaign.id;
+    const wId = newCampaign.worldId;
+
     const sId = (
       await app
         .inject({
@@ -373,7 +387,7 @@ describe('hexcrawl — Slice 3 (session auto-events)', () => {
       await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${cId}/hexes`,
+          url: `/api/v1/worlds/${wId}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0 },
         })

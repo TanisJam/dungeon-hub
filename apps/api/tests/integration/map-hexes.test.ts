@@ -1,39 +1,32 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
+import { addWorldMember } from '../helpers/add-world-member.js';
 
 /**
- * Hexcrawl Map — Slice 1.
+ * Hexcrawl Map — Slice 1 (world-first-model).
  *
- * Hex CRUD con parent-child, visibility por rol (cascade en player), unique
- * coords con NULLS NOT DISTINCT, cycle prevention en PATCH parentHexId,
- * cascade delete a hijos.
+ * Hex CRUD with world-scoped URLs. Auth via worldMembers (getWorldAccess).
+ * Routes: POST/GET /worlds/:worldId/hexes, GET/PATCH/DELETE /hexes/:hexId.
+ *
+ * REQ-MAP-01, REQ-MAP-03, REQ-MAP-04, REQ-CROSS-02
  */
-describe('hexes — Slice 1', () => {
+describe('hexes — world-scoped (world-first-model Slice 1)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let outsider: TestUser;
-  let campaignId: string;
+  let worldId: string;
 
   beforeAll(async () => {
-    const app = await getTestApp();
     dm = await createTestUser();
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Hex Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    const result = await createWorldWithGm(dm.id);
+    worldId = result.worldId;
 
-    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
-    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    await addWorldMember(worldId, alice.id, 'player');
   });
 
   afterAll(async () => {
@@ -47,7 +40,7 @@ describe('hexes — Slice 1', () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/hexes`,
+      url: `/api/v1/worlds/${worldId}/hexes`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload,
     });
@@ -55,52 +48,56 @@ describe('hexes — Slice 1', () => {
     return res.json();
   }
 
-  // ---- POST -------------------------------------------------------------
-  describe('POST /campaigns/:campaignId/hexes', () => {
-    it('GM crea un hex top-level con coords y dmNotes', async () => {
+  // ---- POST /worlds/:worldId/hexes ----------------------------------------
+  describe('POST /worlds/:worldId/hexes', () => {
+    it('GM creates a top-level hex with coords and dmNotes', async () => {
       const hex = await createHex({
         q: 0,
         r: 0,
-        name: 'Origen',
+        name: 'Origin',
         terrain: 'plains',
-        dmNotes: 'Secret: hay un dragón',
+        dmNotes: 'Secret: there is a dragon here',
         worldX: 100.5,
         worldY: 200.0,
       });
       expect(hex.status).toBe('unexplored');
       expect(hex.parentHexId).toBeNull();
-      expect(hex.dmNotes).toBe('Secret: hay un dragón');
+      expect(hex.dmNotes).toBe('Secret: there is a dragon here');
       expect(hex.worldX).toBe(100.5);
+      // REQ-MAP-01: hex carries worldId, no campaignId
+      expect(hex.worldId).toBe(worldId);
+      expect(hex.campaignId).toBeUndefined();
     });
 
-    it('player NO puede crear', async () => {
+    it('player cannot create', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/campaigns/${campaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId}/hexes`,
         headers: { authorization: `Bearer ${alice.accessToken}` },
         payload: { q: 100, r: 100 },
       });
       expect(res.statusCode).toBe(403);
     });
 
-    it('outsider NO puede crear', async () => {
+    it('non-member (outsider) gets 403', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/campaigns/${campaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId}/hexes`,
         headers: { authorization: `Bearer ${outsider.accessToken}` },
         payload: { q: 200, r: 200 },
       });
+      // REQ-MAP-04: non-member rejected
       expect(res.statusCode).toBe(403);
     });
 
-    it('HEX_COORDS_TAKEN si ya existe top-level en (q,r)', async () => {
+    it('HEX_COORDS_TAKEN if top-level (q,r) already exists', async () => {
       await createHex({ q: 5, r: 5 });
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/campaigns/${campaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId}/hexes`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
         payload: { q: 5, r: 5 },
       });
@@ -108,20 +105,19 @@ describe('hexes — Slice 1', () => {
       expect(res.json().issues[0].code).toBe('HEX_COORDS_TAKEN');
     });
 
-    it('mismo (q,r) en distintos parents NO colisiona', async () => {
+    it('same (q,r) under different parents does not collide', async () => {
       const parentA = await createHex({ q: 10, r: 10, scale: 'region' });
       const parentB = await createHex({ q: 11, r: 11, scale: 'region' });
-      // Sub-hex (0,0) en cada parent — no colisiona.
       const subA = await createHex({ parentHexId: parentA.id, q: 0, r: 0, scale: 'local' });
       const subB = await createHex({ parentHexId: parentB.id, q: 0, r: 0, scale: 'local' });
       expect(subA.id).not.toBe(subB.id);
     });
 
-    it('parentHexId que no existe → PARENT_NOT_FOUND', async () => {
+    it('parentHexId that does not exist → PARENT_NOT_FOUND', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'POST',
-        url: `/api/v1/campaigns/${campaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId}/hexes`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
         payload: {
           parentHexId: '00000000-0000-0000-0000-000000000000',
@@ -134,32 +130,24 @@ describe('hexes — Slice 1', () => {
     });
   });
 
-  // ---- GET / visibility -------------------------------------------------
-  describe('GET /campaigns/:campaignId/hexes + visibility', () => {
-    let dmCampaignId: string;
+  // ---- GET /worlds/:worldId/hexes + visibility ----------------------------
+  describe('GET /worlds/:worldId/hexes + visibility', () => {
+    let worldId2: string;
     let hUnexp: string;
     let hRumored: string;
     let hExpl: string;
 
     beforeAll(async () => {
+      const result = await createWorldWithGm(dm.id);
+      worldId2 = result.worldId;
+      await addWorldMember(worldId2, alice.id, 'player');
+
       const app = await getTestApp();
-      dmCampaignId = (
-        await app
-          .inject({
-            method: 'POST',
-            url: '/api/v1/campaigns',
-            headers: { authorization: `Bearer ${dm.accessToken}` },
-            payload: { name: 'Visibility Campaign' },
-          })
-          .then((r) => r.json())
-      ).id;
-      const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
-      await addCampaignAndWorldMember(dmCampaignId, alice.id, 'player');
 
       const u = await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId2}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 0, r: 0, name: 'Hidden', dmNotes: 'secret' },
         })
@@ -169,7 +157,7 @@ describe('hexes — Slice 1', () => {
       const r = await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId2}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: {
             q: 1,
@@ -177,7 +165,7 @@ describe('hexes — Slice 1', () => {
             name: 'Rumored Hex',
             status: 'rumored',
             dmNotes: 'secret2',
-            playerNotes: 'Se dice que hay tesoro',
+            playerNotes: 'Treasure said to be here',
           },
         })
         .then((r) => r.json());
@@ -186,7 +174,7 @@ describe('hexes — Slice 1', () => {
       const e = await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId2}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: { q: 2, r: 0, name: 'Explored Hex', status: 'explored' },
         })
@@ -194,25 +182,25 @@ describe('hexes — Slice 1', () => {
       hExpl = e.id;
     });
 
-    it('GM ve los 3 hexes (incluye unexplored + dmNotes)', async () => {
+    it('GM sees all 3 hexes (including unexplored + dmNotes)', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId2}/hexes`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
       expect(res.statusCode).toBe(200);
       const data = res.json().data;
       expect(data.length).toBe(3);
-      const dmnotes = data.find((h: any) => h.id === hUnexp).dmNotes;
-      expect(dmnotes).toBe('secret');
+      const dmNotes = data.find((h: any) => h.id === hUnexp).dmNotes;
+      expect(dmNotes).toBe('secret');
     });
 
-    it('player ve solo los 2 no-unexplored, sin dmNotes', async () => {
+    it('player sees only the 2 non-unexplored hexes, without dmNotes', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId2}/hexes`,
         headers: { authorization: `Bearer ${alice.accessToken}` },
       });
       expect(res.statusCode).toBe(200);
@@ -222,7 +210,17 @@ describe('hexes — Slice 1', () => {
       expect(data.every((h: any) => h.dmNotes === undefined)).toBe(true);
     });
 
-    it('player → 404 al pedir un hex unexplored por id', async () => {
+    it('REQ-MAP-04: player member can read hexes (200)', async () => {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/worlds/${worldId2}/hexes`,
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('player → 404 when requesting an unexplored hex by id', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
@@ -232,23 +230,22 @@ describe('hexes — Slice 1', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('outsider → 403', async () => {
+    it('REQ-MAP-04: non-member → 403', async () => {
       const app = await getTestApp();
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+        url: `/api/v1/worlds/${worldId2}/hexes`,
         headers: { authorization: `Bearer ${outsider.accessToken}` },
       });
       expect(res.statusCode).toBe(403);
     });
 
-    it('cascade: sub-hex de un parent unexplored NO se le muestra al player', async () => {
+    it('cascade: sub-hex of an unexplored parent is not shown to player', async () => {
       const app = await getTestApp();
-      // Crear sub-hex explored bajo un parent unexplored.
       const sub = await app
         .inject({
           method: 'POST',
-          url: `/api/v1/campaigns/${dmCampaignId}/hexes`,
+          url: `/api/v1/worlds/${worldId2}/hexes`,
           headers: { authorization: `Bearer ${dm.accessToken}` },
           payload: {
             parentHexId: hUnexp,
@@ -260,10 +257,9 @@ describe('hexes — Slice 1', () => {
         })
         .then((r) => r.json());
 
-      // Player pide ?parent=all → no debería ver el sub.
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${dmCampaignId}/hexes?parent=all`,
+        url: `/api/v1/worlds/${worldId2}/hexes?parent=all`,
         headers: { authorization: `Bearer ${alice.accessToken}` },
       });
       const data = res.json().data;
@@ -271,9 +267,24 @@ describe('hexes — Slice 1', () => {
     });
   });
 
-  // ---- Children ---------------------------------------------------------
+  // ---- REQ-CROSS-02: Read-path tolerance for legacy rows ------------------
+  describe('REQ-CROSS-02: pre-existing hex loads after migration backfill', () => {
+    it('hex created in this test (simulating post-backfill row) loads via GET', async () => {
+      const hex = await createHex({ q: 900, r: 900, name: 'Legacy sim' });
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/hexes/${hex.id}`,
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().worldId).toBe(worldId);
+    });
+  });
+
+  // ---- Children -----------------------------------------------------------
   describe('GET /hexes/:hexId/children', () => {
-    it('GM lista hijos de un hex', async () => {
+    it('GM lists children of a hex', async () => {
       const app = await getTestApp();
       const parent = await createHex({ q: 50, r: 50, scale: 'region' });
       await createHex({ parentHexId: parent.id, q: 0, r: 0 });
@@ -289,9 +300,9 @@ describe('hexes — Slice 1', () => {
     });
   });
 
-  // ---- PATCH ------------------------------------------------------------
+  // ---- PATCH /hexes/:hexId ------------------------------------------------
   describe('PATCH /hexes/:hexId', () => {
-    it('GM cambia status a explored', async () => {
+    it('GM changes status to explored', async () => {
       const app = await getTestApp();
       const h = await createHex({ q: 60, r: 60 });
       const res = await app.inject({
@@ -304,7 +315,7 @@ describe('hexes — Slice 1', () => {
       expect(res.json().status).toBe('explored');
     });
 
-    it('player NO puede editar', async () => {
+    it('player cannot edit', async () => {
       const app = await getTestApp();
       const h = await createHex({ q: 61, r: 61 });
       const res = await app.inject({
@@ -316,7 +327,7 @@ describe('hexes — Slice 1', () => {
       expect(res.statusCode).toBe(403);
     });
 
-    it('HEX_CYCLE si querés mover un hex dentro de su descendiente', async () => {
+    it('HEX_CYCLE if moving a hex inside its descendant', async () => {
       const app = await getTestApp();
       const a = await createHex({ q: 70, r: 70, scale: 'region' });
       const b = await createHex({ parentHexId: a.id, q: 0, r: 0, scale: 'sub' });
@@ -331,7 +342,7 @@ describe('hexes — Slice 1', () => {
       expect(res.json().issues[0].code).toBe('HEX_CYCLE');
     });
 
-    it('HEX_CYCLE si querés mover un hex a sí mismo', async () => {
+    it('HEX_CYCLE if moving a hex to itself', async () => {
       const app = await getTestApp();
       const h = await createHex({ q: 80, r: 80 });
       const res = await app.inject({
@@ -344,7 +355,7 @@ describe('hexes — Slice 1', () => {
       expect(res.json().issues[0].code).toBe('HEX_CYCLE');
     });
 
-    it('HEX_COORDS_TAKEN si querés mover a unas coords ya ocupadas', async () => {
+    it('HEX_COORDS_TAKEN when moving to already-occupied coordinates', async () => {
       const app = await getTestApp();
       await createHex({ q: 100, r: 100 });
       const h = await createHex({ q: 100, r: 101 });
@@ -359,9 +370,9 @@ describe('hexes — Slice 1', () => {
     });
   });
 
-  // ---- DELETE -----------------------------------------------------------
+  // ---- DELETE /hexes/:hexId -----------------------------------------------
   describe('DELETE /hexes/:hexId', () => {
-    it('GM borra un hex y cascade borra hijos', async () => {
+    it('GM deletes a hex and cascade deletes children', async () => {
       const app = await getTestApp();
       const parent = await createHex({ q: 200, r: 200, scale: 'region' });
       const child = await createHex({ parentHexId: parent.id, q: 0, r: 0 });
@@ -373,7 +384,6 @@ describe('hexes — Slice 1', () => {
       });
       expect(del.statusCode).toBe(204);
 
-      // El hijo también debería estar borrado (cascade FK).
       const childCheck = await app.inject({
         method: 'GET',
         url: `/api/v1/hexes/${child.id}`,
@@ -382,7 +392,7 @@ describe('hexes — Slice 1', () => {
       expect(childCheck.statusCode).toBe(404);
     });
 
-    it('player NO puede borrar', async () => {
+    it('player cannot delete', async () => {
       const app = await getTestApp();
       const h = await createHex({ q: 210, r: 210 });
       const res = await app.inject({
@@ -391,6 +401,21 @@ describe('hexes — Slice 1', () => {
         headers: { authorization: `Bearer ${alice.accessToken}` },
       });
       expect(res.statusCode).toBe(403);
+    });
+  });
+
+  // ---- REQ-MAP-03: old campaign-scoped route must not exist ----------------
+  describe('REQ-MAP-03: /campaigns/:campaignId/hexes must not exist', () => {
+    it('GET /campaigns/:id/hexes returns 404 (route dropped)', async () => {
+      const app = await getTestApp();
+      // Use a valid UUID so the router doesn't fail on param validation — we're
+      // checking that the ROUTE itself no longer exists, not the resource.
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/campaigns/00000000-0000-0000-0000-000000000001/hexes`,
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+      });
+      expect(res.statusCode).toBe(404);
     });
   });
 });
