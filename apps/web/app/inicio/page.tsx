@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getRole } from '@/lib/role';
 import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
+import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
+import { getActiveWorld } from '@/lib/active-world';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
 import { QuickActions } from '@/components/inicio/quick-actions';
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
@@ -116,20 +119,33 @@ export default async function InicioPage() {
   } = await supabase.auth.getSession();
   const token = session?.access_token;
 
-  const role = await getRole();
+  // Resolve role + activeWorld in parallel (REQ-WIS-01 latency mitigation: parallel, not serial).
+  // Slice 3 will replace getRole() with aw?.callerRole; for now both run in parallel.
+  const [role, aw] = await Promise.all([
+    getRole(),
+    getActiveWorld(token),
+  ]);
+
+  const worldSwitcher = token ? (
+    <WorldSwitcherShell
+      token={token}
+      activeWorldId={aw?.id ?? null}
+      callerRole={aw?.callerRole ?? null}
+    />
+  ) : undefined;
 
   if (role === 'dm') {
-    return <DMView token={token} />;
+    return <DMView token={token} worldSwitcher={worldSwitcher} />;
   }
 
-  return <PlayerView token={token} />;
+  return <PlayerView token={token} worldSwitcher={worldSwitcher} />;
 }
 
 // ---------------------------------------------------------------------------
 // Player view
 // ---------------------------------------------------------------------------
 
-async function PlayerView({ token }: { token?: string }) {
+async function PlayerView({ token, worldSwitcher }: { token?: string; worldSwitcher?: ReactNode }) {
   // Fetch campaigns and roster in parallel
   const [campaignsResult, rosterResult] = await Promise.allSettled([
     token ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token) : Promise.resolve(null),
@@ -183,7 +199,7 @@ async function PlayerView({ token }: { token?: string }) {
   }
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player">
+    <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player" worldSwitcher={worldSwitcher}>
       <div className="flex flex-col gap-4">
         {heroData ? (
           <HeroNextSession campaign={heroData} />
@@ -217,7 +233,7 @@ async function PlayerView({ token }: { token?: string }) {
 // DM view
 // ---------------------------------------------------------------------------
 
-async function DMView({ token }: { token?: string }) {
+async function DMView({ token, worldSwitcher }: { token?: string; worldSwitcher?: ReactNode }) {
   // Fetch campaigns in parallel with world characters (need worldId from campaign first)
   const campaignsResult = await (token
     ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token).catch(() => null)
@@ -274,7 +290,7 @@ async function DMView({ token }: { token?: string }) {
   const pendingCount = gmCampaign?.pendingFichas ?? fichasData.length;
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm">
+    <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm" worldSwitcher={worldSwitcher}>
       <div className="flex flex-col gap-4">
         <PendingFichasCardTrigger
           fichas={fichasData}
