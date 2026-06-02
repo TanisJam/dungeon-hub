@@ -327,13 +327,13 @@ export const sessionEvents = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// hexes — Hexcrawl Map. Una world map implícita por campaña (no `maps` table
+// hexes — Hexcrawl Map. Una world map implícita por world (no `maps` table
 // aparte, YAGNI). Si más adelante hay dungeons/settlements como mapas
 // separados, agregamos `mapId`.
 //
 // Modelo parent-child para soportar subdivisión (region → sub-region → local
 // → city, etc.):
-//   - parentHexId NULL = hex top-level (mapa regional global de la campaña).
+//   - parentHexId NULL = hex top-level (mapa regional global del world).
 //   - parentHexId != NULL = sub-hex DENTRO del padre. (q, r) son locales al padre.
 //
 // Coordenadas:
@@ -350,21 +350,24 @@ export const sessionEvents = pgTable(
 //   - DM ve todos los hexes (incluyendo unexplored + dmNotes).
 //   - Players solo ven status != 'unexplored', NUNCA dmNotes. Sub-hexes de
 //     un parent oculto también quedan ocultos (cascade en la query).
+//
+// Re-parented from campaign_id to world_id (world-first-model Slice 1).
+// campaign_id dropped; migration 0031 backfills world_id from campaigns.world_id.
 // ---------------------------------------------------------------------------
 export const hexes = pgTable(
   'hexes',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: uuid('campaign_id')
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     /** NULL = top-level. Self-FK con cascade: borrar un parent borra sus hijos. */
     parentHexId: uuid('parent_hex_id').references((): AnyPgColumn => hexes.id, {
       onDelete: 'cascade',
     }),
     /** Etiqueta semántica abierta: 'region', 'sub-region', 'local', 'city', etc. */
     scale: text('scale'),
-    /** Coords axiales — locales al parent si tiene; globales en campaña si NULL. */
+    /** Coords axiales — locales al parent si tiene; globales en world si NULL. */
     q: integer('q').notNull(),
     r: integer('r').notNull(),
     /** Coords continuas opcionales para render continuo (Leaflet, etc.). */
@@ -386,10 +389,10 @@ export const hexes = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // El unique sobre (campaignId, parentHexId, q, r) con NULLS NOT DISTINCT
+    // El unique sobre (worldId, parentHexId, q, r) con NULLS NOT DISTINCT
     // se aplica via custom SQL migration (drizzle 0.38 no expone .nullsNotDistinct()).
-    // Ver apps/api/drizzle/custom/0002-hexes-unique-nulls-not-distinct.sql
-    index('idx_hexes_campaign_parent').on(t.campaignId, t.parentHexId),
+    // Ver apps/api/drizzle/custom/0003-hexes-unique-world-nulls-not-distinct.sql
+    index('idx_hexes_world_parent').on(t.worldId, t.parentHexId),
     index('idx_hexes_status').on(t.status),
   ],
 );

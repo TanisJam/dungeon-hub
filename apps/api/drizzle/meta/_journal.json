@@ -211,6 +211,13 @@
       "when": 1780285388841,
       "tag": "0030_flimsy_young_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780406657985,
+      "tag": "0031_world_first_hexes",
+      "breakpoints": true
     }
   ]
 }
