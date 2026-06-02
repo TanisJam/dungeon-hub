@@ -2,10 +2,11 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { factions, npcs, worldEvents } from '../../infra/db/schema.js';
+import { campaigns, factions, npcs, worldEvents } from '../../infra/db/schema.js';
 import { getMapAccess, loadHex } from '../../use-cases/map/load-hex.js';
+import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
 import {
-  listFactionsInCampaign,
+  listFactionsInWorld,
   loadFaction,
   sanitizeFactionForRole,
 } from '../../use-cases/world/load-faction.js';
@@ -22,6 +23,7 @@ import {
 } from '../../use-cases/world/load-world-event.js';
 
 const CampaignParam = z.object({ campaignId: z.string().uuid() });
+const WorldParam = z.object({ worldId: z.string().uuid() });
 const FactionParam = z.object({ factionId: z.string().uuid() });
 const NpcParam = z.object({ npcId: z.string().uuid() });
 const WorldEventParam = z.object({ eventId: z.string().uuid() });
@@ -64,7 +66,6 @@ const CreateFactionBody = z.object({
   description: z.string().max(20000).nullable().optional(),
   dmNotes: z.string().max(20000).nullable().optional(),
   state: z.enum(FACTION_STATES).optional(),
-  reputation: z.number().int().optional(),
 });
 
 const UpdateFactionBody = z
@@ -73,7 +74,6 @@ const UpdateFactionBody = z
     description: z.string().max(20000).nullable().optional(),
     dmNotes: z.string().max(20000).nullable().optional(),
     state: z.enum(FACTION_STATES).optional(),
-    reputation: z.number().int().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
@@ -109,19 +109,23 @@ const UpdateNpcBody = z
 
 export const worldRoute: FastifyPluginAsync = async (app) => {
   // =========================================================================
-  // FACTIONS
+  // FACTIONS — world-scoped (world-first-model Slice 2a)
   // =========================================================================
 
-  // POST /campaigns/:campaignId/factions
+  // POST /worlds/:worldId/factions
   app.post(
-    '/campaigns/:campaignId/factions',
+    '/worlds/:worldId/factions',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
-      const body = CreateFactionBody.parse(request.body);
+      const { worldId } = WorldParam.parse(request.params);
+      const parsed = CreateFactionBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+      }
+      const body = parsed.data;
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
         return reply
@@ -132,12 +136,11 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const [created] = await db
         .insert(factions)
         .values({
-          campaignId,
+          worldId,
           name: body.name,
           description: body.description ?? null,
           dmNotes: body.dmNotes ?? null,
           ...(body.state && { state: body.state }),
-          ...(body.reputation !== undefined && { reputation: body.reputation }),
         })
         .returning();
 
@@ -145,18 +148,18 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // GET /campaigns/:campaignId/factions
+  // GET /worlds/:worldId/factions
   app.get(
-    '/campaigns/:campaignId/factions',
+    '/worlds/:worldId/factions',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-      const list = await listFactionsInCampaign(campaignId);
+      const list = await listFactionsInWorld(worldId);
       return { data: list.map((f) => sanitizeFactionForRole(f, access)) };
     },
   );
@@ -169,7 +172,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     const faction = await loadFaction(factionId);
     if (!faction) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(faction.campaignId, userId);
+    const access = await getWorldAccess(faction.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     return sanitizeFactionForRole(faction, access);
@@ -187,7 +190,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const faction = await loadFaction(factionId);
       if (!faction) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(faction.campaignId, userId);
+      const access = await getWorldAccess(faction.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const updates: Partial<typeof factions.$inferInsert> = { updatedAt: new Date() };
@@ -195,7 +198,6 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       if (body.description !== undefined) updates.description = body.description;
       if (body.dmNotes !== undefined) updates.dmNotes = body.dmNotes;
       if (body.state !== undefined) updates.state = body.state;
-      if (body.reputation !== undefined) updates.reputation = body.reputation;
 
       const [updated] = await db
         .update(factions)
@@ -217,7 +219,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const faction = await loadFaction(factionId);
       if (!faction) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(faction.campaignId, userId);
+      const access = await getWorldAccess(faction.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       await db.delete(factions).where(eq(factions.id, factionId));
@@ -244,10 +246,19 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo un GM puede crear NPCs' });
       }
 
+      // Resolve campaign's worldId for cross-scope faction check (Slice 2a).
+      // Factions are now world-scoped; NPCs are still campaign-scoped until Slice 2b.
+      const campaignRow = await db
+        .select({ worldId: campaigns.worldId })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId))
+        .limit(1);
+      const campaignWorldId = campaignRow[0]?.worldId;
+
       // Validar factionId si se pasa.
       if (body.factionId) {
         const f = await loadFaction(body.factionId);
-        if (!f || f.campaignId !== campaignId) {
+        if (!f || f.worldId !== campaignWorldId) {
           return reply.code(400).send({
             error: 'VALIDATION_FAILED',
             issues: [{ code: 'FACTION_NOT_FOUND', factionId: body.factionId }],
@@ -330,8 +341,17 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
 
     // Validar nuevos FKs si se pasan.
     if (body.factionId !== undefined && body.factionId !== null) {
+      // Resolve NPC's campaign worldId for cross-scope faction check (Slice 2a).
+      // Factions are now world-scoped; compare faction.worldId to campaign's worldId.
+      const npcCampaignRow = await db
+        .select({ worldId: campaigns.worldId })
+        .from(campaigns)
+        .where(eq(campaigns.id, npc.campaignId))
+        .limit(1);
+      const npcWorldId = npcCampaignRow[0]?.worldId;
+
       const f = await loadFaction(body.factionId);
-      if (!f || f.campaignId !== npc.campaignId) {
+      if (!f || f.worldId !== npcWorldId) {
         return reply.code(400).send({
           error: 'VALIDATION_FAILED',
           issues: [{ code: 'FACTION_NOT_FOUND', factionId: body.factionId }],
