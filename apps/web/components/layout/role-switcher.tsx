@@ -18,8 +18,13 @@ interface RoleSwitcherProps {
  * Thumb slides via `left` transition; gradient + glow swap by role.
  */
 export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
-  const [role, setRole] = useRole(defaultRole);
+  // `defaultRole` is the SERVER's per-world effectiveView (authoritative). We display
+  // THAT — not useRole()'s localStorage value, which can go stale and desync from the
+  // server (a stale localStorage='player' previously made the toggle a no-op). We still
+  // use setRole to dual-write the dh:role cookie + localStorage + sync event.
+  const [, setRole] = useRole(defaultRole);
   const router = useRouter();
+  const role = defaultRole;
 
   // Toggling writes the dh:role cookie (in setRole). Server Components gated on
   // that cookie (e.g. the /inicio player/DM trees) only re-render on a refresh,
@@ -30,25 +35,26 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
     router.refresh();
   };
 
+  // Small + discreet: tight padding, micro label, no glow (subtle gradient thumb only).
   const thumbClass =
     role === 'player'
-      ? 'left-[3px] bg-gradient-to-b from-accent to-accent-deep shadow-glow-accent'
-      : 'left-1/2 bg-gradient-to-b from-secondary to-secondary-deep shadow-glow-secondary';
+      ? 'left-[2px] bg-gradient-to-b from-accent to-accent-deep'
+      : 'left-1/2 bg-gradient-to-b from-secondary to-secondary-deep';
 
   return (
     <div
       data-value={role}
-      className="relative inline-grid grid-cols-2 p-[3px] rounded-pill border border-line bg-surface"
+      className="relative inline-grid grid-cols-2 p-[2px] rounded-pill border border-line-soft bg-surface/80"
     >
       <span
         aria-hidden="true"
-        className={`absolute top-[3px] bottom-[3px] w-[calc(50%-3px)] rounded-pill transition-[left] duration-300 ease-out ${thumbClass}`}
+        className={`pointer-events-none absolute top-[2px] bottom-[2px] w-[calc(50%-2px)] rounded-pill transition-[left] duration-200 ease-out ${thumbClass}`}
       />
       <button
         type="button"
         onClick={() => select('player')}
         aria-pressed={role === 'player'}
-        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap text-center transition-colors duration-300 ease-out ${
+        className={`relative z-10 px-[7px] py-[2px] rounded-pill font-sans font-semibold text-[8px] uppercase tracking-[0.06em] whitespace-nowrap text-center transition-colors duration-200 ease-out ${
           role === 'player' ? 'text-on-accent' : 'text-ink-mute'
         }`}
       >
@@ -58,7 +64,7 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
         type="button"
         onClick={() => select('dm')}
         aria-pressed={role === 'dm'}
-        className={`relative z-10 px-[11px] py-[5px] rounded-pill font-sans font-bold text-[9px] uppercase tracking-[0.08em] whitespace-nowrap text-center transition-colors duration-300 ease-out ${
+        className={`relative z-10 px-[7px] py-[2px] rounded-pill font-sans font-semibold text-[8px] uppercase tracking-[0.06em] whitespace-nowrap text-center transition-colors duration-200 ease-out ${
           role === 'dm' ? 'text-on-secondary' : 'text-ink-mute'
         }`}
       >

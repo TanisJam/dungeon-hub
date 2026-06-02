@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { getActiveWorld } from '@/lib/active-world';
+import { getViewPreference } from '@/lib/role';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
 import { QuickActions } from '@/components/inicio/quick-actions';
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
@@ -121,13 +122,15 @@ export default async function InicioPage() {
   // Resolve active world in parallel (REQ-WIS-01 latency mitigation).
   // Slice 3: effectiveView derived from callerRole (per-world authority), NOT from the
   // global dh:role cookie. REQ-WIS-08.
-  const aw = await getActiveWorld(token);
+  const [aw, viewPref] = await Promise.all([getActiveWorld(token), getViewPreference()]);
 
   // effectiveView rule (REQ-WIS-08 + REQ-WIS-09):
   //   - non-GM (player or null callerRole) ALWAYS sees player view
-  //   - GM defaults to DM view (seeded from callerRole); dh:role cookie is now only a
-  //     GM-only view-preference overlay (toggled client-side via RoleSwitcher)
-  const effectiveView = aw?.callerRole === 'gm' ? 'dm' : 'player';
+  //   - GM defaults to DM view (seeded from callerRole); the dh:role cookie is a GM-only
+  //     view-preference overlay (toggled client-side via RoleSwitcher) — 'player' makes a
+  //     GM preview as player; absent → DM default.
+  const effectiveView =
+    aw?.callerRole === 'gm' ? (viewPref === 'player' ? 'player' : 'dm') : 'player';
 
   const worldSwitcher = token ? (
     <WorldSwitcherShell

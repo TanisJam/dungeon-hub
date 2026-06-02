@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { EncuentrosListView, type EncuentroRow } from '@/components/encuentros/encuentros-list-view';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { getActiveWorld } from '@/lib/active-world';
+import { getViewPreference } from '@/lib/role';
 import type { EncounterDetail, EncounterSummary } from '@/components/encuentros/types';
 
 type CampaignRow = {
@@ -27,13 +28,14 @@ export default async function EncuentrosPage() {
 
   // Resolve activeWorld (REQ-WIS-01 latency mitigation — single call, already parallel-ready).
   // Slice 3: effectiveView derived from aw.callerRole (per-world authority). REQ-WIS-08.
-  const aw = await getActiveWorld(token);
+  const [aw, viewPref] = await Promise.all([getActiveWorld(token), getViewPreference()]);
 
-  // effectiveView rule (REQ-WIS-08):
+  // effectiveView rule (REQ-WIS-08/09):
   //   - non-GM (player or null callerRole) ALWAYS sees player view (encounter list hidden)
-  //   - GM sees encounter list
+  //   - GM defaults to DM view; the dh:role overlay lets a GM preview as player.
   const callerRole = aw?.callerRole ?? null;
-  const effectiveView = callerRole === 'gm' ? 'dm' : 'player';
+  const effectiveView =
+    callerRole === 'gm' ? (viewPref === 'player' ? 'player' : 'dm') : 'player';
 
   let rows: EncuentroRow[] = [];
   if (effectiveView === 'dm') {

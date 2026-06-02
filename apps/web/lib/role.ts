@@ -21,3 +21,17 @@ export async function getRole(): Promise<Role> {
   const value = cookieStore.get('dh:role')?.value;
   return value === 'dm' ? 'dm' : 'player';
 }
+
+/**
+ * getViewPreference() — raw `dh:role` cookie value, distinguishing "absent" from "player".
+ *
+ * Used by world-scoped pages to compute the GM-only view overlay:
+ *   - A GM with NO preference defaults to DM view (seeded from callerRole).
+ *   - A GM who explicitly toggled to "Jugador" (cookie === 'player') sees player view.
+ * Unlike getRole(), this does NOT collapse absent→'player', so the GM default works.
+ * Returns null when the cookie is absent/invalid.
+ */
+export async function getViewPreference(): Promise<Role | null> {
+  const value = (await cookies()).get('dh:role')?.value;
+  return value === 'dm' || value === 'player' ? value : null;
+}
