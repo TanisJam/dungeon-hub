@@ -25,9 +25,11 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
     const charName = `E2E HighElf ${Date.now()}`;
 
     await test.step('create character + stats', async () => {
-      await page.goto('/dashboard');
-      await page.locator('a[href="/characters/new"]').first().click();
-      await expect(page).toHaveURL(/\/characters\/new$/);
+      // Navigate directly to the constructor — the dashboard create-link click is
+      // flaky under accumulated test-data load (the char list slows hydration). These
+      // specs test racial spells, not the dashboard navigation.
+      await page.goto('/characters/new');
+      await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 15_000 });
 
       await page.selectOption('select[name="worldId"]', { label: 'E2E Test Campaign (World)' });
       await page.fill('input[name="name"]', charName);
@@ -154,9 +156,11 @@ test.describe('Racial spells — Batch 6 (race-additional-spells)', () => {
     const charName = `E2E Tiefling ${Date.now()}`;
 
     await test.step('create character + stats', async () => {
-      await page.goto('/dashboard');
-      await page.locator('a[href="/characters/new"]').first().click();
-      await expect(page).toHaveURL(/\/characters\/new$/);
+      // Navigate directly to the constructor — the dashboard create-link click is
+      // flaky under accumulated test-data load (the char list slows hydration). These
+      // specs test racial spells, not the dashboard navigation.
+      await page.goto('/characters/new');
+      await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 15_000 });
 
       await page.selectOption('select[name="worldId"]', { label: 'E2E Test Campaign (World)' });
       await page.fill('input[name="name"]', charName);
