@@ -14,6 +14,11 @@ const CreateCampaignBody = z.object({
   name: z.string().min(1).max(120),
   /** Si se omite, se usa DEFAULT_RULES_PROFILE. */
   rulesProfile: RulesProfileSchema.optional(),
+  /**
+   * Opcional. Cuando se provee, crea la campaña bajo un world existente del cual
+   * el caller ya es GM. Omitir para crear un world+campaign atómicamente (path original).
+   */
+  worldId: z.string().uuid().optional(),
 });
 
 const UpdateCampaignBody = z.object({
@@ -46,6 +51,50 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
     }
 
     const profile = body.rulesProfile ?? DEFAULT_RULES_PROFILE;
+
+    // ── Branch: worldId provided → create campaign under an EXISTING world ──
+    if (body.worldId) {
+      // Verify the caller is a GM of that world
+      const check = await assertWorldGm(body.worldId, userId);
+      if (!check.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'WORLD_GM_REQUIRED', worldId: body.worldId, userId }],
+        });
+      }
+
+      // Create campaign under the existing world (no new world row)
+      const [created] = await db
+        .insert(campaigns)
+        .values({
+          name: body.name,
+          gmUserId: userId,
+          worldId: body.worldId,
+        })
+        .returning();
+
+      if (!created) {
+        return reply.code(500).send({ error: 'CREATE_FAILED' });
+      }
+
+      // GM joins the new campaign as member
+      await db.insert(campaignMembers).values({
+        campaignId: created.id,
+        userId,
+        role: 'gm',
+      });
+
+      return reply.code(201).send({
+        id: created.id,
+        name: created.name,
+        gmUserId: created.gmUserId,
+        worldId: created.worldId,
+        rulesProfile: profile,
+        createdAt: created.createdAt,
+      });
+    }
+
+    // ── Default branch: atomic world+campaign creation (existing behavior) ──
 
     // Slug derivado del nombre + UUID suffix para unicidad
     const slugBase = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
