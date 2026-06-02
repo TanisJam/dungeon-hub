@@ -58,6 +58,7 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
     <button
       type="button"
       data-value={role}
+      aria-pressed={role === 'dm'}
       onClick={toggle}
       title="Cambiar vista DM / Jugador"
       aria-label={`Vista actual: ${label}. Tocar para cambiar.`}
