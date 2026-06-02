@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
-import { getRole } from '@/lib/role';
 import { AppShell } from '@/components/layout/app-shell';
 import { EncuentrosListView, type EncuentroRow } from '@/components/encuentros/encuentros-list-view';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
@@ -26,15 +25,18 @@ export default async function EncuentrosPage() {
   } = await supabase.auth.getSession();
   const token = session!.access_token;
 
-  // Resolve role + activeWorld in parallel (REQ-WIS-01 latency mitigation).
-  // Slice 3 will replace getRole() with aw?.callerRole.
-  const [role, aw] = await Promise.all([
-    getRole(),
-    getActiveWorld(token),
-  ]);
+  // Resolve activeWorld (REQ-WIS-01 latency mitigation — single call, already parallel-ready).
+  // Slice 3: effectiveView derived from aw.callerRole (per-world authority). REQ-WIS-08.
+  const aw = await getActiveWorld(token);
+
+  // effectiveView rule (REQ-WIS-08):
+  //   - non-GM (player or null callerRole) ALWAYS sees player view (encounter list hidden)
+  //   - GM sees encounter list
+  const callerRole = aw?.callerRole ?? null;
+  const effectiveView = callerRole === 'gm' ? 'dm' : 'player';
 
   let rows: EncuentroRow[] = [];
-  if (role === 'dm') {
+  if (effectiveView === 'dm') {
     const campaignsResult = await api
       .get<{ data: CampaignRow[] }>('/campaigns', token)
       .catch(() => ({ data: [] as CampaignRow[] }));
@@ -75,10 +77,12 @@ export default async function EncuentrosPage() {
   return (
     <AppShell
       title="Encuentros"
-      subtitle={role === 'dm' ? 'TU MESA — DM' : 'TUS COMBATES'}
+      subtitle={effectiveView === 'dm' ? 'TU MESA — DM' : 'TUS COMBATES'}
+      roleDefault={effectiveView}
+      callerRole={callerRole ?? undefined}
       worldSwitcher={worldSwitcher}
     >
-      <EncuentrosListView role={role} rows={rows} />
+      <EncuentrosListView role={effectiveView} rows={rows} />
     </AppShell>
   );
 }

@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getRole } from '@/lib/role';
 import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
@@ -119,12 +118,16 @@ export default async function InicioPage() {
   } = await supabase.auth.getSession();
   const token = session?.access_token;
 
-  // Resolve role + activeWorld in parallel (REQ-WIS-01 latency mitigation: parallel, not serial).
-  // Slice 3 will replace getRole() with aw?.callerRole; for now both run in parallel.
-  const [role, aw] = await Promise.all([
-    getRole(),
-    getActiveWorld(token),
-  ]);
+  // Resolve active world in parallel (REQ-WIS-01 latency mitigation).
+  // Slice 3: effectiveView derived from callerRole (per-world authority), NOT from the
+  // global dh:role cookie. REQ-WIS-08.
+  const aw = await getActiveWorld(token);
+
+  // effectiveView rule (REQ-WIS-08 + REQ-WIS-09):
+  //   - non-GM (player or null callerRole) ALWAYS sees player view
+  //   - GM defaults to DM view (seeded from callerRole); dh:role cookie is now only a
+  //     GM-only view-preference overlay (toggled client-side via RoleSwitcher)
+  const effectiveView = aw?.callerRole === 'gm' ? 'dm' : 'player';
 
   const worldSwitcher = token ? (
     <WorldSwitcherShell
@@ -134,18 +137,20 @@ export default async function InicioPage() {
     />
   ) : undefined;
 
-  if (role === 'dm') {
-    return <DMView token={token} worldSwitcher={worldSwitcher} />;
+  const callerRole = aw?.callerRole ?? null;
+
+  if (effectiveView === 'dm') {
+    return <DMView token={token} worldSwitcher={worldSwitcher} callerRole={callerRole} />;
   }
 
-  return <PlayerView token={token} worldSwitcher={worldSwitcher} />;
+  return <PlayerView token={token} worldSwitcher={worldSwitcher} callerRole={callerRole} />;
 }
 
 // ---------------------------------------------------------------------------
 // Player view
 // ---------------------------------------------------------------------------
 
-async function PlayerView({ token, worldSwitcher }: { token?: string; worldSwitcher?: ReactNode }) {
+async function PlayerView({ token, worldSwitcher, callerRole }: { token?: string; worldSwitcher?: ReactNode; callerRole?: 'gm' | 'player' | null }) {
   // Fetch campaigns and roster in parallel
   const [campaignsResult, rosterResult] = await Promise.allSettled([
     token ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token) : Promise.resolve(null),
@@ -199,7 +204,7 @@ async function PlayerView({ token, worldSwitcher }: { token?: string; worldSwitc
   }
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player" worldSwitcher={worldSwitcher}>
+    <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player" callerRole={callerRole ?? undefined} worldSwitcher={worldSwitcher}>
       <div className="flex flex-col gap-4">
         {heroData ? (
           <HeroNextSession campaign={heroData} />
@@ -233,7 +238,7 @@ async function PlayerView({ token, worldSwitcher }: { token?: string; worldSwitc
 // DM view
 // ---------------------------------------------------------------------------
 
-async function DMView({ token, worldSwitcher }: { token?: string; worldSwitcher?: ReactNode }) {
+async function DMView({ token, worldSwitcher, callerRole }: { token?: string; worldSwitcher?: ReactNode; callerRole?: 'gm' | 'player' | null }) {
   // Fetch campaigns in parallel with world characters (need worldId from campaign first)
   const campaignsResult = await (token
     ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token).catch(() => null)
@@ -290,7 +295,7 @@ async function DMView({ token, worldSwitcher }: { token?: string; worldSwitcher?
   const pendingCount = gmCampaign?.pendingFichas ?? fichasData.length;
 
   return (
-    <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm" worldSwitcher={worldSwitcher}>
+    <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm" callerRole={callerRole ?? undefined} worldSwitcher={worldSwitcher}>
       <div className="flex flex-col gap-4">
         <PendingFichasCardTrigger
           fichas={fichasData}
