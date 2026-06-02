@@ -489,21 +489,23 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
 
   // =========================================================================
   // WORLD EVENTS — timeline persistente del mundo (vs session_events que son
-  // per-sesión y efímeros).
+  // per-sesión y efímeros). world-first-model Slice 3: now world-scoped.
   // =========================================================================
 
-  // POST /campaigns/:campaignId/world-events
+  // POST /worlds/:worldId/world-events
   app.post(
-    '/campaigns/:campaignId/world-events',
+    '/worlds/:worldId/world-events',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.params);
-      const body = CreateWorldEventBody.parse(request.body);
+      const { worldId } = WorldParam.parse(request.params);
+      const parsed = CreateWorldEventBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+      }
+      const body = parsed.data;
       const userId = request.user!.sub;
 
-      // World events still go through getMapAccess (campaign-scoped) until Slice 3.
-      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
         return reply
@@ -514,7 +516,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const [created] = await db
         .insert(worldEvents)
         .values({
-          campaignId,
+          worldId,
           title: body.title,
           description: body.description ?? null,
           dmNotes: body.dmNotes ?? null,
@@ -529,21 +531,20 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // GET /campaigns/:campaignId/world-events
+  // GET /worlds/:worldId/world-events
   app.get(
-    '/campaigns/:campaignId/world-events',
+    '/worlds/:worldId/world-events',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const query = ListWorldEventsQuery.parse(request.query);
       const userId = request.user!.sub;
 
-      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const list = await listWorldEvents({
-        campaignId,
+        worldId,
         ...(query.tag && { tag: query.tag }),
         ...(query.limit && { limit: query.limit }),
         ...(query.offset && { offset: query.offset }),
@@ -564,8 +565,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
-      const access = await getMapAccess(event.campaignId, userId);
+      const access = await getWorldAccess(event.worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       if (access !== 'gm' && event.visibility === 'dm-only') {
@@ -588,8 +588,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
-      const access = await getMapAccess(event.campaignId, userId);
+      const access = await getWorldAccess(event.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const updates: Partial<typeof worldEvents.$inferInsert> = { updatedAt: new Date() };
@@ -621,8 +620,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
-      const access = await getMapAccess(event.campaignId, userId);
+      const access = await getWorldAccess(event.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       await db.delete(worldEvents).where(eq(worldEvents.id, eventId));

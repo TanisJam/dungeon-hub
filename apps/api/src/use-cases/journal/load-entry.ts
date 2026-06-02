@@ -1,13 +1,13 @@
 import { and, arrayContains, desc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { journalEntries } from '../../infra/db/schema.js';
-import type { MapAccess } from '../map/load-hex.js';
+import type { WorldAccess } from '../auth/get-world-access.js';
 
 export type JournalVisibility = 'public' | 'dm-only';
 
 export interface LoadedJournalEntry {
   id: string;
-  campaignId: string;
+  worldId: string;
   title: string;
   body: string | null;
   visibility: JournalVisibility;
@@ -23,7 +23,7 @@ export async function loadJournalEntry(id: string): Promise<LoadedJournalEntry |
 }
 
 export interface ListJournalOptions {
-  campaignId: string;
+  worldId: string;
   tag?: string;
   limit?: number;
   offset?: number;
@@ -32,7 +32,7 @@ export interface ListJournalOptions {
 export async function listJournalEntries(opts: ListJournalOptions): Promise<LoadedJournalEntry[]> {
   const limit = Math.min(opts.limit ?? 100, 500);
   const offset = opts.offset ?? 0;
-  const conditions = [eq(journalEntries.campaignId, opts.campaignId)];
+  const conditions = [eq(journalEntries.worldId, opts.worldId)];
   if (opts.tag) conditions.push(arrayContains(journalEntries.tags, [opts.tag]));
 
   const rows = await db
@@ -49,7 +49,7 @@ export async function listJournalEntries(opts: ListJournalOptions): Promise<Load
  *  entera es o pública o privada.) */
 export function filterJournalByAccess(
   list: LoadedJournalEntry[],
-  access: MapAccess,
+  access: WorldAccess,
 ): LoadedJournalEntry[] {
   if (access === 'gm') return list;
   return list.filter((e) => e.visibility === 'public');

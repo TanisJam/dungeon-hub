@@ -1,13 +1,13 @@
 import { and, arrayContains, desc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { worldEvents } from '../../infra/db/schema.js';
-import type { MapAccess } from '../map/load-hex.js';
+import type { WorldAccess } from '../auth/get-world-access.js';
 
 export type WorldEventVisibility = 'public' | 'dm-only';
 
 export interface LoadedWorldEvent {
   id: string;
-  campaignId: string;
+  worldId: string;
   title: string;
   description: string | null;
   dmNotes: string | null;
@@ -25,7 +25,7 @@ export async function loadWorldEvent(id: string): Promise<LoadedWorldEvent | nul
 }
 
 export interface ListWorldEventsOptions {
-  campaignId: string;
+  worldId: string;
   tag?: string;
   limit?: number;
   offset?: number;
@@ -34,7 +34,7 @@ export interface ListWorldEventsOptions {
 export async function listWorldEvents(opts: ListWorldEventsOptions): Promise<LoadedWorldEvent[]> {
   const limit = Math.min(opts.limit ?? 200, 500);
   const offset = opts.offset ?? 0;
-  const conditions = [eq(worldEvents.campaignId, opts.campaignId)];
+  const conditions = [eq(worldEvents.worldId, opts.worldId)];
   if (opts.tag) conditions.push(arrayContains(worldEvents.tags, [opts.tag]));
 
   const rows = await db
@@ -50,7 +50,7 @@ export async function listWorldEvents(opts: ListWorldEventsOptions): Promise<Loa
 /** Filtra dm-only events para non-GM y quita dmNotes. */
 export function filterWorldEventsByAccess(
   list: LoadedWorldEvent[],
-  access: MapAccess,
+  access: WorldAccess,
 ): Array<Omit<LoadedWorldEvent, 'dmNotes'> & { dmNotes?: string | null }> {
   if (access === 'gm') return list;
   return list
@@ -63,7 +63,7 @@ export function filterWorldEventsByAccess(
 
 export function sanitizeWorldEventForRole(
   event: LoadedWorldEvent,
-  access: MapAccess,
+  access: WorldAccess,
 ): Omit<LoadedWorldEvent, 'dmNotes'> & { dmNotes?: string | null } {
   if (access === 'gm') return event;
   const { dmNotes: _omit, ...rest } = event;

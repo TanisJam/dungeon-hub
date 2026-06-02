@@ -3,14 +3,14 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { journalEntries } from '../../infra/db/schema.js';
-import { getMapAccess } from '../../use-cases/map/load-hex.js';
+import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
 import {
   filterJournalByAccess,
   listJournalEntries,
   loadJournalEntry,
 } from '../../use-cases/journal/load-entry.js';
 
-const CampaignParam = z.object({ campaignId: z.string().uuid() });
+const WorldParam = z.object({ worldId: z.string().uuid() });
 const EntryParam = z.object({ entryId: z.string().uuid() });
 
 const CreateEntryBody = z.object({
@@ -38,16 +38,20 @@ const ListEntriesQuery = z.object({
 });
 
 export const journalRoute: FastifyPluginAsync = async (app) => {
-  // POST /campaigns/:campaignId/journal-entries
+  // POST /worlds/:worldId/journal-entries
   app.post(
-    '/campaigns/:campaignId/journal-entries',
+    '/worlds/:worldId/journal-entries',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
-      const body = CreateEntryBody.parse(request.body);
+      const { worldId } = WorldParam.parse(request.params);
+      const parsed = CreateEntryBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+      }
+      const body = parsed.data;
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
         return reply
@@ -58,7 +62,7 @@ export const journalRoute: FastifyPluginAsync = async (app) => {
       const [created] = await db
         .insert(journalEntries)
         .values({
-          campaignId,
+          worldId,
           title: body.title,
           body: body.body ?? null,
           ...(body.visibility && { visibility: body.visibility }),
@@ -71,20 +75,20 @@ export const journalRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // GET /campaigns/:campaignId/journal-entries
+  // GET /worlds/:worldId/journal-entries
   app.get(
-    '/campaigns/:campaignId/journal-entries',
+    '/worlds/:worldId/journal-entries',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const query = ListEntriesQuery.parse(request.query);
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const list = await listJournalEntries({
-        campaignId,
+        worldId,
         ...(query.tag && { tag: query.tag }),
         ...(query.limit && { limit: query.limit }),
         ...(query.offset && { offset: query.offset }),
@@ -105,7 +109,7 @@ export const journalRoute: FastifyPluginAsync = async (app) => {
       const entry = await loadJournalEntry(entryId);
       if (!entry) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(entry.campaignId, userId);
+      const access = await getWorldAccess(entry.worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       if (access !== 'gm' && entry.visibility === 'dm-only') {
@@ -128,7 +132,7 @@ export const journalRoute: FastifyPluginAsync = async (app) => {
       const entry = await loadJournalEntry(entryId);
       if (!entry) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(entry.campaignId, userId);
+      const access = await getWorldAccess(entry.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const updates: Partial<typeof journalEntries.$inferInsert> = { updatedAt: new Date() };
@@ -157,7 +161,7 @@ export const journalRoute: FastifyPluginAsync = async (app) => {
       const entry = await loadJournalEntry(entryId);
       if (!entry) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(entry.campaignId, userId);
+      const access = await getWorldAccess(entry.worldId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       await db.delete(journalEntries).where(eq(journalEntries.id, entryId));

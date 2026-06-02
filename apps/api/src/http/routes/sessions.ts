@@ -814,10 +814,11 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
       // World events: auto-crear desde body.worldChanges, con sourceSessionId
       // apuntando a esta sesión. Esto es la "historia oficial" del mundo
       // (distinto de session_events, que son ruido fino in-game).
+      // world-first-model Slice 3: world_events now scoped by worldId (not campaignId).
       if (body.worldChanges && body.worldChanges.length > 0) {
         await tx.insert(worldEvents).values(
           body.worldChanges.map((wc) => ({
-            campaignId: session.campaignId,
+            worldId: completeWorldId,
             title: wc.title,
             description: wc.description ?? null,
             dmNotes: wc.dmNotes ?? null,
