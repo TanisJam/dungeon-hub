@@ -1,5 +1,5 @@
 /**
- * Tests for TopBar — backHref prop and AppShell forwarding.
+ * Tests for TopBar — backHref prop, worldSwitcher prop, and AppShell forwarding.
  *
  * T1: backHref present + canBeDM=true → arrow-left Link at /personajes; RoleSwitcher PRESENT.
  *     (SDD ficha-dm-affordances inverts old T1 — overrides design README §State management)
@@ -9,6 +9,8 @@
  *     (SDD ficha-dm-affordances inverts old T4)
  * T5: AppShell without backHref → TopBar renders RoleSwitcher (no back link).
  * T6: backHref present + canBeDM=false → RoleSwitcher NOT rendered.
+ * T8: worldSwitcher prop present → renders switcher node in left slot (REQ-WIS-03).
+ * T9: worldSwitcher absent + no backHref → renders CrowMark fallback (REQ-WIS-03).
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -91,5 +93,38 @@ describe('AppShell with backHref', () => {
     render(<AppShell title="Inicio" canBeDM={true}><div>content</div></AppShell>);
     expect(screen.queryByLabelText('Volver')).toBeNull();
     expect(screen.getByTestId('role-switcher')).toBeTruthy();
+  });
+});
+
+describe('TopBar — world switcher slot (REQ-WIS-03)', () => {
+  it('T8: worldSwitcher prop present → renders switcher node in left slot (no CrowMark)', () => {
+    render(
+      <TopBar
+        title="Inicio"
+        worldSwitcher={<div data-testid="world-switcher-widget">WorldSwitcher</div>}
+      />,
+    );
+    expect(screen.getByTestId('world-switcher-widget')).toBeTruthy();
+    // CrowMark must NOT appear when worldSwitcher is provided
+    expect(screen.queryByTestId('crow-mark')).toBeNull();
+  });
+
+  it('T9: worldSwitcher absent + no backHref → CrowMark renders (graceful fallback, REQ-WIS-03)', () => {
+    render(<TopBar title="Inicio" />);
+    expect(screen.getByTestId('crow-mark')).toBeTruthy();
+    expect(screen.queryByTestId('world-switcher-widget')).toBeNull();
+  });
+
+  it('T10: backHref takes precedence over worldSwitcher → back arrow renders, no switcher', () => {
+    render(
+      <TopBar
+        title="Ficha"
+        backHref="/personajes"
+        worldSwitcher={<div data-testid="world-switcher-widget">WorldSwitcher</div>}
+      />,
+    );
+    expect(screen.getByLabelText('Volver')).toBeTruthy();
+    expect(screen.queryByTestId('world-switcher-widget')).toBeNull();
+    expect(screen.queryByTestId('crow-mark')).toBeNull();
   });
 });

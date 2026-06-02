@@ -27,12 +27,21 @@ interface TopBarProps {
    * 'player'.
    */
   roleDefault?: Role;
+  /**
+   * WorldSwitcher widget (trigger + sheet) to render in the LEFT slot.
+   * When provided (and backHref is not set), replaces the CrowMark.
+   * Passed as a pre-built ReactNode from AppShell (server-props delivery, ADR-4).
+   * worldName is for display reference only when worldSwitcher is not provided.
+   * REQ-WIS-03.
+   */
+  worldSwitcher?: ReactNode;
 }
 
 /**
  * TopBar — sticky app header (obsidian aesthetic).
  * Crow mark + title/subtitle + role switcher (if canBeDM) + notif bell.
  * When backHref is provided: back arrow in left slot, CrowMark hidden, RoleSwitcher suppressed.
+ * When worldSwitcher is provided (and no backHref): WorldSwitcher in left slot, CrowMark hidden.
  * Server component. RoleSwitcher is a client island.
  */
 export function TopBar({
@@ -43,14 +52,12 @@ export function TopBar({
   hasNotif = false,
   backHref,
   roleDefault = 'player',
+  worldSwitcher,
 }: TopBarProps) {
-  return (
-    <header
-      className="sticky top-0 z-40 flex items-center gap-2.5 px-3.5 pb-3 bg-paper/90 backdrop-blur-md border-b border-line"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
-    >
-      {/* LEFT slot: CrowMark (default) OR back arrow (when backHref set) */}
-      {backHref ? (
+  // Precedence: backHref > worldSwitcher > CrowMark (ADR design: backHref check first)
+  function renderLeftSlot() {
+    if (backHref) {
+      return (
         <Link
           href={backHref}
           aria-label="Volver"
@@ -58,9 +65,21 @@ export function TopBar({
         >
           <Icon name="arrow-left" size={16} />
         </Link>
-      ) : (
-        <CrowMark />
-      )}
+      );
+    }
+    if (worldSwitcher) {
+      return <div className="flex-shrink-0">{worldSwitcher}</div>;
+    }
+    return <CrowMark />;
+  }
+
+  return (
+    <header
+      className="sticky top-0 z-40 flex items-center gap-2.5 px-3.5 pb-3 bg-paper/90 backdrop-blur-md border-b border-line"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
+    >
+      {/* LEFT slot: backHref > worldSwitcher > CrowMark */}
+      {renderLeftSlot()}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <h1 className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
