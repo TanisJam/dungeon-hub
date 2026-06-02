@@ -58,8 +58,11 @@ test('Codex redirects to /codex/facciones and renders content', async ({ page })
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('Crónica stub renders without 404', async ({ page }) => {
+test('Crónica redirects to /cronica/eventos and renders content', async ({ page }) => {
   await page.goto('/cronica', { waitUntil: 'domcontentloaded' });
+  // /cronica redirects to /cronica/eventos (ADR-1, REQ-CRO-01)
+  await expect(page).toHaveURL(/\/cronica\/eventos/, { timeout: 10_000 });
+  // Page renders without 404 — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
