@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type PillTone = 'green' | 'pink' | 'coral' | 'ink' | 'stone' | 'amber';
+export type PillTone = 'primary' | 'accent' | 'secondary' | 'ink' | 'stone' | 'amber';
 export type PillSize = 'sm' | 'md';
 
 interface PillProps {
@@ -10,12 +10,12 @@ interface PillProps {
 }
 
 const toneClasses: Record<PillTone, string> = {
-  green:  'bg-primary-soft text-primary-deep',
-  pink:   'bg-accent-soft text-accent-deep',
-  coral:  'bg-secondary-soft text-secondary-deep',
-  ink:    'bg-ink text-surface',
-  stone:  'bg-paper-soft text-ink-soft',
-  amber:  'bg-warning-soft text-warning-deep',
+  primary:   'bg-primary-soft text-primary-deep',
+  accent:    'bg-accent-soft text-accent-deep',
+  secondary: 'bg-secondary-soft text-secondary-deep',
+  ink:       'bg-ink text-surface',
+  stone:     'bg-paper-soft text-ink-soft',
+  amber:     'bg-warning-soft text-warning-deep',
 };
 
 const sizeClasses: Record<PillSize, string> = {

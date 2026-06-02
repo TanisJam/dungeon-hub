@@ -25,7 +25,7 @@ export function PendientesFichaCard({ ficha }: Props) {
           <p className="italic text-sm text-ink-mute leading-tight">{ficha.lineage}</p>
           <div className="flex items-center gap-2 mt-1">
             <Pill tone="stone" size="sm">{ficha.player}</Pill>
-            <Pill tone={ficha.fresh ? 'pink' : 'stone'} size="sm">
+            <Pill tone={ficha.fresh ? 'accent' : 'stone'} size="sm">
               enviada {ficha.sent}
             </Pill>
           </div>

@@ -137,9 +137,9 @@ describe('PersonajeCard', () => {
     expect(screen.queryByText(/^HP /)).toBeNull();
   });
 
-  it('WPVC-PENDING-TONE-03: pending_approval status pill has data-tone="pink"', () => {
+  it('WPVC-PENDING-TONE-03: pending_approval status pill has data-tone="accent"', () => {
     render(<PersonajeCard char={{ ...baseChar, status: 'pending_approval' }} />);
     const pill = screen.getByText('Pendiente DM');
-    expect(pill.getAttribute('data-tone')).toBe('pink');
+    expect(pill.getAttribute('data-tone')).toBe('accent');
   });
 });

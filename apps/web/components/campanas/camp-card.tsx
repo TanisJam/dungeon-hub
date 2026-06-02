@@ -28,13 +28,13 @@ export function V3CampCard({ campaign }: Props) {
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <Pill size="sm">{campaign.playersCount} jugadores</Pill>
         {sessionsLabel ? (
-          <Pill size="sm" tone="green">
+          <Pill size="sm" tone="primary">
             {sessionsLabel}
           </Pill>
         ) : null}
         {nextSessionLabel ? <Pill size="sm">{nextSessionLabel}</Pill> : null}
         {isDm && campaign.pendingFichas !== null ? (
-          <Pill size="sm" tone="pink">
+          <Pill size="sm" tone="accent">
             {campaign.pendingFichas} fichas pend.
           </Pill>
         ) : null}

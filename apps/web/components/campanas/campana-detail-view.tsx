@@ -18,8 +18,8 @@ const ROLE_LABEL: Record<CampaignMemberRole, string> = {
   gm: 'DM',
   player: 'Jugador',
 };
-const ROLE_TONE: Record<CampaignMemberRole, 'pink' | 'stone'> = {
-  gm: 'pink',
+const ROLE_TONE: Record<CampaignMemberRole, 'accent' | 'stone'> = {
+  gm: 'accent',
   player: 'stone',
 };
 
@@ -30,11 +30,11 @@ const STATUS_LABEL: Record<CampanaSessionRow['status'], string> = {
   completed: 'Jugada',
   cancelled: 'Cancelada',
 };
-const STATUS_TONE: Record<CampanaSessionRow['status'], 'green' | 'coral' | 'stone' | 'amber'> = {
+const STATUS_TONE: Record<CampanaSessionRow['status'], 'primary' | 'secondary' | 'stone' | 'amber'> = {
   scheduled: 'amber',
-  active: 'green',
+  active: 'primary',
   paused: 'stone',
-  completed: 'green',
+  completed: 'primary',
   cancelled: 'stone',
 };
 

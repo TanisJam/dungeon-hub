@@ -157,7 +157,7 @@ export function ClassPicker({
     // Tag pills: hit die, primary ability, saving throws
     const pills: ChoiceOption<string>['pills'] = [];
     if (hd && hd !== '—') pills.push({ tone: 'amber', label: hd });
-    if (primary) pills.push({ tone: 'green', label: primary });
+    if (primary) pills.push({ tone: 'primary', label: primary });
     if (saves && saves !== '—') pills.push({ tone: 'stone', label: `Salv. ${saves}` });
     pills.push({ tone: 'stone', label: e.source });
 

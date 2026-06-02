@@ -36,8 +36,8 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
     <AppShell title={detail.name} subtitle="ENCUENTRO" backHref="/encuentros">
       <div className="flex flex-col gap-4">
         <div className="flex items-baseline gap-2">
-          <Pill size="sm" tone="pink">Ronda {detail.round}</Pill>
-          <Pill size="sm" tone={detail.status === 'active' ? 'green' : 'stone'}>
+          <Pill size="sm" tone="accent">Ronda {detail.round}</Pill>
+          <Pill size="sm" tone={detail.status === 'active' ? 'primary' : 'stone'}>
             {detail.status === 'active' ? 'Activo' : 'Cerrado'}
           </Pill>
         </div>

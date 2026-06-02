@@ -20,14 +20,14 @@ describe('RosterList', () => {
     expect(goblinRow?.classList.contains('dead')).toBe(true);
   });
 
-  it('PC vs NPC pill tone surfaced via data-tone (green / pink)', () => {
+  it('PC vs NPC pill tone surfaced via data-tone (primary / accent)', () => {
     const { container } = render(
       <RosterList combatants={combatants} currentCombatantId="a" />,
     );
     const rows = Array.from(container.querySelectorAll('.encuentros-init-row'));
     const miraRow = rows.find((r) => r.getAttribute('data-combatant-id') === 'a')!;
     const goblinRow = rows.find((r) => r.getAttribute('data-combatant-id') === 'b')!;
-    expect(miraRow.querySelector('[data-tone="green"]')).not.toBeNull();
-    expect(goblinRow.querySelector('[data-tone="pink"]')).not.toBeNull();
+    expect(miraRow.querySelector('[data-tone="primary"]')).not.toBeNull();
+    expect(goblinRow.querySelector('[data-tone="accent"]')).not.toBeNull();
   });
 });

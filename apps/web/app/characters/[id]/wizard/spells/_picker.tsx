@@ -629,7 +629,7 @@ function SpellRow({
             componentsM={spell.componentsM}
           />
           {locked && (
-            <Pill tone="pink" size="sm">
+            <Pill tone="accent" size="sm">
               Subclase
             </Pill>
           )}
@@ -686,7 +686,7 @@ function WizardSpellRow({
             componentsM={spell.componentsM}
           />
           {locked && (
-            <Pill tone="pink" size="sm">
+            <Pill tone="accent" size="sm">
               Subclase
             </Pill>
           )}

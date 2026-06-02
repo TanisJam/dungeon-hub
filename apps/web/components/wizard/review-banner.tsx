@@ -58,12 +58,12 @@ export function ReviewBanner({
             </span>
           )}
           {classPill && (
-            <Pill tone={classPill.tone ?? 'coral'} size="sm">
+            <Pill tone={classPill.tone ?? 'secondary'} size="sm">
               {classPill.label}
             </Pill>
           )}
           {subclassPill && (
-            <Pill tone={subclassPill.tone ?? 'pink'} size="sm">
+            <Pill tone={subclassPill.tone ?? 'accent'} size="sm">
               {subclassPill.label}
             </Pill>
           )}

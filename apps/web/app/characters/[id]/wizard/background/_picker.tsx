@@ -216,8 +216,8 @@ export function BackgroundPicker({
 
     // Tag pills: one pill per fixed skill, then tools/languages summary, then source
     const pills: ChoiceOption<string>['pills'] = [
-      ...p.fixedSkills.map((s) => ({ tone: 'green' as const, label: titleCase(s) })),
-      ...(p.skillChoose ? [{ tone: 'green' as const, label: `+${p.skillChoose.count} elección` }] : []),
+      ...p.fixedSkills.map((s) => ({ tone: 'primary' as const, label: titleCase(s) })),
+      ...(p.skillChoose ? [{ tone: 'primary' as const, label: `+${p.skillChoose.count} elección` }] : []),
       ...(p.fixedTools.length > 0 || Object.keys(p.toolChooseCounts).length > 0 || p.toolChoose !== null
         ? [{ tone: 'stone' as const, label: 'Herramientas' }]
         : []),

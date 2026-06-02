@@ -12,8 +12,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_TONES: Record<string, PillTone> = {
-  active: 'green',
-  pending_approval: 'pink',
+  active: 'primary',
+  pending_approval: 'accent',
   retired: 'stone',
   dead: 'stone',
   draft: 'stone',
@@ -58,7 +58,7 @@ export function PersonajeCard({
         <div className="mt-1 flex flex-wrap gap-1.5">
           {worldName ? <Pill size="sm" tone="ink">{worldName}</Pill> : null}
           {char.status === 'active' && char.hpCurrent != null && char.hpMax != null ? (
-            <Pill size="sm" tone="coral">HP {char.hpCurrent}/{char.hpMax}</Pill>
+            <Pill size="sm" tone="secondary">HP {char.hpCurrent}/{char.hpMax}</Pill>
           ) : null}
           <Pill size="sm" tone={tone}>{label}</Pill>
         </div>

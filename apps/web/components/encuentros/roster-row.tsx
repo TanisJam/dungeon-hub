@@ -35,7 +35,7 @@ export function RosterList({ combatants, currentCombatantId }: Props) {
             <span className="hp">
               {c.hpCurrent}/{c.hpMax}
             </span>
-            <Pill size="sm" tone={c.kind === 'pc' ? 'green' : 'pink'}>
+            <Pill size="sm" tone={c.kind === 'pc' ? 'primary' : 'accent'}>
               {c.kind === 'pc' ? 'PC' : 'NPC'}
             </Pill>
           </li>

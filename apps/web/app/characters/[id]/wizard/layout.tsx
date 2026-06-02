@@ -22,9 +22,9 @@ const STATUS_LABELS: Record<string, string> = {
   dead: 'Muerto',
 };
 
-const STATUS_TONES: Record<string, 'stone' | 'green' | 'amber' | 'ink'> = {
+const STATUS_TONES: Record<string, 'stone' | 'primary' | 'amber' | 'ink'> = {
   draft: 'stone',
-  active: 'green',
+  active: 'primary',
   pending_approval: 'amber',
   retired: 'ink',
   dead: 'ink',

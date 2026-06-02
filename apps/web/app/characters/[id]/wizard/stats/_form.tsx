@@ -359,7 +359,7 @@ function StandardArrayEditor({
               {/* Modifier pill + score + arrow button */}
               <div className="flex items-center gap-2">
                 {assigned && mod && (
-                  <Pill tone="green" size="sm">{mod}</Pill>
+                  <Pill tone="primary" size="sm">{mod}</Pill>
                 )}
                 <span className="font-display w-7 text-center text-[22px] font-bold leading-none text-ink">
                   {assigned ? v : '—'}
@@ -439,7 +439,7 @@ function RollEditor({
               <span className="font-display text-[28px] font-bold leading-none text-ink">
                 {v}
               </span>
-              <Pill tone="green" size="sm">{mod}</Pill>
+              <Pill tone="primary" size="sm">{mod}</Pill>
             </div>
           );
         })}

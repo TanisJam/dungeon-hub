@@ -43,9 +43,9 @@ export function EncuentrosListView({ role, rows }: Props) {
             <div className="font-display text-base font-bold text-ink">{encounter.name}</div>
             <div className="font-sans text-xs italic text-ink-mute">{campaignName}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              <Pill size="sm" tone="pink">Ronda {encounter.round}</Pill>
+              <Pill size="sm" tone="accent">Ronda {encounter.round}</Pill>
               <Pill size="sm">{combatantsCount} combatientes</Pill>
-              <Pill size="sm" tone={encounter.status === 'active' ? 'green' : 'stone'}>
+              <Pill size="sm" tone={encounter.status === 'active' ? 'primary' : 'stone'}>
                 {encounter.status === 'active' ? 'Activo' : 'Cerrado'}
               </Pill>
             </div>

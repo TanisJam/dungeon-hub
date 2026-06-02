@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_TONES: Record<string, PillTone> = {
   gm: 'amber',
-  player: 'green',
+  player: 'primary',
 };
 
 export function CampaignsSection({

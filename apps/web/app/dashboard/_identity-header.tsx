@@ -14,9 +14,9 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_TONES: Record<string, PillTone> = {
-  admin: 'coral',
+  admin: 'secondary',
   dm: 'amber',
-  player: 'green',
+  player: 'primary',
 };
 
 export function IdentityHeader({

@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_TONES: Record<string, PillTone> = {
   draft: 'stone',
-  active: 'green',
+  active: 'primary',
   retired: 'ink',
   dead: 'ink',
   pending_approval: 'amber',

@@ -26,7 +26,7 @@ export function HeroNextSession({ campaign }: HeroNextSessionProps) {
           <div className="text-eyebrow text-ink-soft tracking-wider">{campaign.nextSession}</div>
         </div>
         <span className="flex-1" />
-        <Pill tone="green" size="sm">
+        <Pill tone="primary" size="sm">
           <Icon name="dice" size={10} /> Sesión {campaign.sessions + 1}
         </Pill>
       </div>

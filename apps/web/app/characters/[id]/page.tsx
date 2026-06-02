@@ -149,12 +149,12 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   // For non-GMs: show Activo pill alone when active, nothing otherwise.
   const rightAction = isGm ? (
     <div className="flex items-center gap-2">
-      {isActive && <Pill tone="green" size="sm">Activo</Pill>}
+      {isActive && <Pill tone="primary" size="sm">Activo</Pill>}
       {/* defaultRole='dm' ensures DM affordances are shown by default on first visit */}
       <RoleSwitcher defaultRole="dm" />
     </div>
   ) : isActive ? (
-    <Pill tone="green" size="sm">Activo</Pill>
+    <Pill tone="primary" size="sm">Activo</Pill>
   ) : undefined;
 
   return (

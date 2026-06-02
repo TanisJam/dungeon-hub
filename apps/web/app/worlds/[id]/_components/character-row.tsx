@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<ListedWorldCharacter['status'], string> = {
 const STATUS_TONES: Record<ListedWorldCharacter['status'], PillTone> = {
   draft: 'stone',
   pending_approval: 'amber',
-  active: 'green',
+  active: 'primary',
   retired: 'ink',
   dead: 'ink',
 };

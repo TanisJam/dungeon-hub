@@ -25,8 +25,8 @@ export function ActiveCharacterCard({ char }: ActiveCharacterCardProps) {
           </div>
           <div className="font-sans text-xs italic text-ink-mute">{char.lineage}</div>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            <Pill size="sm" tone="coral">HP {char.hp}</Pill>
-            <Pill size="sm" tone="green">AC {char.ac}</Pill>
+            <Pill size="sm" tone="secondary">HP {char.hp}</Pill>
+            <Pill size="sm" tone="primary">AC {char.ac}</Pill>
             <Pill size="sm" tone="stone">Init {initLabel}</Pill>
           </div>
         </div>

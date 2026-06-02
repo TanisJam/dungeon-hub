@@ -55,7 +55,7 @@ function TraitRow({ trait }: TraitRowProps) {
       <div className="flex items-center gap-2">
         <p className="text-sm font-semibold text-ink leading-tight">{trait.name}</p>
         {trait.source === 'subrace' ? (
-          <Pill tone="pink" size="sm">Sublinaje</Pill>
+          <Pill tone="accent" size="sm">Sublinaje</Pill>
         ) : (
           <Pill tone="stone" size="sm">Linaje</Pill>
         )}
