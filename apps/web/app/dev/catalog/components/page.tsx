@@ -1,5 +1,6 @@
 import { COMPONENT_REGISTRY, type ComponentGroup } from './_registry';
 import { Frame375 } from './_frame-375';
+import { DomainContentIsland } from './_islands/domain-content-island';
 
 const GROUP_LABELS: Record<ComponentGroup, string> = {
   ui:     'ui/ primitives',
@@ -71,6 +72,9 @@ export default function ComponentsPage() {
           </section>
         );
       })}
+
+      {/* Domain content — compendium renderers with fixture data */}
+      <DomainContentIsland />
     </div>
   );
 }
