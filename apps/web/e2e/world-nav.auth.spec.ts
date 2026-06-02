@@ -41,11 +41,11 @@ test('each tab label is visible and non-empty', async ({ page }) => {
   }
 });
 
-test('Mapa stub renders without 404', async ({ page }) => {
+test('Mapa renders hex list content (no longer a stub — REQ-MAP-02)', async ({ page }) => {
   await page.goto('/mapa', { waitUntil: 'domcontentloaded' });
-  // Should not be a 404 — either redirects to / (unauth) or renders the stub
+  await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
+  // Page renders without error — title visible (hex list or empty state)
   const title = page.locator('h1, h2').first();
-  // If authed, stub renders "Próximamente — Parte 3"
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
