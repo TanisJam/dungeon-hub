@@ -255,8 +255,11 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
         }
       }
       if (body.hexId) {
+        // TODO world-first-model Slice 2b: change to cross-world check (h.worldId !== npc.worldId).
+        // Slice 1 re-parents hexes to worldId; existence check is sufficient until Slice 2b
+        // re-parents NPCs and enables the full world-scoped cross-scope validation.
         const h = await loadHex(body.hexId);
-        if (!h || h.campaignId !== campaignId) {
+        if (!h) {
           return reply.code(400).send({
             error: 'VALIDATION_FAILED',
             issues: [{ code: 'HEX_NOT_FOUND', hexId: body.hexId }],
@@ -336,8 +339,9 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       }
     }
     if (body.hexId !== undefined && body.hexId !== null) {
+      // TODO world-first-model Slice 2b: change to cross-world check (h.worldId !== npc.worldId).
       const h = await loadHex(body.hexId);
-      if (!h || h.campaignId !== npc.campaignId) {
+      if (!h) {
         return reply.code(400).send({
           error: 'VALIDATION_FAILED',
           issues: [{ code: 'HEX_NOT_FOUND', hexId: body.hexId }],

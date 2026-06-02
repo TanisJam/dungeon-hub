@@ -4,9 +4,8 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { hexes, pois } from '../../infra/db/schema.js';
 import {
-  getMapAccess,
   isHexVisibleToPlayer,
-  listHexesInCampaign,
+  listHexesInWorld,
   loadHex,
   sanitizeHexForRole,
   wouldCreateCycle,
@@ -19,6 +18,7 @@ import {
   sanitizePoiForRole,
 } from '../../use-cases/map/load-poi.js';
 import { recordSessionEventForWorld } from '../../use-cases/sessions/events.js';
+import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
 
 type HexStatus = 'unexplored' | 'rumored' | 'explored' | 'cleared';
 type PoiStatus = 'unknown' | 'discovered' | 'cleared';
@@ -51,7 +51,7 @@ function poiTransitionEvent(from: PoiStatus, to: PoiStatus): string | null {
 
 const SessionQuery = z.object({ sessionId: z.string().uuid().optional() });
 
-const CampaignParam = z.object({ campaignId: z.string().uuid() });
+const WorldParam = z.object({ worldId: z.string().uuid() });
 const HexParam = z.object({ hexId: z.string().uuid() });
 
 const HEX_STATUSES = ['unexplored', 'rumored', 'explored', 'cleared'] as const;
@@ -120,17 +120,17 @@ const UpdatePoiBody = z
   });
 
 export const mapRoute: FastifyPluginAsync = async (app) => {
-  // ---- POST /campaigns/:campaignId/hexes ----------------------------------
-  // Crea un hex. Solo GM de la campaña.
+  // ---- POST /worlds/:worldId/hexes ----------------------------------------
+  // Crea un hex. Solo GM del world.
   app.post(
-    '/campaigns/:campaignId/hexes',
+    '/worlds/:worldId/hexes',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const body = CreateHexBody.parse(request.body);
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
         return reply
@@ -138,10 +138,10 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
           .send({ error: 'FORBIDDEN', message: 'Solo un GM puede crear hexes' });
       }
 
-      // Si especifica parentHexId, debe existir Y ser de la misma campaña.
+      // Si especifica parentHexId, debe existir Y ser del mismo world.
       if (body.parentHexId) {
         const parent = await loadHex(body.parentHexId);
-        if (!parent || parent.campaignId !== campaignId) {
+        if (!parent || parent.worldId !== worldId) {
           return reply.code(400).send({
             error: 'VALIDATION_FAILED',
             issues: [{ code: 'PARENT_NOT_FOUND', parentHexId: body.parentHexId }],
@@ -149,10 +149,10 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         }
       }
 
-      // Pre-check: existe ya un hex con (campaignId, parentHexId, q, r)?
+      // Pre-check: existe ya un hex con (worldId, parentHexId, q, r)?
       // El custom SQL unique index lo enforcea también, pero pre-check da un
       // 400 limpio en lugar de un 500 de DB.
-      const dupConditions = [eq(hexes.campaignId, campaignId), eq(hexes.q, body.q), eq(hexes.r, body.r)];
+      const dupConditions = [eq(hexes.worldId, worldId), eq(hexes.q, body.q), eq(hexes.r, body.r)];
       if (body.parentHexId == null) {
         dupConditions.push(isNull(hexes.parentHexId));
       } else {
@@ -180,7 +180,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
       const [created] = await db
         .insert(hexes)
         .values({
-          campaignId,
+          worldId,
           parentHexId: body.parentHexId ?? null,
           scale: body.scale ?? null,
           q: body.q,
@@ -201,7 +201,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         const query = SessionQuery.parse(request.query);
         await recordSessionEventForWorld({
           gmUserId: userId,
-          campaignId,
+          worldId,
           ...(query.sessionId && { preferredSessionId: query.sessionId }),
           eventType: 'hex_created',
           payload: {
@@ -219,30 +219,30 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // ---- GET /campaigns/:campaignId/hexes -----------------------------------
-  // Lista hexes de una campaña. Filtra por visibility según rol.
+  // ---- GET /worlds/:worldId/hexes -----------------------------------------
+  // Lista hexes de un world. Filtra por visibility según rol.
   //   ?parent=top  → solo top-level (default si nada se pasa).
   //   ?parent=all  → todos (aplanado).
   //   ?parent=<uuid> → hijos directos de ese hex.
   app.get(
-    '/campaigns/:campaignId/hexes',
+    '/worlds/:worldId/hexes',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const query = ListHexesQuery.parse(request.query);
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const parentSpec = query.parent ?? 'top';
       let raw: LoadedHex[];
       if (parentSpec === 'all') {
-        raw = await listHexesInCampaign({ campaignId });
+        raw = await listHexesInWorld({ worldId });
       } else if (parentSpec === 'top') {
-        raw = await listHexesInCampaign({ campaignId, parentHexId: null });
+        raw = await listHexesInWorld({ worldId, parentHexId: null });
       } else {
-        raw = await listHexesInCampaign({ campaignId, parentHexId: parentSpec });
+        raw = await listHexesInWorld({ worldId, parentHexId: parentSpec });
       }
 
       // Para players: filtrar invisible (cascade) + sanitizar dmNotes.
@@ -250,11 +250,11 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         return { data: raw };
       }
 
-      // Para filtrar cascade necesitamos todos los hexes de la campaña para
+      // Para filtrar cascade necesitamos todos los hexes del world para
       // walker el árbol. Si ya pedimos 'all', lo tenemos; si no, hacemos un
       // fetch extra (OK para nuestros volúmenes).
       const allForCascade =
-        parentSpec === 'all' ? raw : await listHexesInCampaign({ campaignId });
+        parentSpec === 'all' ? raw : await listHexesInWorld({ worldId });
       const byId = new Map(allForCascade.map((h) => [h.id, h]));
       const visible: LoadedHex[] = [];
       for (const h of raw) {
@@ -272,7 +272,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     if (access !== 'gm') {
@@ -294,7 +294,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
       const parent = await loadHex(hexId);
       if (!parent) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      const access = await getMapAccess(parent.campaignId, userId);
+      const access = await getWorldAccess(parent.worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
       // Si el parent NO es visible para el player, los hijos tampoco lo son.
@@ -303,14 +303,14 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         if (!visible) return reply.code(404).send({ error: 'NOT_FOUND' });
       }
 
-      const children = await listHexesInCampaign({
-        campaignId: parent.campaignId,
+      const children = await listHexesInWorld({
+        worldId: parent.worldId,
         parentHexId: hexId,
       });
 
       if (access === 'gm') return { data: children };
 
-      const allForCascade = await listHexesInCampaign({ campaignId: parent.campaignId });
+      const allForCascade = await listHexesInWorld({ worldId: parent.worldId });
       const byId = new Map(allForCascade.map((h) => [h.id, h]));
       const visible: LoadedHex[] = [];
       for (const c of children) {
@@ -330,21 +330,21 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     // Cycle check: si cambia parentHexId a algo distinto de NULL.
     if (body.parentHexId !== undefined && body.parentHexId !== null && body.parentHexId !== hex.parentHexId) {
-      // Validar que el nuevo parent existe Y es de la misma campaña.
+      // Validar que el nuevo parent existe Y es del mismo world.
       const newParent = await loadHex(body.parentHexId);
-      if (!newParent || newParent.campaignId !== hex.campaignId) {
+      if (!newParent || newParent.worldId !== hex.worldId) {
         return reply.code(400).send({
           error: 'VALIDATION_FAILED',
           issues: [{ code: 'PARENT_NOT_FOUND', parentHexId: body.parentHexId }],
         });
       }
       const cycle = await wouldCreateCycle({
-        campaignId: hex.campaignId,
+        worldId: hex.worldId,
         hexId,
         newParentId: body.parentHexId,
       });
@@ -370,7 +370,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
       const newR = body.r ?? hex.r;
       const newParentId = body.parentHexId !== undefined ? body.parentHexId : hex.parentHexId;
       const dupConditions = [
-        eq(hexes.campaignId, hex.campaignId),
+        eq(hexes.worldId, hex.worldId),
         eq(hexes.q, newQ),
         eq(hexes.r, newR),
       ];
@@ -422,7 +422,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         const query = SessionQuery.parse(request.query);
         await recordSessionEventForWorld({
           gmUserId: userId,
-          campaignId: hex.campaignId,
+          worldId: hex.worldId,
           ...(query.sessionId && { preferredSessionId: query.sessionId }),
           eventType,
           payload: {
@@ -447,7 +447,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     await db.delete(hexes).where(eq(hexes.id, hexId));
@@ -471,7 +471,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     const [created] = await db
@@ -492,7 +492,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
       const query = SessionQuery.parse(request.query);
       await recordSessionEventForWorld({
         gmUserId: userId,
-        campaignId: hex.campaignId,
+        worldId: hex.worldId,
         ...(query.sessionId && { preferredSessionId: query.sessionId }),
         eventType: 'poi_created',
         payload: {
@@ -515,7 +515,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     // Cascade: si el hex no es visible al player, los POIs tampoco.
@@ -539,7 +539,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(poi.hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     if (access !== 'gm') {
@@ -565,7 +565,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(poi.hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     const updates: Partial<typeof pois.$inferInsert> = { updatedAt: new Date() };
@@ -585,7 +585,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         const query = SessionQuery.parse(request.query);
         await recordSessionEventForWorld({
           gmUserId: userId,
-          campaignId: hex.campaignId,
+          worldId: hex.worldId,
           ...(query.sessionId && { preferredSessionId: query.sessionId }),
           eventType,
           payload: {
@@ -613,7 +613,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const hex = await loadHex(poi.hexId);
     if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(hex.campaignId, userId);
+    const access = await getWorldAccess(hex.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     await db.delete(pois).where(eq(pois.id, poiId));
