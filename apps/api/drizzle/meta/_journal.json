@@ -232,6 +232,13 @@
       "when": 1780409578860,
       "tag": "0033_world_first_npcs_nm_reputation",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780410000000,
+      "tag": "0034_world_first_lore",
+      "breakpoints": true
     }
   ]
 }

@@ -578,9 +578,10 @@ export const worldEvents = pgTable(
   'world_events',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: uuid('campaign_id')
+    // world-first-model Slice 3: campaign_id → world_id (migration 0034)
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     description: text('description'),
     dmNotes: text('dm_notes'),
@@ -598,7 +599,7 @@ export const worldEvents = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index('idx_world_events_campaign_time').on(t.campaignId, t.occurredAt),
+    index('idx_world_events_world_time').on(t.worldId, t.occurredAt),
     index('idx_world_events_source').on(t.sourceSessionId),
     index('idx_world_events_tags').using('gin', t.tags),
   ],
@@ -620,9 +621,10 @@ export const journalEntries = pgTable(
   'journal_entries',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: uuid('campaign_id')
+    // world-first-model Slice 3: campaign_id → world_id (migration 0034)
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     body: text('body'),
     visibility: text('visibility', { enum: ['public', 'dm-only'] })
@@ -636,7 +638,7 @@ export const journalEntries = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index('idx_journal_campaign_updated').on(t.campaignId, t.updatedAt),
+    index('idx_journal_world_updated').on(t.worldId, t.updatedAt),
     index('idx_journal_tags').using('gin', t.tags),
   ],
 );
