@@ -3,13 +3,16 @@
 // This is the open/closed seam — Batch 2/3 add entries here without touching the route,
 // list island, detail sheet, or Server Action.
 //
-// Batch 1 populates only 'spells'. Batch 2 adds items/races/classes/backgrounds.
-// Batch 3 adds monsters.
+// Batch 1: spells. Batch 2: items, races, classes, backgrounds. Batch 3: monsters.
 
 import type { ComponentType } from 'react';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 import { SpellHeader } from '@/app/compendium/_components/spell-header';
-import { SpellRowView } from '../_components/row-views';
+import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView } from '../_components/row-views';
+import { ItemHeader } from '../_components/item-header';
+import { RaceHeader } from '../_components/race-header';
+import { ClassHeader } from '../_components/class-header';
+import { BackgroundHeader } from '../_components/background-header';
 
 // ---------------------------------------------------------------------------
 // CategoryConfig — per-category wiring contract
@@ -29,7 +32,8 @@ export interface CategoryConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Registry — Batch 1: spells only. Batch 2/3 will add the remaining entries.
+// Registry — Batch 2: items, races, classes, backgrounds added.
+// Monsters still a placeholder — Batch 3.
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_CONFIG: Record<CompendiumCategory, CategoryConfig> = {
@@ -39,37 +43,35 @@ export const CATEGORY_CONFIG: Record<CompendiumCategory, CategoryConfig> = {
     RowView: SpellRowView,
     Header: SpellHeader,
   },
-  // Batch 2 entries — placeholders so the Record<CompendiumCategory, ...> type is satisfied.
-  // These will be replaced with real implementations in Batch 2.
   items: {
     endpoint: 'items',
     label: 'Items',
-    RowView: SpellRowView, // placeholder — replaced in Batch 2
-    Header: SpellHeader,   // placeholder — replaced in Batch 2
+    RowView: ItemRowView,
+    Header: ItemHeader,
   },
   races: {
     endpoint: 'races',
     label: 'Razas',
-    RowView: SpellRowView,
-    Header: SpellHeader,
+    RowView: RaceRowView,
+    Header: RaceHeader,
   },
   classes: {
     endpoint: 'classes',
     label: 'Clases',
-    RowView: SpellRowView,
-    Header: SpellHeader,
+    RowView: ClassRowView,
+    Header: ClassHeader,
   },
   backgrounds: {
     endpoint: 'backgrounds',
     label: 'Trasfondos',
-    RowView: SpellRowView,
-    Header: SpellHeader,
+    RowView: BackgroundRowView,
+    Header: BackgroundHeader,
   },
-  // Batch 3 entry — placeholder
+  // Batch 3 entry — placeholder (MonsterStatblockHeader not yet implemented)
   monsters: {
     endpoint: 'monsters',
     label: 'Monstruos',
-    RowView: SpellRowView,
-    Header: SpellHeader,
+    RowView: SpellRowView,   // placeholder — replaced in Batch 3
+    Header: SpellHeader,     // placeholder — replaced in Batch 3
   },
 };
