@@ -3,8 +3,13 @@ import { test, expect } from '@playwright/test';
 /**
  * create-campaign — end-to-end: a DM creates a new campaign from /campanas.
  *
- * Flow: switch to DM mode (dh:role cookie) → /campanas → "Iniciar campaña nueva"
- * → fill name → submit → lands on the new campaign's detail page.
+ * Flow: navigate to /campanas → DM view (derived from callerRole='gm' of the active world)
+ * → "Iniciar campaña nueva" → fill name → submit → lands on the new campaign's detail page.
+ *
+ * Slice 3 migration (REQ-WIS-E03): the dh:role=dm cookie hack is replaced by per-world
+ * GM membership. The E2E test user is GM of 'E2E Test Campaign (World)' (created by
+ * auth.setup.ts via POST /campaigns). getActiveWorld() falls back to that world when no
+ * dh:world cookie is set, and callerRole='gm' causes the DM view to render without a cookie.
  *
  * Mobile-first: runs at a 375px viewport (iPhone SE) per project convention.
  */
@@ -13,11 +18,10 @@ const MOBILE = { width: 375, height: 812 };
 
 test.use({ viewport: MOBILE });
 
-test('DM creates a new campaign and lands on its detail page', async ({ page, context }) => {
-  // Switch to DM mode the same way the app does: the dh:role=dm cookie.
-  await context.addCookies([
-    { name: 'dh:role', value: 'dm', url: 'http://localhost:3001', sameSite: 'Lax' },
-  ]);
+test('DM creates a new campaign and lands on its detail page', async ({ page }) => {
+  // DM view now renders from per-world callerRole (GM of 'E2E Test Campaign (World)').
+  // No dh:role cookie needed — getActiveWorld falls back to the user's first world
+  // and callerRole='gm' triggers the DM view. (REQ-WIS-08)
 
   // 1. From the campaigns list, the DM sees the create CTA.
   await page.goto('/campanas', { waitUntil: 'domcontentloaded' });

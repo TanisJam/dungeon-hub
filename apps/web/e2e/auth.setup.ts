@@ -110,11 +110,13 @@ setup('ensure test user + sign in + save state', async ({ page }) => {
   });
   expect(loginRes.status(), `dev/login failed: ${await loginRes.text()}`).toBe(200);
 
-  // 5. Verificar auth visitando /inicio — el role pill "Jugador" es señal
-  //    fiable de que la shell v3 rendereó correctamente.
+  // 5. Verificar auth visitando /inicio — la URL /inicio confirma que la shell v3
+  //    rendereó correctamente (el role pill puede ser "Jugador" o "DM" según el
+  //    callerRole del mundo activo; Slice 3 hace que los GMs vean "DM" por defecto).
   await page.goto('/inicio');
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 5000 });
-  await expect(page.getByText('Jugador', { exact: true })).toBeVisible({ timeout: 5000 });
+  // Wait for the TopBar to be visible (proxy for successful shell render).
+  await expect(page.locator('header').first()).toBeVisible({ timeout: 5000 });
 
   // 6. Guardar storage state
   await page.context().storageState({ path: AUTH_FILE });
