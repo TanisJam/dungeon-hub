@@ -22,7 +22,7 @@ export function CampanasView({ role, campaigns }: Props) {
           ))}
         </div>
         <Link
-          href="/campaigns/new"
+          href="/campanas/new"
           className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line p-4 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
         >
           <span className="text-lg text-accent">+</span>

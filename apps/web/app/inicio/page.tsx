@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getRole } from '@/lib/role';
@@ -283,11 +284,20 @@ async function DMView({ token }: { token?: string }) {
         {dmCampaignData ? (
           <DMNextSessionCard campaign={dmCampaignData} />
         ) : (
-          <V3Empty
-            glyph="scroll"
-            title="Sin campaña activa"
-            sub="Creá una campaña para comenzar."
-          />
+          <div className="flex flex-col items-center gap-4">
+            <V3Empty
+              glyph="scroll"
+              title="Sin campaña activa"
+              sub="Creá una campaña para comenzar."
+            />
+            <Link
+              href="/campanas/new"
+              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
+            >
+              <span className="text-lg text-accent">+</span>
+              <span>Crear campaña nueva</span>
+            </Link>
+          </div>
         )}
         <DMQuickActions />
         <QuestsSinTocarList quests={[]} />
