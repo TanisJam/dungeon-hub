@@ -1653,8 +1653,21 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     { preHandler: app.authenticate },
     async (request, reply) => {
       const { id } = ParamsWithId.parse(request.params);
-      const body = GrantKnowledgeBody.parse(request.body);
       const userId = request.user!.sub;
+
+      // Validate body first — cheap, no DB. Use safeParse so invalid bodies → 400 not 500.
+      const bodyResult = GrantKnowledgeBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: bodyResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const body = bodyResult.data;
 
       const character = await loadCharacter(id);
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
