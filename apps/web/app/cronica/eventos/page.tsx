@@ -1,0 +1,109 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { api } from '@/lib/api';
+import { getActiveWorld } from '@/lib/active-world';
+import { getViewPreference } from '@/lib/role';
+import { AppShell } from '@/components/layout/app-shell';
+import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
+import { SubNav } from '@/components/world/_shell/sub-nav';
+import { EventClientWrapper } from '@/components/world/events/event-client-wrapper';
+import { V3Empty } from '@/components/ui';
+import type { EventRow } from '../actions';
+
+/**
+ * Eventos — Server Component.
+ *
+ * Resolves active world + view preference in parallel (REQ-CRO-02).
+ * Computes effectiveView from callerRole (world authority) and dh:role cookie overlay.
+ * SSR-fetches initial events list sorted by occurredAt DESC; renders SubNav + EventClientWrapper.
+ * REQ-CRO-01, REQ-CRO-02.
+ */
+export default async function EventosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tag?: string }>;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/');
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  const { tag } = await searchParams;
+
+  // REQ-CRO-02: resolve active world + view preference in parallel
+  const [aw, viewPref] = await Promise.all([getActiveWorld(token), getViewPreference()]);
+
+  // Canonical effectiveView formula (REQ-WIS-08)
+  const effectiveView =
+    aw?.callerRole === 'gm' ? (viewPref === 'player' ? 'player' : 'dm') : 'player';
+
+  const callerRole = aw?.callerRole ?? null;
+  const worldSwitcher = token ? (
+    <WorldSwitcherShell
+      token={token}
+      activeWorldId={aw?.id ?? null}
+      callerRole={callerRole}
+    />
+  ) : undefined;
+
+  const subNavItems = [
+    { label: 'Eventos', href: '/cronica/eventos' },
+    { label: 'Notas', href: '/cronica/notas' },
+  ];
+
+  // REQ-CRO-02 Scenario: No active world — render empty state (no 500)
+  if (!aw) {
+    return (
+      <AppShell
+        title="Crónica"
+        subtitle="EVENTOS"
+        worldSwitcher={worldSwitcher}
+        callerRole={callerRole}
+      >
+        <SubNav items={subNavItems} activePath="/cronica/eventos" />
+        <V3Empty
+          glyph="scroll"
+          title="Sin mundo activo"
+          sub="Selecciona o crea un mundo para ver los eventos."
+        />
+      </AppShell>
+    );
+  }
+
+  // SSR initial events list
+  let initialEvents: EventRow[] = [];
+  try {
+    const params = new URLSearchParams({ limit: '50', offset: '0' });
+    if (tag) params.set('tag', tag);
+    const res = await api.get<{ data: EventRow[] }>(
+      `/worlds/${aw.id}/world-events?${params.toString()}`,
+      token,
+    );
+    initialEvents = res.data ?? [];
+  } catch {
+    // If fetch fails, render with empty list — client can retry via search
+  }
+
+  return (
+    <AppShell
+      title="Crónica"
+      subtitle="EVENTOS"
+      worldSwitcher={worldSwitcher}
+      callerRole={callerRole}
+    >
+      <SubNav items={subNavItems} activePath="/cronica/eventos" />
+      <EventClientWrapper
+        worldId={aw.id}
+        effectiveView={effectiveView}
+        initialEvents={initialEvents}
+        initialTag={tag}
+      />
+    </AppShell>
+  );
+}
