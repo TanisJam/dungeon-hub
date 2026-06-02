@@ -77,6 +77,8 @@ import { buildFeatContext } from '../../use-cases/characters/build-feat-context.
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import { loadInventoryDetail } from '../../use-cases/characters/load-inventory-detail.js';
 import { recordSessionEventForCharacter, routeTransferEvent } from '../../use-cases/sessions/events.js';
+import { emitCharacterEvent } from '../../use-cases/characters/emit-character-event.js';
+import { readBestiary } from '../../use-cases/characters/read-bestiary.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
 import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
 import { loadFeatureProgression } from '../../use-cases/characters/load-feature-progression.js';
@@ -226,6 +228,13 @@ const TransferItemBody = z.object({
 
 const RecentGrantsQuery = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
+});
+
+// character-codex: knowledge grant + bestiary read (spec #1626)
+const GrantKnowledgeBody = z.object({
+  kind: z.enum(['bestiary', 'item', 'spell', 'npc', 'faction', 'location', 'lore']),
+  refKey: z.string().min(1),
+  refSource: z.string().min(1),
 });
 
 // engine-timeline-duration: optional encounterId querystring param for GET /sheet
@@ -1632,6 +1641,93 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       });
 
       return { events };
+    },
+  );
+
+  // ---- POST /characters/:id/knowledge ----------------------------------------
+  // DM-only: grants a knowledge entry (Bestiary, etc.) to a character.
+  // Idempotent — double-grant = 1 row, 200 OK.
+  // REQ-CK-API-01, character-codex SDD #1626.
+  app.post(
+    '/characters/:id/knowledge',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const body = GrantKnowledgeBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // DM-only gate (mirrors grant/item pattern at ~1506)
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      if (!gmCheck.ok) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'WORLD_GM_REQUIRED', worldId: character.worldId, userId }],
+        });
+      }
+
+      // Idempotent upsert via emitCharacterEvent (ADR-4 thin hook)
+      await db.transaction(async (tx) => {
+        await emitCharacterEvent(tx, {
+          characterId: id,
+          worldId: character.worldId,
+          type: `${body.kind}_discovered`,
+          refKey: body.refKey,
+          refSource: body.refSource,
+          grantedByUserId: userId,
+        });
+      });
+
+      return reply.code(200).send({
+        ok: true,
+        characterId: id,
+        kind: body.kind,
+        refKey: body.refKey,
+        refSource: body.refSource,
+      });
+    },
+  );
+
+  // ---- GET /characters/:id/knowledge/bestiary ---------------------------------
+  // Returns the character's known monsters projected against compendium_monsters.
+  // DM: full MM with known flag. Player: only known monsters (gate applied).
+  // REQ-CK-API-02, REQ-CK-GATE-01, character-codex SDD #1626.
+  app.get(
+    '/characters/:id/knowledge/bestiary',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Resolve caller role: owner → player view; GM → dm view; non-member → 403
+      const access = await getCharacterAccess(character, userId);
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+
+      let effectiveView: 'dm' | 'player';
+      if (gmCheck.ok) {
+        effectiveView = 'dm';
+      } else if (access !== 'none') {
+        effectiveView = 'player';
+      } else {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+        });
+      }
+
+      const result = await readBestiary(id, effectiveView);
+
+      return {
+        monsters: result.monsters,
+        total: result.total,
+        knownCount: result.knownCount,
+        effectiveView,
+      };
     },
   );
 

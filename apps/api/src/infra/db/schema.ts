@@ -1204,6 +1204,57 @@ export const modifierInstances = pgTable(
 // FK: CASCADE on character delete — when a character is removed all their
 //     concentration tracking is gone too.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// character_knowledge — per-character knowledge/discovery layer (character-codex S1).
+//
+// HOUSE RULE — anti-metagaming: players only see compendium entries their
+// character has explicitly encountered. DM grants manually; Slice 2 auto-unlocks
+// on encounter combatant-add-with-slug. No RAW basis (PHB p.177-179 has no gate).
+//
+// Polymorphic via `kind`: bestiary | item | spell | npc | faction | location | lore.
+// Slice 1 proves the architecture with 'bestiary'. Wave 2 adds other kinds.
+//
+// UNIQUE(characterId, kind, refKey, refSource) → idempotent upsert (ON CONFLICT DO NOTHING).
+// INDEX(characterId, kind) → hot-path for player-bestiary query.
+//
+// source: 'dm-grant' | 'encounter' (how the knowledge was acquired).
+// grantedByUserId: NULL for system-generated rows (auto-unlock from encounter).
+// ---------------------------------------------------------------------------
+export const characterKnowledge = pgTable(
+  'character_knowledge',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    /** Entry kind. Slice 1: 'bestiary'. Wave 2 adds other kinds. */
+    kind: text('kind', {
+      enum: ['bestiary', 'item', 'spell', 'npc', 'faction', 'location', 'lore'],
+    }).notNull(),
+    /** Compendium slug (e.g. 'goblin', 'longsword'). */
+    refKey: text('ref_key').notNull(),
+    /** Compendium source (e.g. 'mm', 'PHB'). */
+    refSource: text('ref_source').notNull(),
+    /** How this knowledge was acquired: 'dm-grant' | 'encounter'. */
+    source: text('source').notNull(),
+    /** User who granted this knowledge. NULL for system-generated rows. */
+    grantedByUserId: uuid('granted_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    discoveredAt: timestamp('discovered_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Idempotent upsert: ON CONFLICT (characterId, kind, refKey, refSource) DO NOTHING
+    uniqueIndex('uq_character_knowledge').on(t.characterId, t.kind, t.refKey, t.refSource),
+    // Hot-path for player-bestiary query
+    index('idx_ck_character_kind').on(t.characterId, t.kind),
+    index('idx_ck_world').on(t.worldId),
+  ],
+);
+
 export const characterConcentration = pgTable(
   'character_concentration',
   {

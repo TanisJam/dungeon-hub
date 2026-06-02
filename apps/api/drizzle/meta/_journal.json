@@ -239,6 +239,13 @@
       "when": 1780410000000,
       "tag": "0034_world_first_lore",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1780443473475,
+      "tag": "0035_character_knowledge",
+      "breakpoints": true
     }
   ]
 }
