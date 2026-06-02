@@ -8,11 +8,12 @@
 import type { ComponentType } from 'react';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 import { SpellHeader } from '@/app/compendium/_components/spell-header';
-import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView } from '../_components/row-views';
+import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView, MonsterRowView } from '../_components/row-views';
 import { ItemHeader } from '../_components/item-header';
 import { RaceHeader } from '../_components/race-header';
 import { ClassHeader } from '../_components/class-header';
 import { BackgroundHeader } from '../_components/background-header';
+import { MonsterStatblockHeader } from '../_components/monster-statblock-header';
 
 // ---------------------------------------------------------------------------
 // CategoryConfig — per-category wiring contract
@@ -67,11 +68,11 @@ export const CATEGORY_CONFIG: Record<CompendiumCategory, CategoryConfig> = {
     RowView: BackgroundRowView,
     Header: BackgroundHeader,
   },
-  // Batch 3 entry — placeholder (MonsterStatblockHeader not yet implemented)
+  // Batch 3 — real MonsterStatblockHeader + MonsterRowView (no more placeholders)
   monsters: {
     endpoint: 'monsters',
     label: 'Monstruos',
-    RowView: SpellRowView,   // placeholder — replaced in Batch 3
-    Header: SpellHeader,     // placeholder — replaced in Batch 3
+    RowView: MonsterRowView,
+    Header: MonsterStatblockHeader,
   },
 };

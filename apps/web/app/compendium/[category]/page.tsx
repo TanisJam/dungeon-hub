@@ -104,7 +104,6 @@ export default async function CompendiumCategoryPage({
         accessToken={token}
         initialRows={initialRows}
         total={total}
-        config={config}
       />
     </AppShell>
   );

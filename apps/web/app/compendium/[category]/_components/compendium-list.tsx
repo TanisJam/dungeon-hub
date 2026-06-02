@@ -4,9 +4,13 @@
 // ADR-3: ONE island keyed by category — per-category variation is in config.RowView only.
 // REQ-CBROWSE-04: debounced search, 200ms, stale-drop via reqIdRef.
 // REQ-CBROWSE-09: mobile-first, 44px tap targets, no horizontal overflow.
+//
+// IMPORTANT: config is NOT passed as a prop from the Server Component — function components
+// (RowView, Header) cannot be serialized across the Server/Client boundary in Next.js RSC.
+// Instead, this island imports CATEGORY_CONFIG directly and resolves config by category string.
 
 import { useEffect, useRef, useState } from 'react';
-import type { CategoryConfig } from '../_config/registry';
+import { CATEGORY_CONFIG } from '../_config/registry';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 import { searchCompendium } from '../actions';
 import { DetailSheet } from './detail-sheet';
@@ -18,7 +22,8 @@ interface CompendiumListProps {
   accessToken: string;
   initialRows: unknown[];
   total: number;
-  config: CategoryConfig;
+  // NOTE: config is NOT in props — resolved client-side from CATEGORY_CONFIG to avoid
+  // serialization of function components across the Server/Client boundary.
 }
 
 /**
@@ -33,8 +38,9 @@ export function CompendiumList({
   accessToken,
   initialRows,
   total: initialTotal,
-  config,
 }: CompendiumListProps) {
+  // Resolve config client-side — avoids passing function components as props (RSC boundary).
+  const config = CATEGORY_CONFIG[category];
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<unknown[]>(initialRows);
   const [totalCount, setTotalCount] = useState(initialTotal);
