@@ -88,30 +88,31 @@ const DEBT_ITEMS: DebtItem[] = [
       'Type-scale: only 2 named @utility entries (text-eyebrow at 10px, text-stat at 28px). ' +
       'All other sizes (9, 11, 13, 15, 17, 19, 22, 26, 30px) used as arbitrary text-[Npx] values.',
     affectedFiles: [
-      'app/globals.css — @theme block (missing --color-on-accent, --color-on-secondary)',
-      'app/globals.css — @utility block (missing text-micro through text-display)',
+      'app/globals.css — @theme block (now includes --color-on-accent: #1A1208, --color-on-secondary: #1A1208)',
+      'app/globals.css — @utility block (now includes text-micro through text-display, 9 entries)',
     ],
     resolution:
-      'Resolved in Slice 4: --color-on-accent and --color-on-secondary added to @theme. ' +
-      '9 @utility type-scale entries added (text-micro to text-display). ' +
-      'Adoption in feature files is a follow-up.',
+      'DONE (Slice 4): --color-on-accent: #1A1208 and --color-on-secondary: #1A1208 added to @theme (both `:root` and `[data-palette]`). ' +
+      '9 @utility type-scale entries added: text-micro(9px) text-caption(11px) text-footnote(13px) text-body(15px) text-body-lg(17px) text-subhead(19px) text-title(22px) text-headline(26px) text-display(30px). ' +
+      'Adoption of text-[Npx] → named utility is a follow-up.',
   },
   {
     id: 'warning-accent-dupe',
     title: '5. warning ≡ accent (exact duplicate, ambiguous semantic)',
     status: 'slice4',
     description:
-      'globals.css: --color-warning: #D4A24C is the same as --color-accent: #D4A24C. ' +
+      'globals.css: --color-warning: #D4A24C was the same as --color-accent: #D4A24C. ' +
       'Likewise warning-deep = accent-deep and warning-soft = accent-soft. ' +
-      'This means "warning" and "decorative copper accent" are visually identical, ' +
+      'This made "warning" and "decorative copper accent" visually identical, ' +
       'making it impossible to distinguish caution states from brand accents.',
     affectedFiles: [
-      'app/globals.css — @theme --color-warning* block (lines 48-50)',
+      'app/globals.css — @theme --color-warning: now #E0A82E (hotter amber, distinct from copper accent #D4A24C)',
+      'app/globals.css — @theme --color-warning-deep: now #B07A1E (was #A87528)',
+      'app/globals.css — @theme --color-warning-soft: kept #3A2D17 (shared dark bg — acceptable)',
     ],
     resolution:
-      'Resolved in Slice 4: warning gets a distinct amber value (#E0A82E), ' +
-      'warning-deep #B07A1E, keeping warning-soft #3A2D17. ' +
-      'Visually reads "hotter amber" vs copper accent.',
+      'DONE (Slice 4): warning now resolves to #E0A82E (amber) vs accent #D4A24C (copper). ' +
+      'warning-deep is #B07A1E. Semantically unambiguous: amber = caution, copper = decorative brand accent.',
   },
   {
     id: 'scoped-css-parallel',

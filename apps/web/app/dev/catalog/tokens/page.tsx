@@ -58,10 +58,12 @@ const COLORS: ColorToken[] = [
   { name: 'secondary-deep',     hex: '#7F3F6B' },
   { name: 'secondary-soft',     hex: '#2E1A28' },
   { name: 'success',            hex: '#6BA368' },
-  { name: 'warning',            hex: '#D4A24C', note: '⚠ duplicates accent — pending Slice 4' },
+  { name: 'warning',            hex: '#E0A82E', note: 'hotter amber — distinct from copper accent' },
   { name: 'warning-soft',       hex: '#3A2D17' },
-  { name: 'warning-deep',       hex: '#A87528', note: '⚠ duplicates accent-deep — pending Slice 4' },
+  { name: 'warning-deep',       hex: '#B07A1E' },
   { name: 'danger',             hex: '#CC4444' },
+  { name: 'on-accent',          hex: '#1A1208', note: 'dark text on accent/copper backgrounds' },
+  { name: 'on-secondary',       hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
 ];
 
 type TypographyToken = { name: string; stack: string };
@@ -74,8 +76,17 @@ const FONT_FAMILIES: TypographyToken[] = [
 
 type ScaleEntry = { name: string; size: string; utility: string };
 const TYPE_SCALE: ScaleEntry[] = [
-  { name: 'text-eyebrow', size: '10px', utility: 'sans, 700, uppercase, tracking-wide' },
-  { name: 'text-stat',    size: '28px', utility: 'display, 700, tabular-nums' },
+  { name: 'text-micro',    size: '9px',  utility: 'lh 1.4' },
+  { name: 'text-caption',  size: '11px', utility: 'lh 1.4' },
+  { name: 'text-eyebrow',  size: '10px', utility: 'sans, 700, uppercase, tracking-wide' },
+  { name: 'text-footnote', size: '13px', utility: 'lh 1.45' },
+  { name: 'text-body',     size: '15px', utility: 'lh 1.5' },
+  { name: 'text-body-lg',  size: '17px', utility: 'lh 1.5' },
+  { name: 'text-subhead',  size: '19px', utility: 'lh 1.4' },
+  { name: 'text-title',    size: '22px', utility: 'lh 1.3' },
+  { name: 'text-headline', size: '26px', utility: 'lh 1.25' },
+  { name: 'text-stat',     size: '28px', utility: 'display, 700, tabular-nums' },
+  { name: 'text-display',  size: '30px', utility: 'lh 1.2' },
 ];
 
 type RadiusToken = { name: string; value: string; utilityClass: string };
@@ -196,7 +207,7 @@ export default function TokensPage() {
           </div>
         ))}
         <p className="text-[10px] text-ink-mute italic mt-2">
-          Full type scale (text-micro through text-display) added in Slice 4.
+          All 9 named scale entries (text-micro → text-display) added in Slice 4. Migration of text-[Npx] arbitraries is a follow-up.
         </p>
       </div>
 
