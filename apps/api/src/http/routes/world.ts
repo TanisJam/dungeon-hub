@@ -2,8 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { campaigns, factions, npcs, worldEvents } from '../../infra/db/schema.js';
-import { getMapAccess, loadHex } from '../../use-cases/map/load-hex.js';
+import { factions, npcs, worldEvents } from '../../infra/db/schema.js';
+import { loadHex } from '../../use-cases/map/load-hex.js';
 import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
 import {
   listFactionsInWorld,
@@ -11,10 +11,18 @@ import {
   sanitizeFactionForRole,
 } from '../../use-cases/world/load-faction.js';
 import {
-  listNpcsInCampaign,
+  listNpcsInWorld,
   loadNpc,
   sanitizeNpcForRole,
 } from '../../use-cases/world/load-npc.js';
+import {
+  attachNpcFaction,
+  detachNpcFaction,
+} from '../../use-cases/world/load-npc-factions.js';
+import {
+  getReputation,
+  setReputation,
+} from '../../use-cases/world/load-character-reputation.js';
 import {
   filterWorldEventsByAccess,
   listWorldEvents,
@@ -22,10 +30,19 @@ import {
   sanitizeWorldEventForRole,
 } from '../../use-cases/world/load-world-event.js';
 
-const CampaignParam = z.object({ campaignId: z.string().uuid() });
 const WorldParam = z.object({ worldId: z.string().uuid() });
 const FactionParam = z.object({ factionId: z.string().uuid() });
 const NpcParam = z.object({ npcId: z.string().uuid() });
+const WorldNpcFactionParam = z.object({
+  worldId: z.string().uuid(),
+  npcId: z.string().uuid(),
+  factionId: z.string().uuid(),
+});
+const ReputationParam = z.object({
+  worldId: z.string().uuid(),
+  characterId: z.string().uuid(),
+  factionId: z.string().uuid(),
+});
 const WorldEventParam = z.object({ eventId: z.string().uuid() });
 
 const CreateWorldEventBody = z.object({
@@ -84,7 +101,6 @@ const CreateNpcBody = z.object({
   race: z.string().min(1).max(60).nullable().optional(),
   description: z.string().max(20000).nullable().optional(),
   dmNotes: z.string().max(20000).nullable().optional(),
-  factionId: z.string().uuid().nullable().optional(),
   hexId: z.string().uuid().nullable().optional(),
   status: z.enum(NPC_STATUSES).optional(),
   worldX: z.number().nullable().optional(),
@@ -97,7 +113,6 @@ const UpdateNpcBody = z
     race: z.string().min(1).max(60).nullable().optional(),
     description: z.string().max(20000).nullable().optional(),
     dmNotes: z.string().max(20000).nullable().optional(),
-    factionId: z.string().uuid().nullable().optional(),
     hexId: z.string().uuid().nullable().optional(),
     status: z.enum(NPC_STATUSES).optional(),
     worldX: z.number().nullable().optional(),
@@ -106,6 +121,10 @@ const UpdateNpcBody = z
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
   });
+
+const SetReputationBody = z.object({
+  value: z.number().int(),
+});
 
 export const worldRoute: FastifyPluginAsync = async (app) => {
   // =========================================================================
@@ -228,49 +247,32 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
   );
 
   // =========================================================================
-  // NPCs
+  // NPCs — world-scoped (world-first-model Slice 2b)
   // =========================================================================
 
-  // POST /campaigns/:campaignId/npcs
+  // POST /worlds/:worldId/npcs
   app.post(
-    '/campaigns/:campaignId/npcs',
+    '/worlds/:worldId/npcs',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
-      const body = CreateNpcBody.parse(request.body);
+      const { worldId } = WorldParam.parse(request.params);
+      const parsed = CreateNpcBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+      }
+      const body = parsed.data;
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
         return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo un GM puede crear NPCs' });
       }
 
-      // Resolve campaign's worldId for cross-scope faction check (Slice 2a).
-      // Factions are now world-scoped; NPCs are still campaign-scoped until Slice 2b.
-      const campaignRow = await db
-        .select({ worldId: campaigns.worldId })
-        .from(campaigns)
-        .where(eq(campaigns.id, campaignId))
-        .limit(1);
-      const campaignWorldId = campaignRow[0]?.worldId;
-
-      // Validar factionId si se pasa.
-      if (body.factionId) {
-        const f = await loadFaction(body.factionId);
-        if (!f || f.worldId !== campaignWorldId) {
-          return reply.code(400).send({
-            error: 'VALIDATION_FAILED',
-            issues: [{ code: 'FACTION_NOT_FOUND', factionId: body.factionId }],
-          });
-        }
-      }
+      // Cross-scope hex check (ADR-5): hex.worldId must match route worldId.
       if (body.hexId) {
-        // TODO world-first-model Slice 2b: change to cross-world check (h.worldId !== npc.worldId).
-        // Slice 1 re-parents hexes to worldId; existence check is sufficient until Slice 2b
-        // re-parents NPCs and enables the full world-scoped cross-scope validation.
         const h = await loadHex(body.hexId);
-        if (!h) {
+        if (!h || h.worldId !== worldId) {
           return reply.code(400).send({
             error: 'VALIDATION_FAILED',
             issues: [{ code: 'HEX_NOT_FOUND', hexId: body.hexId }],
@@ -281,34 +283,34 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const [created] = await db
         .insert(npcs)
         .values({
-          campaignId,
+          worldId,
           name: body.name,
           race: body.race ?? null,
           description: body.description ?? null,
           dmNotes: body.dmNotes ?? null,
-          factionId: body.factionId ?? null,
           hexId: body.hexId ?? null,
           ...(body.status && { status: body.status }),
           worldX: body.worldX ?? null,
           worldY: body.worldY ?? null,
         })
         .returning();
-      return reply.code(201).send(created);
+
+      return reply.code(201).send({ ...(created as object), factions: [] });
     },
   );
 
-  // GET /campaigns/:campaignId/npcs
+  // GET /worlds/:worldId/npcs
   app.get(
-    '/campaigns/:campaignId/npcs',
+    '/worlds/:worldId/npcs',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { worldId } = WorldParam.parse(request.params);
       const userId = request.user!.sub;
 
-      const access = await getMapAccess(campaignId, userId);
+      const access = await getWorldAccess(worldId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-      const list = await listNpcsInCampaign(campaignId);
+      const list = await listNpcsInWorld(worldId);
       return { data: list.map((n) => sanitizeNpcForRole(n, access)) };
     },
   );
@@ -321,7 +323,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     const npc = await loadNpc(npcId);
     if (!npc) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(npc.campaignId, userId);
+    const access = await getWorldAccess(npc.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     return sanitizeNpcForRole(npc, access);
@@ -336,32 +338,13 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     const npc = await loadNpc(npcId);
     if (!npc) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(npc.campaignId, userId);
+    const access = await getWorldAccess(npc.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    // Validar nuevos FKs si se pasan.
-    if (body.factionId !== undefined && body.factionId !== null) {
-      // Resolve NPC's campaign worldId for cross-scope faction check (Slice 2a).
-      // Factions are now world-scoped; compare faction.worldId to campaign's worldId.
-      const npcCampaignRow = await db
-        .select({ worldId: campaigns.worldId })
-        .from(campaigns)
-        .where(eq(campaigns.id, npc.campaignId))
-        .limit(1);
-      const npcWorldId = npcCampaignRow[0]?.worldId;
-
-      const f = await loadFaction(body.factionId);
-      if (!f || f.worldId !== npcWorldId) {
-        return reply.code(400).send({
-          error: 'VALIDATION_FAILED',
-          issues: [{ code: 'FACTION_NOT_FOUND', factionId: body.factionId }],
-        });
-      }
-    }
+    // Cross-scope hex check (ADR-5): hex.worldId must match npc.worldId.
     if (body.hexId !== undefined && body.hexId !== null) {
-      // TODO world-first-model Slice 2b: change to cross-world check (h.worldId !== npc.worldId).
       const h = await loadHex(body.hexId);
-      if (!h) {
+      if (!h || h.worldId !== npc.worldId) {
         return reply.code(400).send({
           error: 'VALIDATION_FAILED',
           issues: [{ code: 'HEX_NOT_FOUND', hexId: body.hexId }],
@@ -374,14 +357,17 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     if (body.race !== undefined) updates.race = body.race;
     if (body.description !== undefined) updates.description = body.description;
     if (body.dmNotes !== undefined) updates.dmNotes = body.dmNotes;
-    if (body.factionId !== undefined) updates.factionId = body.factionId;
     if (body.hexId !== undefined) updates.hexId = body.hexId;
     if (body.status !== undefined) updates.status = body.status;
     if (body.worldX !== undefined) updates.worldX = body.worldX;
     if (body.worldY !== undefined) updates.worldY = body.worldY;
 
     const [updated] = await db.update(npcs).set(updates).where(eq(npcs.id, npcId)).returning();
-    return updated;
+    if (!updated) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    // Reload with factions to return the full NPC shape.
+    const reloaded = await loadNpc(updated.id);
+    return reloaded;
   });
 
   // DELETE /npcs/:npcId
@@ -392,12 +378,114 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     const npc = await loadNpc(npcId);
     if (!npc) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const access = await getMapAccess(npc.campaignId, userId);
+    const access = await getWorldAccess(npc.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     await db.delete(npcs).where(eq(npcs.id, npcId));
     return reply.code(204).send();
   });
+
+  // =========================================================================
+  // NPC FACTION MEMBERSHIP — N:M (world-first-model Slice 2b)
+  // =========================================================================
+
+  // POST /worlds/:worldId/npcs/:npcId/factions/:factionId  — attach
+  app.post(
+    '/worlds/:worldId/npcs/:npcId/factions/:factionId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId, npcId, factionId } = WorldNpcFactionParam.parse(request.params);
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+      if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await attachNpcFaction(npcId, factionId);
+      if (!result.ok) {
+        const firstIssue = result.issues[0];
+        // PK duplicate is handled below; cross-world and not-found are 400.
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      return reply.code(200).send({ ok: true });
+    },
+  );
+
+  // DELETE /worlds/:worldId/npcs/:npcId/factions/:factionId  — detach
+  app.delete(
+    '/worlds/:worldId/npcs/:npcId/factions/:factionId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId, npcId, factionId } = WorldNpcFactionParam.parse(request.params);
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+      if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await detachNpcFaction(npcId, factionId);
+      if (!result.ok) {
+        return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
+
+      return reply.code(204).send();
+    },
+  );
+
+  // =========================================================================
+  // CHARACTER FACTION REPUTATION (world-first-model Slice 2b)
+  // =========================================================================
+
+  // PUT /worlds/:worldId/characters/:characterId/factions/:factionId/reputation
+  app.put(
+    '/worlds/:worldId/characters/:characterId/factions/:factionId/reputation',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId, characterId, factionId } = ReputationParam.parse(request.params);
+      const parsed = SetReputationBody.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
+      }
+      const { value } = parsed.data;
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+      if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await setReputation(characterId, factionId, value);
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      return reply.code(200).send(result.reputation);
+    },
+  );
+
+  // GET /worlds/:worldId/characters/:characterId/factions/:factionId/reputation
+  app.get(
+    '/worlds/:worldId/characters/:characterId/factions/:factionId/reputation',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId, characterId, factionId } = ReputationParam.parse(request.params);
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await getReputation(characterId, factionId);
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      if (result.reputation === null) {
+        return reply.code(200).send({ characterId, factionId, value: 0 });
+      }
+
+      return reply.code(200).send(result.reputation);
+    },
+  );
 
   // =========================================================================
   // WORLD EVENTS — timeline persistente del mundo (vs session_events que son
@@ -409,10 +497,12 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     '/campaigns/:campaignId/world-events',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.params);
       const body = CreateWorldEventBody.parse(request.body);
       const userId = request.user!.sub;
 
+      // World events still go through getMapAccess (campaign-scoped) until Slice 3.
+      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
       const access = await getMapAccess(campaignId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
       if (access !== 'gm') {
@@ -444,10 +534,11 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
     '/campaigns/:campaignId/world-events',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { campaignId } = CampaignParam.parse(request.params);
+      const { campaignId } = z.object({ campaignId: z.string().uuid() }).parse(request.params);
       const query = ListWorldEventsQuery.parse(request.query);
       const userId = request.user!.sub;
 
+      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
       const access = await getMapAccess(campaignId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
@@ -473,6 +564,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
+      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
       const access = await getMapAccess(event.campaignId, userId);
       if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
@@ -496,6 +588,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
+      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
       const access = await getMapAccess(event.campaignId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
@@ -528,6 +621,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
       const event = await loadWorldEvent(eventId);
       if (!event) return reply.code(404).send({ error: 'NOT_FOUND' });
 
+      const { getMapAccess } = await import('../../use-cases/map/load-hex.js');
       const access = await getMapAccess(event.campaignId, userId);
       if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
