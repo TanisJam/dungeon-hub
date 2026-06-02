@@ -45,11 +45,13 @@ test('DM view: FAB "Crear" is visible at /codex/facciones', async ({ page }) => 
 });
 
 test('DM can create a faction via FAB', async ({ page }) => {
-  await page.goto('/codex/facciones', { waitUntil: 'domcontentloaded' });
+  // networkidle: the FAB is a hydrated client island — clicking before hydration is a no-op.
+  await page.goto('/codex/facciones', { waitUntil: 'networkidle' });
   await expect(page).toHaveURL(/\/codex\/facciones/, { timeout: 10_000 });
 
   // Open create form
   const fab = page.getByRole('button', { name: /crear/i });
+  await expect(fab).toBeVisible({ timeout: 10_000 });
   await fab.click();
 
   // Form sheet opens

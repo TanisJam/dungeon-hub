@@ -23,6 +23,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FactionClientWrapper } from './faction-client-wrapper';
 import type { FactionRow } from '@/app/codex/actions';
 
+// WorldEntityShell calls useRouter().refresh() after mutations — mock it (no app-router in jsdom).
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+}));
+
 // ─── Mock Server Actions ─────────────────────────────────────────────────────
 
 vi.mock('@/app/codex/actions', () => ({

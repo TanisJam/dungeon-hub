@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { V3Sheet } from '@/components/ui';
 
 export type EffectiveView = 'dm' | 'player';
@@ -72,6 +73,7 @@ export function WorldEntityShell<TRow, TDetail>({
   renderForm,
   onDelete,
 }: WorldEntityShellProps<TRow, TDetail>) {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TRow[]>(items);
   const [totalCount, setTotalCount] = useState(initialTotal);
@@ -178,8 +180,10 @@ export function WorldEntityShell<TRow, TDetail>({
 
   function handleFormDone() {
     setFormOpen(false);
-    // Close detail sheet too — the list will need a refresh which the Server Action handles
     handleCloseDetail();
+    // Re-fetch the SSR list so the created/edited row shows immediately. The list-reset
+    // effect (deps include `items`) propagates the refreshed data into `results`.
+    router.refresh();
   }
 
   // ─── Delete (DM-only) ───────────────────────────────────────────────────────
@@ -189,6 +193,7 @@ export function WorldEntityShell<TRow, TDetail>({
     try {
       await onDelete(selectedRow);
       handleCloseDetail();
+      router.refresh(); // re-fetch SSR list so the deleted row disappears immediately
     } catch {
       // Surface error inline — just stop deleting; user can retry
     } finally {
