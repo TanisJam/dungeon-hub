@@ -7,6 +7,10 @@
  *   REQ-CDG-XP-FORM: submit pending state, success → close, error → stays open
  *   REQ-CDG-GOLD-FORM: 5 coin inputs → grantGold with non-zero coins only
  *   REQ-CDG-ITEM-FORM: debounced typeahead → grantItem
+ *
+ * SDD character-codex (spec #1626):
+ *   REQ-CK-WEB-01: Bestiario tab — (a) present for gm; (b) absent for player;
+ *                  (c) NO statblock in player bestiary DOM for ungranted monsters.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,7 +20,12 @@ vi.mock('../actions', () => ({
   grantXp: vi.fn().mockResolvedValue({ ok: true }),
   grantGold: vi.fn().mockResolvedValue({ ok: true }),
   grantItem: vi.fn().mockResolvedValue({ ok: true }),
+  grantKnowledge: vi.fn().mockResolvedValue({ ok: true }),
   searchCompendiumItems: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('../codex/bestiario/actions', () => ({
+  searchCompendiumMonsters: vi.fn().mockResolvedValue([]),
 }));
 
 import { DmGrantPanel } from './dm-grant-panel';
@@ -269,5 +278,81 @@ describe('DmGrantPanel — tap targets (mobile-first)', () => {
     for (const tab of tabs) {
       expect(tab.className).toContain('min-h-[44px]');
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// REQ-CK-WEB-01 — Bestiario tab (character-codex SDD #1626)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('DmGrantPanel — Bestiario tab (REQ-CK-WEB-01)', () => {
+  it('(a) gm → "Bestiario" tab visible after opening modal', async () => {
+    render(<DmGrantPanel {...PROPS} callerRole="gm" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
+    });
+    // Bestiario tab must be present in the tab list
+    expect(screen.getByRole('tab', { name: 'Bestiario' })).toBeTruthy();
+  });
+
+  it('(b) player → no trigger button at all (DM grant affordance absent)', () => {
+    const { container } = render(<DmGrantPanel {...PROPS} callerRole="player" />);
+    // The entire panel renders nothing — absence is guaranteed
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('picks monster from typeahead → calls grantKnowledge with kind=bestiary, modal closes', async () => {
+    const { searchCompendiumMonsters } = await import('../codex/bestiario/actions');
+    const { grantKnowledge } = await import('../actions');
+
+    vi.mocked(searchCompendiumMonsters).mockResolvedValue([
+      { slug: 'goblin', source: 'mm', name: 'Goblin', cr: '1/4', type: 'humanoid' },
+    ]);
+    vi.mocked(grantKnowledge).mockResolvedValue({ ok: true });
+
+    render(<DmGrantPanel {...PROPS} callerRole="gm" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('tab', { name: 'Bestiario' }));
+    });
+
+    // Search input is present
+    const searchInput = screen.getByRole('searchbox');
+    await act(async () => {
+      fireEvent.change(searchInput, { target: { value: 'gob' } });
+    });
+
+    // Wait for debounce + result render
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: /Goblin/i })).toBeTruthy();
+      },
+      { timeout: 1000 },
+    );
+
+    // Pick the monster
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Goblin/i }));
+    });
+
+    // Submit
+    await act(async () => {
+      fireEvent.submit(searchInput.closest('form')!);
+    });
+
+    await vi.waitFor(() => {
+      expect(grantKnowledge).toHaveBeenCalledWith('char-1', {
+        kind: 'bestiary',
+        refKey: 'goblin',
+        refSource: 'mm',
+      });
+    });
+
+    // Modal closes on success
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
 });
