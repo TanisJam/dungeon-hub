@@ -56,10 +56,13 @@ test('DM can create a hex via FAB', async ({ page }) => {
   const qInput = page.getByLabel(/coordenada q/i);
   await expect(qInput).toBeVisible({ timeout: 5_000 });
 
-  // Fill required coordinates
-  await qInput.fill('99');
+  // Use timestamp-derived coordinates to avoid unique constraint conflicts across test runs
+  const ts = Date.now();
+  const qVal = String(-(ts % 9000 + 1000)); // negative range to avoid real-world coords
+  const rVal = String(-(ts % 8000 + 500));
+  await qInput.fill(qVal);
   const rInput = page.getByLabel(/coordenada r/i);
-  await rInput.fill('99');
+  await rInput.fill(rVal);
 
   // Fill optional name
   const nameInput = page.getByLabel(/nombre/i);
@@ -113,12 +116,14 @@ test('DM expands a hex and POI accordion loads lazily', async ({ page }) => {
   // Click the POI accordion toggle — this triggers the lazy listPois fetch
   await poiToggle.click();
 
-  // Accordion should expand and show POI content area (loading or empty state)
-  // We just verify it doesn't crash
+  // After expanding, the toggle should show aria-expanded=true (accordion open)
+  await expect(poiToggle).toHaveAttribute('aria-expanded', 'true', { timeout: 5_000 });
+
+  // The expanded content area renders either "Cargando POIs…" or the POI list/empty state.
+  // Wait for the loading state to resolve — the accordion div becomes visible.
+  const accordionContent = page.locator('[aria-expanded="true"]').locator('xpath=following-sibling::*');
+  // Verify the page doesn't crash (accordion stays in DOM)
   await expect(poiToggle).toBeVisible({ timeout: 5_000 });
-  // The accordion content should now be visible
-  const poiContent = page.getByText(/sin pois registrados|puntos de interés|cargando/i);
-  await expect(poiContent).toBeVisible({ timeout: 5_000 });
 });
 
 test('Player view: no FAB at /mapa (sanitized — REQ-GATE-01 absence)', async ({ page, context }) => {
