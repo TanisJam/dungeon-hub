@@ -6,7 +6,7 @@ export type HexStatus = 'unexplored' | 'rumored' | 'explored' | 'cleared';
 
 export interface LoadedHex {
   id: string;
-  campaignId: string;
+  worldId: string;
   parentHexId: string | null;
   scale: string | null;
   q: number;
@@ -30,10 +30,10 @@ export async function loadHex(id: string): Promise<LoadedHex | null> {
 export type MapAccess = 'gm' | 'player' | 'none';
 
 /**
- * Acceso al map de una campaña:
- *  - 'gm' = miembro con role='gm' → ve todo (incluye unexplored + dmNotes).
- *  - 'player' = miembro con role='player' → ve solo hexes visibles, sin dmNotes.
- *  - 'none' = no es miembro → 403.
+ * Acceso al map via campaign membership (campaignMembers).
+ * RETAINED for encounter routes which remain campaign-scoped.
+ * Do NOT use for hex/poi map routes — those now use getWorldAccess
+ * from use-cases/auth/get-world-access.ts (world-first-model Slice 1).
  */
 export async function getMapAccess(
   campaignId: string,
@@ -94,16 +94,16 @@ export async function isHexVisibleToPlayer(
 }
 
 /**
- * Lista todos los hexes de una campaña, opcionalmente filtrados por parent
+ * Lista todos los hexes de un world, opcionalmente filtrados por parent
  * (null = top-level). El caller filtra visibility después.
  */
-export async function listHexesInCampaign(args: {
-  campaignId: string;
+export async function listHexesInWorld(args: {
+  worldId: string;
   /** undefined = todos. null = solo top-level. string = solo hijos de ese parent. */
   parentHexId?: string | null;
 }): Promise<LoadedHex[]> {
-  const { campaignId, parentHexId } = args;
-  const conditions = [eq(hexes.campaignId, campaignId)];
+  const { worldId, parentHexId } = args;
+  const conditions = [eq(hexes.worldId, worldId)];
   if (parentHexId !== undefined) {
     if (parentHexId === null) {
       conditions.push(isNull(hexes.parentHexId));
@@ -119,16 +119,16 @@ export async function listHexesInCampaign(args: {
  * Detecta ciclos al cambiar el parentHexId de un hex.
  * Retorna true si el nuevo parent es el propio hex o un descendiente.
  *
- * Carga todos los hexes de la campaña en memoria — OK para nuestros volúmenes.
+ * Carga todos los hexes del world en memoria — OK para nuestros volúmenes.
  */
 export async function wouldCreateCycle(args: {
-  campaignId: string;
+  worldId: string;
   hexId: string;
   newParentId: string;
 }): Promise<boolean> {
   if (args.newParentId === args.hexId) return true;
 
-  const all = await listHexesInCampaign({ campaignId: args.campaignId });
+  const all = await listHexesInWorld({ worldId: args.worldId });
   const byId = new Map(all.map((h) => [h.id, h]));
 
   // Walk hacia arriba desde newParent. Si tocamos hexId → ciclo.

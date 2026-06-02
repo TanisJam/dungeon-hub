@@ -156,33 +156,38 @@ export async function recordSessionEventForCharacter(args: {
 }
 
 /**
- * Encuentra LA sesión active del GM en una campaña dada. Para auto-logging
+ * Encuentra LA sesión active del GM en un world dado. Para auto-logging
  * de mutaciones del mundo (hex/POI status changes durante la partida).
  *
  * Reglas:
- *   - 0 sesiones active del GM en la campaña → null (no log).
+ *   - 0 sesiones active del GM en el world → null (no log).
  *   - 1 sesión active → esa es. (caso común)
  *   - N > 1 sesiones active → ambiguo. Si `preferredSessionId` viene y
  *     coincide con una de ellas, esa. Si no, null (mejor no loggear que
  *     loggear mal).
  *
  * Solo sesiones con status='active' cuentan — paused = "no estamos jugando".
+ *
+ * ADR-4: Resolves worldId via JOIN sessions→campaigns by worldId. Sessions
+ * remain campaign-scoped; only the lookup join changes. No redundant column
+ * added to hexes/sessions.
  */
-export async function findActiveSessionForGmInCampaign(args: {
+export async function findActiveSessionForGmInWorld(args: {
   gmUserId: string;
-  campaignId: string;
+  worldId: string;
   preferredSessionId?: string;
 }): Promise<string | null> {
-  const { sessions } = await import('../../infra/db/schema.js');
+  const { sessions, campaigns } = await import('../../infra/db/schema.js');
   const { db } = await import('../../infra/db/client.js');
   const { and, eq } = await import('drizzle-orm');
 
   const rows = await db
     .select({ id: sessions.id })
     .from(sessions)
+    .innerJoin(campaigns, eq(campaigns.id, sessions.campaignId))
     .where(
       and(
-        eq(sessions.campaignId, args.campaignId),
+        eq(campaigns.worldId, args.worldId),
         eq(sessions.gmUserId, args.gmUserId),
         eq(sessions.status, 'active'),
       ),
@@ -199,15 +204,18 @@ export async function findActiveSessionForGmInCampaign(args: {
 
 /**
  * Auto-log para eventos del mundo (hex/POI). Detecta sesión active del GM
- * en la campaña, registra event si la encuentra. No-op silencioso si no
- * hay (caso "el DM está editando contenido fuera de una partida").
+ * en el world (via JOIN sessions→campaigns), registra event si la encuentra.
+ * No-op silencioso si no hay (caso "el DM está editando contenido fuera de
+ * una partida").
  *
  * Como `recordSessionEventForCharacter`, falla silenciosa via try/catch
  * para no romper la response del PATCH/POST que ya fue persistida.
+ *
+ * Accepts worldId (not campaignId) — ADR-4 re-parent.
  */
 export async function recordSessionEventForWorld(args: {
   gmUserId: string;
-  campaignId: string;
+  worldId: string;
   /** Opcional: si el GM tiene >1 sesión active, este desambigua. */
   preferredSessionId?: string;
   eventType: string;
@@ -215,9 +223,9 @@ export async function recordSessionEventForWorld(args: {
   visibility?: EventVisibility;
 }): Promise<void> {
   try {
-    const sessionId = await findActiveSessionForGmInCampaign({
+    const sessionId = await findActiveSessionForGmInWorld({
       gmUserId: args.gmUserId,
-      campaignId: args.campaignId,
+      worldId: args.worldId,
       ...(args.preferredSessionId && { preferredSessionId: args.preferredSessionId }),
     });
     if (!sessionId) return;
