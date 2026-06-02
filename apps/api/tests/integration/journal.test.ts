@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
+import { addWorldMember } from '../helpers/add-world-member.js';
 
 /**
- * Journal / Lore — wiki interna del mundo, per-campaña.
+ * Journal / Lore — Slice 3 (world-first-model).
+ *
+ * journal_entries re-parented from campaign_id → world_id (migration 0034).
+ * Routes: /worlds/:worldId/journal-entries (collection), /journal-entries/:entryId (item).
+ * Auth: getWorldAccess via worldMembers.
  *
  * Visibility:
  *   - public: visible para todos los miembros.
@@ -11,11 +17,12 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
  *
  * Crear/editar/borrar: solo GM.
  */
-describe('journal — entries', () => {
+describe('journal — entries (Slice 3 world-scoped)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let outsider: TestUser;
-  let campaignId: string;
+  let worldId: string;
+  let oldCampaignId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -23,19 +30,20 @@ describe('journal — entries', () => {
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    campaignId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Journal Campaign' },
-        })
-        .then((r) => r.json())
-    ).id;
+    // Slice 3: world_id is the root scope. No campaign needed for journal.
+    ({ worldId } = await createWorldWithGm(dm.id));
+    await addWorldMember(worldId, alice.id, 'player');
 
-    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
-    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    // Create a campaign to verify the old URL returns 404 (REQ-LORE-03).
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { name: 'Journal Old Campaign' },
+      })
+      .then((r) => r.json());
+    oldCampaignId = campaign.id;
   });
 
   afterAll(async () => {
@@ -45,11 +53,11 @@ describe('journal — entries', () => {
     await closeTestApp();
   });
 
-  async function createEntry(payload: Record<string, unknown>): Promise<any> {
+  async function createEntry(payload: Record<string, unknown>, wid = worldId): Promise<any> {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/journal-entries`,
+      url: `/api/v1/worlds/${wid}/journal-entries`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload,
     });
@@ -57,8 +65,8 @@ describe('journal — entries', () => {
     return res.json();
   }
 
-  // ---- POST -------------------------------------------------------------
-  it('GM crea entry con body, tags y authorUserId', async () => {
+  // ---- REQ-LORE-02: worldId on entry, no campaignId ----------------------
+  it('GM crea entry — response tem worldId (no campaignId), authorUserId correto', async () => {
     const e = await createEntry({
       title: 'Historia de Kelthara',
       body: '# Historia\n\nKelthara fue una fortaleza élfica...',
@@ -68,13 +76,15 @@ describe('journal — entries', () => {
     expect(e.tags).toEqual(['history', 'geography']);
     expect(e.visibility).toBe('public');
     expect(e.authorUserId).toBe(dm.id);
+    expect(e.worldId).toBe(worldId);
+    expect(e.campaignId).toBeUndefined();
   });
 
   it('player NO puede crear', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/journal-entries`,
+      url: `/api/v1/worlds/${worldId}/journal-entries`,
       headers: { authorization: `Bearer ${alice.accessToken}` },
       payload: { title: 'Player attempt' },
     });
@@ -85,11 +95,22 @@ describe('journal — entries', () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/journal-entries`,
+      url: `/api/v1/worlds/${worldId}/journal-entries`,
       headers: { authorization: `Bearer ${outsider.accessToken}` },
       payload: { title: 'Outsider attempt' },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  // ---- REQ-LORE-03: old campaign URL returns 404 -------------------------
+  it('vieja URL /campaigns/:id/journal-entries retorna 404', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/campaigns/${oldCampaignId}/journal-entries`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   // ---- Visibility -------------------------------------------------------
@@ -100,7 +121,7 @@ describe('journal — entries', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${campaignId}/journal-entries`,
+      url: `/api/v1/worlds/${worldId}/journal-entries`,
       headers: { authorization: `Bearer ${alice.accessToken}` },
     });
     const data = res.json().data;
@@ -139,7 +160,7 @@ describe('journal — entries', () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${campaignId}/journal-entries?tag=history`,
+      url: `/api/v1/worlds/${worldId}/journal-entries?tag=history`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
     });
     const data = res.json().data;
@@ -150,32 +171,24 @@ describe('journal — entries', () => {
   // ---- Orden updatedAt DESC --------------------------------------------
   it('lista ordenada por updatedAt DESC (último editado primero)', async () => {
     const app = await getTestApp();
-    const freshId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Order Test' },
-        })
-        .then((r) => r.json())
-    ).id;
 
-    const e1 = (
-      await app
-        .inject({
-          method: 'POST',
-          url: `/api/v1/campaigns/${freshId}/journal-entries`,
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { title: 'First' },
-        })
-        .then((r) => r.json())
-    );
+    // Use a fresh world to avoid ordering interference.
+    const { worldId: freshWorldId } = await createWorldWithGm(dm.id);
+
+    const e1 = await app
+      .inject({
+        method: 'POST',
+        url: `/api/v1/worlds/${freshWorldId}/journal-entries`,
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+        payload: { title: 'First' },
+      })
+      .then((r) => r.json());
+
     await new Promise((r) => setTimeout(r, 50));
     await app
       .inject({
         method: 'POST',
-        url: `/api/v1/campaigns/${freshId}/journal-entries`,
+        url: `/api/v1/worlds/${freshWorldId}/journal-entries`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
         payload: { title: 'Second' },
       })
@@ -183,13 +196,13 @@ describe('journal — entries', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${freshId}/journal-entries`,
+      url: `/api/v1/worlds/${freshWorldId}/journal-entries`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
     });
     const data = res.json().data;
     expect(data[0].title).toBe('Second');
 
-    // PATCH e1 para que suba al top.
+    // PATCH e1 to push it to top.
     await new Promise((r) => setTimeout(r, 50));
     await app.inject({
       method: 'PATCH',
@@ -199,7 +212,7 @@ describe('journal — entries', () => {
     });
     const res2 = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${freshId}/journal-entries`,
+      url: `/api/v1/worlds/${freshWorldId}/journal-entries`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
     });
     expect(res2.json().data[0].title).toBe('First');

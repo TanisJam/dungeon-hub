@@ -1,23 +1,26 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
+import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
+import { addWorldMember } from '../helpers/add-world-member.js';
 
 /**
- * World State — Slice 2 (world events timeline).
+ * World Events — Slice 3 (world-first-model).
+ *
+ * world_events re-parented from campaign_id → world_id (migration 0034).
+ * Routes: /worlds/:worldId/world-events (collection), /world-events/:eventId (item).
+ * Auth: getWorldAccess via worldMembers.
  *
  * Distintos de session_events:
- *   - world_events: persistentes, per-campaña, "historia oficial".
+ *   - world_events: persistentes, per-mundo, "historia oficial".
  *   - session_events: efímeros, per-sesión, ruido in-game.
- *
- * Hook session.complete.worldChanges → auto-crea world_events con
- * sourceSessionId apuntando a la sesión.
  */
-describe('world events — Slice 2', () => {
+describe('world events — Slice 3 (world-scoped)', () => {
   let dm: TestUser;
   let alice: TestUser;
   let outsider: TestUser;
-  let campaignId: string;
   let worldId: string;
+  let campaignId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -25,7 +28,12 @@ describe('world events — Slice 2', () => {
     alice = await createTestUser();
     outsider = await createTestUser();
 
-    const weCampaign = await app
+    // Create world for lore tests (Slice 3: no campaign needed for world_events).
+    ({ worldId } = await createWorldWithGm(dm.id));
+    await addWorldMember(worldId, alice.id, 'player');
+
+    // Campaign still needed for the session.complete → worldChanges integration test.
+    const campaign = await app
       .inject({
         method: 'POST',
         url: '/api/v1/campaigns',
@@ -33,11 +41,8 @@ describe('world events — Slice 2', () => {
         payload: { name: 'World Events Campaign' },
       })
       .then((r) => r.json());
-    campaignId = weCampaign.id;
-    worldId = weCampaign.worldId;
-
-    const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
-    await addCampaignAndWorldMember(campaignId, alice.id, 'player');
+    campaignId = campaign.id;
+    // campaign.worldId is a NEW world; re-use it for session tests only.
   });
 
   afterAll(async () => {
@@ -47,11 +52,11 @@ describe('world events — Slice 2', () => {
     await closeTestApp();
   });
 
-  async function createEvent(payload: Record<string, unknown>): Promise<any> {
+  async function createEvent(payload: Record<string, unknown>, wid = worldId): Promise<any> {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/world-events`,
+      url: `/api/v1/worlds/${wid}/world-events`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload,
     });
@@ -59,8 +64,8 @@ describe('world events — Slice 2', () => {
     return res.json();
   }
 
-  // ---- CRUD básico --------------------------------------------------------
-  it('GM crea world event con tags y visibility', async () => {
+  // ---- REQ-LORE-01: worldId on event, no campaignId -----------------------
+  it('GM crea world event y la response tiene worldId (no campaignId)', async () => {
     const ev = await createEvent({
       title: 'El Rey Aldric muere',
       description: 'Cae en batalla contra los orcos',
@@ -72,13 +77,15 @@ describe('world events — Slice 2', () => {
     expect(ev.tags).toEqual(['death', 'royal']);
     expect(ev.visibility).toBe('public');
     expect(ev.sourceSessionId).toBeNull();
+    expect(ev.worldId).toBe(worldId);
+    expect(ev.campaignId).toBeUndefined();
   });
 
   it('player NO puede crear', async () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${campaignId}/world-events`,
+      url: `/api/v1/worlds/${worldId}/world-events`,
       headers: { authorization: `Bearer ${alice.accessToken}` },
       payload: { title: 'Player Attempt' },
     });
@@ -89,10 +96,21 @@ describe('world events — Slice 2', () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${campaignId}/world-events`,
+      url: `/api/v1/worlds/${worldId}/world-events`,
       headers: { authorization: `Bearer ${outsider.accessToken}` },
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  // ---- REQ-LORE-03: old campaign URL returns 404 --------------------------
+  it('vieja URL /campaigns/:id/world-events retorna 404', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/campaigns/${campaignId}/world-events`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+    });
+    expect(res.statusCode).toBe(404);
   });
 
   // ---- Visibility ---------------------------------------------------------
@@ -110,7 +128,7 @@ describe('world events — Slice 2', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${campaignId}/world-events`,
+      url: `/api/v1/worlds/${worldId}/world-events`,
       headers: { authorization: `Bearer ${alice.accessToken}` },
     });
     const data = res.json().data;
@@ -139,7 +157,7 @@ describe('world events — Slice 2', () => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${campaignId}/world-events?tag=death`,
+      url: `/api/v1/worlds/${worldId}/world-events?tag=death`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
     });
     const data = res.json().data;
@@ -149,35 +167,27 @@ describe('world events — Slice 2', () => {
 
   // ---- Orden por occurredAt desc -----------------------------------------
   it('lista ordenada por occurredAt DESC', async () => {
-    // Crear campaña fresca para no contaminar con los events previos.
     const app = await getTestApp();
-    const freshId = (
-      await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/campaigns',
-          headers: { authorization: `Bearer ${dm.accessToken}` },
-          payload: { name: 'Order Test' },
-        })
-        .then((r) => r.json())
-    ).id;
+
+    // Use a fresh world to avoid ordering interference from other tests.
+    const { worldId: freshWorldId } = await createWorldWithGm(dm.id);
 
     await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${freshId}/world-events`,
+      url: `/api/v1/worlds/${freshWorldId}/world-events`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload: { title: 'Antiguo', occurredAt: '2025-01-01T00:00:00Z' },
     });
     await app.inject({
       method: 'POST',
-      url: `/api/v1/campaigns/${freshId}/world-events`,
+      url: `/api/v1/worlds/${freshWorldId}/world-events`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
       payload: { title: 'Reciente', occurredAt: '2026-06-01T00:00:00Z' },
     });
 
     const res = await app.inject({
       method: 'GET',
-      url: `/api/v1/campaigns/${freshId}/world-events`,
+      url: `/api/v1/worlds/${freshWorldId}/world-events`,
       headers: { authorization: `Bearer ${dm.accessToken}` },
     });
     const data = res.json().data;
@@ -211,31 +221,48 @@ describe('world events — Slice 2', () => {
     expect(del.statusCode).toBe(204);
   });
 
-  // ---- Hook session.complete ---------------------------------------------
-  describe('session.complete.worldChanges → auto-crea world_events', () => {
-    it('crea world events con sourceSessionId apuntando a la sesión', async () => {
+  // ---- Hook session.complete → worldChanges (world_id used, not campaignId) ---
+  describe('session.complete.worldChanges → auto-crea world_events con worldId', () => {
+    it('crea world events con worldId + sourceSessionId apuntando a la sesión', async () => {
       const app = await getTestApp();
-      // Sesión active con un participant.
+
+      // campaign.worldId is the world that the session belongs to.
+      const campaignResp = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${dm.accessToken}` },
+          payload: { name: 'Session World Changes Campaign' },
+        })
+        .then((r) => r.json());
+      const sessionCampaignId: string = campaignResp.id;
+      const sessionWorldId: string = campaignResp.worldId;
+
+      const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+      await addCampaignAndWorldMember(sessionCampaignId, alice.id, 'player');
+
       const charId = (
         await app
           .inject({
             method: 'POST',
             url: '/api/v1/characters',
             headers: { authorization: `Bearer ${alice.accessToken}` },
-            payload: { worldId, name: `wc ${Math.random()}` },
+            payload: { worldId: sessionWorldId, name: `wc ${Math.random()}` },
           })
           .then((r) => r.json())
       ).id;
+
       const sId = (
         await app
           .inject({
             method: 'POST',
             url: '/api/v1/sessions',
             headers: { authorization: `Bearer ${dm.accessToken}` },
-            payload: { campaignId, title: 'WC Session' },
+            payload: { campaignId: sessionCampaignId, title: 'WC Session' },
           })
           .then((r) => r.json())
       ).id;
+
       await app.inject({
         method: 'POST',
         url: `/api/v1/sessions/${sId}/join`,
@@ -248,7 +275,7 @@ describe('world events — Slice 2', () => {
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
 
-      // Complete con worldChanges.
+      // Complete with worldChanges.
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/sessions/${sId}/complete`,
@@ -272,40 +299,60 @@ describe('world events — Slice 2', () => {
       });
       expect(res.statusCode).toBe(200);
 
-      // Verificar world events creados.
+      // Verify world events created under the world (not campaign URL).
       const list = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${campaignId}/world-events`,
+        url: `/api/v1/worlds/${sessionWorldId}/world-events`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
       const data = list.json().data;
       const fromThisSession = data.filter((e: any) => e.sourceSessionId === sId);
       expect(fromThisSession.length).toBe(2);
       expect(fromThisSession.find((e: any) => e.visibility === 'dm-only')).toBeDefined();
+      // REQ-LORE-01: worldId on event, not campaignId
+      expect(fromThisSession[0].worldId).toBe(sessionWorldId);
+      expect(fromThisSession[0].campaignId).toBeUndefined();
     });
 
     it('borrar la sesión deja los world_events vivos pero con sourceSessionId NULL', async () => {
       const app = await getTestApp();
+
+      const campaignResp = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${dm.accessToken}` },
+          payload: { name: 'Disposable Campaign' },
+        })
+        .then((r) => r.json());
+      const disposableCampaignId: string = campaignResp.id;
+      const disposableWorldId: string = campaignResp.worldId;
+
+      const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
+      await addCampaignAndWorldMember(disposableCampaignId, alice.id, 'player');
+
       const sId = (
         await app
           .inject({
             method: 'POST',
             url: '/api/v1/sessions',
             headers: { authorization: `Bearer ${dm.accessToken}` },
-            payload: { campaignId, title: 'Disposable session' },
+            payload: { campaignId: disposableCampaignId, title: 'Disposable session' },
           })
           .then((r) => r.json())
       ).id;
+
       const charId = (
         await app
           .inject({
             method: 'POST',
             url: '/api/v1/characters',
             headers: { authorization: `Bearer ${alice.accessToken}` },
-            payload: { worldId, name: `disp ${Math.random()}` },
+            payload: { worldId: disposableWorldId, name: `disp ${Math.random()}` },
           })
           .then((r) => r.json())
       ).id;
+
       await app.inject({
         method: 'POST',
         url: `/api/v1/sessions/${sId}/join`,
@@ -326,17 +373,16 @@ describe('world events — Slice 2', () => {
         },
       });
 
-      // Borrar la sesión via DB directo (no exponemos DELETE de sesión, lo
-      // simulamos para validar el FK ON DELETE SET NULL).
+      // Delete session directly (no exposed DELETE session endpoint).
       const { db } = await import('../../src/infra/db/client.js');
       const { sessions } = await import('../../src/infra/db/schema.js');
       const { eq } = await import('drizzle-orm');
       await db.delete(sessions).where(eq(sessions.id, sId));
 
-      // El world event sigue ahí, sourceSessionId NULL.
+      // World event still exists, sourceSessionId is now NULL.
       const all = await app.inject({
         method: 'GET',
-        url: `/api/v1/campaigns/${campaignId}/world-events`,
+        url: `/api/v1/worlds/${disposableWorldId}/world-events`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
       const found = all
