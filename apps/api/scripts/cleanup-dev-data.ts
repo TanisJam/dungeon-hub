@@ -183,8 +183,15 @@ async function main() {
     for (const { label, table } of DELETION_ORDER) {
       // Drizzle delete with no .where() = DELETE FROM <table> (all rows)
       const result = await tx.delete(table as Parameters<typeof tx.delete>[0]);
-      // postgres-js returns an array; its length is the affected-row count
-      const count = Array.isArray(result) ? result.length : 0;
+      // A no-returning DELETE resolves to a postgres-js RowList whose `.length` is 0;
+      // the affected-row count lives on `.count`. (The old `.length` check always
+      // reported 0 — making a real cleanup look like "nothing to delete".)
+      const count =
+        typeof (result as { count?: number }).count === 'number'
+          ? (result as { count: number }).count
+          : Array.isArray(result)
+            ? result.length
+            : 0;
       summary.push({ label, deleted: count });
       totalDeleted += count;
       if (count > 0) {
