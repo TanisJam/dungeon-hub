@@ -88,7 +88,10 @@ export function TermProvider({
   // apiBaseUrl being absent is a configuration error; treat as inert so the
   // provider never reaches fetchTermEntry with an empty base URL (which throws).
   // -------------------------------------------------------------------------
-  const isActive = Boolean(accessToken) && Boolean(apiBaseUrl);
+  // Real fetch needs accessToken + apiBaseUrl; mockMode bypasses fetch so it
+  // only needs accessToken. Without the mockMode branch the dev-preview (which
+  // passes no apiBaseUrl) stays inert and the hovercard never opens.
+  const isActive = Boolean(accessToken) && (Boolean(apiBaseUrl) || Boolean(mockMode));
 
   // -------------------------------------------------------------------------
   // Fetch / resolve helper

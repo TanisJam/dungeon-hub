@@ -247,7 +247,7 @@ describe('TermProvider — missing accessToken makes all refs inert', () => {
 // B.1 — Missing apiBaseUrl → inert (no fetch, no card, no throw)
 // ---------------------------------------------------------------------------
 
-describe('TermProvider — missing apiBaseUrl makes all refs inert', () => {
+describe('TermProvider — apiBaseUrl required only for the real fetch path', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -257,8 +257,52 @@ describe('TermProvider — missing apiBaseUrl makes all refs inert', () => {
     vi.useRealTimers();
   });
 
-  it('does not fetch and does not open card when apiBaseUrl is undefined', async () => {
-    const mockResolver = vi.fn();
+  // Real fetch path (no mockMode): missing apiBaseUrl must stay inert so we
+  // never call fetchTermEntry with an empty base URL (which throws).
+  it('real path is inert (no card, no throw) when apiBaseUrl is undefined and no mockMode', async () => {
+    render(
+      <TermProvider worldId="campaign-1" accessToken="tok" apiBaseUrl={undefined}>
+        <span data-compendium-ref="spell|fireball|PHB" data-testid="ref-span">
+          fireball
+        </span>
+      </TermProvider>,
+    );
+
+    fireEvent.pointerOver(screen.getByTestId('ref-span'));
+    await act(async () => {
+      vi.advanceTimersByTime(OPEN_DELAY + 10);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('real path is inert when apiBaseUrl is empty string and no mockMode', async () => {
+    render(
+      <TermProvider worldId="campaign-1" accessToken="tok" apiBaseUrl="">
+        <span data-compendium-ref="spell|fireball|PHB" data-testid="ref-span">
+          fireball
+        </span>
+      </TermProvider>,
+    );
+
+    fireEvent.pointerOver(screen.getByTestId('ref-span'));
+    await act(async () => {
+      vi.advanceTimersByTime(OPEN_DELAY + 10);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  // mockMode bypasses fetch, so it stays ACTIVE without apiBaseUrl. This is the
+  // /dev/compendium-preview case — it must open the card. (Regression guard:
+  // a stricter `accessToken && apiBaseUrl` gate previously broke the preview.)
+  it('mockMode stays active WITHOUT apiBaseUrl — card opens', async () => {
+    const mockResolver = makeMockResolver({
+      kind: 'ok',
+      entry: { name: 'Fireball', entries: ['A bright streak...'], source: 'PHB' },
+    });
 
     render(
       <TermProvider
@@ -279,34 +323,7 @@ describe('TermProvider — missing apiBaseUrl makes all refs inert', () => {
       await Promise.resolve();
     });
 
-    expect(mockResolver).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('does not fetch and does not open card when apiBaseUrl is empty string', async () => {
-    const mockResolver = vi.fn();
-
-    render(
-      <TermProvider
-        worldId="campaign-1"
-        accessToken="tok"
-        apiBaseUrl=""
-        mockMode={mockResolver}
-      >
-        <span data-compendium-ref="spell|fireball|PHB" data-testid="ref-span">
-          fireball
-        </span>
-      </TermProvider>,
-    );
-
-    fireEvent.pointerOver(screen.getByTestId('ref-span'));
-    await act(async () => {
-      vi.advanceTimersByTime(OPEN_DELAY + 10);
-      await Promise.resolve();
-    });
-
-    expect(mockResolver).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).not.toBeNull();
   });
 });
 
