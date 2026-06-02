@@ -11,6 +11,8 @@ export async function createCampaign(
   formData: FormData,
 ): Promise<CreateState> {
   const name = String(formData.get('name') ?? '').trim();
+  // worldId is forwarded from a hidden form field; NOT user-editable (REQ-CIW-02)
+  const worldId = String(formData.get('worldId') ?? '').trim() || undefined;
 
   if (!name) return { error: 'Name is required.' };
   if (name.length > 120) return { error: 'Name must be 120 chars or fewer.' };
@@ -19,11 +21,14 @@ export async function createCampaign(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { error: 'Not authenticated.' };
 
+  const payload: { name: string; worldId?: string } = { name };
+  if (worldId) payload.worldId = worldId;
+
   let created: { id: string };
   try {
     created = await api.post<{ id: string }>(
       '/campaigns',
-      { name },
+      payload,
       session.access_token,
     );
   } catch (err) {
