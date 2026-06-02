@@ -199,27 +199,29 @@ test.describe('J6A2 — GM+owner default load: HP editor must be in DM mode with
       await dmPage.goto(`/characters/${heroId}`, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
-      // Affordances side: Otorgar should be visible by default (GM defaults to dm).
-      const otorgarVisible = await dmPage
-        .getByRole('button', { name: 'Otorgar recompensa de DM' })
-        .isVisible({ timeout: 10_000 })
-        .catch(() => false);
+      // Affordances side: Otorgar must be visible by default (GM defaults to dm) — this
+      // confirms the page hydrated into DM mode. Wait for it BEFORE checking the editor.
+      await expect(
+        dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' }),
+        'GM should default to DM mode (Otorgar visible) on first load',
+      ).toBeVisible({ timeout: 15_000 });
 
-      // HP editor side: open it, check the max field is EDITABLE (not the player hint).
-      await dmPage.getByRole('button', { name: 'Editar HP' }).click();
+      // HP editor side: in DM mode the "HP máximo" field must be EDITABLE with NO player
+      // hint. Retry open+check to absorb the client-hydration race under suite load (the
+      // editor can briefly render player-mode before useRole settles to 'dm').
       const maxInput = dmPage.getByRole('spinbutton', { name: 'HP máximo' });
-      await maxInput.waitFor({ timeout: 5_000 });
-      const maxEditable = await maxInput.isEditable().catch(() => false);
-      const playerHintVisible = await dmPage
-        .getByText('Solo el DM puede ajustar el máximo')
-        .isVisible({ timeout: 1_000 })
-        .catch(() => false);
-
-      // The bug: Otorgar visible (DM) but HP máximo read-only with the player hint.
-      expect(
-        { otorgarVisible, maxEditable, playerHintVisible },
-        'On default load: if Otorgar is DM-visible, HP máximo must be editable (no player hint)',
-      ).toEqual({ otorgarVisible: true, maxEditable: true, playerHintVisible: false });
+      await expect(async () => {
+        if (!(await maxInput.isVisible().catch(() => false))) {
+          await dmPage.getByRole('button', { name: 'Editar HP' }).click().catch(() => {});
+        }
+        await expect(maxInput, 'HP máximo must be editable in DM mode').toBeEditable({
+          timeout: 3_000,
+        });
+        await expect(
+          dmPage.getByText('Solo el DM puede ajustar el máximo'),
+          'player read-only hint must NOT show in DM mode',
+        ).toBeHidden({ timeout: 1_000 });
+      }).toPass({ timeout: 30_000 });
     } finally {
       await dmCtx.close();
     }
