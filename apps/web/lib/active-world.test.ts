@@ -48,11 +48,19 @@ import { getActiveWorld } from './active-world';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// GET /worlds/:id returns the world directly (top-level), not nested under 'world:'.
+// Matches the actual API route response in apps/api/src/http/routes/worlds.ts.
 const WORLD_ALPHA = {
-  world: { id: 'world-alpha', name: 'Alpha Realm', slug: 'alpha-realm', callerRole: 'gm' as const },
+  id: 'world-alpha',
+  name: 'Alpha Realm',
+  slug: 'alpha-realm',
+  callerRole: 'gm' as const,
 };
 const WORLD_BETA = {
-  world: { id: 'world-beta', name: 'Beta Realm', slug: 'beta-realm', callerRole: 'player' as const },
+  id: 'world-beta',
+  name: 'Beta Realm',
+  slug: 'beta-realm',
+  callerRole: 'player' as const,
 };
 const TOKEN = 'test-token';
 

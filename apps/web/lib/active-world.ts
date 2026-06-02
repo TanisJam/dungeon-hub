@@ -14,13 +14,14 @@ export type ActiveWorld = {
   callerRole: CallerRole;
 };
 
+// GET /worlds/:id returns the world directly (not nested under a `world` key).
+// Shape matches the API route in apps/api/src/http/routes/worlds.ts.
 type WorldDetailResponse = {
-  world: {
-    id: string;
-    name: string;
-    slug: string;
-    callerRole: CallerRole;
-  };
+  id: string;
+  name: string;
+  slug: string;
+  callerRole: CallerRole;
+  // Additional fields the API returns (ownerUserId, rulesProfile, refData) are ignored here.
 };
 
 // ---------------------------------------------------------------------------
@@ -38,10 +39,10 @@ async function fetchWorldById(
   try {
     const res = await api.get<WorldDetailResponse>(`/worlds/${worldId}`, token);
     return {
-      id: res.world.id,
-      name: res.world.name,
-      slug: res.world.slug,
-      callerRole: res.world.callerRole,
+      id: res.id,
+      name: res.name,
+      slug: res.slug,
+      callerRole: res.callerRole,
     };
   } catch {
     return null;
