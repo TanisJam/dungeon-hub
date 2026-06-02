@@ -244,6 +244,73 @@ describe('TermProvider — missing accessToken makes all refs inert', () => {
 });
 
 // ---------------------------------------------------------------------------
+// B.1 — Missing apiBaseUrl → inert (no fetch, no card, no throw)
+// ---------------------------------------------------------------------------
+
+describe('TermProvider — missing apiBaseUrl makes all refs inert', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    cleanup();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('does not fetch and does not open card when apiBaseUrl is undefined', async () => {
+    const mockResolver = vi.fn();
+
+    render(
+      <TermProvider
+        worldId="campaign-1"
+        accessToken="tok"
+        apiBaseUrl={undefined}
+        mockMode={mockResolver}
+      >
+        <span data-compendium-ref="spell|fireball|PHB" data-testid="ref-span">
+          fireball
+        </span>
+      </TermProvider>,
+    );
+
+    fireEvent.pointerOver(screen.getByTestId('ref-span'));
+    await act(async () => {
+      vi.advanceTimersByTime(OPEN_DELAY + 10);
+      await Promise.resolve();
+    });
+
+    expect(mockResolver).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('does not fetch and does not open card when apiBaseUrl is empty string', async () => {
+    const mockResolver = vi.fn();
+
+    render(
+      <TermProvider
+        worldId="campaign-1"
+        accessToken="tok"
+        apiBaseUrl=""
+        mockMode={mockResolver}
+      >
+        <span data-compendium-ref="spell|fireball|PHB" data-testid="ref-span">
+          fireball
+        </span>
+      </TermProvider>,
+    );
+
+    fireEvent.pointerOver(screen.getByTestId('ref-span'));
+    await act(async () => {
+      vi.advanceTimersByTime(OPEN_DELAY + 10);
+      await Promise.resolve();
+    });
+
+    expect(mockResolver).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // TERM-FETCH — unsupported-kind guard: resolver not called, no dialog
 // ---------------------------------------------------------------------------
 

@@ -84,9 +84,11 @@ export function TermProvider({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -------------------------------------------------------------------------
-  // Auth guard: if no accessToken, provider is completely inert
+  // Auth + config guard: if no accessToken OR no apiBaseUrl, provider is inert.
+  // apiBaseUrl being absent is a configuration error; treat as inert so the
+  // provider never reaches fetchTermEntry with an empty base URL (which throws).
   // -------------------------------------------------------------------------
-  const isActive = Boolean(accessToken);
+  const isActive = Boolean(accessToken) && Boolean(apiBaseUrl);
 
   // -------------------------------------------------------------------------
   // Fetch / resolve helper

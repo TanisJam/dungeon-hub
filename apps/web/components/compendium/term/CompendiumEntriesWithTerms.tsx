@@ -53,7 +53,7 @@ export function CompendiumEntriesWithTerms({
   entries,
   worldId,
   accessToken,
-  apiBaseUrl,
+  apiBaseUrl = process.env.NEXT_PUBLIC_API_URL,
   mockMode,
 }: CompendiumEntriesWithTermsProps) {
   return (
