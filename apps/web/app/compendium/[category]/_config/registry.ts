@@ -33,8 +33,8 @@ export interface CategoryConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Registry — Batch 2: items, races, classes, backgrounds added.
-// Monsters still a placeholder — Batch 3.
+// Registry — all 6 categories have real RowView + Header (Batches 1–3 complete).
+// Adding a category = one entry here (the open/closed seam).
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_CONFIG: Record<CompendiumCategory, CategoryConfig> = {
