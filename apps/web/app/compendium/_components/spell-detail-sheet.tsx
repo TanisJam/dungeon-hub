@@ -2,21 +2,24 @@
 
 import { V3Sheet } from '@/components/ui';
 import { SpellDetailBody } from './spell-detail-body';
-import { V3_SPELL_DETAIL } from './data';
+import type { SpellDetail } from './types';
 
 interface SpellDetailSheetProps {
   open: boolean;
   onClose: () => void;
+  /** Real spell data from the API (GET /compendium/spells/:slug). */
+  spell: SpellDetail;
 }
 
 /**
- * SpellDetailSheet — client component wrapping V3Sheet with Fireball detail body.
- * WCDS-OPEN-02: controlled open/close state; focus trap inherited from V3Sheet.
+ * SpellDetailSheet — client component wrapping V3Sheet with spell detail body.
+ * Dormant: no caller on /compendium yet. Requires a spell-list/search UI (separate feature).
+ * The hardcoded Fireball mock has been removed — this component now requires real spell data.
  */
-export function SpellDetailSheet({ open, onClose }: SpellDetailSheetProps) {
+export function SpellDetailSheet({ open, onClose, spell }: SpellDetailSheetProps) {
   return (
-    <V3Sheet open={open} onClose={onClose} title={V3_SPELL_DETAIL.eyebrow}>
-      <SpellDetailBody spell={V3_SPELL_DETAIL} />
+    <V3Sheet open={open} onClose={onClose} title={spell.eyebrow}>
+      <SpellDetailBody spell={spell} />
     </V3Sheet>
   );
 }

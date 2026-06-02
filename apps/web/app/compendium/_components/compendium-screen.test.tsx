@@ -14,19 +14,44 @@ const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
 
 describe('CompendiumScreen', () => {
   it('WED-CSS-SCOPED-05 / WCS-SCOPE-01: outer .compendium-init wrapper renders exactly once', () => {
-    const { container } = render(<CompendiumScreen counts={defaultCounts} />);
+    const { container } = render(
+      <CompendiumScreen counts={defaultCounts} campaignName={null} />,
+    );
     // WCS-SCOPE-01: outer .compendium-init wrapper must be present
     const wrappers = container.querySelectorAll('.compendium-init');
     expect(wrappers.length).toBe(1);
   });
 
   it('WCS-SCOPE-02: all 4 sections are present in the render', () => {
-    const { getByText } = render(<CompendiumScreen counts={defaultCounts} />);
+    const { getByText } = render(
+      <CompendiumScreen counts={defaultCounts} campaignName={null} />,
+    );
     // WCS-SCOPE-02: Categorías, Tu campaña, Más consultado, search trigger all present
     expect(getByText('Categorías')).toBeTruthy();
     expect(getByText('Tu campaña')).toBeTruthy();
     expect(getByText('Más consultado')).toBeTruthy();
     // Search bar presence
     expect(getByText('Hechizo, item, monstruo, lore…')).toBeTruthy();
+  });
+
+  it('WCP-CAMPAIGN-04: threads real campaign name into CuratedRow', () => {
+    const { getByText } = render(
+      <CompendiumScreen counts={defaultCounts} campaignName="La Gran Campaña" />,
+    );
+    expect(getByText('La Gran Campaña')).toBeTruthy();
+  });
+
+  it('WCP-CAMPAIGN-04: renders empty-state when campaignName is null', () => {
+    const { getByText } = render(
+      <CompendiumScreen counts={defaultCounts} campaignName={null} />,
+    );
+    expect(getByText('Sin campaña activa')).toBeTruthy();
+  });
+
+  it('does NOT render fake "Las Tres Lunas" copy', () => {
+    const { queryByText } = render(
+      <CompendiumScreen counts={defaultCounts} campaignName={null} />,
+    );
+    expect(queryByText(/Las Tres Lunas/)).toBeNull();
   });
 });

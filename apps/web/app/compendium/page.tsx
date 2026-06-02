@@ -69,7 +69,7 @@ export default async function CompendiumPage() {
 
   return (
     <AppShell title="Compendium" subtitle="REGLAS Y OBJETOS">
-      <CompendiumScreen counts={counts} />
+      <CompendiumScreen counts={counts} campaignName={activeCampaign?.name ?? null} />
     </AppShell>
   );
 }

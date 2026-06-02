@@ -1,5 +1,5 @@
 export type { CategoryId, CategoryDef, RecentDef, SpellDetail, SpellMeta } from './types';
-export { V3_COMPENDIUM_CATS, V3_RECENT, V3_SPELL_DETAIL } from './data';
+export { V3_COMPENDIUM_CATS } from './data';
 export { CompendiumCategoryGrid } from './compendium-category-grid';
 export { CompendiumCuratedRow } from './compendium-curated-row';
 export { CompendiumRecentsList } from './compendium-recents-list';
