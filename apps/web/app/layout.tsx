@@ -42,10 +42,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-aesthetic="obsidian" data-palette="obsidian">
-      <body
-        className={`${notoSerifGeorgian.variable} ${inter.variable} ${mplusRounded.variable} ${jetbrainsMono.variable} min-h-screen bg-paper text-ink font-sans antialiased`}
-      >
+    <html
+      lang="en"
+      data-aesthetic="obsidian"
+      data-palette="obsidian"
+      className={`${notoSerifGeorgian.variable} ${inter.variable} ${mplusRounded.variable} ${jetbrainsMono.variable}`}
+    >
+      <body className="min-h-screen bg-paper text-ink font-sans antialiased">
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
