@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
-import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
+import { addCampaignAndWorldMember, addWorldMember } from '../helpers/add-world-member.js';
 
 describe('campaigns', () => {
   let user: TestUser;
@@ -208,6 +208,123 @@ describe('campaigns', () => {
         await deleteTestUser(p1.id);
         await deleteTestUser(p2.id);
       }
+    });
+
+    // ── worldId branch (REQ-CIW-01) ──────────────────────────────────────────
+
+    describe('POST /campaigns — worldId branch', () => {
+      let gmUser: TestUser;
+      let playerUser: TestUser;
+      let nonMemberUser: TestUser;
+      let existingWorldId: string;
+
+      beforeAll(async () => {
+        const app = await getTestApp();
+        gmUser = await createTestUser();
+        playerUser = await createTestUser();
+        nonMemberUser = await createTestUser();
+
+        // Create an existing world+campaign via the atomic path (no worldId)
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${gmUser.accessToken}` },
+          payload: { name: 'Existing World Campaign' },
+        });
+        const body = res.json<{ worldId: string }>();
+        existingWorldId = body.worldId;
+
+        // Add playerUser as a world+campaign member (player role, NOT gm)
+        const campaignId = res.json<{ id: string }>().id;
+        await addCampaignAndWorldMember(campaignId, playerUser.id, 'player');
+      });
+
+      afterAll(async () => {
+        if (gmUser) await deleteTestUser(gmUser.id);
+        if (playerUser) await deleteTestUser(playerUser.id);
+        if (nonMemberUser) await deleteTestUser(nonMemberUser.id);
+      });
+
+      it('(a) no worldId → creates new world+campaign (existing atomic path preserved)', async () => {
+        const app = await getTestApp();
+        const countBefore = await (await import('../../src/infra/db/client.js')).db
+          .select()
+          .from((await import('../../src/infra/db/schema.js')).worlds);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${gmUser.accessToken}` },
+          payload: { name: 'No WorldId Campaign' },
+        });
+
+        expect(res.statusCode).toBe(201);
+        const body = res.json<{ id: string; worldId: string }>();
+        expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
+        expect(body.worldId).toMatch(/^[0-9a-f-]{36}$/);
+        // A NEW world must have been created (different from existingWorldId)
+        expect(body.worldId).not.toBe(existingWorldId);
+
+        const countAfter = await (await import('../../src/infra/db/client.js')).db
+          .select()
+          .from((await import('../../src/infra/db/schema.js')).worlds);
+        expect(countAfter.length).toBeGreaterThan(countBefore.length);
+      });
+
+      it('(b) worldId + caller is GM → creates campaign under existing world, no new world created', async () => {
+        const app = await getTestApp();
+        const { db } = await import('../../src/infra/db/client.js');
+        const { worlds } = await import('../../src/infra/db/schema.js');
+        const worldsBefore = await db.select().from(worlds);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${gmUser.accessToken}` },
+          payload: { name: 'Session 0', worldId: existingWorldId },
+        });
+
+        expect(res.statusCode).toBe(201);
+        const body = res.json<{ id: string; worldId: string; name: string }>();
+        expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
+        expect(body.name).toBe('Session 0');
+        // Must be under the EXISTING world, not a new one
+        expect(body.worldId).toBe(existingWorldId);
+
+        // No new world row must have been inserted
+        const worldsAfter = await db.select().from(worlds);
+        expect(worldsAfter.length).toBe(worldsBefore.length);
+      });
+
+      it('(c) worldId + caller is player member (NOT GM) → 403', async () => {
+        const app = await getTestApp();
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${playerUser.accessToken}` },
+          payload: { name: 'Player Should Fail', worldId: existingWorldId },
+        });
+
+        expect(res.statusCode).toBe(403);
+        const body = res.json<{ error: string; issues: { code: string }[] }>();
+        expect(body.error).toBe('FORBIDDEN');
+        expect(body.issues[0]?.code).toBe('WORLD_GM_REQUIRED');
+      });
+
+      it('(d) worldId + caller is NOT a member → 403', async () => {
+        const app = await getTestApp();
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/campaigns',
+          headers: { authorization: `Bearer ${nonMemberUser.accessToken}` },
+          payload: { name: 'Non Member Should Fail', worldId: existingWorldId },
+        });
+
+        expect(res.statusCode).toBe(403);
+        const body = res.json<{ error: string; issues: { code: string }[] }>();
+        expect(body.error).toBe('FORBIDDEN');
+        expect(body.issues[0]?.code).toBe('WORLD_GM_REQUIRED');
+      });
     });
 
     it('T3: pendingFichas computed only for GM caller (ACLE-PENDING-FICHAS-DM-ONLY-02)', async () => {
