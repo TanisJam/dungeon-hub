@@ -444,21 +444,21 @@ export const pois = pgTable(
 // ---------------------------------------------------------------------------
 // factions — grupos políticos / organizaciones del mundo.
 //
-// Reputation es per-CAMPAÑA (relación compartida del party con la facción),
-// no per-character. Es un int signado: positivo = aliados, negativo = enemigos.
-// El DM lo mueve manualmente; no hay auto-update por eventos en este slice.
+// Re-parented to world_id (world-first-model Slice 2a).
+// Party-level reputation column dropped; per-character×faction reputation
+// lands in Slice 2b as character_faction_reputation table.
 //
 // Visibility (igual que hex/POI):
 //   - DM ve todo, incluyendo dmNotes.
-//   - Players ven name, description, state, reputation. NUNCA dmNotes.
+//   - Players ven name, description, state. NUNCA dmNotes.
 // ---------------------------------------------------------------------------
 export const factions = pgTable(
   'factions',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    campaignId: uuid('campaign_id')
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
     dmNotes: text('dm_notes'),
@@ -467,12 +467,10 @@ export const factions = pgTable(
     })
       .notNull()
       .default('active'),
-    /** Reputación del party con la facción. Signed: + aliados, - enemigos. */
-    reputation: integer('reputation').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('idx_factions_campaign').on(t.campaignId)],
+  (t) => [index('idx_factions_world').on(t.worldId)],
 );
 
 // ---------------------------------------------------------------------------

@@ -218,6 +218,13 @@
       "when": 1780406657985,
       "tag": "0031_world_first_hexes",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780408910569,
+      "tag": "0032_world_first_factions",
+      "breakpoints": true
     }
   ]
 }
