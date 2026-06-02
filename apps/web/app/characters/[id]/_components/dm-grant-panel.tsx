@@ -5,10 +5,13 @@
  *
  * SDD dm-session-grants (spec #867):
  *   REQ-CDG-DM-PANEL-VISIBILITY: renders nothing unless callerRole === 'gm'
- *   REQ-CDG-DM-PANEL-INTERACTION: full-screen modal at 375px, 3 tabs (XP/Oro/Ítem)
+ *   REQ-CDG-DM-PANEL-INTERACTION: full-screen modal at 375px, 4 tabs (XP/Oro/Ítem/Bestiario)
  *   REQ-CDG-XP-FORM: signed integer input → grantXp
  *   REQ-CDG-GOLD-FORM: 5 coin inputs, "Corregir" toggle → grantGold
  *   REQ-CDG-ITEM-FORM: debounced typeahead → grantItem
+ *
+ * SDD character-codex (spec #1626):
+ *   REQ-CK-WEB-01: "Bestiario" tab — monster typeahead → grantKnowledge
  *
  * Tabs ABOVE form for thumb reach at 375px.
  * Modal pattern copied from inventory/picker.tsx (full-screen, ESC + backdrop).
@@ -19,12 +22,17 @@ import {
   grantXp,
   grantGold,
   grantItem,
+  grantKnowledge,
   searchCompendiumItems,
   type CompendiumItemHit,
 } from '../actions';
+import {
+  searchCompendiumMonsters,
+  type CompendiumMonsterHit,
+} from '../codex/bestiario/actions';
 
 type CallerRole = 'gm' | 'player' | null;
-type Tab = 'xp' | 'gold' | 'item';
+type Tab = 'xp' | 'gold' | 'item' | 'bestiary';
 
 interface DmGrantPanelProps {
   characterId: string;
@@ -36,6 +44,8 @@ interface DmGrantPanelProps {
 export function DmGrantPanel({ characterId, characterName, callerRole, worldId }: DmGrantPanelProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('xp');
+  // Type-narrowed handler — ensures setActiveTab receives exactly Tab values
+  function handleTabChange(tab: Tab) { setActiveTab(tab); }
 
   // Gate: only GMs see this panel
   if (callerRole !== 'gm') return null;
@@ -66,7 +76,7 @@ export function DmGrantPanel({ characterId, characterName, callerRole, worldId }
           characterName={characterName}
           worldId={worldId}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           onClose={handleClose}
         />
       )}
@@ -148,7 +158,7 @@ function DmGrantModal({
 
         {/* Tabs ABOVE form — thumb reach at 375px */}
         <div className="flex border-b border-line" role="tablist">
-          {(['xp', 'gold', 'item'] as const).map((tab) => (
+          {(['xp', 'gold', 'item', 'bestiary'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -161,7 +171,7 @@ function DmGrantModal({
                   : 'text-ink-mute hover:text-ink'
               }`}
             >
-              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : 'Ítem'}
+              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : tab === 'item' ? 'Ítem' : 'Bestiario'}
             </button>
           ))}
         </div>
@@ -176,6 +186,9 @@ function DmGrantModal({
           )}
           {activeTab === 'item' && (
             <ItemTab characterId={characterId} worldId={worldId} onClose={onClose} />
+          )}
+          {activeTab === 'bestiary' && (
+            <BestiarioTab characterId={characterId} onClose={onClose} />
           )}
         </div>
       </div>
@@ -502,6 +515,152 @@ function ItemTab({
         className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isPending ? 'Otorgando…' : 'Otorgar ítem'}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bestiario tab (character-codex SDD #1626, REQ-CK-WEB-01)
+// ---------------------------------------------------------------------------
+
+function BestiarioTab({
+  characterId,
+  onClose,
+}: {
+  characterId: string;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CompendiumMonsterHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<CompendiumMonsterHit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const reqIdRef = useRef(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Debounced monster search
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const myReqId = ++reqIdRef.current;
+    const handle = setTimeout(async () => {
+      const hits = await searchCompendiumMonsters(trimmed);
+      if (reqIdRef.current === myReqId) {
+        setResults(hits);
+        setSearching(false);
+      }
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  function handlePickMonster(monster: CompendiumMonsterHit) {
+    setPicked(monster);
+    setQuery(monster.name);
+    setResults([]);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!picked) {
+      setError('Seleccioná un monstruo de la lista.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await grantKnowledge(characterId, {
+        kind: 'bestiary',
+        refKey: picked.slug,
+        refSource: picked.source,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Monster search */}
+      <div>
+        <label htmlFor="monster-search" className="block text-sm font-medium text-ink mb-1">
+          Buscar monstruo
+        </label>
+        <input
+          ref={inputRef}
+          id="monster-search"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPicked(null);
+          }}
+          placeholder="Goblin, dragón rojo…"
+          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+        />
+      </div>
+
+      {/* Search results */}
+      {query.trim().length > 0 && !picked && (
+        <div className="rounded-md border border-line bg-white overflow-hidden">
+          {searching && (
+            <p className="px-4 py-3 text-sm text-ink-mute">Buscando…</p>
+          )}
+          {!searching && results.length === 0 && (
+            <p className="px-4 py-3 text-sm text-ink-mute">Sin resultados.</p>
+          )}
+          {results.length > 0 && (
+            <ul className="divide-y divide-line max-h-48 overflow-y-auto">
+              {results.map((monster) => (
+                <li key={`${monster.slug}|${monster.source}`}>
+                  <button
+                    type="button"
+                    onClick={() => handlePickMonster(monster)}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-paper-soft transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{monster.name}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                        {[monster.cr ? `CR ${monster.cr}` : null, monster.type, monster.source]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isPending || !picked}
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isPending ? 'Otorgando…' : 'Revelar monstruo'}
       </button>
     </form>
   );

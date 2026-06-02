@@ -575,3 +575,47 @@ export async function fetchInventoryDetail(
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
 }
+
+// ── character-codex: knowledge grant ─────────────────────────────────────────
+
+export type GrantKnowledgeState = { ok: false; error: string } | { ok: true };
+
+export type KnowledgeKind = 'bestiary' | 'item' | 'spell' | 'npc' | 'faction' | 'location' | 'lore';
+
+/**
+ * DM-only: grant a knowledge entry to a character.
+ * Maps to POST /characters/:id/knowledge.
+ * Idempotent — double-grant = no error.
+ *
+ * REQ-CK-API-01 (spec #1626, character-codex)
+ */
+export async function grantKnowledge(
+  characterId: string,
+  entry: { kind: KnowledgeKind; refKey: string; refSource: string },
+): Promise<GrantKnowledgeState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(
+      `/characters/${characterId}/knowledge`,
+      { kind: entry.kind, refKey: entry.refKey, refSource: entry.refSource },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { message?: string; error?: string } | null;
+      return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}/codex/bestiario`);
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
