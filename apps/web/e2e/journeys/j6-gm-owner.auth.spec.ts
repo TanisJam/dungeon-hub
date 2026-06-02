@@ -128,14 +128,12 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       const roleSwitcher = dmPage.locator('[data-value]');
       await expect(roleSwitcher).toBeVisible({ timeout: 10_000 });
 
-      // Ensure we start in DM mode by clicking the DM button.
-      // Use exact:true to match the role-switcher pill button, not "Otorgar recompensa de DM".
-      const dmButton = dmPage.getByRole('button', { name: 'DM', exact: true });
-      await expect(dmButton).toBeVisible({ timeout: 5_000 });
-      await dmButton.click();
-
-      // In DM mode: "Otorgar" button should be visible
+      // The role switcher is a single toggle button. Ensure DM mode: if the DM-only
+      // "Otorgar" affordance isn't visible, tap the switcher to toggle into DM.
       const otorgarBtn = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
+      if (!(await otorgarBtn.isVisible().catch(() => false))) {
+        await roleSwitcher.click();
+      }
       await expect(otorgarBtn).toBeVisible({ timeout: 10_000 });
 
       // ── UI FLOW (the REAL user path): set HP max via the editor in DM mode ──
@@ -154,16 +152,14 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       // Restore to 20/20 for future runs.
       await putHp(heroId, { current: 20, max: 20, temp: 0 }, dmJwt);
 
-      // Toggle to "Jugador" (player) mode
-      const jugadorButton = dmPage.getByRole('button', { name: 'Jugador', exact: true });
-      await expect(jugadorButton).toBeVisible({ timeout: 5_000 });
-      await jugadorButton.click();
+      // Toggle to "Jugador" (player) mode via the single switcher button
+      await roleSwitcher.click();
 
       // In player mode: "Otorgar" should DISAPPEAR
       await expect(otorgarBtn).not.toBeVisible({ timeout: 5_000 });
 
       // Toggle back to DM mode
-      await dmButton.click();
+      await roleSwitcher.click();
 
       // DM mode again: "Otorgar" should REAPPEAR
       await expect(otorgarBtn).toBeVisible({ timeout: 5_000 });

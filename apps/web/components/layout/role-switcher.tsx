@@ -1,75 +1,83 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Role } from '@/lib/use-role';
 import { useRole } from '@/lib/use-role';
 
 interface RoleSwitcherProps {
   /**
-   * Initial/default role when no stored value is found in localStorage.
-   * Pass 'dm' for GM users so the switcher shows DM selected on first visit.
-   * Defaults to 'player'.
+   * The server's per-world effectiveView (authoritative seed). Shown as the current
+   * role on SSR; reconciled from the dh:role cookie after mount. Defaults to 'player'.
    */
   defaultRole?: Role;
 }
 
+/** Read the dh:role cookie (client-only). The cookie is the server's source of truth. */
+function readRoleCookie(): Role | null {
+  if (typeof document === 'undefined') return null;
+  const v = document.cookie
+    .split('; ')
+    .find((c) => c.startsWith('dh:role='))
+    ?.split('=')[1];
+  return v === 'dm' || v === 'player' ? v : null;
+}
+
 /**
- * RoleSwitcher — animated pill toggling between Jugador and DM.
- * Thumb slides via `left` transition; gradient + glow swap by role.
+ * RoleSwitcher — a single compact button showing the CURRENT view (DM / PJ) with a
+ * swap glyph. Tap to toggle to the other role.
+ *
+ * Display is server-authoritative: SSR uses `defaultRole` (the page's effectiveView),
+ * then reconciles from the dh:role cookie after mount (NOT stale localStorage). Toggling
+ * flips local state immediately (round-trips), and `setRole` dual-writes the cookie +
+ * localStorage + sync event so server pages re-render and client affordances react.
  */
 export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
-  // `defaultRole` is the SERVER's per-world effectiveView (authoritative). We display
-  // THAT — not useRole()'s localStorage value, which can go stale and desync from the
-  // server (a stale localStorage='player' previously made the toggle a no-op). We still
-  // use setRole to dual-write the dh:role cookie + localStorage + sync event.
   const [, setRole] = useRole(defaultRole);
   const router = useRouter();
-  const role = defaultRole;
+  const [role, setLocal] = useState<Role>(defaultRole);
 
-  // Toggling writes the dh:role cookie (in setRole). Server Components gated on
-  // that cookie (e.g. the /inicio player/DM trees) only re-render on a refresh,
-  // so trigger one here — otherwise the view stays stale until navigation.
-  const select = (next: Role) => {
-    if (next === role) return;
+  useEffect(() => {
+    setLocal(readRoleCookie() ?? defaultRole);
+  }, [defaultRole]);
+
+  const toggle = () => {
+    const next: Role = role === 'dm' ? 'player' : 'dm';
+    setLocal(next);
     setRole(next);
     router.refresh();
   };
 
-  // Small + discreet: tight padding, micro label, no glow (subtle gradient thumb only).
-  const thumbClass =
-    role === 'player'
-      ? 'left-[2px] bg-gradient-to-b from-accent to-accent-deep'
-      : 'left-1/2 bg-gradient-to-b from-secondary to-secondary-deep';
+  const label = role === 'dm' ? 'DM' : 'PJ';
+  const tone =
+    role === 'dm'
+      ? 'border-secondary/45 text-secondary bg-secondary-soft/60'
+      : 'border-accent/45 text-accent bg-accent-soft/60';
 
   return (
-    <div
+    <button
+      type="button"
       data-value={role}
-      className="relative inline-grid grid-cols-2 p-[2px] rounded-pill border border-line-soft bg-surface/80"
+      onClick={toggle}
+      title="Cambiar vista DM / Jugador"
+      aria-label={`Vista actual: ${label}. Tocar para cambiar.`}
+      className={`inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors hover:brightness-110 active:translate-y-px ${tone}`}
     >
-      <span
+      <svg
         aria-hidden="true"
-        className={`pointer-events-none absolute top-[2px] bottom-[2px] w-[calc(50%-2px)] rounded-pill transition-[left] duration-200 ease-out ${thumbClass}`}
-      />
-      <button
-        type="button"
-        onClick={() => select('player')}
-        aria-pressed={role === 'player'}
-        className={`relative z-10 px-[7px] py-[2px] rounded-pill font-sans font-semibold text-[8px] uppercase tracking-[0.06em] whitespace-nowrap text-center transition-colors duration-200 ease-out ${
-          role === 'player' ? 'text-on-accent' : 'text-ink-mute'
-        }`}
+        viewBox="0 0 24 24"
+        width="10"
+        height="10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        Jugador
-      </button>
-      <button
-        type="button"
-        onClick={() => select('dm')}
-        aria-pressed={role === 'dm'}
-        className={`relative z-10 px-[7px] py-[2px] rounded-pill font-sans font-semibold text-[8px] uppercase tracking-[0.06em] whitespace-nowrap text-center transition-colors duration-200 ease-out ${
-          role === 'dm' ? 'text-on-secondary' : 'text-ink-mute'
-        }`}
-      >
-        DM
-      </button>
-    </div>
+        <path d="M4 9h13M14 6l3 3-3 3" />
+        <path d="M20 15H7M10 12l-3 3 3 3" />
+      </svg>
+      <span>{label}</span>
+    </button>
   );
 }
