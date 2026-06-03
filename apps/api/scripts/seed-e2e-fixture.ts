@@ -176,24 +176,36 @@ async function apiCall<T>(
 
 // ── World helpers ─────────────────────────────────────────────────────────────
 
-/**
- * Find-or-create the shared E2E world.
- * POST /campaigns creates the world + GM membership atomically.
- * If it already exists, GET /worlds?mine=1 finds it.
- */
-async function findOrCreateWorld(dmJwt: string): Promise<string> {
-  const worldsRes = await apiCall<{ worlds: Array<{ id: string; name: string }> }>(
-    'GET',
-    '/api/v1/worlds?mine=1',
-    dmJwt,
-  );
+interface WorldAndCampaign {
+  worldId: string;
+  campaignId: string;
+}
 
-  const existing = worldsRes.worlds.find((w) => w.name === E2E_WORLD_LABEL);
-  if (existing) {
-    console.log(`  [world] exists  "${E2E_WORLD_LABEL}" (id: ${existing.id})`);
-    return existing.id;
+/**
+ * Find-or-create the shared E2E world + campaign.
+ * POST /campaigns creates the world + GM membership atomically.
+ * If it already exists, GET /campaigns finds the fixture campaign by name.
+ * Returns both worldId and campaignId so callers can seed campaign_members.
+ *
+ * GET /campaigns returns { data: Array<{ id, name, worldId, ... }> } for
+ * all campaigns where the user is a member — the DM is always a member of
+ * their own campaigns.
+ */
+async function findOrCreateWorld(dmJwt: string): Promise<WorldAndCampaign> {
+  // Check if the fixture campaign already exists in the DM's campaign list.
+  const campaignListRes = await apiCall<{
+    data: Array<{ id: string; name: string; worldId: string }>;
+  }>('GET', '/api/v1/campaigns', dmJwt);
+
+  const existingCampaign = campaignListRes.data?.find((c) => c.name === E2E_CAMPAIGN_NAME);
+  if (existingCampaign) {
+    console.log(
+      `  [world] exists  "${E2E_WORLD_LABEL}" (worldId: ${existingCampaign.worldId}, campaignId: ${existingCampaign.id})`,
+    );
+    return { worldId: existingCampaign.worldId, campaignId: existingCampaign.id };
   }
 
+  // Create new campaign — the API creates the world atomically and returns both IDs.
   const campaign = await apiCall<{ id: string; worldId: string }>(
     'POST',
     '/api/v1/campaigns',
@@ -204,15 +216,16 @@ async function findOrCreateWorld(dmJwt: string): Promise<string> {
   console.log(
     `  [world] created "${E2E_WORLD_LABEL}" (worldId: ${campaign.worldId}, campaignId: ${campaign.id})`,
   );
-  return campaign.worldId;
+  return { worldId: campaign.worldId, campaignId: campaign.id };
 }
 
 /**
- * Add a player to the world (idempotent via onConflictDoNothing).
+ * Add a player to the campaign (and world) atomically — idempotent.
+ * Uses addCampaignAndWorldMember which handles both tables via onConflictDoNothing.
  */
-async function ensureWorldMember(worldId: string, userId: string): Promise<void> {
-  const { addWorldMember } = await import('../tests/helpers/add-world-member.js');
-  await addWorldMember(worldId, userId, 'player');
+async function ensureCampaignMember(campaignId: string, userId: string): Promise<void> {
+  const { addCampaignAndWorldMember } = await import('../tests/helpers/add-world-member.js');
+  await addCampaignAndWorldMember(campaignId, userId, 'player');
 }
 
 // ── Character helpers ─────────────────────────────────────────────────────────
@@ -452,16 +465,18 @@ async function main(): Promise<void> {
 
   // ── 2. World (find-or-create) ────────────────────────────────────────────────
   console.log('\n[seed-e2e] Step 2: world');
-  const worldId = await findOrCreateWorld(dm.jwt);
+  const { worldId, campaignId } = await findOrCreateWorld(dm.jwt);
 
-  // Ensure all players are world members (idempotent).
-  console.log('\n[seed-e2e] Step 3: world memberships');
-  await ensureWorldMember(worldId, player1.id);
-  console.log(`  [member] player1@dh.test → ${worldId}`);
-  await ensureWorldMember(worldId, player2.id);
-  console.log(`  [member] player2@dh.test → ${worldId}`);
-  await ensureWorldMember(worldId, player3.id);
-  console.log(`  [member] player3@dh.test → ${worldId}`);
+  // Ensure all players are world members (idempotent) AND campaign members so that
+  // GET /encounters/:id returns 200 + callerRole:'player' instead of 403.
+  // addCampaignAndWorldMember handles both tables atomically (onConflictDoNothing).
+  console.log('\n[seed-e2e] Step 3: world + campaign memberships');
+  await ensureCampaignMember(campaignId, player1.id);
+  console.log(`  [member] player1@dh.test → world:${worldId} + campaign:${campaignId}`);
+  await ensureCampaignMember(campaignId, player2.id);
+  console.log(`  [member] player2@dh.test → world:${worldId} + campaign:${campaignId}`);
+  await ensureCampaignMember(campaignId, player3.id);
+  console.log(`  [member] player3@dh.test → world:${worldId} + campaign:${campaignId}`);
 
   // ── 3. Characters (find-or-create) ──────────────────────────────────────────
   console.log('\n[seed-e2e] Step 4: characters');
@@ -592,8 +607,11 @@ async function main(): Promise<void> {
 ║  player2@dh.test    (player)                                 ║
 ║  player3@dh.test    (player — no characters)                 ║
 ╠══════════════════════════════════════════════════════════════╣
-║  WORLD                                                       ║
-║  worldId: ${worldId.padEnd(40)}║
+║  WORLD + CAMPAIGN                                            ║
+║  worldId:    ${worldId.padEnd(37)}║
+║  campaignId: ${campaignId.padEnd(37)}║
+║  Players are members of BOTH world + campaign (encounter     ║
+║  access requires campaignMembers row — REQ-WCO-E2E-01)       ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  CHARACTERS — players                                        ║
 ║  "${p1DraftName}"  →  draft        (player1)                       ║
