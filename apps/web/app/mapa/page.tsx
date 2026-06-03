@@ -32,10 +32,10 @@ import { listAllPois } from './actions';
 export default async function MapaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; place?: string }>;
 }) {
   // Resolve searchParams first (Next.js 15 async searchParams)
-  const { view } = await searchParams;
+  const { view, place } = await searchParams;
   const activeMapView = view === 'mapa' ? 'mapa' : 'lista';
 
   const supabase = await createClient();
@@ -104,6 +104,14 @@ export default async function MapaPage({
     pois = await listAllPois(aw.id);
   }
 
+  // REQ-PLACE-TAP-02/03: resolve place-mode target from ?place=<poiId> URL param.
+  // Self-healing: unknown/invalid id → null (no banner, no stuck mode).
+  // Only meaningful when view==='mapa' (ignored on lista to prevent cross-branch confusion).
+  const placementTarget =
+    activeMapView === 'mapa' && place
+      ? (pois.find((p) => p.id === place) ?? null)
+      : null;
+
   return (
     <AppShell
       title="Mapa"
@@ -126,6 +134,7 @@ export default async function MapaPage({
           supabaseUrl={env.SUPABASE_URL}
           pois={pois}
           effectiveView={effectiveView}
+          placement={placementTarget}
         />
       ) : (
         <HexClientWrapper
