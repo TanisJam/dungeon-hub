@@ -13,9 +13,12 @@ import {
 } from '../../use-cases/map/load-hex.js';
 import {
   filterPoisByAccess,
+  filterWorldPoisForPlayer,
   listPoisForHex,
+  listPoisInWorld,
   loadPoi,
   sanitizePoiForRole,
+  stripParentHexStatus,
 } from '../../use-cases/map/load-poi.js';
 import { recordSessionEventForWorld } from '../../use-cases/sessions/events.js';
 import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
@@ -92,6 +95,11 @@ const ListHexesQuery = z.object({
   /** 'top' = solo top-level (parentHexId IS NULL). 'all' = todos.
    *  uuid = solo hijos de ese hex. */
   parent: z.union([z.literal('top'), z.literal('all'), z.string().uuid()]).optional(),
+});
+
+/** Mirrors the hexes ?parent=all shape for POI world-scope listing. */
+const ListWorldPoisQuery = z.object({
+  parent: z.literal('all').optional(),
 });
 
 const POI_STATUSES = ['unknown', 'discovered', 'cleared'] as const;
@@ -261,6 +269,33 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         if (await isHexVisibleToPlayer(h, byId)) visible.push(h);
       }
       return { data: visible.map((h) => sanitizeHexForRole(h, access)) };
+    },
+  );
+
+  // ---- GET /worlds/:worldId/pois ------------------------------------------
+  // Lista todos los POIs de un world (Slice 2: world-map-poi-layer).
+  // REQ-POI-ENDPOINT-01, REQ-POI-CASCADE-01, REQ-POI-CASCADE-02.
+  //   GM path:     all POIs, dmNotes preserved, parentHexStatus stripped.
+  //   Player path: cascade (unexplored hex) + unknown-status gate, no dmNotes.
+  app.get(
+    '/worlds/:worldId/pois',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId } = WorldParam.parse(request.params);
+      ListWorldPoisQuery.parse(request.query); // accept ?parent=all or absent
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const raw = await listPoisInWorld({ worldId });
+
+      if (access === 'gm') {
+        return { data: raw.map(stripParentHexStatus) };
+      }
+
+      // Player: single-pass cascade + access filter (REQ-POI-CASCADE-01/02)
+      return { data: filterWorldPoisForPlayer(raw) };
     },
   );
 
