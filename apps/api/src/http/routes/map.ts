@@ -305,6 +305,55 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  // ---- POST /worlds/:worldId/pois -----------------------------------------
+  // Creates a free-floating POI (hexId: null) directly attached to the world.
+  // REQ-PWC-API-01: mirrors /hexes/:hexId/pois but without the hex load/404 step.
+  app.post(
+    '/worlds/:worldId/pois',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId } = WorldParam.parse(request.params);
+      const body = CreatePoiBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const [created] = await db
+        .insert(pois)
+        .values({
+          worldId,
+          hexId: null,
+          name: body.name,
+          description: body.description ?? null,
+          dmNotes: body.dmNotes ?? null,
+          ...(body.status && { status: body.status }),
+          worldX: body.worldX ?? null,
+          worldY: body.worldY ?? null,
+        })
+        .returning();
+
+      // Auto-log: POI created with non-default status. unknown = prep, no event.
+      if (created && created.status !== 'unknown') {
+        const query = SessionQuery.parse(request.query);
+        await recordSessionEventForWorld({
+          gmUserId: userId,
+          worldId,
+          ...(query.sessionId && { preferredSessionId: query.sessionId }),
+          eventType: 'poi_created',
+          payload: {
+            poiId: created.id,
+            hexId: null,
+            name: created.name,
+            status: created.status,
+          },
+        });
+      }
+
+      return reply.code(201).send(created);
+    },
+  );
+
   // ---- GET /hexes/:hexId --------------------------------------------------
   app.get('/hexes/:hexId', { preHandler: app.authenticate }, async (request, reply) => {
     const { hexId } = HexParam.parse(request.params);
