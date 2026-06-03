@@ -164,7 +164,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
         maxBounds={MAP_BOUNDS}
         maxBoundsViscosity={1.0}
         crs={L.CRS.Simple}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', background: 'var(--color-paper)' }}
         className="w-full h-full"
       >
         {/*
