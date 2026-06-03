@@ -189,7 +189,11 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
         maxBounds={MAP_BOUNDS}
         maxBoundsViscosity={1.0}
         crs={L.CRS.Simple}
-        style={{ width: '100%', height: '100%', background: 'var(--color-paper)' }}
+        // position:relative (from leaflet.css) + an explicit zIndex makes the
+        // MapContainer its OWN stacking context, trapping Leaflet's internal panes
+        // (tiles ~200, markers ~400, popups ~700) so they can't paint over the
+        // sibling drawer (z-20) / toggle (z-30). Without this the map covers them.
+        style={{ width: '100%', height: '100%', background: 'var(--color-paper)', position: 'relative', zIndex: 0 }}
         className="w-full h-full"
       >
         {/*
