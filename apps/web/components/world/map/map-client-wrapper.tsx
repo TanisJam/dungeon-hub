@@ -26,7 +26,8 @@ const WorldMapLeafletDynamic = dynamic(
     ssr: false,
     loading: () => (
       <div
-        className="fixed inset-x-0 bottom-16 top-[120px] z-10 flex items-center justify-center bg-paper"
+        className="fixed inset-x-0 top-[120px] z-10 flex items-center justify-center bg-paper"
+        style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
         data-testid="map-container"
       >
         <p className="text-sm text-ink-muted">Cargando mapa…</p>

@@ -146,11 +146,13 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
      * Full-bleed breakout from AppShell max-w-sm:
      * fixed inset-0 places the map to fill the full viewport.
      * top-[120px]: accounts for TopBar (~56px) + MapToggle (~48px) + gap.
-     * bottom-[64px]: accounts for TabBar height.
+     * bottom: clears TabBar real height (73px) + iOS safe-area inset so the map
+     * edge never hides under the TabBar on notched devices.
      * z-10 keeps the map above page content but below sheets (z-50).
      */
     <div
-      className="fixed inset-x-0 bottom-16 top-[120px] z-10"
+      className="fixed inset-x-0 top-[120px] z-10"
+      style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       data-testid="map-container"
     >
       <MapContainer
