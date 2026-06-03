@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ResourcePanel } from './resource-panel';
 import type { ClassResourceView } from '@/lib/sheet-types';
 
@@ -11,10 +11,15 @@ vi.mock('@/app/encuentros/[id]/actions', () => ({
   longRest: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-// useRouter is called by ResourcePanel for VERSION_CONFLICT refresh
+// useRouter is called by ResourcePanel for VERSION_CONFLICT refresh.
+// mockRefresh is module-level so FIX 5 tests can assert on it.
+const mockRefresh = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ refresh: mockRefresh }),
 }));
+
+// Import mutable mock references for FIX 5 per-test overrides
+import { useResource } from '@/app/encuentros/[id]/actions';
 
 const kiResource: ClassResourceView = {
   slug: 'monk:ki-points',
@@ -83,5 +88,30 @@ describe('ResourcePanel', () => {
     );
     expect(screen.getByRole('button', { name: /descanso corto/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /descanso largo/i })).toBeTruthy();
+  });
+
+  // FIX 5 (SUGGESTION): VERSION_CONFLICT from useResource → router.refresh() is called
+  // (resource-panel.tsx lines 50-54 handle this path)
+  it('FIX-5: VERSION_CONFLICT on useResource calls router.refresh()', async () => {
+    vi.mocked(useResource).mockResolvedValueOnce({
+      ok: false,
+      code: 'VERSION_CONFLICT',
+    } as never);
+    mockRefresh.mockClear();
+
+    render(
+      <ResourcePanel
+        characterId="char-123"
+        encounterId="enc-456"
+        resources={[kiResource]}
+      />,
+    );
+
+    const useBtn = screen.getByRole('button', { name: /usar/i });
+    fireEvent.click(useBtn);
+
+    await waitFor(() => {
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+    });
   });
 });
