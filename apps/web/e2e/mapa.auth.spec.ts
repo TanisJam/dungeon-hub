@@ -165,6 +165,30 @@ test('Mapa tab is active in TabBar when on /mapa', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
+// Lista view: SSR gate — map container must NOT render (W-02 closeout)
+//
+// page.tsx gates `listAllPois` and the MapClientWrapper branch on
+// `activeMapView === 'mapa'`. On the lista branch (default / ?view=lista),
+// the Leaflet island is never mounted, so [data-testid="map-container"]
+// must be absent from the DOM entirely.
+//
+// This is the observable guarantee that POI markers (and their SSR fetch)
+// are not active on the lista view. REQ-POI-MARKER-01, REQ-POI-MARKER-02.
+// ---------------------------------------------------------------------------
+
+test('Lista view: map container is not rendered (SSR gate — W-02)', async ({ page }) => {
+  // Default route = lista view (no ?view=mapa param)
+  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
+
+  // The Leaflet island is conditionally mounted only on mapa view.
+  // On lista, the MapClientWrapper is never rendered — so the container
+  // div with data-testid="map-container" must not be present at all.
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
 // Mapa view: marker layer (REQ-POI-MARKER-01, REQ-POI-MARKER-02)
 // ADR-4: zero-marker tolerance — assert container/no-crash unconditionally;
 // tap-to-open is conditional on a marker being present in the DOM.
