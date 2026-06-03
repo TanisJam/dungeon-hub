@@ -258,3 +258,47 @@ describe('PoiAccordion — edit form seeds coord values (REQ-PLACE-FIELDS-01)', 
     expect(yInput.value).toBe('');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Round-trip edit test (REQ-PWC-FORM-01: accordion edit round-trip after extraction)
+// ---------------------------------------------------------------------------
+
+describe('PoiAccordion — edit round-trip after PoiForm extraction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('L: open edit → change name → submit → onUpdatePoi called with new name', async () => {
+    const poi = makePoiRow({ id: 'poi-rt', name: 'Old Name' });
+    const onUpdatePoi = vi.fn().mockResolvedValue({ ok: true });
+
+    await renderExpandedAccordion({
+      pois: [poi],
+      effectiveView: 'dm',
+      onUpdatePoi,
+    });
+
+    // Open the edit form
+    await openEditForm('Old Name');
+
+    // The name input should be seeded with the existing value
+    const nameInput = screen.getByLabelText(/nombre/i) as HTMLInputElement;
+    expect(nameInput.value).toBe('Old Name');
+
+    // Change the name
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.change(nameInput, { target: { value: 'New Name' } });
+
+    // Submit
+    const submitBtn = screen.getByRole('button', { name: /guardar/i });
+    await act(async () => {
+      submitBtn.click();
+    });
+
+    // onUpdatePoi must have been called with the new name
+    expect(onUpdatePoi).toHaveBeenCalledWith(
+      'poi-rt',
+      expect.objectContaining({ name: 'New Name' }),
+    );
+  });
+});
