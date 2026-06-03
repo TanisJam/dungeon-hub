@@ -1,7 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PersonajeCard } from './personaje-card';
 import type { RosterCharacter } from './types';
+
+// ---------------------------------------------------------------------------
+// Mock: next/navigation (required because PersonajeCard renders SetActiveCharacterButton)
+// ---------------------------------------------------------------------------
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock: setActiveCharacter server action
+// ---------------------------------------------------------------------------
+
+vi.mock('@/app/set-active-character', () => ({
+  setActiveCharacter: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
 
 const baseChar: RosterCharacter = {
   id: 'abc',
@@ -14,6 +34,10 @@ const baseChar: RosterCharacter = {
   hpCurrent: null,
   hpMax: null,
 };
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('PersonajeCard', () => {
   it('renders portrait initial as first letter uppercase', () => {
@@ -53,16 +77,74 @@ describe('PersonajeCard', () => {
     expect(link.getAttribute('href')).toBe('/characters/abc/wizard');
   });
 
-  it('highlight=true adds class personajes-char-card-active', () => {
+  // ── ADR F-VIS: personajes-char-card-active is now on the outer div wrapper,
+  //    NOT on the <Link>. The Link is flex-1 inside the wrapper. ──
+
+  it('highlight=true adds class personajes-char-card-active to outer wrapper div', () => {
+    const { container } = render(<PersonajeCard char={baseChar} highlight={true} />);
+    // The outer wrapper is the first div child of the container
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).toContain('personajes-char-card-active');
+  });
+
+  it('highlight=true does NOT add personajes-char-card-active to the Link', () => {
     render(<PersonajeCard char={baseChar} highlight={true} />);
     const link = screen.getByRole('link');
-    expect(link.className).toContain('personajes-char-card-active');
+    expect(link.className).not.toContain('personajes-char-card-active');
   });
 
   it('highlight=false (default) does NOT add personajes-char-card-active', () => {
-    render(<PersonajeCard char={baseChar} />);
-    const link = screen.getByRole('link');
-    expect(link.className).not.toContain('personajes-char-card-active');
+    const { container } = render(<PersonajeCard char={baseChar} />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).not.toContain('personajes-char-card-active');
+  });
+
+  it('draft card does NOT have personajes-char-card-active (no highlight)', () => {
+    const { container } = render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.className).not.toContain('personajes-char-card-active');
+  });
+
+  // ── ADR F-VIS: "Jugando" pill (tone=accent) appears when highlight=true ──
+
+  it('Jugando pill rendered when highlight=true (REQ-AC-SEL-03)', () => {
+    render(<PersonajeCard char={baseChar} highlight={true} />);
+    expect(screen.getByText('Jugando')).toBeTruthy();
+  });
+
+  it('Jugando pill NOT rendered when highlight=false', () => {
+    render(<PersonajeCard char={baseChar} highlight={false} />);
+    expect(screen.queryByText('Jugando')).toBeNull();
+  });
+
+  it('Jugando pill has data-tone="accent"', () => {
+    render(<PersonajeCard char={baseChar} highlight={true} />);
+    const pill = screen.getByText('Jugando');
+    expect(pill.getAttribute('data-tone')).toBe('accent');
+  });
+
+  // ── REQ-AC-SEL-02: SetActiveCharacterButton only for active status ──
+
+  it('SetActiveCharacterButton rendered for active status card', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'active' }} />);
+    // The button is the SetActiveCharacterButton (☆ or ★ inside)
+    const btns = screen.getAllByRole('button');
+    expect(btns.length).toBeGreaterThan(0);
+  });
+
+  it('SetActiveCharacterButton NOT rendered for draft status card (REQ-AC-SEL-02)', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('SetActiveCharacterButton NOT rendered for retired status card (REQ-AC-SEL-02)', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'retired' }} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('SetActiveCharacterButton NOT rendered for dead status card (REQ-AC-SEL-02)', () => {
+    render(<PersonajeCard char={{ ...baseChar, status: 'dead' }} />);
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   describe('status pill mapping (PERS-CARD-02)', () => {
@@ -90,12 +172,6 @@ describe('PersonajeCard', () => {
       render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
       expect(screen.getByText('Borrador')).toBeTruthy();
     });
-  });
-
-  it('draft card does NOT have personajes-char-card-active (no highlight)', () => {
-    render(<PersonajeCard char={{ ...baseChar, status: 'draft' }} />);
-    const link = screen.getByRole('link');
-    expect(link.className).not.toContain('personajes-char-card-active');
   });
 
   // ── v3 design (spec personajes-v3-data) ──

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Pill } from '@/components/ui/pill';
 import type { PillTone } from '@/components/ui/pill';
+import { SetActiveCharacterButton } from './set-active-character-button';
 import type { RosterCharacter } from './types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,10 +24,12 @@ export function PersonajeCard({
   char,
   worldName,
   highlight = false,
+  activeCharacterId,
 }: {
   char: RosterCharacter;
   worldName?: string;
   highlight?: boolean;
+  activeCharacterId?: string;
 }) {
   const initial = char.name.trim().charAt(0).toUpperCase() || '?';
   const tone: PillTone = STATUS_TONES[char.status] ?? 'stone';
@@ -36,34 +39,52 @@ export function PersonajeCard({
       ? `/characters/${char.id}/wizard`
       : `/characters/${char.id}`;
 
+  // highlight is now driven by char.id === activeCharacterId at the call site.
+  // The wrapper div carries the active border — not the Link (ADR F-AFF, ADR F-VIS).
+  const isActive = highlight;
+
   return (
-    <Link
-      href={href}
-      className={`flex overflow-hidden rounded-md border bg-surface transition-colors hover:border-ink-mute ${
-        highlight ? 'personajes-char-card-active' : 'border-line'
+    <div
+      className={`flex overflow-hidden rounded-md border bg-surface ${
+        isActive ? 'personajes-char-card-active' : 'border-line'
       }`}
     >
-      <div className="personajes-portrait grid w-[72px] shrink-0 place-items-center border-r border-line font-display text-[26px] font-bold text-accent">
-        {initial}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5">
-        <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
-          {char.name}
+      <Link
+        href={href}
+        className="flex flex-1 transition-colors hover:border-ink-mute"
+      >
+        <div className="personajes-portrait grid w-[72px] shrink-0 place-items-center border-r border-line font-display text-[26px] font-bold text-accent">
+          {initial}
         </div>
-        {char.lineage ? (
-          <div data-testid="char-lineage" className="font-sans text-xs italic text-ink-mute">
-            {char.lineage}
+        <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5">
+          <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
+            {char.name}
           </div>
-        ) : null}
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {worldName ? <Pill size="sm" tone="ink">{worldName}</Pill> : null}
-          {char.status === 'active' && char.hpCurrent != null && char.hpMax != null ? (
-            <Pill size="sm" tone="secondary">HP {char.hpCurrent}/{char.hpMax}</Pill>
+          {char.lineage ? (
+            <div data-testid="char-lineage" className="font-sans text-xs italic text-ink-mute">
+              {char.lineage}
+            </div>
           ) : null}
-          <Pill size="sm" tone={tone}>{label}</Pill>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {worldName ? <Pill size="sm" tone="ink">{worldName}</Pill> : null}
+            {char.status === 'active' && char.hpCurrent != null && char.hpMax != null ? (
+              <Pill size="sm" tone="secondary">HP {char.hpCurrent}/{char.hpMax}</Pill>
+            ) : null}
+            <Pill size="sm" tone={tone}>{label}</Pill>
+            {isActive ? (
+              <Pill size="sm" tone="accent">Jugando</Pill>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <div className="self-center pr-3 text-xl leading-none text-ink-mute">›</div>
-    </Link>
+        <div className="self-center pr-3 text-xl leading-none text-ink-mute">›</div>
+      </Link>
+      {char.status === 'active' ? (
+        <SetActiveCharacterButton
+          characterId={char.id}
+          worldId={char.worldId}
+          isActive={isActive}
+        />
+      ) : null}
+    </div>
   );
 }

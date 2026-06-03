@@ -6,6 +6,7 @@ import { V3Empty } from '@/components/ui/empty';
 import { PersonajeCard, StatusFilterChips, CreatePersonajeCTA } from '@/components/personajes';
 import type { RosterCharacter } from '@/components/personajes/types';
 import { parseChip, filterByStatusChip, computeCounts } from '@/lib/personajes-filter';
+import { getActiveCharacter } from '@/lib/active-character';
 
 type SearchParams = Promise<{ status?: string }>;
 
@@ -25,15 +26,18 @@ export default async function PersonajesPage({
   } = await supabase.auth.getSession();
   const token = session!.access_token;
 
-  const [charsResult, worldsResult] = await Promise.allSettled([
+  const [charsResult, worldsResult, activeCharResult] = await Promise.allSettled([
     api.get<{ data: RosterCharacter[] }>('/characters', token),
     getMyWorlds(token),
+    getActiveCharacter(token),
   ]);
 
   const characters: RosterCharacter[] =
     charsResult.status === 'fulfilled' ? charsResult.value.data : [];
   const worlds = worldsResult.status === 'fulfilled' ? worldsResult.value : [];
   const worldsMap = Object.fromEntries(worlds.map((w) => [w.id, w.name]));
+  const activeCharacterId =
+    activeCharResult.status === 'fulfilled' ? (activeCharResult.value?.id ?? null) : null;
 
   const { status } = await searchParams;
   const chip = parseChip(status);
@@ -61,12 +65,13 @@ export default async function PersonajesPage({
           />
         ) : (
           <div className="flex flex-col gap-2">
-            {visible.map((c, i) => (
+            {visible.map((c) => (
               <PersonajeCard
                 key={c.id}
                 char={c}
                 worldName={worldsMap[c.worldId]}
-                highlight={chip === 'active' && i === 0 && c.status === 'active'}
+                activeCharacterId={activeCharacterId ?? undefined}
+                highlight={c.id === activeCharacterId}
               />
             ))}
           </div>
