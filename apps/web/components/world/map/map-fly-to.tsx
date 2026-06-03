@@ -20,8 +20,8 @@ import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { worldToLatLng } from '@/lib/world/map/coords';
 
-/** Fly-to zoom level — between INITIAL_ZOOM(1) and MAX_ZOOM(5); good "jumped to it" feel. */
-const FLY_ZOOM = 3;
+/** Fly-to zoom level — closer "jumped to it" feel (map maxZoom is 6). */
+const FLY_ZOOM = 4;
 
 export interface FlyTarget {
   x: number;

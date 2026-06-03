@@ -53,10 +53,10 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
       className={[
         // Base — fixed panel, z-20 (above map z-10, below toggle z-30 and TabBar z-40)
         'fixed inset-x-0 bottom-0 z-20 flex flex-col',
-        // Mobile bottom-sheet shape
-        'max-h-[55vh] w-full rounded-t-xl',
+        // Mobile bottom-sheet shape — fixed half-height sheet (not content-hugging)
+        'h-[55vh] w-full rounded-t-xl',
         // Desktop left-panel shape (overrides mobile above)
-        'md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:w-80 md:max-h-none md:rounded-t-none md:rounded-r-xl',
+        'md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:h-auto md:w-80 md:rounded-t-none md:rounded-r-xl',
         // Surface
         'bg-surface shadow-xl',
         // Animation

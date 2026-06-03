@@ -304,6 +304,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
            * safe-area-inset-bottom — same pattern as the map container itself.
            * REQ-PML-DRAWER-02, ADR-4.
            */}
+          {!drawerOpen && (
           <button
             type="button"
             onClick={() => setDrawerOpen((v) => !v)}
@@ -315,6 +316,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
           >
             Puntos
           </button>
+          )}
 
           {/*
            * PoiMapDrawer — fixed-positioned overlay panel with the POI list.
