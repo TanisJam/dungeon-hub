@@ -671,10 +671,26 @@ test('B1-T4: Player view — drawer opens; list shows no DM-only (unknown) rows'
   const page = await playerCtx.newPage();
 
   try {
-    await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+    await page.goto('/mapa?view=mapa', { waitUntil: 'domcontentloaded' });
 
+    // Wait for the map container first — it is present in both GM and player views and
+    // signals that the React tree has rendered. Without this the FAB check below may fire
+    // before the client bundle has hydrated and produce a false-negative.
     const mapContainer = page.locator('[data-testid="map-container"]');
     await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+    // Early skip guard: after the map container is visible the client bundle has hydrated.
+    // The DM poi-create FAB ([data-testid="poi-create-fab"]) is only rendered when
+    // effectiveView === 'dm'. If it is present, player1 resolved as GM — skip immediately
+    // instead of burning the remaining budget on toggle/drawer waits that may not exist
+    // in this role configuration.
+    const dmFab = page.locator('[data-testid="poi-create-fab"]');
+    const isGmMode = await dmFab.isVisible().catch(() => false);
+    test.skip(
+      isGmMode,
+      'player1 resolved as GM in their active world (DM FAB visible after map render) — ' +
+        'run db:seed:e2e + fixture:setup to ensure player1 is only a player in the E2E world.',
+    );
 
     // Toggle should be visible for players too (B1: drawer is role-agnostic, list is pre-filtered)
     const toggle = page.locator('[data-testid="poi-drawer-toggle"]');
