@@ -1,5 +1,15 @@
 export type CombatantKind = 'pc' | 'npc';
 
+export type CombatantCondition = {
+  name: string;
+  appliedByCombatantId: string | null;
+};
+
+export type CombatantEffect = {
+  name: string;
+  sourceCombatantId: string | null;
+};
+
 export type EncounterCombatant = {
   id: string;
   name: string;
@@ -9,6 +19,13 @@ export type EncounterCombatant = {
   hpCurrent: number;
   hpMax: number;
   insertionOrder: number;
+  // REQ-WCO-API-03 — conditions/effects (PHB Appendix A p.290-292) + action economy
+  conditions: CombatantCondition[];
+  effects: CombatantEffect[];
+  actionUsed: boolean;
+  bonusActionUsed: boolean;
+  reactionUsed: boolean;
+  attacksRemaining: number;
 };
 
 export type EncounterDetail = {
