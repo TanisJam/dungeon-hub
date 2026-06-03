@@ -27,6 +27,10 @@ export async function useResource(
   if (!IdSchema.safeParse(characterId).success) {
     return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid character ID' };
   }
+  // FIX 4: validate encounterId to prevent path-traversal or bad revalidation paths
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
 
   const supabase = await createClient();
   const {
@@ -67,6 +71,10 @@ export async function restoreResource(
   if (!IdSchema.safeParse(characterId).success) {
     return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid character ID' };
   }
+  // FIX 4: validate encounterId to prevent path-traversal or bad revalidation paths
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
 
   const supabase = await createClient();
   const {
@@ -105,6 +113,10 @@ export async function shortRest(
   if (!IdSchema.safeParse(characterId).success) {
     return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid character ID' };
   }
+  // FIX 4: validate encounterId to prevent path-traversal or bad revalidation paths
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
 
   const supabase = await createClient();
   const {
@@ -138,6 +150,10 @@ export async function longRest(
 ): Promise<EncounterActionResult> {
   if (!IdSchema.safeParse(characterId).success) {
     return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid character ID' };
+  }
+  // FIX 4: validate encounterId to prevent path-traversal or bad revalidation paths
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
   }
 
   const supabase = await createClient();
