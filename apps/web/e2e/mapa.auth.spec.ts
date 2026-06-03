@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
  *   (i) Tap-to-place round-trip: null-coord POI → Colocar en mapa → place mode → tap → persist.
  *   (j) Round-trip persistence: coord committed via tap survives page reload.
  *   (k) Cancelar exits place-mode without writing coords.
- *   (l) Drag-mode gating: DM markers are draggable; player markers are not.
+ *   (l) Popup button gating: DM popup has Editar/Mover buttons; player popup does not.
  *   (m) Player gating: no "Colocar en mapa" button in player view.
  *
  * B2 additions (REQ-PWC-CREATE-01..05, REQ-PWC-IA-01..03):
@@ -42,9 +42,9 @@ import { test, expect } from '@playwright/test';
  * when no seeded coords exist in the E2E world. Assertions are container/no-crash
  * by default, with conditional tap-to-open when a marker IS present.
  *
- * TASK-5.3 (manual gate — NOT in this E2E):
- *   Real-device 375px drag verification must be done manually by Mauricio.
- *   See apply-progress artifact for the full manual checkpoint.
+ * B2-Refinement (manual gate — NOT in this E2E):
+ *   375px viewport: tap marker → popup shows Editar/Mover buttons; tap Editar → edit sheet opens;
+ *   tap Mover → enters place-mode → tap → POI repositioned. Verify on real device.
  *
  * B2-IAx (manual gate — NOT in this E2E):
  *   375px viewport visual review: FAB (bottom-right) vs drawer toggle (bottom-left) vs
@@ -414,40 +414,69 @@ test('T3: Cancelar exits place-mode without writing coords', async ({ page }) =>
 });
 
 /**
- * T4: Drag-mode gating — attribute assertion (NOT gesture simulation).
+ * T4: Edit/move popup button gating (replaces removed drag-mode gating).
  *
- * REQ-PLACE-DRAG-01: DM view markers are draggable; player view markers are not.
- * Playwright cannot reliably simulate a Leaflet marker drag gesture — so we assert
- * the DOM attribute instead. The manual gate (TASK-5.3) covers the actual gesture.
+ * B2 Refinement: DM drag removed — markers are static, edit/move gated behind popup buttons.
+ * DM view: tapping a marker opens a popup containing "Editar" and "Mover" buttons.
+ * Player view: tapping a marker opens a popup WITHOUT those DM-only buttons.
+ * Conditional: skipped entirely when zero placed markers exist in the E2E world (ADR-4 tolerance).
  */
-test('T4: Drag-mode gating — DM markers have draggable attribute; player markers do not', async ({ page, context }) => {
-  // DM view: at least one placed marker should be draggable
-  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+test('T4: DM popup shows Editar/Mover buttons; player popup does not', async ({ browser }) => {
+  // DM view: assert popup buttons are present when a marker exists
+  {
+    const dmCtx = await browser.newContext();
+    const page = await dmCtx.newPage();
+    try {
+      await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
 
-  const mapContainer = page.locator('[data-testid="map-container"]');
-  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+      const mapContainer = page.locator('[data-testid="map-container"]');
+      await expect(mapContainer).toBeVisible({ timeout: 15_000 });
 
-  const markers = page.locator('.dungeon-hub-map-marker');
-  const markerCount = await markers.count();
+      const markers = page.locator('.dungeon-hub-map-marker');
+      const markerCount = await markers.count();
 
-  if (markerCount > 0) {
-    // At least one Leaflet marker layer container should have the draggable class
-    // Leaflet adds 'leaflet-marker-draggable' to a draggable marker's layer.
-    // We look at the parent wrapper (.leaflet-marker-icon or .leaflet-marker-pane descendant)
-    const draggableMarkers = page.locator('.leaflet-marker-draggable');
-    await expect(draggableMarkers.first()).toBeVisible({ timeout: 5_000 });
+      if (markerCount > 0) {
+        // Tap a marker to open the popup
+        await markers.first().click();
+        const popup = page.locator('.leaflet-popup-content');
+        await expect(popup).toBeVisible({ timeout: 5_000 });
+
+        // DM-only popup buttons must be present
+        await expect(popup.getByRole('button', { name: 'Editar' })).toBeVisible({ timeout: 3_000 });
+        await expect(popup.getByRole('button', { name: 'Mover' })).toBeVisible({ timeout: 3_000 });
+      }
+      // Zero markers: valid baseline — no assertion needed (ADR-4 tolerance)
+    } finally {
+      await dmCtx.close();
+    }
   }
 
-  // Player view: switch auth state and verify no draggable markers
-  await context.storageState({ path: '/home/tanisjam/projects/personal/dungeon_hub/apps/web/e2e/.auth/player1.json' });
-  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+  // Player view: popup must NOT contain Editar/Mover buttons
+  {
+    const playerCtx = await browser.newContext({ storageState: PLAYER1_AUTH });
+    const page = await playerCtx.newPage();
+    try {
+      await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
 
-  const mapContainerPlayer = page.locator('[data-testid="map-container"]');
-  await expect(mapContainerPlayer).toBeVisible({ timeout: 15_000 });
+      const mapContainer = page.locator('[data-testid="map-container"]');
+      await expect(mapContainer).toBeVisible({ timeout: 15_000 });
 
-  // Player: no draggable markers
-  const playerDraggableMarkers = page.locator('.leaflet-marker-draggable');
-  await expect(playerDraggableMarkers).toHaveCount(0);
+      const markers = page.locator('.dungeon-hub-map-marker');
+      const markerCount = await markers.count();
+
+      if (markerCount > 0) {
+        await markers.first().click();
+        const popup = page.locator('.leaflet-popup-content');
+        await expect(popup).toBeVisible({ timeout: 5_000 });
+
+        // Player must not see edit/move buttons
+        await expect(popup.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+        await expect(popup.getByRole('button', { name: 'Mover' })).toHaveCount(0);
+      }
+    } finally {
+      await playerCtx.close();
+    }
+  }
 });
 
 /**
@@ -643,17 +672,24 @@ test('B1-T4: Player view — drawer opens; list shows no DM-only (unknown) rows'
     // that sorts first), the API legitimately returns unknown-status POIs. The API role-filter IS
     // correct — this is an env/seed dependency. Re-run db:seed:e2e and fixture:setup to fix.
     if (unknownCount > 0) {
-      // Confirm this is really a GM-world situation: draggable markers indicate DM mode.
-      // If so, skip rather than fail — the component and API filter are both correct.
-      const draggableMarkers = page.locator('.leaflet-marker-draggable');
-      const draggableCount = await draggableMarkers.count();
+      // Confirm this is really a GM-world situation: DM popup buttons (Editar/Mover) on any
+      // visible marker indicate DM mode (B2 Refinement — drag removed, popup buttons are the gate).
+      const markers = page.locator('.dungeon-hub-map-marker');
+      const firstMarkerCount = await markers.count();
+      let dmButtonsVisible = false;
+      if (firstMarkerCount > 0) {
+        await markers.first().click();
+        const popup = page.locator('.leaflet-popup-content');
+        if (await popup.isVisible().catch(() => false)) {
+          dmButtonsVisible = await popup.getByRole('button', { name: 'Editar' }).isVisible().catch(() => false);
+        }
+      }
       test.skip(
-        draggableCount > 0,
-        'player1 resolved as GM in their active world (draggable markers visible) — ' +
+        dmButtonsVisible,
+        'player1 resolved as GM in their active world (DM popup buttons visible) — ' +
           'run db:seed:e2e + fixture:setup to ensure player1 is only a player in the E2E world.',
       );
-      // If no draggable markers: unknown POIs are present but markers are non-draggable — still
-      // consistent with DM mode (zero placed POIs + unknown status). Skip unconditionally.
+      // If no DM buttons: unknown POIs present but role unclear — skip unconditionally.
       test.skip(
         true,
         'player1 active world returns unknown-status POIs — player role not confirmed in this env. ' +
@@ -775,12 +811,14 @@ test('B2-CREATE-2: Player does not see poi-create FAB (REQ-PWC-CREATE-01)', asyn
     const mapContainer = page.locator('[data-testid="map-container"]');
     await expect(mapContainer).toBeVisible({ timeout: 15_000 });
 
-    // Skip guard: if player1 resolves as GM, draggable markers would be present.
-    const draggableMarkers = page.locator('.leaflet-marker-draggable');
-    const draggableCount = await draggableMarkers.count();
+    // Skip guard: if player1 resolves as GM, the create FAB would be visible.
+    // B2 Refinement: drag removed — use FAB presence as the DM-role signal instead of
+    // .leaflet-marker-draggable (which no longer exists after removing always-on drag).
+    const createFabCheck = page.locator('[data-testid="poi-create-fab"]');
+    const fabCount = await createFabCheck.count();
     test.skip(
-      draggableCount > 0,
-      'player1 resolved as GM in their active world — run db:seed:e2e + fixture:setup to fix.',
+      fabCount > 0,
+      'player1 resolved as GM in their active world (create FAB visible) — run db:seed:e2e + fixture:setup to fix.',
     );
 
     // Player must NOT see the create FAB
