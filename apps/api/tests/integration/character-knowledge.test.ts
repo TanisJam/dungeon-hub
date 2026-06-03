@@ -1,12 +1,16 @@
 /**
  * Integration tests: character knowledge routes
  *
- * REQ-CK-API-01 — POST /characters/:id/knowledge (DM grant, idempotent, 403, 400)
- * REQ-CK-API-02 — GET  /characters/:id/knowledge/bestiary (DM full + flags, player filtered, 403)
+ * REQ-CK-API-01  — POST /characters/:id/knowledge (DM grant, idempotent, 403, 400)
+ * REQ-CCB-API-01 — GET  /characters/:id/knowledge/:kind (monsters: DM full+flags, player filtered, 403, 400 invalid-kind)
+ * REQ-CCB-API-02 — GET  /characters/:id/codex/counts ({ monsters:{known,total} })
  * REQ-CK-GATE-01 — Layered visibility gate
  *
- * Spec: character-codex #1626
+ * Spec: character-codex #1626, character-codex-browser (CCB Slice 1')
  * Pattern: mirrors campaigns.test.ts (in-process Fastify + real Postgres, singleFork)
+ *
+ * NOTE: /knowledge/bestiary has been REMOVED (replaced by /knowledge/:kind).
+ * Confirm: a request to /knowledge/bestiary returns 400 VALIDATION_FAILED (unknown kind).
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -207,27 +211,27 @@ describe('character knowledge routes', () => {
     });
   });
 
-  // ── GET /characters/:id/knowledge/bestiary ──────────────────────────────────
+  // ── GET /characters/:id/knowledge/:kind — monsters ──────────────────────────
 
-  describe('GET /characters/:id/knowledge/bestiary', () => {
-    it('returns response structure: monsters[], total, knownCount, effectiveView', async () => {
+  describe('GET /characters/:id/knowledge/:kind (monsters)', () => {
+    it('returns response structure: rows[], total, knownCount, effectiveView', async () => {
       const app = await getTestApp();
 
       // GM view
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
       });
 
       expect(res.statusCode).toBe(200);
       const body = res.json<{
-        monsters: unknown[];
+        rows: unknown[];
         total: number;
         knownCount: number;
         effectiveView: string;
       }>();
-      expect(Array.isArray(body.monsters)).toBe(true);
+      expect(Array.isArray(body.rows)).toBe(true);
       expect(typeof body.total).toBe('number');
       expect(typeof body.knownCount).toBe('number');
       expect(body.effectiveView).toBe('dm');
@@ -242,24 +246,24 @@ describe('character knowledge routes', () => {
 
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
       });
 
       expect(res.statusCode).toBe(200);
       const body = res.json<{
-        monsters: Array<{ slug: string; source: string; name: string; cr: string | null; type: string | null; known: boolean }>;
+        rows: Array<{ slug: string; source: string; name: string; cr: string | null; type: string | null; known: boolean }>;
         total: number;
         knownCount: number;
         effectiveView: string;
       }>();
 
       expect(body.effectiveView).toBe('dm');
-      // DM sees ALL compendium monsters (total = monsters.length)
-      expect(body.monsters).toHaveLength(body.total);
+      // DM sees ALL compendium monsters (total = rows.length)
+      expect(body.rows).toHaveLength(body.total);
 
       // Every monster has the required fields
-      for (const m of body.monsters) {
+      for (const m of body.rows) {
         expect(m).toHaveProperty('slug');
         expect(m).toHaveProperty('source');
         expect(m).toHaveProperty('name');
@@ -269,7 +273,7 @@ describe('character knowledge routes', () => {
       }
 
       // knownCount matches the actual count of known: true entries
-      const actualKnown = body.monsters.filter((m) => m.known).length;
+      const actualKnown = body.rows.filter((m) => m.known).length;
       expect(actualKnown).toBe(body.knownCount);
     });
 
@@ -280,13 +284,13 @@ describe('character knowledge routes', () => {
       // Player should see ONLY that monster, not the full compendium.
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${player.accessToken}` },
       });
 
       expect(res.statusCode).toBe(200);
       const body = res.json<{
-        monsters: Array<{ slug: string; source: string; known: boolean }>;
+        rows: Array<{ slug: string; source: string; known: boolean }>;
         total: number;
         knownCount: number;
         effectiveView: string;
@@ -294,22 +298,17 @@ describe('character knowledge routes', () => {
 
       expect(body.effectiveView).toBe('player');
 
-      // Player sees FEWER (or equal) monsters than total — only the known ones
-      // NOTE: current implementation returns known-only (no silhouette placeholders for
-      // undiscovered monsters). This is a DEVIATION from REQ-CK-WEB-01 (which leaves
-      // silhouette UX deferred) but the READ endpoint returns known-only by design
-      // (read-bestiary.ts line 91: `if (visible) push(…, known: true)`).
-      // Spec REQ-CK-API-02: "player: returns ONLY the monsters where known === true"
-      // → this behavior is CORRECT per spec.
-      expect(body.monsters.length).toBeLessThanOrEqual(body.total);
+      // Player sees FEWER (or equal) rows than total — only the known ones
+      // REQ-CCB-API-01: player view returns known-only (no silhouette placeholders).
+      expect(body.rows.length).toBeLessThanOrEqual(body.total);
 
       // All returned monsters are known
-      for (const m of body.monsters) {
+      for (const m of body.rows) {
         expect(m.known).toBe(true);
       }
 
-      // knownCount matches the actual returned count (player view: monsters = known only)
-      expect(body.monsters).toHaveLength(body.knownCount);
+      // knownCount matches the actual returned count (player view: rows = known only)
+      expect(body.rows).toHaveLength(body.knownCount);
     });
 
     it('Player view: does NOT include unknown monsters (gate enforced)', async () => {
@@ -317,31 +316,31 @@ describe('character knowledge routes', () => {
 
       const dmRes = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
       });
       const dmBody = dmRes.json<{
-        monsters: Array<{ slug: string; source: string; known: boolean }>;
+        rows: Array<{ slug: string; source: string; known: boolean }>;
         total: number;
         knownCount: number;
       }>();
 
       const playerRes = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${player.accessToken}` },
       });
       const playerBody = playerRes.json<{
-        monsters: Array<{ slug: string; source: string; known: boolean }>;
+        rows: Array<{ slug: string; source: string; known: boolean }>;
         total: number;
         knownCount: number;
       }>();
 
       // If there are unknown monsters in the compendium, the player must not see them
-      const unknownInCompendium = dmBody.monsters.filter((m) => !m.known);
+      const unknownInCompendium = dmBody.rows.filter((m) => !m.known);
       if (unknownInCompendium.length > 0) {
         const playerSlugs = new Set(
-          playerBody.monsters.map((m) => `${m.slug}|${m.source}`),
+          playerBody.rows.map((m) => `${m.slug}|${m.source}`),
         );
         for (const unknown of unknownInCompendium) {
           expect(playerSlugs.has(`${unknown.slug}|${unknown.source}`)).toBe(false);
@@ -354,7 +353,7 @@ describe('character knowledge routes', () => {
 
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
         headers: { authorization: `Bearer ${outsider.accessToken}` },
       });
 
@@ -368,7 +367,7 @@ describe('character knowledge routes', () => {
 
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
       });
 
       expect(res.statusCode).toBe(401);
@@ -380,7 +379,116 @@ describe('character knowledge routes', () => {
       const fakeId = '00000000-0000-0000-0000-000000000001';
       const res = await app.inject({
         method: 'GET',
-        url: `/api/v1/characters/${fakeId}/knowledge/bestiary`,
+        url: `/api/v1/characters/${fakeId}/knowledge/monsters`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('Invalid kind (dragons) → 400 VALIDATION_FAILED', async () => {
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/dragons`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      // REQ-CCB-API-01 invalid-kind scenario
+      expect(res.statusCode).toBe(400);
+      const body = res.json<{ error: string; issues: unknown[] }>();
+      expect(body.error).toBe('VALIDATION_FAILED');
+      expect(Array.isArray(body.issues)).toBe(true);
+    });
+
+    it('Old /knowledge/bestiary route is gone → 400 (invalid kind, not 200)', async () => {
+      const app = await getTestApp();
+
+      // /knowledge/bestiary is no longer a valid route — 'bestiary' is NOT an allowed URL kind.
+      // The new route is /knowledge/monsters (maps to DB kind 'bestiary' internally).
+      // This test confirms the old path is not exposed as a live route.
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/bestiary`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      // 'bestiary' is not in the allowlist for URL kind → 400 VALIDATION_FAILED
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  // ── GET /characters/:id/codex/counts ─────────────────────────────────────────
+
+  describe('GET /characters/:id/codex/counts', () => {
+    it('returns { monsters: { known, total } } structure', async () => {
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/codex/counts`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{ monsters: { known: number; total: number } }>();
+      expect(typeof body.monsters).toBe('object');
+      expect(typeof body.monsters.known).toBe('number');
+      expect(typeof body.monsters.total).toBe('number');
+      expect(body.monsters.known).toBeGreaterThanOrEqual(0);
+      expect(body.monsters.total).toBeGreaterThanOrEqual(0);
+      expect(body.monsters.known).toBeLessThanOrEqual(body.monsters.total);
+    });
+
+    it('known count reflects actual knowledge rows for this character', async () => {
+      const app = await getTestApp();
+
+      // GM view — both return the same counts (access check only)
+      const gmCountsRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/codex/counts`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+      const gmCounts = gmCountsRes.json<{ monsters: { known: number; total: number } }>();
+
+      // Player can also read counts (owner of character)
+      const playerCountsRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/codex/counts`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      });
+      const playerCounts = playerCountsRes.json<{ monsters: { known: number; total: number } }>();
+
+      // Both return the same total (compendium size is global)
+      expect(gmCounts.monsters.total).toBe(playerCounts.monsters.total);
+      // known count matches (character-specific, same data)
+      expect(gmCounts.monsters.known).toBe(playerCounts.monsters.known);
+      // At this point the character has at least 1 grant (TEST_MONSTER from POST tests)
+      expect(gmCounts.monsters.known).toBeGreaterThanOrEqual(1);
+    });
+
+    it('Outsider (no world membership) → 403 FORBIDDEN', async () => {
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/codex/counts`,
+        headers: { authorization: `Bearer ${outsider.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(403);
+      const body = res.json<{ error: string }>();
+      expect(body.error).toBe('FORBIDDEN');
+    });
+
+    it('Non-existent character → 404', async () => {
+      const app = await getTestApp();
+
+      const fakeId = '00000000-0000-0000-0000-000000000002';
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${fakeId}/codex/counts`,
         headers: { authorization: `Bearer ${gm.accessToken}` },
       });
 

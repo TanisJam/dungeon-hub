@@ -78,7 +78,8 @@ import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-
 import { loadInventoryDetail } from '../../use-cases/characters/load-inventory-detail.js';
 import { recordSessionEventForCharacter, routeTransferEvent } from '../../use-cases/sessions/events.js';
 import { emitCharacterEvent } from '../../use-cases/characters/emit-character-event.js';
-import { readBestiary } from '../../use-cases/characters/read-bestiary.js';
+import { readCharacterCodexCategory, type CodexKind } from '../../use-cases/characters/read-character-codex.js';
+import { getCodexCounts } from '../../use-cases/characters/codex-counts.js';
 import { loadClassSpells } from '../../use-cases/characters/load-class-spells.js';
 import { loadOptionalFeatures } from '../../use-cases/characters/load-optional-features.js';
 import { loadFeatureProgression } from '../../use-cases/characters/load-feature-progression.js';
@@ -235,6 +236,14 @@ const GrantKnowledgeBody = z.object({
   kind: z.enum(['bestiary', 'item', 'spell', 'npc', 'faction', 'location', 'lore']),
   refKey: z.string().min(1),
   refSource: z.string().min(1),
+});
+
+// character-codex-browser: GET /knowledge/:kind param validation.
+// URL kind 'monsters' maps to DB kind 'bestiary' inside readCharacterCodexCategory.
+// Add new URL kinds here as future slices land (items, spells, etc.).
+const KnowledgeKindParam = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(['monsters'] as [CodexKind, ...CodexKind[]]),
 });
 
 // engine-timeline-duration: optional encounterId querystring param for GET /sheet
@@ -1703,21 +1712,37 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  // ---- GET /characters/:id/knowledge/bestiary ---------------------------------
-  // Returns the character's known monsters projected against compendium_monsters.
-  // DM: full MM with known flag. Player: only known monsters (gate applied).
-  // REQ-CK-API-02, REQ-CK-GATE-01, character-codex SDD #1626.
+  // ---- GET /characters/:id/knowledge/:kind ------------------------------------
+  // Generalized knowledge read endpoint. Replaces /knowledge/bestiary (CCB Slice 1').
+  //
+  // Supported kinds (URL → DB):
+  //   monsters → character_knowledge.kind='bestiary' (DB enum unchanged)
+  //
+  // DM: full compendium entries + known flag. Player: only known entries.
+  // REQ-CCB-API-01, character-codex-browser SDD.
   app.get(
-    '/characters/:id/knowledge/bestiary',
+    '/characters/:id/knowledge/:kind',
     { preHandler: app.authenticate },
     async (request, reply) => {
-      const { id } = ParamsWithId.parse(request.params);
+      // Validate :kind param against allowlist — unknown kinds → 400 VALIDATION_FAILED
+      const paramsResult = KnowledgeKindParam.safeParse(request.params);
+      if (!paramsResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: paramsResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const { id, kind } = paramsResult.data;
       const userId = request.user!.sub;
 
       const character = await loadCharacter(id);
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      // Resolve caller role: owner → player view; GM → dm view; non-member → 403
+      // Resolve caller role: GM → dm view; owner/member → player view; non-member → 403
       const access = await getCharacterAccess(character, userId);
       const gmCheck = await assertWorldGm(character.worldId, userId);
 
@@ -1733,14 +1758,45 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const result = await readBestiary(id, effectiveView);
+      const result = await readCharacterCodexCategory(id, kind, effectiveView);
 
       return {
-        monsters: result.monsters,
+        rows: result.rows,
         total: result.total,
         knownCount: result.knownCount,
-        effectiveView,
+        effectiveView: result.effectiveView,
       };
+    },
+  );
+
+  // ---- GET /characters/:id/codex/counts ---------------------------------------
+  // Returns per-kind known/total counts for the character codex grid.
+  // Access: owner or GM. Non-member → 403.
+  // REQ-CCB-API-02, character-codex-browser SDD.
+  app.get(
+    '/characters/:id/codex/counts',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Same access check as the knowledge read route
+      const access = await getCharacterAccess(character, userId);
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+
+      const hasCcess = gmCheck.ok || access !== 'none';
+      if (!hasCcess) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+        });
+      }
+
+      const counts = await getCodexCounts(id);
+      return counts;
     },
   );
 
