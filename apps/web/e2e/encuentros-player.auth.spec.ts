@@ -7,21 +7,16 @@
  *   (1) Player sees TurnBanner on /encuentros/:id
  *   (2) ResourcePanel visible for own combatant; rest buttons accessible
  *   (3) No horizontal scroll at 375px (REQ-WCO-WEB-01)
+ *   (4) Round-trip: use a resource charge → page reflects updated count
  *
  * Seeding strategy:
  *   - DM creates an encounter via API (POST /encounters) with player1's character as PC combatant.
  *   - Player1 browses the encounter page via /api/dev/login cookie injection.
  *
- * KNOWN LIMITATION (Risk #3 from sdd/web-combat-observe/tasks):
- *   Encounter visibility requires campaignMembers row (not just worldMembers).
- *   There is no public API to add a player to campaign_members — it requires DB access.
- *   The seed-e2e-fixture.ts only adds worldMembers, not campaignMembers, for players.
- *   As a result, player1's encounter access depends on the fixture campaign having player1
- *   in campaignMembers. If not, the spec skips gracefully with a clear message.
- *   FIX: add `addCampaignMember` to the fixture seed, or expose a DM-only POST
- *   /campaigns/:id/members endpoint. Until then, this spec is OPERATOR-PENDING for
- *   the full round-trip. The spec IS well-formed; it validates that the page loads
- *   correctly for any user with campaign access.
+ * Fixture requirement (REQ-WCO-E2E-01):
+ *   seed-e2e-fixture.ts now seeds both world_members AND campaign_members for each player
+ *   so that GET /encounters/:id returns 200 + callerRole:'player' instead of 403.
+ *   Run: pnpm --filter @dungeon-hub/api db:seed:e2e
  *
  * Stack must be running (apps/web/e2e/README.md).
  * Viewport: 375px (iPhone SE) per CLAUDE.md §2 mobile-first.
@@ -185,18 +180,35 @@ test.describe('Encuentros — player read view @ 375px', () => {
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth, 'Horizontal scroll present at 375px').toBeLessThanOrEqual(400);
 
-    // ── Step 9: ResourcePanel rest buttons visible (REQ-WCO-WEB-05/06) ───
-    // player1's L1 Fighter has Second Wind resource — ResourcePanel should render.
+    // ── Step 9: ResourcePanel visible with rest buttons (REQ-WCO-WEB-05/06) ──
+    // player1 is a campaign member (fixed by seed-e2e-fixture.ts REQ-WCO-E2E-01).
+    // The encounter has player1's character as a PC combatant, so the ownCombatant
+    // intersection succeeds and ResourcePanel renders with the L1 Fighter's resources.
     const shortRestBtn = page.getByRole('button', { name: /descanso corto/i }).first();
-    const hasPanel = await shortRestBtn.isVisible({ timeout: 5_000 }).catch(() => false);
-    if (hasPanel) {
-      await expect(page.getByRole('button', { name: /descanso largo/i }).first()).toBeVisible();
-    }
-    // NOTE: if the panel doesn't appear, it may be because player1's character has no
-    // matching combatant (characterId intersection failed). This is a valid degrade state —
-    // the spec verifies the page renders correctly, not that ResourcePanel always appears.
+    await expect(shortRestBtn).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: /descanso largo/i }).first()).toBeVisible();
 
-    // ── Step 10: Screenshot for visual review (non-fatal) ─────────────────
+    // ── Step 10: Round-trip — use Second Wind charge, verify count decrements ─
+    // L1 Fighter has Second Wind (1/1). Click "Usar" → Server Action fires →
+    // revalidatePath triggers re-render → count should show 0/1.
+    const usarBtn = page.getByRole('button', { name: /usar/i }).first();
+    await expect(usarBtn).toBeVisible({ timeout: 5_000 });
+
+    // Capture initial count text before use (e.g. "1 / 1")
+    const counterEl = page.locator('span.tabular-nums').first();
+    const initialCount = await counterEl.textContent();
+
+    // Click Usar and wait for the counter to change (revalidatePath re-render)
+    await usarBtn.click();
+    await expect(counterEl).not.toHaveText(initialCount ?? '', { timeout: 10_000 });
+
+    // After use: remaining must have dropped by 1 (0/1 for Second Wind)
+    const updatedCount = await counterEl.textContent();
+    const remaining = parseInt(updatedCount?.trim().split('/')[0] ?? '0', 10);
+    const initial = parseInt(initialCount?.trim().split('/')[0] ?? '1', 10);
+    expect(remaining, 'Resource charge count must decrement after Usar').toBe(initial - 1);
+
+    // ── Step 11: Screenshot for visual review (non-fatal) ─────────────────
     await page.screenshot({
       path: `e2e/.screenshots/encuentros-player-${Date.now()}.png`,
     }).catch(() => {});
