@@ -55,7 +55,6 @@ test.describe('Encuentros — player read view @ 375px', () => {
 
   test('REQ-WCO-E2E-01: player sees TurnBanner and encounter detail at 375px', async ({
     page,
-    request,
   }) => {
     // ── Step 1: Obtain JWTs for fixture users ──────────────────────────────
     let dmJwt: string;
@@ -142,10 +141,12 @@ test.describe('Encuentros — player read view @ 375px', () => {
     }
 
     // ── Step 5: Login as player1 in the browser context ───────────────────
-    // Pattern from fixture.setup.ts: POST /api/dev/login sets @supabase/ssr cookies
-    // so that Server Components see the player1 session on navigation.
+    // Use page.request (shares the page cookie jar) so that the @supabase/ssr
+    // cookies set by /api/dev/login are visible to subsequent page.goto() calls.
+    // Using the standalone `request` fixture would NOT share cookies with the page.
+    // Pattern mirrors fixture.setup.ts exactly.
     await page.goto('/');
-    const loginRes = await request.post('/api/dev/login', {
+    const loginRes = await page.request.post('/api/dev/login', {
       data: { email: FIXTURE_PLAYER1_EMAIL, password: FIXTURE_PASSWORD },
     });
     if (loginRes.status() !== 200) {
