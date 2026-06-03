@@ -298,7 +298,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
          * Refinement (B2): markers are NO LONGER draggable (drag caused accidental moves).
          * DM edit/move are gated behind explicit "Editar" and "Mover" popup buttons.
          * "Editar" → onEditPoi(poi) → MapClientWrapper opens edit V3Sheet.
-         * "Mover"  → router.push('?view=mapa&place=<id>') → enters existing place-mode.
+         * "Mover"  → onStartMove(poi) → drag-to-move state (B2 Refinement 2, MoveBanner + draggable).
          */}
         {pois
           .filter((p) => p.worldX != null && p.worldY != null)
