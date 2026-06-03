@@ -1,12 +1,15 @@
 import { Pill } from '@/components/ui/pill';
+import { ConditionBadges } from './condition-badges';
 import type { EncounterCombatant } from './types';
 
 type Props = {
   combatants: EncounterCombatant[];
   currentCombatantId: string;
+  // REQ-WCO-WEB-04: action economy shown for own combatant only
+  ownCombatantId?: string | null;
 };
 
-export function RosterList({ combatants, currentCombatantId }: Props) {
+export function RosterList({ combatants, currentCombatantId, ownCombatantId }: Props) {
   const sorted = [...combatants].sort(
     (a, b) => b.initiative - a.initiative || a.insertionOrder - b.insertionOrder,
   );
@@ -16,6 +19,7 @@ export function RosterList({ combatants, currentCombatantId }: Props) {
       {sorted.map((c) => {
         const isCurrent = c.id === currentCombatantId;
         const isDead = c.hpCurrent === 0;
+        const isOwn = ownCombatantId != null && c.id === ownCombatantId;
         const rowClass = [
           'encuentros-init-row',
           isCurrent ? 'current' : '',
@@ -23,6 +27,11 @@ export function RosterList({ combatants, currentCombatantId }: Props) {
         ]
           .filter(Boolean)
           .join(' ');
+
+        // Derive string arrays for ConditionBadges
+        const conditionNames = c.conditions.map((cd) => cd.name);
+        const effectNames = c.effects.map((ef) => ef.name);
+
         return (
           <li
             key={c.id}
@@ -38,6 +47,49 @@ export function RosterList({ combatants, currentCombatantId }: Props) {
             <Pill size="sm" tone={c.kind === 'pc' ? 'primary' : 'accent'}>
               {c.kind === 'pc' ? 'PC' : 'NPC'}
             </Pill>
+
+            {/* REQ-WCO-WEB-03: condition + effect badges for all combatants */}
+            {(conditionNames.length > 0 || effectNames.length > 0) && (
+              <ConditionBadges conditions={conditionNames} effects={effectNames} />
+            )}
+
+            {/* REQ-WCO-WEB-04: action economy indicators for own row only */}
+            {isOwn && (
+              <span
+                data-action-economy
+                className="flex gap-1 text-xs text-ink-soft"
+                aria-label="Economía de turno"
+              >
+                <span
+                  title="Acción"
+                  className={c.actionUsed ? 'opacity-40' : 'opacity-100'}
+                  aria-label={c.actionUsed ? 'Acción usada' : 'Acción disponible'}
+                >
+                  A
+                </span>
+                <span
+                  title="Acción adicional"
+                  className={c.bonusActionUsed ? 'opacity-40' : 'opacity-100'}
+                  aria-label={c.bonusActionUsed ? 'Acción adicional usada' : 'Acción adicional disponible'}
+                >
+                  B
+                </span>
+                <span
+                  title="Reacción"
+                  className={c.reactionUsed ? 'opacity-40' : 'opacity-100'}
+                  aria-label={c.reactionUsed ? 'Reacción usada' : 'Reacción disponible'}
+                >
+                  R
+                </span>
+                <span
+                  title="Ataques restantes"
+                  data-attacks-remaining
+                  aria-label={`${c.attacksRemaining} ataques restantes`}
+                >
+                  ⚔{c.attacksRemaining}
+                </span>
+              </span>
+            )}
           </li>
         );
       })}

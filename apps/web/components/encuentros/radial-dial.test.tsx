@@ -3,12 +3,21 @@ import { render } from '@testing-library/react';
 import { RadialDial } from './radial-dial';
 import type { EncounterCombatant } from './types';
 
+const defaultEconomy = {
+  conditions: [],
+  effects: [],
+  actionUsed: false,
+  bonusActionUsed: false,
+  reactionUsed: false,
+  attacksRemaining: 1,
+};
+
 const combatants: EncounterCombatant[] = [
-  { id: 'a', name: 'Mira',     kind: 'pc',  characterId: null, initiative: 18, hpCurrent: 22, hpMax: 22, insertionOrder: 0 },
-  { id: 'b', name: 'Goblin α', kind: 'npc', characterId: null, initiative: 15, hpCurrent: 5,  hpMax: 7,  insertionOrder: 1 },
-  { id: 'c', name: 'Brann',    kind: 'pc',  characterId: null, initiative: 13, hpCurrent: 28, hpMax: 32, insertionOrder: 2 },
-  { id: 'd', name: 'Thorgar',  kind: 'pc',  characterId: null, initiative: 11, hpCurrent: 52, hpMax: 52, insertionOrder: 3 },
-  { id: 'e', name: 'Goblin β', kind: 'npc', characterId: null, initiative: 8,  hpCurrent: 0,  hpMax: 7,  insertionOrder: 4 },
+  { id: 'a', name: 'Mira',     kind: 'pc',  characterId: null, initiative: 18, hpCurrent: 22, hpMax: 22, insertionOrder: 0, ...defaultEconomy },
+  { id: 'b', name: 'Goblin α', kind: 'npc', characterId: null, initiative: 15, hpCurrent: 5,  hpMax: 7,  insertionOrder: 1, ...defaultEconomy },
+  { id: 'c', name: 'Brann',    kind: 'pc',  characterId: null, initiative: 13, hpCurrent: 28, hpMax: 32, insertionOrder: 2, ...defaultEconomy },
+  { id: 'd', name: 'Thorgar',  kind: 'pc',  characterId: null, initiative: 11, hpCurrent: 52, hpMax: 52, insertionOrder: 3, ...defaultEconomy },
+  { id: 'e', name: 'Goblin β', kind: 'npc', characterId: null, initiative: 8,  hpCurrent: 0,  hpMax: 7,  insertionOrder: 4, ...defaultEconomy },
 ];
 
 describe('RadialDial', () => {
