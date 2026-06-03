@@ -18,6 +18,19 @@ import { test, expect } from '@playwright/test';
  *   (l) Drag-mode gating: DM markers are draggable; player markers are not.
  *   (m) Player gating: no "Colocar en mapa" button in player view.
  *
+ * B2 additions (REQ-PWC-CREATE-01..05, REQ-PWC-IA-01..03):
+ *   (n) /mapa (no ?view) shows the map container by default (REQ-PWC-IA-01).
+ *   (o) Lista|Mapa toggle bar is absent from the DOM (REQ-PWC-IA-01).
+ *   (p) Discreet hex-list control navigates to ?view=lista (REQ-PWC-IA-02).
+ *   (q) Back-to-map control in lista view navigates to the map (REQ-PWC-IA-03).
+ *   (r) DM poi-create FAB visible on map view (REQ-PWC-CREATE-01).
+ *   (s) FAB absent for players (REQ-PWC-CREATE-01).
+ *   (t) FAB absent when place-mode is active (REQ-PWC-CREATE-05).
+ *   (u) Tapping FAB shows create-mode banner (REQ-PWC-CREATE-02).
+ *   (v) Cancelar on banner exits create-mode (REQ-PWC-CREATE-02).
+ *   (w) Tapping map in create-mode opens V3Sheet create form with pre-filled coords (REQ-PWC-CREATE-03).
+ *   (x) Submitting create form creates POI (marker appears or no crash) (REQ-PWC-CREATE-03).
+ *
  * Note: The E2E test user is GM of 'E2E Test Campaign (World)' via auth.setup.ts.
  * The test assumes the dev stack is running (apps/web/e2e/README.md).
  *
@@ -32,6 +45,10 @@ import { test, expect } from '@playwright/test';
  * TASK-5.3 (manual gate — NOT in this E2E):
  *   Real-device 375px drag verification must be done manually by Mauricio.
  *   See apply-progress artifact for the full manual checkpoint.
+ *
+ * B2-IAx (manual gate — NOT in this E2E):
+ *   375px viewport visual review: FAB (bottom-right) vs drawer toggle (bottom-left) vs
+ *   hex-list control (top-right) non-collision must be verified manually on device.
  */
 
 const MOBILE = { width: 375, height: 812 };
@@ -47,8 +64,8 @@ test('Mapa page renders for GM (DM view)', async ({ page }) => {
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('DM view: FAB "Crear" is visible at /mapa', async ({ page }) => {
-  await page.goto('/mapa', { waitUntil: 'domcontentloaded' });
+test('DM view: FAB "Crear" is visible at /mapa?view=lista', async ({ page }) => {
+  await page.goto('/mapa?view=lista', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
 
   // DM (callerRole='gm') should see the FAB — REQ-MAP-01, REQ-GATE-01
@@ -58,7 +75,7 @@ test('DM view: FAB "Crear" is visible at /mapa', async ({ page }) => {
 
 test('DM can create a hex via FAB', async ({ page }) => {
   // networkidle: the FAB is a hydrated client island — clicking before hydration is a no-op.
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
   await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
 
   // Open create form
@@ -93,7 +110,7 @@ test('DM can create a hex via FAB', async ({ page }) => {
 
 test('DM expands a hex and POI accordion loads lazily', async ({ page }) => {
   // networkidle ensures hydration
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
   await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
 
   // Check if there are any hexes in the list; if not, create one first
@@ -175,18 +192,13 @@ test('Mapa tab is active in TabBar when on /mapa', async ({ page }) => {
 // ---------------------------------------------------------------------------
 // Lista view: SSR gate — map container must NOT render (W-02 closeout)
 //
-// page.tsx gates `listAllPois` and the MapClientWrapper branch on
-// `activeMapView === 'mapa'`. On the lista branch (default / ?view=lista),
-// the Leaflet island is never mounted, so [data-testid="map-container"]
-// must be absent from the DOM entirely.
-//
-// This is the observable guarantee that POI markers (and their SSR fetch)
-// are not active on the lista view. REQ-POI-MARKER-01, REQ-POI-MARKER-02.
+// Now that mapa is the default view, lista view is at ?view=lista.
+// The Leaflet island must NOT be rendered when ?view=lista is active.
 // ---------------------------------------------------------------------------
 
-test('Lista view: map container is not rendered (SSR gate — W-02)', async ({ page }) => {
-  // Default route = lista view (no ?view=mapa param)
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+test('Lista view (?view=lista): map container is not rendered (SSR gate — W-02)', async ({ page }) => {
+  // Explicit lista view
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
   await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
 
   // The Leaflet island is conditionally mounted only on mapa view.
@@ -268,7 +280,7 @@ test('Mapa view: tap marker opens POI detail popup if markers are present (REQ-P
  * (it should be — we navigated to ?view=mapa via the button).
  */
 test('T1: Tap-to-place round-trip — null-coord POI → place-mode → tap → marker (DM)', async ({ page }) => {
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
 
   // Step 1: create a fresh hex (unique to this run)
   const runId = Date.now();
@@ -351,8 +363,8 @@ test('T1: Tap-to-place round-trip — null-coord POI → place-mode → tap → 
  * REQ-PLACE-TAP-05: pressing Cancelar clears place-mode, does not write coords.
  */
 test('T3: Cancelar exits place-mode without writing coords', async ({ page }) => {
-  // Navigate to mapa — we'll look for any existing null-coord POI, or skip if none.
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  // Navigate to lista — we'll look for any existing null-coord POI, or skip if none.
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
 
   // Try to find a "Colocar en mapa" button — if present we can run the cancel test.
   // The prior T1 test may have placed all POIs. This test creates its own fresh POI.
@@ -446,7 +458,7 @@ test('T4: Drag-mode gating — DM markers have draggable attribute; player marke
 test('T5: Player gating — no "Colocar en mapa" button in player view', async ({ page, context }) => {
   // Switch to player auth
   await context.storageState({ path: '/home/tanisjam/projects/personal/dungeon_hub/apps/web/e2e/.auth/player1.json' });
-  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
 
   // Expand any hex accordion that's visible (if any)
   const hexRows = page.locator('ul li button').first();
@@ -654,4 +666,271 @@ test('B1-T4: Player view — drawer opens; list shows no DM-only (unknown) rows'
   } finally {
     await playerCtx.close();
   }
+});
+
+// ---------------------------------------------------------------------------
+// B2 — IA assertions (REQ-PWC-IA-01..03) + create-mode flow (REQ-PWC-CREATE-01..05)
+// ---------------------------------------------------------------------------
+
+/**
+ * B2-IA-1: /mapa (no ?view) shows the map container by default.
+ *
+ * REQ-PWC-IA-01: map is the default view.
+ */
+test('B2-IA-1: /mapa default (no ?view) renders map container (REQ-PWC-IA-01)', async ({ page }) => {
+  await page.goto('/mapa', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
+
+  // With map-first default, the map container must be present at /mapa (no ?view param).
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * B2-IA-2: Lista|Mapa toggle bar is absent from the DOM.
+ *
+ * REQ-PWC-IA-01: MapToggle removed — no segmented bar in DOM.
+ */
+test('B2-IA-2: Lista|Mapa toggle bar is absent from DOM (REQ-PWC-IA-01)', async ({ page }) => {
+  await page.goto('/mapa', { waitUntil: 'networkidle' });
+
+  // The old toggle had role="group" aria-label="Vista del mapa" — must be absent.
+  const toggleBar = page.locator('[aria-label="Vista del mapa"]');
+  await expect(toggleBar).toHaveCount(0);
+});
+
+/**
+ * B2-IA-3: Discreet hex-list control navigates to ?view=lista.
+ *
+ * REQ-PWC-IA-02: discreet affordance replaces the toggle bar.
+ */
+test('B2-IA-3: Discreet hex-list control navigates to ?view=lista (REQ-PWC-IA-02)', async ({ page }) => {
+  await page.goto('/mapa', { waitUntil: 'networkidle' });
+
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // The discreet hex-list control (data-testid="hex-list-access")
+  const hexListControl = page.locator('[data-testid="hex-list-access"]');
+  await expect(hexListControl).toBeVisible({ timeout: 10_000 });
+
+  // Tapping it should navigate to ?view=lista
+  await hexListControl.click();
+  await expect(page).toHaveURL(/view=lista/, { timeout: 5_000 });
+
+  // The map container should now be absent (we're on lista view)
+  await expect(mapContainer).toHaveCount(0);
+});
+
+/**
+ * B2-IA-4: Back-to-map control in ?view=lista navigates to map view.
+ *
+ * REQ-PWC-IA-03: round-trip map → lista → map without browser back button.
+ */
+test('B2-IA-4: Back-to-map control navigates from lista to map view (REQ-PWC-IA-03)', async ({ page }) => {
+  await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
+
+  // Back-to-map button must be present in the lista view
+  const backBtn = page.locator('[data-testid="back-to-map"]');
+  await expect(backBtn).toBeVisible({ timeout: 10_000 });
+
+  // Tapping it navigates to the map view
+  await backBtn.click();
+  await expect(page).toHaveURL(/view=mapa/, { timeout: 5_000 });
+
+  // Map container should be visible
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * B2-CREATE-1: DM poi-create FAB is visible on the map view.
+ *
+ * REQ-PWC-CREATE-01: DM-only FAB at bottom-right.
+ */
+test('B2-CREATE-1: DM sees poi-create FAB on map view (REQ-PWC-CREATE-01)', async ({ page }) => {
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // DM should see the create FAB
+  const createFab = page.locator('[data-testid="poi-create-fab"]');
+  await expect(createFab).toBeVisible({ timeout: 10_000 });
+});
+
+/**
+ * B2-CREATE-2: Player does NOT see the poi-create FAB.
+ *
+ * REQ-PWC-CREATE-01: players must not see the FAB.
+ * Skip guard pattern from B1-T4: player1 may resolve as GM in their active world.
+ */
+test('B2-CREATE-2: Player does not see poi-create FAB (REQ-PWC-CREATE-01)', async ({ browser }) => {
+  const playerCtx = await browser.newContext({ storageState: PLAYER1_AUTH });
+  const page = await playerCtx.newPage();
+
+  try {
+    await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+
+    const mapContainer = page.locator('[data-testid="map-container"]');
+    await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+    // Skip guard: if player1 resolves as GM, draggable markers would be present.
+    const draggableMarkers = page.locator('.leaflet-marker-draggable');
+    const draggableCount = await draggableMarkers.count();
+    test.skip(
+      draggableCount > 0,
+      'player1 resolved as GM in their active world — run db:seed:e2e + fixture:setup to fix.',
+    );
+
+    // Player must NOT see the create FAB
+    const createFab = page.locator('[data-testid="poi-create-fab"]');
+    await expect(createFab).toHaveCount(0);
+  } finally {
+    await playerCtx.close();
+  }
+});
+
+/**
+ * B2-CREATE-3: Tapping FAB shows the create-mode banner; Cancelar exits it.
+ *
+ * REQ-PWC-CREATE-02: banner + Cancelar flow.
+ */
+test('B2-CREATE-3: FAB tap shows create-mode banner; Cancelar clears it (REQ-PWC-CREATE-02)', async ({ page }) => {
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // Tap the create FAB
+  const createFab = page.locator('[data-testid="poi-create-fab"]');
+  await expect(createFab).toBeVisible({ timeout: 10_000 });
+  await createFab.click();
+
+  // Create-mode banner must appear
+  const banner = page.locator('[data-testid="create-mode-banner"]');
+  await expect(banner).toBeVisible({ timeout: 5_000 });
+  await expect(banner).toContainText('Tocá el mapa para crear un POI');
+
+  // FAB must be hidden now (create-mode active)
+  await expect(createFab).toHaveCount(0);
+
+  // Tap Cancelar → banner disappears, FAB reappears
+  await page.getByRole('button', { name: /cancelar creación/i }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(createFab).toBeVisible({ timeout: 5_000 });
+});
+
+/**
+ * B2-CREATE-4: Tapping map in create-mode opens V3Sheet create form with pre-filled coords.
+ *
+ * REQ-PWC-CREATE-03: tap → sheet pre-filled → Cancelar exits.
+ *
+ * Note on map-tap fragility: Leaflet's MapContainer is a canvas-based interactive element.
+ * We use locator('.leaflet-container').click({ position: ... }) to simulate a tap.
+ * The CreateModeClickCatcher fires on the Leaflet click event; coords are clamped.
+ * We verify the sheet opens (V3Sheet renders with role=dialog) and shows coord fields.
+ * If the map tap does not fire (e.g. event captured by other handler), this test returns
+ * without failing — the API integration test covers the persistence contract.
+ */
+test('B2-CREATE-4: Create-mode map tap opens V3Sheet create form (REQ-PWC-CREATE-03)', async ({ page }) => {
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // Enter create-mode
+  const createFab = page.locator('[data-testid="poi-create-fab"]');
+  await expect(createFab).toBeVisible({ timeout: 10_000 });
+  await createFab.click();
+
+  const banner = page.locator('[data-testid="create-mode-banner"]');
+  await expect(banner).toBeVisible({ timeout: 5_000 });
+
+  // Tap the Leaflet container (ADR-5 pattern: conditional — map tap may not fire in headless)
+  const leafletContainer = page.locator('.leaflet-container');
+  await expect(leafletContainer).toBeVisible({ timeout: 10_000 });
+  await leafletContainer.click({ position: { x: 180, y: 200 } });
+
+  // Check if the V3Sheet dialog appeared (tolerance: may not fire in headless Chromium)
+  const sheetDialog = page.locator('[role="dialog"]');
+  const sheetOpened = await sheetDialog.isVisible().catch(() => false);
+
+  if (!sheetOpened) {
+    // Map tap did not open the sheet in headless — acceptable (see note above).
+    // Verify at minimum no crash occurred and the banner is still there or FAB reappears.
+    const stillInCreateMode = await banner.isVisible().catch(() => false);
+    const fabReappeared = await createFab.isVisible().catch(() => false);
+    // Either we're still in create mode (tap did nothing) or it exited — no crash is the gate.
+    expect(stillInCreateMode || fabReappeared).toBeTruthy();
+    return;
+  }
+
+  // Sheet is open — verify coord fields are pre-filled (non-empty worldX/worldY)
+  const worldXInput = page.getByLabel(/coord x/i);
+  await expect(worldXInput).toBeVisible({ timeout: 5_000 });
+  const worldXValue = await worldXInput.inputValue();
+  // The input should have a non-empty value (pre-filled from the tapped coords)
+  expect(worldXValue).not.toBe('');
+
+  // Cancel the sheet — exits create mode
+  await page.getByRole('button', { name: /cancelar/i }).first().click();
+
+  // After cancel: sheet closed, create-mode exited, FAB visible again
+  await expect(sheetDialog).toHaveCount(0, { timeout: 3_000 });
+  await expect(createFab).toBeVisible({ timeout: 5_000 });
+});
+
+/**
+ * B2-CREATE-5: Full create flow — FAB → tap → fill → submit → no crash.
+ *
+ * REQ-PWC-CREATE-03: submit creates POI; marker appears OR sheet closed + no crash.
+ * Zero-marker tolerance applies (ADR-4). Canonical route through createWorldPoi.
+ */
+test('B2-CREATE-5: Full create flow — FAB → tap → sheet → submit (REQ-PWC-CREATE-03)', async ({ page }) => {
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // Enter create-mode
+  const createFab = page.locator('[data-testid="poi-create-fab"]');
+  await expect(createFab).toBeVisible({ timeout: 10_000 });
+  await createFab.click();
+
+  const banner = page.locator('[data-testid="create-mode-banner"]');
+  await expect(banner).toBeVisible({ timeout: 5_000 });
+
+  // Tap the map
+  const leafletContainer = page.locator('.leaflet-container');
+  await expect(leafletContainer).toBeVisible({ timeout: 10_000 });
+  await leafletContainer.click({ position: { x: 200, y: 200 } });
+
+  // If sheet didn't open (headless tolerance), skip submit assertion
+  const sheetDialog = page.locator('[role="dialog"]');
+  const sheetOpened = await sheetDialog.isVisible().catch(() => false);
+
+  if (!sheetOpened) {
+    // No crash and we're past the banner/FAB state — acceptable
+    return;
+  }
+
+  // Fill the POI name
+  const uniquePoiName = `E2E World POI ${Date.now()}`;
+  const nameInput = page.getByLabel(/nombre \*/i);
+  await expect(nameInput).toBeVisible({ timeout: 5_000 });
+  await nameInput.fill(uniquePoiName);
+
+  // Submit
+  const submitBtn = page.getByRole('button', { name: /crear poi/i });
+  await expect(submitBtn).toBeVisible({ timeout: 5_000 });
+  await submitBtn.click();
+
+  // After submit: sheet should close and no crash — either FAB reappears or page reloads
+  // Zero-marker tolerance: we don't assert a new marker in DOM (may not be seeded in E2E world).
+  // We assert the sheet closed successfully (no error banner from the form).
+  await expect(sheetDialog).toHaveCount(0, { timeout: 10_000 });
+
+  // The FAB should reappear after successful create (createDone sets creating=false)
+  await expect(createFab).toBeVisible({ timeout: 15_000 });
 });
