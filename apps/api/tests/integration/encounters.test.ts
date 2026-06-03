@@ -378,6 +378,39 @@ describe('encounters', () => {
     expect(bodyC2.effects).toEqual([{ name: 'Hex', sourceCombatantId: null }]);
   });
 
+  // REQ-WCO-WEB-08: GET /encounters/:id must return a caller-specific callerRole field
+  // so the web client can gate TurnControlsIsland (GM-only control).
+  // 'gm' for the campaign GM; 'player' for any other campaign member.
+  it('T10: GET /encounters/:id includes callerRole — "gm" for alice, "player" for charlie (REQ-WCO-WEB-08)', async () => {
+    const app = await getTestApp();
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: { campaignId, name: 'CallerRole Test', combatants: baseCombatants },
+      })
+      .then((r) => r.json());
+
+    // GM caller — alice created the campaign so she is 'gm'
+    const gmRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${created.id}`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+    });
+    expect(gmRes.statusCode).toBe(200);
+    expect(gmRes.json().callerRole).toBe('gm');
+
+    // Player caller — charlie was added as 'player' member
+    const playerRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${created.id}`,
+      headers: { authorization: `Bearer ${charlie.accessToken}` },
+    });
+    expect(playerRes.statusCode).toBe(200);
+    expect(playerRes.json().callerRole).toBe('player');
+  });
+
   it('T6: PATCH /:id/combatants/:cid HP=0 → advance skips it (AE-COMBATANT-HP-PATCH-05)', async () => {
     const app = await getTestApp();
     const created = await app
