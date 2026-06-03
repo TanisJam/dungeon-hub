@@ -11,6 +11,12 @@ import type { PoiRow } from '@/app/mapa/actions';
 import { PoiDetail } from './poi-detail';
 import { PoiAccordion } from './poi-accordion';
 
+// PoiAccordion calls useRouter() (added in Slice 3 for "Colocar en mapa" nav).
+// Mock it here so the existing accordion smoke tests continue to work.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
+
 // ---------------------------------------------------------------------------
 // Fixture
 // ---------------------------------------------------------------------------
