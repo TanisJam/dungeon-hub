@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
+import { db } from '../../src/infra/db/client.js';
+import { encounterCombatantConditions, encounterCombatantEffects } from '../../src/infra/db/schema.js';
 
 describe('encounters', () => {
   let alice: TestUser; // GM
@@ -174,6 +176,117 @@ describe('encounters', () => {
     });
     expect(conflict.statusCode).toBe(409);
     expect(conflict.json().error).toBe('VERSION_CONFLICT');
+  });
+
+  /**
+   * REQ-WCO-API-01 — Extended combatant response shape.
+   *
+   * Seed combatant with 1 condition row + 1 effect row + actionUsed=true (via DB direct insert,
+   * since condition/effect child-table rows are added by engine use-cases, not the create-encounter
+   * API). Assert GET /encounters/:id returns conditions[], effects[], actionUsed, bonusActionUsed,
+   * attacksRemaining in each combatant.
+   *
+   * PHB Appendix A p.291 — Stunned condition.
+   * PHB p.251 — Hex: caster-sourced effect.
+   */
+  it('T7: GET /encounters/:id — combatant with condition + effect + actionUsed returned in response (REQ-WCO-API-01)', async () => {
+    const app = await getTestApp();
+
+    // Create a minimal encounter (1 NPC so we can apply conditions without a character sheet).
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          campaignId,
+          name: 'WCO API Shape Test',
+          combatants: [{ name: 'Goblin WCO', kind: 'npc', initiative: 10, hpCurrent: 7, hpMax: 7, ac: 13 }],
+        },
+      })
+      .then((r) => r.json());
+
+    const combatantId: string = created.combatants[0].id;
+
+    // Seed condition row directly (encounter_combatant_conditions).
+    // PHB Appendix A p.291: Stunned — incapacitated, can't move, speech slurred.
+    await db.insert(encounterCombatantConditions).values({
+      combatantId,
+      conditionName: 'Stunned',
+      appliedByCombatantId: null,
+    });
+
+    // Seed effect row directly (encounter_combatant_effects).
+    // PHB p.251: Hex — caster-sourced effect, disadvantage on ability checks.
+    await db.insert(encounterCombatantEffects).values({
+      combatantId,
+      effectName: 'Hex',
+      sourceCombatantId: null,
+    });
+
+    // T7: assert GET returns new shape — conditions[], effects[], action-economy booleans.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${created.id}`,
+      headers: { authorization: `Bearer ${charlie.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const combatant = body.combatants[0];
+
+    // REQ-WCO-API-01: conditions and effects arrays present.
+    expect(combatant.conditions).toEqual([{ name: 'Stunned', appliedByCombatantId: null }]);
+    expect(combatant.effects).toEqual([{ name: 'Hex', sourceCombatantId: null }]);
+
+    // REQ-WCO-API-01: action-economy scalars present (defaults from DB NOT NULL DEFAULT).
+    expect(combatant.actionUsed).toBe(false);
+    expect(combatant.bonusActionUsed).toBe(false);
+    expect(combatant.attacksRemaining).toBe(0);
+    expect(typeof combatant.reactionUsed).toBe('boolean');
+  });
+
+  /**
+   * REQ-WCO-API-02 — Read-path tolerance for legacy rows.
+   *
+   * Combatant with NO condition/effect rows → conditions: [], effects: [], HTTP 200.
+   * Also verifies action-economy safe defaults (false/0 — schema defaults NOT NULL).
+   */
+  it('T8: GET /encounters/:id — legacy combatant with no condition/effect rows → empty arrays, HTTP 200 (REQ-WCO-API-02)', async () => {
+    const app = await getTestApp();
+
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          campaignId,
+          name: 'WCO Legacy Tolerance Test',
+          combatants: [{ name: 'Skeleton WCO', kind: 'npc', initiative: 8, hpCurrent: 13, hpMax: 13, ac: 13 }],
+        },
+      })
+      .then((r) => r.json());
+
+    // No condition/effect rows seeded — legacy combatant.
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${created.id}`,
+      headers: { authorization: `Bearer ${charlie.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const combatant = body.combatants[0];
+
+    // REQ-WCO-API-02: empty arrays, not null, not missing.
+    expect(combatant.conditions).toEqual([]);
+    expect(combatant.effects).toEqual([]);
+
+    // REQ-WCO-API-02: action-economy defaults (NOT NULL DEFAULT false/0 in schema).
+    expect(combatant.actionUsed).toBe(false);
+    expect(combatant.bonusActionUsed).toBe(false);
+    expect(combatant.attacksRemaining).toBe(0);
   });
 
   it('T6: PATCH /:id/combatants/:cid HP=0 → advance skips it (AE-COMBATANT-HP-PATCH-05)', async () => {
