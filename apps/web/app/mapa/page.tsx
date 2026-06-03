@@ -8,9 +8,9 @@ import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { HexClientWrapper } from '@/components/world/map/hex-client-wrapper';
 import { MapClientWrapper } from '@/components/world/map/map-client-wrapper';
-import { MapToggle } from '@/components/world/map/map-toggle';
 import { V3Empty } from '@/components/ui';
-import type { HexRow } from './actions';
+import type { HexRow, PoiRow } from './actions';
+import { listAllPois } from './actions';
 
 /**
  * Mapa — Server Component (Slice 4 + WM Slice 1).
@@ -31,11 +31,12 @@ import type { HexRow } from './actions';
 export default async function MapaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; place?: string }>;
 }) {
   // Resolve searchParams first (Next.js 15 async searchParams)
-  const { view } = await searchParams;
-  const activeMapView = view === 'mapa' ? 'mapa' : 'lista';
+  const { view, place } = await searchParams;
+  // REQ-PWC-IA-01: map is the default view — no ?view or ?view=mapa → mapa; ?view=lista → lista.
+  const activeMapView = view === 'lista' ? 'lista' : 'mapa';
 
   const supabase = await createClient();
   const {
@@ -95,6 +96,22 @@ export default async function MapaPage({
     // If fetch fails, render with empty list — client can retry via search
   }
 
+  // REQ-POI-MARKER-01: SSR fetch for POI marker layer — only when mapa view is active.
+  // The API applies role-based cascade filtering (player: unexplored hex + unknown status removed).
+  // Lista view: pois is [] — lazy accordion remains unchanged.
+  let pois: PoiRow[] = [];
+  if (activeMapView === 'mapa') {
+    pois = await listAllPois(aw.id);
+  }
+
+  // REQ-PLACE-TAP-02/03: resolve place-mode target from ?place=<poiId> URL param.
+  // Self-healing: unknown/invalid id → null (no banner, no stuck mode).
+  // Only meaningful when view==='mapa' (ignored on lista to prevent cross-branch confusion).
+  const placementTarget =
+    activeMapView === 'mapa' && place
+      ? (pois.find((p) => p.id === place) ?? null)
+      : null;
+
   return (
     <AppShell
       title="Mapa"
@@ -102,17 +119,22 @@ export default async function MapaPage({
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >
-      {/* REQ-WM-02: Lista|Mapa segmented toggle — thumb-reachable at 375px */}
-      <MapToggle activeView={activeMapView} />
-
-      {/* REQ-WM-02: Branch on view — Lista shows hex list, Mapa shows Leaflet island */}
+      {/* REQ-WM-02 / REQ-PWC-IA-01: Branch on view — Mapa is default; Lista accessible via discreet control */}
       {activeMapView === 'mapa' ? (
         /*
          * REQ-WM-03: MapClientWrapper wraps the Leaflet island with ssr:false.
          * The island breaks out of AppShell max-w-sm via fixed positioning.
          * supabaseUrl is derived from NEXT_PUBLIC_SUPABASE_URL (no new env var — ADR-1).
+         * REQ-POI-MARKER-02: pois + effectiveView forwarded for the marker layer.
+         * REQ-PWC-CREATE-01: worldId threaded for DM create-mode FAB.
          */
-        <MapClientWrapper supabaseUrl={env.SUPABASE_URL} />
+        <MapClientWrapper
+          supabaseUrl={env.SUPABASE_URL}
+          pois={pois}
+          effectiveView={effectiveView}
+          placement={placementTarget}
+          worldId={aw.id}
+        />
       ) : (
         <HexClientWrapper
           worldId={aw.id}

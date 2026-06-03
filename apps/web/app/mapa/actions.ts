@@ -196,7 +196,8 @@ export type PoiStatus = 'unknown' | 'discovered' | 'cleared';
 
 export interface PoiRow {
   id: string;
-  hexId: string;
+  worldId: string;
+  hexId: string | null;
   name: string;
   description: string | null;
   dmNotes: string | null;
@@ -212,6 +213,10 @@ export interface PoiBody {
   description?: string;
   dmNotes?: string;
   status?: PoiStatus;
+  /** World pixel X coordinate [0..IMAGE_W]. Optional — omit to leave unchanged. */
+  worldX?: number | null;
+  /** World pixel Y coordinate [0..IMAGE_H]. Optional — omit to leave unchanged. */
+  worldY?: number | null;
 }
 
 interface PoiListResponse {
@@ -237,6 +242,24 @@ export async function listPois(hexId: string): Promise<PoiRow[]> {
 }
 
 // ---------------------------------------------------------------------------
+// listAllPois — SSR, called ONLY when activeMapView === 'mapa'.
+// REQ-POI-MARKER-01: fetches all world-scope POIs for the marker layer.
+// The API applies role-based cascade filtering (unexplored hex + unknown status).
+// ---------------------------------------------------------------------------
+
+export async function listAllPois(worldId: string): Promise<PoiRow[]> {
+  const token = await getToken();
+  if (!token) return [];
+
+  try {
+    const res = await api.get<PoiListResponse>(`/worlds/${worldId}/pois?parent=all`, token);
+    return res.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // createPoi — DM-only.
 // ---------------------------------------------------------------------------
 
@@ -249,6 +272,29 @@ export async function createPoi(
 
   try {
     const created = await api.post<PoiRow>(`/hexes/${hexId}/pois`, body, token);
+    revalidatePath('/mapa');
+    return { ok: true, data: created };
+  } catch (err) {
+    return handleApiError(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createWorldPoi — DM-only. Creates a free-floating POI (hexId: null).
+// REQ-PWC-ACTION-01: mirrors createPoi pattern; calls POST /worlds/:worldId/pois.
+// No caller yet in Batch A — Batch B wires the create-mode UI.
+// ---------------------------------------------------------------------------
+
+export async function createWorldPoi(
+  worldId: string,
+  body: PoiBody,
+): Promise<ActionResult<PoiRow>> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'No autenticado', status: 401 };
+
+  try {
+    const created = await api.post<PoiRow>(`/worlds/${worldId}/pois`, body, token);
+    revalidatePath('/mapa');
     return { ok: true, data: created };
   } catch (err) {
     return handleApiError(err);
@@ -268,6 +314,7 @@ export async function updatePoi(
 
   try {
     const updated = await api.patch<PoiRow>(`/pois/${poiId}`, body, token);
+    revalidatePath('/mapa');
     return { ok: true, data: updated };
   } catch (err) {
     return handleApiError(err);
@@ -284,6 +331,7 @@ export async function deletePoi(poiId: string): Promise<ActionResult> {
 
   try {
     await api.delete(`/pois/${poiId}`, token);
+    revalidatePath('/mapa');
     return { ok: true, data: undefined };
   } catch (err) {
     return handleApiError(err);

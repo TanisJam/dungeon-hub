@@ -208,7 +208,10 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
     const role = await memberRole(encounter.campaignId, userId);
     if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    return encounter;
+    // REQ-WCO-WEB-08: surface the caller's campaign role so the web client can
+    // gate GM-only controls (TurnControlsIsland) without a second round-trip.
+    // `role` is already computed above — this is not new business logic.
+    return { ...encounter, callerRole: role };
   });
 
   // ---- POST /encounters/:id/advance-turn ----------------------------------

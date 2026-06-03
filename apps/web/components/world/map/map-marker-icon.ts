@@ -32,13 +32,16 @@ const STATUS_COLORS: Record<PoiStatus | 'default', string> = {
  * Create a Leaflet divIcon for a map marker.
  *
  * @param status - POI status for color coding. Falls back to 'default' if absent.
+ * @param moving - When true, adds the `poi-marker--moving` class which triggers the
+ *                 pulse animation (globals.css) to signal the marker is in drag-move mode.
  * @returns L.DivIcon instance ready for use in a Leaflet Marker.
  */
-export function createMarkerIcon(status?: PoiStatus | null): L.DivIcon {
+export function createMarkerIcon(status?: PoiStatus | null, moving?: boolean): L.DivIcon {
   const color = status ? (STATUS_COLORS[status] ?? STATUS_COLORS.default) : STATUS_COLORS.default;
 
   // Circular pin with a 4px white ring. Pointer shadow for depth.
   // The outer div (44×44) is the tap target; the inner circle (28×28) is visual.
+  // `poi-marker-inner` class is used by the CSS pulse animation when `moving` is true.
   const html = `
     <div style="
       width: 44px;
@@ -47,7 +50,7 @@ export function createMarkerIcon(status?: PoiStatus | null): L.DivIcon {
       align-items: flex-end;
       justify-content: center;
     ">
-      <div style="
+      <div class="poi-marker-inner" style="
         width: 28px;
         height: 28px;
         border-radius: 50%;
@@ -59,7 +62,7 @@ export function createMarkerIcon(status?: PoiStatus | null): L.DivIcon {
   `;
 
   return L.divIcon({
-    className: 'dungeon-hub-map-marker',
+    className: moving ? 'dungeon-hub-map-marker poi-marker--moving' : 'dungeon-hub-map-marker',
     html,
     iconSize: [44, 44],
     iconAnchor: [22, 44], // bottom-center of the 44px container = pin tip

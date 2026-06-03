@@ -47,6 +47,16 @@ export interface CreatedEncounter {
     insertionOrder: number;
     /** engine-reaction-bus: PHB p.190 — one reaction per round. */
     reactionUsed: boolean;
+    // web-combat-observe REQ-WCO-API-01: per-combatant conditions, effects, and action economy.
+    // PHB Appendix A p.290-292: condition names. PHB p.251: effect names (Hex, Hunter's Mark, etc.).
+    conditions: Array<{ name: string; appliedByCombatantId: string | null }>;
+    effects: Array<{ name: string; sourceCombatantId: string | null }>;
+    /** PHB p.189 — one action per turn. */
+    actionUsed: boolean;
+    /** PHB p.189 — one bonus action per turn. */
+    bonusActionUsed: boolean;
+    /** engine-action-economy: attacks remaining under the current Attack action (Extra Attack). 0 = resting state. */
+    attacksRemaining: number;
   }>;
 }
 
@@ -114,6 +124,13 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
         ac: c.ac,
         insertionOrder: c.insertionOrder,
         reactionUsed: c.reactionUsed,
+        // web-combat-observe REQ-WCO-API-01/03: new combatants always start with empty
+        // conditions/effects and default action-economy state (PHB p.189 — budget resets each turn).
+        conditions: [],
+        effects: [],
+        actionUsed: c.actionUsed,
+        bonusActionUsed: c.bonusActionUsed,
+        attacksRemaining: c.attacksRemaining,
       })),
     };
   });

@@ -7,7 +7,8 @@ export type PoiStatus = 'unknown' | 'discovered' | 'cleared';
 
 export interface LoadedPoi {
   id: string;
-  hexId: string;
+  worldId: string;
+  hexId: string | null;
   name: string;
   description: string | null;
   dmNotes: string | null;
@@ -68,7 +69,7 @@ export function sanitizePoiForRole(
  * the wire. Use stripParentHexStatus before returning any response.
  */
 export interface LoadedPoiWithHexStatus extends LoadedPoi {
-  parentHexStatus: HexStatus;
+  parentHexStatus: HexStatus | null;
 }
 
 /**
@@ -82,11 +83,14 @@ export function stripParentHexStatus(p: LoadedPoiWithHexStatus): LoadedPoi {
 }
 
 /**
- * Fetches all POIs in a world via JOIN pois → hexes on hexId.
- * Projects parentHexStatus from hexes.status for single-pass cascade filtering.
- * Does NOT require a world_id column on pois — the JOIN via hexId is mandatory.
+ * Fetches all POIs in a world via pois.world_id (direct scope, idx_pois_world).
+ * LEFT JOINs hexes to project parentHexStatus (HexStatus | null) for
+ * single-pass hybrid visibility cascade. Free-floating POIs (hexId null)
+ * project parentHexStatus = null.
  *
- * REQ-POI-ENDPOINT-01.
+ * parentHexStatus MUST NOT be serialized to the wire — use stripParentHexStatus.
+ *
+ * REQ-POIWL-API-05.
  */
 export async function listPoisInWorld(args: {
   worldId: string;
@@ -94,6 +98,7 @@ export async function listPoisInWorld(args: {
   const rows = await db
     .select({
       id: pois.id,
+      worldId: pois.worldId,
       hexId: pois.hexId,
       name: pois.name,
       description: pois.description,
@@ -103,28 +108,33 @@ export async function listPoisInWorld(args: {
       worldY: pois.worldY,
       createdAt: pois.createdAt,
       updatedAt: pois.updatedAt,
-      parentHexStatus: hexes.status,
+      parentHexStatus: hexes.status, // HexStatus | null (null for free-floating)
     })
     .from(pois)
-    .innerJoin(hexes, eq(pois.hexId, hexes.id))
-    .where(eq(hexes.worldId, args.worldId));
+    .leftJoin(hexes, eq(pois.hexId, hexes.id)) // LEFT: keeps free-floating POIs
+    .where(eq(pois.worldId, args.worldId)); // direct scope, uses idx_pois_world
 
   return rows as LoadedPoiWithHexStatus[];
 }
 
 /**
  * Filters a world-scope POI list for player visibility in a single pass:
- *   1. Hex-status cascade gate: drops POIs on unexplored hexes (REQ-POI-CASCADE-01).
- *   2. POI-level gate: drops status='unknown' and strips dmNotes (REQ-POI-CASCADE-02).
+ *   1. Hybrid hex-status gate (REQ-POIWL-VIS-01, REQ-POIWL-VIS-02):
+ *      - Hex-bound POIs (hexId set): excluded when parent hex is unexplored.
+ *      - Free-floating POIs (hexId null): hex gate skipped entirely.
+ *   2. POI-level gate: drops status='unknown' and strips dmNotes.
  *
  * Reuses filterPoisByAccess for step 2 — no reimplementation.
- * NO extra query, NO N+1.
- *
- * Pure function — testable without HTTP or DB.
+ * NO extra query, NO N+1. Pure function — testable without HTTP or DB.
  */
 export function filterWorldPoisForPlayer(
   list: LoadedPoiWithHexStatus[],
 ): Array<Omit<LoadedPoi, 'dmNotes'> & { dmNotes?: string | null }> {
-  const onVisibleHex = list.filter((p) => p.parentHexStatus !== 'unexplored');
+  // Hybrid visibility: hex-associated POIs (hexId set) inherit the hex cascade —
+  // dropped when parent hex is unexplored. Free-floating POIs (hexId null) skip
+  // the hex gate entirely and rely solely on the POI-level status gate below.
+  const onVisibleHex = list.filter(
+    (p) => p.hexId == null || p.parentHexStatus !== 'unexplored',
+  );
   return filterPoisByAccess(onVisibleHex.map(stripParentHexStatus), 'player');
 }

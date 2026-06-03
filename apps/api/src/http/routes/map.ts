@@ -105,23 +105,29 @@ const ListWorldPoisQuery = z.object({
 const POI_STATUSES = ['unknown', 'discovered', 'cleared'] as const;
 const PoiParam = z.object({ poiId: z.string().uuid() });
 
-const CreatePoiBody = z.object({
+// Coordinate bounds for the Sword Coast map asset (data/Sword-Coast-Map_HighRes.jpg).
+// Values intentionally duplicated from IMAGE_W/IMAGE_H in apps/web/lib/world/map/coords.ts
+// because the API cannot import from apps/web. Keep in sync when the source asset changes.
+const POI_COORD_MAX_X = 10200; // IMAGE_W
+const POI_COORD_MAX_Y = 6600; // IMAGE_H
+
+export const CreatePoiBody = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(20000).nullable().optional(),
   dmNotes: z.string().max(20000).nullable().optional(),
   status: z.enum(POI_STATUSES).optional(),
-  worldX: z.number().nullable().optional(),
-  worldY: z.number().nullable().optional(),
+  worldX: z.number().min(0).max(POI_COORD_MAX_X).nullable().optional(),
+  worldY: z.number().min(0).max(POI_COORD_MAX_Y).nullable().optional(),
 });
 
-const UpdatePoiBody = z
+export const UpdatePoiBody = z
   .object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(20000).nullable().optional(),
     dmNotes: z.string().max(20000).nullable().optional(),
     status: z.enum(POI_STATUSES).optional(),
-    worldX: z.number().nullable().optional(),
-    worldY: z.number().nullable().optional(),
+    worldX: z.number().min(0).max(POI_COORD_MAX_X).nullable().optional(),
+    worldY: z.number().min(0).max(POI_COORD_MAX_Y).nullable().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
@@ -296,6 +302,55 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
 
       // Player: single-pass cascade + access filter (REQ-POI-CASCADE-01/02)
       return { data: filterWorldPoisForPlayer(raw) };
+    },
+  );
+
+  // ---- POST /worlds/:worldId/pois -----------------------------------------
+  // Creates a free-floating POI (hexId: null) directly attached to the world.
+  // REQ-PWC-API-01: mirrors /hexes/:hexId/pois but without the hex load/404 step.
+  app.post(
+    '/worlds/:worldId/pois',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { worldId } = WorldParam.parse(request.params);
+      const body = CreatePoiBody.parse(request.body);
+      const userId = request.user!.sub;
+
+      const access = await getWorldAccess(worldId, userId);
+      if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const [created] = await db
+        .insert(pois)
+        .values({
+          worldId,
+          hexId: null,
+          name: body.name,
+          description: body.description ?? null,
+          dmNotes: body.dmNotes ?? null,
+          ...(body.status && { status: body.status }),
+          worldX: body.worldX ?? null,
+          worldY: body.worldY ?? null,
+        })
+        .returning();
+
+      // Auto-log: POI created with non-default status. unknown = prep, no event.
+      if (created && created.status !== 'unknown') {
+        const query = SessionQuery.parse(request.query);
+        await recordSessionEventForWorld({
+          gmUserId: userId,
+          worldId,
+          ...(query.sessionId && { preferredSessionId: query.sessionId }),
+          eventType: 'poi_created',
+          payload: {
+            poiId: created.id,
+            hexId: null,
+            name: created.name,
+            status: created.status,
+          },
+        });
+      }
+
+      return reply.code(201).send(created);
     },
   );
 
@@ -512,6 +567,7 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const [created] = await db
       .insert(pois)
       .values({
+        worldId: hex.worldId,
         hexId,
         name: body.name,
         description: body.description ?? null,
@@ -571,16 +627,19 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const poi = await loadPoi(poiId);
     if (!poi) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const hex = await loadHex(poi.hexId);
-    if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
-
-    const access = await getWorldAccess(hex.worldId, userId);
+    // Access via poi.worldId directly — no hex load needed for access check.
+    const access = await getWorldAccess(poi.worldId, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     if (access !== 'gm') {
-      // Cascade del hex.
-      const hexVisible = await isHexVisibleToPlayer(hex);
-      if (!hexVisible) return reply.code(404).send({ error: 'NOT_FOUND' });
+      // Hex-bound POIs: apply cascade from parent hex visibility.
+      // Free-floating POIs (hexId null): skip hex cascade, status gate only.
+      if (poi.hexId != null) {
+        const hex = await loadHex(poi.hexId);
+        if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
+        const hexVisible = await isHexVisibleToPlayer(hex);
+        if (!hexVisible) return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
       // POI unknown invisible al player.
       if (poi.status === 'unknown') return reply.code(404).send({ error: 'NOT_FOUND' });
     }
@@ -597,10 +656,8 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const poi = await loadPoi(poiId);
     if (!poi) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const hex = await loadHex(poi.hexId);
-    if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
-
-    const access = await getWorldAccess(hex.worldId, userId);
+    // Access via poi.worldId directly — no hex load required.
+    const access = await getWorldAccess(poi.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     const updates: Partial<typeof pois.$inferInsert> = { updatedAt: new Date() };
@@ -620,12 +677,12 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
         const query = SessionQuery.parse(request.query);
         await recordSessionEventForWorld({
           gmUserId: userId,
-          worldId: hex.worldId,
+          worldId: poi.worldId,
           ...(query.sessionId && { preferredSessionId: query.sessionId }),
           eventType,
           payload: {
             poiId,
-            hexId: hex.id,
+            hexId: poi.hexId, // nullable — tolerated in JSONB payload
             name: updated.name,
             from: poi.status,
             to: body.status,
@@ -645,10 +702,8 @@ export const mapRoute: FastifyPluginAsync = async (app) => {
     const poi = await loadPoi(poiId);
     if (!poi) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-    const hex = await loadHex(poi.hexId);
-    if (!hex) return reply.code(404).send({ error: 'NOT_FOUND' });
-
-    const access = await getWorldAccess(hex.worldId, userId);
+    // Access via poi.worldId directly — no hex load required.
+    const access = await getWorldAccess(poi.worldId, userId);
     if (access !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
 
     await db.delete(pois).where(eq(pois.id, poiId));

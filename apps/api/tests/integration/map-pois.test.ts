@@ -5,13 +5,13 @@ import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
 import { addWorldMember } from '../helpers/add-world-member.js';
 
 /**
- * Hexcrawl Map — POIs (world-first-model Slice 1).
+ * Hexcrawl Map — POIs (poi-world-level Slice 1).
  *
- * POI CRUD under hex with visibility cascade (hex parent + POI status).
- * POI world-scope is derived via pois.hex_id → hexes.id → hexes.world_id.
- * No direct world_id column on pois table (REQ-MAP-02).
+ * POI CRUD under hex with hybrid visibility cascade (hex parent + POI status).
+ * POI world-scope is now direct: pois.world_id (re-anchored from hex cascade).
+ * hex_id is nullable; deleting a hex orphans its POIs (hex_id → null, POI survives).
  *
- * REQ-MAP-02, REQ-MAP-04, REQ-CROSS-02
+ * REQ-POIWL-TEST-01, REQ-POIWL-TEST-02, REQ-MAP-04, REQ-CROSS-02
  */
 describe('pois — world-scoped (world-first-model Slice 1)', () => {
   let dm: TestUser;
@@ -85,8 +85,8 @@ describe('pois — world-scoped (world-first-model Slice 1)', () => {
       expect(poi.status).toBe('unknown');
       expect(poi.name).toBe('Ruins of Kelthara');
       expect(poi.dmNotes).toBe('There is a lich below');
-      // REQ-MAP-02: no direct world_id column on POI
-      expect(poi.worldId).toBeUndefined();
+      // poi-world-level: POI now carries world_id directly
+      expect(poi.worldId).toBe(worldId);
     });
 
     it('player cannot create', async () => {
@@ -216,12 +216,12 @@ describe('pois — world-scoped (world-first-model Slice 1)', () => {
     });
   });
 
-  // ---- REQ-MAP-02: POI world resolution via hex cascade -------------------
-  describe('REQ-MAP-02: POI world resolution via hex cascade', () => {
-    it('POI inherits world scope via hex_id → hex.world_id (no direct worldId column)', async () => {
+  // ---- poi carries world_id directly (poi-world-level) --------------------
+  describe('poi carries world_id directly', () => {
+    it('POI created under hex carries worldId equal to the hex world', async () => {
       const poi = await createPoi(hexExploredId, { name: 'Cascade test POI', status: 'discovered' });
-      // The POI should be visible from the world-scoped hex, not via a worldId on the POI.
-      expect(poi.worldId).toBeUndefined();
+      // poi-world-level: POI now carries worldId directly, set from the parent hex at create time.
+      expect(poi.worldId).toBe(worldId);
       expect(poi.hexId).toBe(hexExploredId);
 
       // Confirm the hex itself carries worldId.
@@ -282,7 +282,8 @@ describe('pois — world-scoped (world-first-model Slice 1)', () => {
       expect(after.statusCode).toBe(404);
     });
 
-    it('cascade from hex: deleting the hex deletes its POIs', async () => {
+    it('deleting the hex orphans its POIs (hex_id → null, POI survives)', async () => {
+      // REQ-POIWL-TEST-02: ON DELETE SET NULL — POI must survive hex deletion with hexId=null.
       const app = await getTestApp();
       const tempHex = (
         await app
@@ -294,7 +295,7 @@ describe('pois — world-scoped (world-first-model Slice 1)', () => {
           })
           .then((r) => r.json())
       ).id;
-      const poi = await createPoi(tempHex, { name: 'Will Vanish' });
+      const poi = await createPoi(tempHex, { name: 'Will Survive as Free-Floating' });
 
       await app.inject({
         method: 'DELETE',
@@ -302,12 +303,130 @@ describe('pois — world-scoped (world-first-model Slice 1)', () => {
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
 
+      // POI MUST survive — GET returns 200 (was 404 under cascade).
       const after = await app.inject({
         method: 'GET',
         url: `/api/v1/pois/${poi.id}`,
         headers: { authorization: `Bearer ${dm.accessToken}` },
       });
-      expect(after.statusCode).toBe(404);
+      expect(after.statusCode).toBe(200);
+      expect(after.json().hexId).toBeNull();
+
+      // Free-floating POI MUST still appear in world-scope GET (leftJoin keeps it).
+      const worldPois = await app.inject({
+        method: 'GET',
+        url: `/api/v1/worlds/${worldId}/pois`,
+        headers: { authorization: `Bearer ${dm.accessToken}` },
+      });
+      expect(worldPois.statusCode).toBe(200);
+      const surviving = worldPois.json().data.find((p: any) => p.id === poi.id);
+      expect(surviving).toBeDefined();
+      expect(surviving.hexId).toBeNull();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /worlds/:worldId/pois — REQ-PWC-API-01
+// Free-floating POI creation (hexId: null) directly on a world.
+// ---------------------------------------------------------------------------
+describe('POST /worlds/:worldId/pois (free-floating POI create)', () => {
+  let dm: TestUser;
+  let alice: TestUser;
+  let outsider: TestUser;
+  let worldId: string;
+
+  beforeAll(async () => {
+    dm = await createTestUser();
+    alice = await createTestUser();
+    outsider = await createTestUser();
+
+    const result = await createWorldWithGm(dm.id);
+    worldId = result.worldId;
+    await addWorldMember(worldId, alice.id, 'player');
+  });
+
+  afterAll(async () => {
+    if (dm) await deleteTestUser(dm.id);
+    if (alice) await deleteTestUser(alice.id);
+    if (outsider) await deleteTestUser(outsider.id);
+    await closeTestApp();
+  });
+
+  it('DM creates free-floating POI — 201, hexId: null, correct worldId and coords', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { name: 'Ruinas', status: 'discovered', worldX: 500, worldY: 400 },
+    });
+    expect(res.statusCode).toBe(201);
+    const poi = res.json();
+    expect(poi.hexId).toBeNull();
+    expect(poi.worldId).toBe(worldId);
+    expect(poi.worldX).toBe(500);
+    expect(poi.worldY).toBe(400);
+    expect(poi.name).toBe('Ruinas');
+  });
+
+  it('player (non-GM) → 403', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${alice.accessToken}` },
+      payload: { name: 'Player attempt' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('outsider (non-member) → 403', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${outsider.accessToken}` },
+      payload: { name: 'Outsider attempt' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('status: unknown — POI still created with hexId: null', async () => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { name: 'Hidden prep', status: 'unknown' },
+    });
+    expect(res.statusCode).toBe(201);
+    const poi = res.json();
+    expect(poi.hexId).toBeNull();
+    expect(poi.status).toBe('unknown');
+  });
+
+  it('created POI is retrievable via GET /worlds/:worldId/pois', async () => {
+    const app = await getTestApp();
+    const createRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+      payload: { name: 'Visible Ruin', status: 'discovered', worldX: 1000, worldY: 800 },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json();
+
+    const listRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/worlds/${worldId}/pois`,
+      headers: { authorization: `Bearer ${dm.accessToken}` },
+    });
+    expect(listRes.statusCode).toBe(200);
+    const found = listRes.json().data.find((p: any) => p.id === created.id);
+    expect(found).toBeDefined();
+    expect(found.hexId).toBeNull();
+    expect(found.worldX).toBe(1000);
+    expect(found.worldY).toBe(800);
   });
 });

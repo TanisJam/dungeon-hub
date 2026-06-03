@@ -31,6 +31,16 @@
  *   Source: data/Sword-Coast-Map_HighRes.jpg
  */
 
+/**
+ * Source image pixel width — data/Sword-Coast-Map_HighRes.jpg.
+ * These are the authoritative TS constants. The .mjs build scripts (tile-map.mjs,
+ * seed-poi-coords.mjs) keep their own literals with a sync comment — they cannot
+ * import TS modules. The API also duplicates these as POI_COORD_MAX_X/Y (same reason).
+ */
+export const IMAGE_W = 10200;
+/** Source image pixel height — data/Sword-Coast-Map_HighRes.jpg. */
+export const IMAGE_H = 6600;
+
 /** Native-resolution zoom level (= max zoom). Must match tile-map.mjs MAX_ZOOM. */
 export const MAX_ZOOM = 5;
 
