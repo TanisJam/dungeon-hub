@@ -18,6 +18,9 @@ export type EncounterCombatant = {
   initiative: number;
   hpCurrent: number;
   hpMax: number;
+  // FIX-3 (WARNING): ac mirrors the API shape from load-encounter.ts which returns ac
+  // for NPC combatants (REQ-AC-CREATE-01). Optional/null for PC combatants.
+  ac?: number | null;
   insertionOrder: number;
   // REQ-WCO-API-03 — conditions/effects (PHB Appendix A p.290-292) + action economy
   conditions: CombatantCondition[];
@@ -40,6 +43,9 @@ export type EncounterDetail = {
   createdAt: string;
   updatedAt: string;
   combatants: EncounterCombatant[];
+  // REQ-WCO-WEB-08: caller-specific role returned by GET /encounters/:id.
+  // Used by the web client to gate GM-only controls (e.g. TurnControlsIsland).
+  callerRole: 'gm' | 'player';
 };
 
 export type EncounterSummary = {
