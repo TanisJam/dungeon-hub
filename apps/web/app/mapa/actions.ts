@@ -237,6 +237,24 @@ export async function listPois(hexId: string): Promise<PoiRow[]> {
 }
 
 // ---------------------------------------------------------------------------
+// listAllPois — SSR, called ONLY when activeMapView === 'mapa'.
+// REQ-POI-MARKER-01: fetches all world-scope POIs for the marker layer.
+// The API applies role-based cascade filtering (unexplored hex + unknown status).
+// ---------------------------------------------------------------------------
+
+export async function listAllPois(worldId: string): Promise<PoiRow[]> {
+  const token = await getToken();
+  if (!token) return [];
+
+  try {
+    const res = await api.get<PoiListResponse>(`/worlds/${worldId}/pois?parent=all`, token);
+    return res.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // createPoi — DM-only.
 // ---------------------------------------------------------------------------
 

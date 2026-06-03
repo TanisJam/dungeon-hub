@@ -27,9 +27,13 @@
  */
 
 import { useEffect } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { worldToLatLng, MAX_ZOOM } from '@/lib/world/map/coords';
+import { createMarkerIcon } from './map-marker-icon';
+import type { PoiRow } from '@/app/mapa/actions';
+import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
+import { PoiDetail } from './poi-detail';
 
 // Import Leaflet CSS — required for map tiles and controls to render correctly.
 // Next.js handles this import via its CSS bundler when the component is client-only.
@@ -38,6 +42,10 @@ import 'leaflet/dist/leaflet.css';
 interface WorldMapLeafletProps {
   /** Base URL for Supabase Storage CDN. Derived from NEXT_PUBLIC_SUPABASE_URL. */
   supabaseUrl: string;
+  /** World-scope POI list (SSR-fetched, server-filtered for role). REQ-POI-MARKER-01. */
+  pois: PoiRow[];
+  /** Effective view — used to gate DM-notes in PoiDetail inside the Popup. REQ-POI-MARKER-02. */
+  effectiveView: EffectiveView;
 }
 
 /** Source image pixel dimensions (data/Sword-Coast-Map_HighRes.jpg). */
@@ -63,7 +71,7 @@ const MIN_ZOOM = 0;
 // with the tile pyramid + the pixel↔LatLng scale.
 const INITIAL_ZOOM = 1;
 
-export function WorldMapLeaflet({ supabaseUrl }: WorldMapLeafletProps) {
+export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView }: WorldMapLeafletProps) {
   /**
    * Leaflet has a default-icon PNG resolution issue with webpack/Next.js bundlers.
    * Since we use divIcon for all markers (map-marker-icon.ts), we suppress the
@@ -131,6 +139,26 @@ export function WorldMapLeaflet({ supabaseUrl }: WorldMapLeafletProps) {
           noWrap
           attribution="Sword Coast — Forgotten Realms"
         />
+        {/*
+         * POI marker layer (Slice 2 — REQ-POI-MARKER-01, REQ-POI-DETAIL-01).
+         * Only renders markers for POIs with non-null worldX and worldY.
+         * POIs with null coords are silently skipped (expected behavior, not a defect).
+         * Tap → Popup opens (Leaflet native tap/click — no hover dependency).
+         * PoiDetail is the single source of truth for DM-notes gating (REQ-GATE-01).
+         */}
+        {pois
+          .filter((p) => p.worldX != null && p.worldY != null)
+          .map((p) => (
+            <Marker
+              key={p.id}
+              position={worldToLatLng(p.worldX!, p.worldY!)}
+              icon={createMarkerIcon(p.status)}
+            >
+              <Popup>
+                <PoiDetail poi={p} isDM={effectiveView === 'dm'} />
+              </Popup>
+            </Marker>
+          ))}
       </MapContainer>
     </div>
   );

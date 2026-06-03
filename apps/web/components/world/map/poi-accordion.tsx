@@ -16,18 +16,7 @@
 import { useState } from 'react';
 import type { PoiRow, PoiStatus, PoiBody } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-
-const POI_STATUS_LABEL: Record<PoiStatus, string> = {
-  unknown: 'Desconocido',
-  discovered: 'Descubierto',
-  cleared: 'Despejado',
-};
-
-const POI_STATUS_STYLE: Record<PoiStatus, string> = {
-  unknown: 'bg-stone-100 text-stone-600',
-  discovered: 'bg-blue-100 text-blue-700',
-  cleared: 'bg-green-100 text-green-700',
-};
+import { PoiDetail } from './poi-detail';
 
 interface PoiFormState {
   open: boolean;
@@ -202,30 +191,8 @@ export function PoiAccordion({
                   {visiblePois.map((poi) => (
                     <li key={poi.id} className="py-2">
                       <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-medium text-ink">{poi.name}</p>
-                            <span
-                              className={[
-                                'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-                                POI_STATUS_STYLE[poi.status] ?? 'bg-stone-100 text-stone-600',
-                              ].join(' ')}
-                            >
-                              {POI_STATUS_LABEL[poi.status] ?? poi.status}
-                            </span>
-                          </div>
-                          {poi.description && (
-                            <p className="mt-0.5 text-xs text-ink-soft line-clamp-2">
-                              {poi.description}
-                            </p>
-                          )}
-                          {/* DM notes — absent for players (REQ-GATE-01) */}
-                          {isDM && poi.dmNotes && (
-                            <p className="mt-0.5 text-xs text-amber-700 italic">
-                              DM: {poi.dmNotes}
-                            </p>
-                          )}
-                        </div>
+                        {/* PoiDetail owns name/badge/desc/dmNotes rendering (REQ-POI-DETAIL-01) */}
+                        <PoiDetail poi={poi} isDM={isDM} />
 
                         {/* DM controls — absent for players (REQ-GATE-01) */}
                         {isDM && (

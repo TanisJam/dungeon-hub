@@ -10,7 +10,8 @@ import { HexClientWrapper } from '@/components/world/map/hex-client-wrapper';
 import { MapClientWrapper } from '@/components/world/map/map-client-wrapper';
 import { MapToggle } from '@/components/world/map/map-toggle';
 import { V3Empty } from '@/components/ui';
-import type { HexRow } from './actions';
+import type { HexRow, PoiRow } from './actions';
+import { listAllPois } from './actions';
 
 /**
  * Mapa — Server Component (Slice 4 + WM Slice 1).
@@ -95,6 +96,14 @@ export default async function MapaPage({
     // If fetch fails, render with empty list — client can retry via search
   }
 
+  // REQ-POI-MARKER-01: SSR fetch for POI marker layer — only when mapa view is active.
+  // The API applies role-based cascade filtering (player: unexplored hex + unknown status removed).
+  // Lista view: pois is [] — lazy accordion remains unchanged.
+  let pois: PoiRow[] = [];
+  if (activeMapView === 'mapa') {
+    pois = await listAllPois(aw.id);
+  }
+
   return (
     <AppShell
       title="Mapa"
@@ -111,8 +120,13 @@ export default async function MapaPage({
          * REQ-WM-03: MapClientWrapper wraps the Leaflet island with ssr:false.
          * The island breaks out of AppShell max-w-sm via fixed positioning.
          * supabaseUrl is derived from NEXT_PUBLIC_SUPABASE_URL (no new env var — ADR-1).
+         * REQ-POI-MARKER-02: pois + effectiveView forwarded for the marker layer.
          */
-        <MapClientWrapper supabaseUrl={env.SUPABASE_URL} />
+        <MapClientWrapper
+          supabaseUrl={env.SUPABASE_URL}
+          pois={pois}
+          effectiveView={effectiveView}
+        />
       ) : (
         <HexClientWrapper
           worldId={aw.id}

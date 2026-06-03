@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * mapa — E2E spec for the Mapa tab (Ubicaciones/Hexes + lazy POI accordion).
- * REQ-MAP-01, REQ-MAP-02, REQ-GATE-01, REQ-GATE-03.
+ * mapa — E2E spec for the Mapa tab (Ubicaciones/Hexes + lazy POI accordion + Leaflet markers).
+ * REQ-MAP-01, REQ-MAP-02, REQ-GATE-01, REQ-GATE-03, REQ-POI-MARKER-01, REQ-POI-MARKER-02.
  *
  * Verifies:
  *   (a) /mapa renders without error for GM (DM view).
@@ -11,6 +11,8 @@ import { test, expect } from '@playwright/test';
  *   (d) DM expands a hex → POIs accordion loads lazily.
  *   (e) Player view: no FAB, no DM-only content (sanitized).
  *   (f) Mapa tab remains active.
+ *   (g) Mapa view: map container renders; markers present if seeded coords exist.
+ *   (h) Tap-to-open: if marker exists, tapping opens POI detail popup.
  *
  * Note: The E2E test user is GM of 'E2E Test Campaign (World)' via auth.setup.ts.
  * The test assumes the dev stack is running (apps/web/e2e/README.md).
@@ -18,6 +20,10 @@ import { test, expect } from '@playwright/test';
  * Mobile-first: 375px viewport. REQ-GATE-03.
  *
  * CRITICAL: FAB is a hydrated client island — use networkidle + await expect before clicking.
+ *
+ * ADR-4 tolerance: marker layer assertions are conditional — zero markers is valid
+ * when no seeded coords exist in the E2E world. Assertions are container/no-crash
+ * by default, with conditional tap-to-open when a marker IS present.
  */
 
 const MOBILE = { width: 375, height: 812 };
@@ -156,4 +162,52 @@ test('Mapa tab is active in TabBar when on /mapa', async ({ page }) => {
 
   // Mapa tab should still be visible and we should be on /mapa
   await expect(nav.locator('a[href="/mapa"]')).toBeVisible({ timeout: 5_000 });
+});
+
+// ---------------------------------------------------------------------------
+// Mapa view: marker layer (REQ-POI-MARKER-01, REQ-POI-MARKER-02)
+// ADR-4: zero-marker tolerance — assert container/no-crash unconditionally;
+// tap-to-open is conditional on a marker being present in the DOM.
+// ---------------------------------------------------------------------------
+
+test('Mapa view: map container renders without crash (REQ-POI-MARKER-01)', async ({ page }) => {
+  // Navigate to Mapa view
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
+
+  // Map container div must be in the DOM (rendered by WorldMapLeaflet)
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+});
+
+test('Mapa view: tap marker opens POI detail popup if markers are present (REQ-POI-MARKER-01)', async ({ page }) => {
+  await page.goto('/mapa?view=mapa', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/mapa/, { timeout: 10_000 });
+
+  // Wait for map container to render
+  const mapContainer = page.locator('[data-testid="map-container"]');
+  await expect(mapContainer).toBeVisible({ timeout: 15_000 });
+
+  // Check if any Leaflet markers are present in the DOM (conditional — ADR-4).
+  // Markers are rendered as .dungeon-hub-map-marker divIcon elements.
+  const markers = page.locator('.dungeon-hub-map-marker');
+  const markerCount = await markers.count();
+
+  if (markerCount === 0) {
+    // No seeded coords — valid baseline, test passes (ADR-4 tolerance).
+    // This is the expected state before running seed:poi-coords.
+    return;
+  }
+
+  // A marker exists — tap it and assert PoiDetail popup opens.
+  await markers.first().click();
+
+  // Leaflet Popup renders the POI name from PoiDetail (REQ-POI-DETAIL-01).
+  // The popup content appears in the DOM after the tap.
+  const popup = page.locator('.leaflet-popup-content');
+  await expect(popup).toBeVisible({ timeout: 5_000 });
+
+  // Popup must contain some text (POI name from PoiDetail)
+  const popupText = await popup.textContent();
+  expect(popupText).toBeTruthy();
 });

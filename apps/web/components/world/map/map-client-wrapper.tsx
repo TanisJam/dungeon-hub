@@ -9,13 +9,14 @@
  *   This wrapper is the ONLY place where `ssr:false` is used for the map.
  *
  * Props are forwarded as-is to WorldMapLeaflet.
- * In Slice 2, additional props (hexes, pois, effectiveView, onSelectEntity) will
- * be added here as the marker layer is wired up.
+ * Slice 2: pois + effectiveView added for the POI marker layer (REQ-POI-MARKER-02).
  *
  * REQ-WM-03 (ssr:false requirement).
  */
 
 import dynamic from 'next/dynamic';
+import type { PoiRow } from '@/app/mapa/actions';
+import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
 
 const WorldMapLeafletDynamic = dynamic(
   () => import('./world-map-leaflet').then((m) => ({ default: m.WorldMapLeaflet })),
@@ -35,8 +36,12 @@ const WorldMapLeafletDynamic = dynamic(
 interface MapClientWrapperProps {
   /** Supabase Storage base URL (NEXT_PUBLIC_SUPABASE_URL from lib/env.ts). */
   supabaseUrl: string;
+  /** World-scope POI list (SSR-fetched, server-filtered for role). REQ-POI-MARKER-01. */
+  pois: PoiRow[];
+  /** Effective view for the DM-notes gate inside PoiDetail. REQ-POI-MARKER-02. */
+  effectiveView: EffectiveView;
 }
 
-export function MapClientWrapper({ supabaseUrl }: MapClientWrapperProps) {
-  return <WorldMapLeafletDynamic supabaseUrl={supabaseUrl} />;
+export function MapClientWrapper({ supabaseUrl, pois, effectiveView }: MapClientWrapperProps) {
+  return <WorldMapLeafletDynamic supabaseUrl={supabaseUrl} pois={pois} effectiveView={effectiveView} />;
 }
