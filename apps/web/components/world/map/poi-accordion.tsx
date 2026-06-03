@@ -12,10 +12,16 @@
 //
 // REQ-MAP-01, REQ-GATE-01: DM sees all POIs + dmNotes + CRUD; player sees filtered
 // POIs (status != 'unknown') without dmNotes or controls.
+//
+// Slice 3 additions:
+// - Coord X / Coord Y numeric inputs in create/edit form (DM-only, REQ-PLACE-FIELDS-01)
+// - "Colocar en mapa" button on null-coord POI rows (DM-only, REQ-PLACE-TAP-01)
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { PoiRow, PoiStatus, PoiBody } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
+import { IMAGE_W, IMAGE_H } from '@/lib/world/map/coords';
 import { PoiDetail } from './poi-detail';
 
 interface PoiFormState {
@@ -45,6 +51,7 @@ export function PoiAccordion({
   onUpdatePoi,
   onDeletePoi,
 }: PoiAccordionProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [pois, setPois] = useState<PoiRow[] | null>(null); // null = not yet loaded
   const [loading, setLoading] = useState(false);
@@ -54,6 +61,9 @@ export function PoiAccordion({
   const [formDesc, setFormDesc] = useState('');
   const [formDmNotes, setFormDmNotes] = useState('');
   const [formStatus, setFormStatus] = useState<PoiStatus>('unknown');
+  // String state for numeric coord inputs — number inputs emit '' on empty, not 0.
+  const [formWorldX, setFormWorldX] = useState<string>('');
+  const [formWorldY, setFormWorldY] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
   const isDM = effectiveView === 'dm';
@@ -82,6 +92,8 @@ export function PoiAccordion({
     setFormDesc('');
     setFormDmNotes('');
     setFormStatus('unknown');
+    setFormWorldX('');
+    setFormWorldY('');
     setFormError(null);
     setForm({ open: true, mode: 'create', initial: null });
   }
@@ -91,6 +103,8 @@ export function PoiAccordion({
     setFormDesc(poi.description ?? '');
     setFormDmNotes(poi.dmNotes ?? '');
     setFormStatus(poi.status);
+    setFormWorldX(poi.worldX?.toString() ?? '');
+    setFormWorldY(poi.worldY?.toString() ?? '');
     setFormError(null);
     setForm({ open: true, mode: 'edit', initial: poi });
   }
@@ -108,11 +122,21 @@ export function PoiAccordion({
     setSubmitting(true);
     setFormError(null);
 
+    // Map coord string state → number | undefined.
+    // Empty field = omit from body (leave existing coord unchanged on edit; null on create).
+    // Zod .min(0).max() in the API is the backstop for out-of-range — a 400 will surface
+    // via formError. We do NOT client-clamp here (contrast with drag/tap which clamp
+    // because a gesture has no text field the DM can correct — ADR-4).
+    const x = formWorldX.trim() === '' ? undefined : Number(formWorldX);
+    const y = formWorldY.trim() === '' ? undefined : Number(formWorldY);
+
     const body: PoiBody = {
       name: formName.trim(),
       ...(formDesc.trim() && { description: formDesc.trim() }),
       ...(formDmNotes.trim() && { dmNotes: formDmNotes.trim() }),
       status: formStatus,
+      ...(x !== undefined && Number.isFinite(x) && { worldX: x }),
+      ...(y !== undefined && Number.isFinite(y) && { worldY: y }),
     };
 
     try {
@@ -196,23 +220,40 @@ export function PoiAccordion({
 
                         {/* DM controls — absent for players (REQ-GATE-01) */}
                         {isDM && (
-                          <div className="flex shrink-0 gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openEdit(poi)}
-                              aria-label={`Editar POI ${poi.name}`}
-                              className="min-h-[44px] min-w-[44px] rounded-md border border-line bg-paper-soft px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-paper"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(poi)}
-                              aria-label={`Eliminar POI ${poi.name}`}
-                              className="min-h-[44px] min-w-[44px] rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100"
-                            >
-                              ×
-                            </button>
+                          <div className="flex shrink-0 flex-col gap-1">
+                            {/*
+                             * "Colocar en mapa" button — DM-only, null-coord POIs only.
+                             * REQ-PLACE-TAP-01, REQ-PLACE-TAP-02: switches to Mapa view
+                             * and sets ?place=<id> so the map enters tap-to-place mode.
+                             */}
+                            {poi.worldX === null && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`?view=mapa&place=${poi.id}`)}
+                                aria-label={`Colocar ${poi.name} en el mapa`}
+                                className="min-h-[44px] rounded-md border border-line bg-paper-soft px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-paper"
+                              >
+                                Colocar en mapa
+                              </button>
+                            )}
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(poi)}
+                                aria-label={`Editar POI ${poi.name}`}
+                                className="min-h-[44px] min-w-[44px] rounded-md border border-line bg-paper-soft px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-paper"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(poi)}
+                                aria-label={`Eliminar POI ${poi.name}`}
+                                className="min-h-[44px] min-w-[44px] rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100"
+                              >
+                                ×
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -294,6 +335,48 @@ export function PoiAccordion({
                       <option value="discovered">Descubierto</option>
                       <option value="cleared">Despejado</option>
                     </select>
+                  </div>
+
+                  {/*
+                   * Coord X / Coord Y numeric inputs — DM only (REQ-PLACE-FIELDS-01).
+                   * After the Estado field, before the error block.
+                   * Optional: empty field = omit from body (leave coord unchanged on edit).
+                   * min-h-[44px] for mobile touch target compliance (CLAUDE.md §2).
+                   */}
+                  <div>
+                    <label htmlFor={`poi-x-${hexId}`} className="block text-xs text-ink-soft">
+                      Coord X (0–{IMAGE_W})
+                    </label>
+                    <input
+                      id={`poi-x-${hexId}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={IMAGE_W}
+                      step={1}
+                      value={formWorldX}
+                      onChange={(e) => setFormWorldX(e.target.value)}
+                      placeholder="Opcional"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor={`poi-y-${hexId}`} className="block text-xs text-ink-soft">
+                      Coord Y (0–{IMAGE_H})
+                    </label>
+                    <input
+                      id={`poi-y-${hexId}`}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={IMAGE_H}
+                      step={1}
+                      value={formWorldY}
+                      onChange={(e) => setFormWorldY(e.target.value)}
+                      placeholder="Opcional"
+                      className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                    />
                   </div>
 
                   {formError && (
