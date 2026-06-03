@@ -105,23 +105,29 @@ const ListWorldPoisQuery = z.object({
 const POI_STATUSES = ['unknown', 'discovered', 'cleared'] as const;
 const PoiParam = z.object({ poiId: z.string().uuid() });
 
-const CreatePoiBody = z.object({
+// Coordinate bounds for the Sword Coast map asset (data/Sword-Coast-Map_HighRes.jpg).
+// Values intentionally duplicated from IMAGE_W/IMAGE_H in apps/web/lib/world/map/coords.ts
+// because the API cannot import from apps/web. Keep in sync when the source asset changes.
+const POI_COORD_MAX_X = 10200; // IMAGE_W
+const POI_COORD_MAX_Y = 6600; // IMAGE_H
+
+export const CreatePoiBody = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(20000).nullable().optional(),
   dmNotes: z.string().max(20000).nullable().optional(),
   status: z.enum(POI_STATUSES).optional(),
-  worldX: z.number().nullable().optional(),
-  worldY: z.number().nullable().optional(),
+  worldX: z.number().min(0).max(POI_COORD_MAX_X).nullable().optional(),
+  worldY: z.number().min(0).max(POI_COORD_MAX_Y).nullable().optional(),
 });
 
-const UpdatePoiBody = z
+export const UpdatePoiBody = z
   .object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(20000).nullable().optional(),
     dmNotes: z.string().max(20000).nullable().optional(),
     status: z.enum(POI_STATUSES).optional(),
-    worldX: z.number().nullable().optional(),
-    worldY: z.number().nullable().optional(),
+    worldX: z.number().min(0).max(POI_COORD_MAX_X).nullable().optional(),
+    worldY: z.number().min(0).max(POI_COORD_MAX_Y).nullable().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), {
     message: 'Al menos un campo debe estar presente',
