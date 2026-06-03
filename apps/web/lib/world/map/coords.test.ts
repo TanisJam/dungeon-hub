@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { worldToLatLng, latLngToWorld, SCALE } from './coords';
+import { worldToLatLng, latLngToWorld, SCALE, IMAGE_W, IMAGE_H } from './coords';
 
 const H = 6600; // image height
 const W = 10200; // image width
@@ -75,5 +75,25 @@ describe('latLngToWorld — inverse transform', () => {
 
   it('Leaflet [-H/SCALE, W/SCALE] → worldX=W, worldY=H (bottom-right)', () => {
     expect(latLngToWorld(-H / SCALE, W / SCALE)).toEqual({ worldX: W, worldY: H });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Export-lock: IMAGE_W / IMAGE_H constants (REQ-PLACE-CONST-01)
+//
+// ORACLE NOTE: The W = 10200 / H = 6600 literals above are intentionally kept as
+// independent oracle values so that a bug in coords.ts cannot make the transform
+// tests pass by importing the same wrong constant. These two assertions below are
+// the ONLY place IMAGE_W/IMAGE_H are imported — they lock the exported value
+// against the source asset dimensions. They do NOT replace the local W/H oracle.
+// ---------------------------------------------------------------------------
+
+describe('IMAGE_W / IMAGE_H — export lock (REQ-PLACE-CONST-01)', () => {
+  it('IMAGE_W matches the source asset width (10200 px)', () => {
+    expect(IMAGE_W).toBe(10200);
+  });
+
+  it('IMAGE_H matches the source asset height (6600 px)', () => {
+    expect(IMAGE_H).toBe(6600);
   });
 });

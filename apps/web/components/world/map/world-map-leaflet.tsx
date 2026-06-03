@@ -29,7 +29,7 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { worldToLatLng, MAX_ZOOM } from '@/lib/world/map/coords';
+import { worldToLatLng, latLngToWorld, IMAGE_W, IMAGE_H, MAX_ZOOM } from '@/lib/world/map/coords';
 import { createMarkerIcon } from './map-marker-icon';
 import type { PoiRow } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
@@ -47,10 +47,6 @@ interface WorldMapLeafletProps {
   /** Effective view — used to gate DM-notes in PoiDetail inside the Popup. REQ-POI-MARKER-02. */
   effectiveView: EffectiveView;
 }
-
-/** Source image pixel dimensions (data/Sword-Coast-Map_HighRes.jpg). */
-const IMAGE_W = 10200;
-const IMAGE_H = 6600;
 
 /**
  * IMAGE BOUNDS in Leaflet CRS.Simple [lat, lng] space, derived from the SAME

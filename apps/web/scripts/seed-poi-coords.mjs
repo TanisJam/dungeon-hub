@@ -65,10 +65,11 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// Image dimensions (matches world-map-leaflet.tsx)
+// Image dimensions — keep in sync with IMAGE_W/IMAGE_H in apps/web/lib/world/map/coords.ts
+// (This .mjs script cannot import TS modules directly; literals are intentional.)
 // ---------------------------------------------------------------------------
-const IMAGE_W = 10200;
-const IMAGE_H = 6600;
+const IMAGE_W = 10200; // keep in sync with IMAGE_W in apps/web/lib/world/map/coords.ts
+const IMAGE_H = 6600; // keep in sync with IMAGE_H in apps/web/lib/world/map/coords.ts
 
 // Radius for ring offset when multiple POIs share a hex
 const RING_RADIUS = 120;

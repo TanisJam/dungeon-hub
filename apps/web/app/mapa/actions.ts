@@ -212,6 +212,10 @@ export interface PoiBody {
   description?: string;
   dmNotes?: string;
   status?: PoiStatus;
+  /** World pixel X coordinate [0..IMAGE_W]. Optional — omit to leave unchanged. */
+  worldX?: number | null;
+  /** World pixel Y coordinate [0..IMAGE_H]. Optional — omit to leave unchanged. */
+  worldY?: number | null;
 }
 
 interface PoiListResponse {
@@ -267,6 +271,7 @@ export async function createPoi(
 
   try {
     const created = await api.post<PoiRow>(`/hexes/${hexId}/pois`, body, token);
+    revalidatePath('/mapa');
     return { ok: true, data: created };
   } catch (err) {
     return handleApiError(err);
@@ -286,6 +291,7 @@ export async function updatePoi(
 
   try {
     const updated = await api.patch<PoiRow>(`/pois/${poiId}`, body, token);
+    revalidatePath('/mapa');
     return { ok: true, data: updated };
   } catch (err) {
     return handleApiError(err);
@@ -302,6 +308,7 @@ export async function deletePoi(poiId: string): Promise<ActionResult> {
 
   try {
     await api.delete(`/pois/${poiId}`, token);
+    revalidatePath('/mapa');
     return { ok: true, data: undefined };
   } catch (err) {
     return handleApiError(err);

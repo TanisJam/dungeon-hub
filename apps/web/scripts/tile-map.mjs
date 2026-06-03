@@ -43,9 +43,9 @@ const TILES_DIR = join(__dirname, '..', 'temp', 'tiles');
 const BUCKET = 'world-maps';
 const PATH_PREFIX = 'sword-coast';
 
-// ─── Image dimensions (PHB: 10200×6600) ──────────────────────────────────────
-const IMAGE_W = 10200;
-const IMAGE_H = 6600;
+// ─── Image dimensions ─────────────────────────────────────────────────────────
+const IMAGE_W = 10200; // keep in sync with IMAGE_W in apps/web/lib/world/map/coords.ts
+const IMAGE_H = 6600; // keep in sync with IMAGE_H in apps/web/lib/world/map/coords.ts
 const TILE_SIZE = 256;
 const MIN_ZOOM = 0;
 const MAX_ZOOM = 5;
