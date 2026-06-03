@@ -13,6 +13,7 @@
  * Slice 3: placement added for DM tap-to-place mode (REQ-PLACE-TAP-02/03).
  * B2: worldId + creating/pendingCoords state for DM tap-to-create (REQ-PWC-CREATE-01..05).
  *     IA: discreet hex-list access control (REQ-PWC-IA-02). MapToggle removed (REQ-PWC-IA-01).
+ * B2 Refinement: editingPoi state + edit V3Sheet; onEditPoi wired to WorldMapLeaflet popup buttons.
  *
  * REQ-WM-03 (ssr:false requirement).
  */
@@ -21,7 +22,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type { PoiRow, PoiBody } from '@/app/mapa/actions';
-import { createWorldPoi } from '@/app/mapa/actions';
+import { createWorldPoi, updatePoi } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
 import { V3Sheet } from '@/components/ui';
 import { PoiForm } from './poi-form';
@@ -145,6 +146,14 @@ export function MapClientWrapper({
   const [creating, setCreating] = useState(false);
   const [pendingCoords, setPendingCoords] = useState<{ worldX: number; worldY: number } | null>(null);
 
+  /**
+   * Edit-mode state (B2 Refinement).
+   * `editingPoi` — set when DM taps "Editar" in a marker popup; opens the edit V3Sheet.
+   * Mutual exclusion: the edit sheet is a modal on top — it does not conflict with
+   * create-mode or place-mode (those are map-layer interactions; the sheet is a portal overlay).
+   */
+  const [editingPoi, setEditingPoi] = useState<PoiRow | null>(null);
+
   const placeActive = placement != null;
 
   function handleCancel() {
@@ -190,6 +199,23 @@ export function MapClientWrapper({
     router.refresh();
     setPendingCoords(null);
     setCreating(false);
+  }
+
+  /**
+   * Submit handler for the PoiForm inside the edit sheet.
+   * Calls updatePoi server action with the poi id + body.
+   */
+  async function handleEditSubmit(body: PoiBody) {
+    if (!editingPoi) return { ok: false as const, error: 'Sin POI' };
+    const result = await updatePoi(editingPoi.id, body);
+    return result.ok
+      ? { ok: true as const }
+      : { ok: false as const, error: (result as { error: string }).error };
+  }
+
+  function handleEditDone() {
+    setEditingPoi(null);
+    router.refresh();
   }
 
   return (
@@ -270,6 +296,30 @@ export function MapClientWrapper({
         )}
       </V3Sheet>
 
+      {/*
+       * V3Sheet edit form (B2 Refinement).
+       * Opens when DM taps "Editar" in a marker popup → setEditingPoi(poi).
+       * PoiForm with mode="edit" + initial={editingPoi}.
+       * onDone: close sheet + refresh markers.
+       * Mutual exclusion: this is a portal overlay; it does not conflict with
+       * create-mode or place-mode map interactions.
+       */}
+      <V3Sheet
+        open={editingPoi != null}
+        onClose={handleEditDone}
+        title="Editar punto de interés"
+      >
+        {editingPoi && (
+          <PoiForm
+            mode="edit"
+            initial={editingPoi}
+            onSubmit={handleEditSubmit}
+            onDone={handleEditDone}
+            idPrefix="edit"
+          />
+        )}
+      </V3Sheet>
+
       <WorldMapLeafletDynamic
         supabaseUrl={supabaseUrl}
         pois={pois}
@@ -277,6 +327,7 @@ export function MapClientWrapper({
         placement={placement}
         creating={creating}
         onCreateAt={handleCreateAt}
+        onEditPoi={setEditingPoi}
       />
     </>
   );

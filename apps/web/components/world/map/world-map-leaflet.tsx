@@ -21,10 +21,10 @@
  *   TopBar height + toggle height (~120px combined). This avoids negative-margin
  *   breakout and is reliable across screen sizes.
  *
- * SLICE 3 SCOPE: DM draggable markers + tap-to-place PlaceModeClickCatcher.
+ * SLICE 3 SCOPE: tap-to-place PlaceModeClickCatcher.
+ * B2 Refinement: DM drag removed — edit/move gated behind popup buttons.
  *
- * REQ-WM-03, REQ-WM-04, REQ-PLACE-DRAG-01, REQ-PLACE-DRAG-02,
- * REQ-PLACE-TAP-04, REQ-PLACE-BOUNDS-02.
+ * REQ-WM-03, REQ-WM-04, REQ-PLACE-TAP-04, REQ-PLACE-BOUNDS-02.
  */
 
 import { useEffect, useState } from 'react';
@@ -71,6 +71,12 @@ interface WorldMapLeafletProps {
    * Receives clamped worldX/worldY coords; bubbles up to MapClientWrapper to open the create sheet.
    */
   onCreateAt: (worldX: number, worldY: number) => void;
+  /**
+   * DM-only callback fired when "Editar" is tapped in a POI popup.
+   * Bubbles up to MapClientWrapper to open the edit V3Sheet.
+   * Only wired when effectiveView === 'dm'.
+   */
+  onEditPoi: (poi: PoiRow) => void;
 }
 
 /**
@@ -141,7 +147,7 @@ function CreateModeClickCatcher({ onCreate }: { onCreate: (x: number, y: number)
   return null;
 }
 
-export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt }: WorldMapLeafletProps) {
+export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt, onEditPoi }: WorldMapLeafletProps) {
   const router = useRouter();
 
   /**
@@ -182,15 +188,8 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
     if (placement || creating) setDrawerOpen(false);
   }, [placement, creating]);
 
-  /**
-   * commitCoords — persist drag/tap result via Server Action + repaint.
-   * REQ-PLACE-DRAG-02, REQ-PLACE-TAP-04: router.refresh() re-pulls SSR so
-   * the marker doesn't snap back and new markers appear without a hard reload.
-   */
-  const commitCoords = async (poiId: string, x: number, y: number) => {
-    await updatePoi(poiId, { worldX: x, worldY: y });
-    router.refresh();
-  };
+  // commitCoords was used by the now-removed drag handler (Slice 3).
+  // Place-mode tap (PlaceModeClickCatcher) calls updatePoi directly inline.
 
   /**
    * Tile URL template.
@@ -260,10 +259,10 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
          * Tap → Popup opens (Leaflet native tap/click — no hover dependency).
          * PoiDetail is the single source of truth for DM-notes gating (REQ-GATE-01).
          *
-         * Slice 3 additions (REQ-PLACE-DRAG-01, REQ-PLACE-DRAG-02):
-         * - draggable={effectiveView === 'dm'}: DM-only draggable markers.
-         * - dragend handler (DM only): latLngToWorld → clamp → commitCoords.
-         *   eventHandlers is undefined for players (no handler attached at all).
+         * Refinement (B2): markers are NO LONGER draggable (drag caused accidental moves).
+         * DM edit/move are gated behind explicit "Editar" and "Mover" popup buttons.
+         * "Editar" → onEditPoi(poi) → MapClientWrapper opens edit V3Sheet.
+         * "Mover"  → router.push('?view=mapa&place=<id>') → enters existing place-mode.
          */}
         {pois
           .filter((p) => p.worldX != null && p.worldY != null)
@@ -272,26 +271,29 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
               key={p.id}
               position={worldToLatLng(p.worldX!, p.worldY!)}
               icon={createMarkerIcon(p.status)}
-              draggable={effectiveView === 'dm'}
-              eventHandlers={
-                effectiveView === 'dm'
-                  ? {
-                      dragend: (e) => {
-                        const m = e.target as L.Marker;
-                        const { lat, lng } = m.getLatLng();
-                        const { worldX, worldY } = latLngToWorld(lat, lng);
-                        void commitCoords(
-                          p.id,
-                          clamp(worldX, 0, IMAGE_W),
-                          clamp(worldY, 0, IMAGE_H),
-                        );
-                      },
-                    }
-                  : undefined
-              }
             >
               <Popup>
                 <PoiDetail poi={p} isDM={effectiveView === 'dm'} />
+                {effectiveView === 'dm' && (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEditPoi(p)}
+                      className="min-h-[44px] flex-1 rounded-md bg-ink px-3 py-1 text-sm font-medium text-surface"
+                      data-testid={`poi-edit-btn-${p.id}`}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`?view=mapa&place=${p.id}`)}
+                      className="min-h-[44px] flex-1 rounded-md border border-ink px-3 py-1 text-sm font-medium text-ink"
+                      data-testid={`poi-move-btn-${p.id}`}
+                    >
+                      Mover
+                    </button>
+                  </div>
+                )}
               </Popup>
             </Marker>
           ))}
