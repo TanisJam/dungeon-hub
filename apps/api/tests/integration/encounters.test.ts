@@ -1,9 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
 import { db } from '../../src/infra/db/client.js';
-import { encounterCombatantConditions, encounterCombatantEffects } from '../../src/infra/db/schema.js';
+import {
+  encounterCombatants,
+  encounterCombatantConditions,
+  encounterCombatantEffects,
+} from '../../src/infra/db/schema.js';
 
 describe('encounters', () => {
   let alice: TestUser; // GM
@@ -179,17 +184,18 @@ describe('encounters', () => {
   });
 
   /**
-   * REQ-WCO-API-01 — Extended combatant response shape.
+   * REQ-WCO-API-01 — Extended combatant response shape with NON-DEFAULT action-economy values.
    *
-   * Seed combatant with 1 condition row + 1 effect row + actionUsed=true (via DB direct insert,
-   * since condition/effect child-table rows are added by engine use-cases, not the create-encounter
-   * API). Assert GET /encounters/:id returns conditions[], effects[], actionUsed, bonusActionUsed,
-   * attacksRemaining in each combatant.
+   * Seed combatant with 1 condition row + 1 effect row, then directly update the combatant row
+   * to set non-default action-economy values (actionUsed=true, bonusActionUsed=true,
+   * attacksRemaining=2). This proves the serializer actually reads and returns these fields;
+   * a serializer that hard-coded `false`/`0` would fail the assertions below.
    *
    * PHB Appendix A p.291 — Stunned condition.
    * PHB p.251 — Hex: caster-sourced effect.
+   * PHB p.189 — one action and one bonus action per turn (action-economy basis).
    */
-  it('T7: GET /encounters/:id — combatant with condition + effect + actionUsed returned in response (REQ-WCO-API-01)', async () => {
+  it('T7: GET /encounters/:id — combatant with condition + effect + non-default action-economy returned (REQ-WCO-API-01)', async () => {
     const app = await getTestApp();
 
     // Create a minimal encounter (1 NPC so we can apply conditions without a character sheet).
@@ -224,7 +230,15 @@ describe('encounters', () => {
       sourceCombatantId: null,
     });
 
-    // T7: assert GET returns new shape — conditions[], effects[], action-economy booleans.
+    // Flip action-economy to NON-DEFAULT values so the assertion proves the serializer
+    // reads the actual DB state rather than returning hard-coded defaults.
+    // PHB p.189: action + bonus action spent; 2 Extra Attacks remaining under Attack action.
+    await db
+      .update(encounterCombatants)
+      .set({ actionUsed: true, bonusActionUsed: true, attacksRemaining: 2 })
+      .where(eq(encounterCombatants.id, combatantId));
+
+    // T7: assert GET returns new shape — conditions[], effects[], action-economy fields.
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/encounters/${created.id}`,
@@ -239,10 +253,10 @@ describe('encounters', () => {
     expect(combatant.conditions).toEqual([{ name: 'Stunned', appliedByCombatantId: null }]);
     expect(combatant.effects).toEqual([{ name: 'Hex', sourceCombatantId: null }]);
 
-    // REQ-WCO-API-01: action-economy scalars present (defaults from DB NOT NULL DEFAULT).
-    expect(combatant.actionUsed).toBe(false);
-    expect(combatant.bonusActionUsed).toBe(false);
-    expect(combatant.attacksRemaining).toBe(0);
+    // REQ-WCO-API-01: non-default action-economy values — proves serializer reads DB state.
+    expect(combatant.actionUsed).toBe(true);
+    expect(combatant.bonusActionUsed).toBe(true);
+    expect(combatant.attacksRemaining).toBe(2);
     expect(typeof combatant.reactionUsed).toBe('boolean');
   });
 
@@ -287,6 +301,81 @@ describe('encounters', () => {
     expect(combatant.actionUsed).toBe(false);
     expect(combatant.bonusActionUsed).toBe(false);
     expect(combatant.attacksRemaining).toBe(0);
+  });
+
+  /**
+   * REQ-WCO-API-01 — Multi-combatant grouping: no cross-combatant condition/effect leakage.
+   *
+   * Creates an encounter with TWO combatants. Seeds a condition on C1 and an effect on C2.
+   * Asserts that the Map-keyed grouping in loadEncounter (load-encounter.ts) routes each
+   * child row to the correct combatant — C1 gets Stunned, C2 gets Hex, and neither row
+   * appears in the other combatant's arrays.
+   *
+   * PHB Appendix A p.292 — Stunned condition.
+   * PHB p.251 — Hex: caster-sourced effect, disadvantage on ability checks.
+   */
+  it('T9: GET /encounters/:id — conditions/effects grouped per combatant, no cross-combatant leakage (REQ-WCO-API-01)', async () => {
+    const app = await getTestApp();
+
+    const created = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${alice.accessToken}` },
+        payload: {
+          campaignId,
+          name: 'WCO Grouping Test',
+          combatants: [
+            { name: 'Fighter C1', kind: 'npc', initiative: 20, hpCurrent: 30, hpMax: 30, ac: 16 },
+            { name: 'Warlock C2', kind: 'npc', initiative: 10, hpCurrent: 20, hpMax: 20, ac: 12 },
+          ],
+        },
+      })
+      .then((r) => r.json());
+
+    // Identify C1 and C2 by initiative order (highest first).
+    const c1 = created.combatants.find((c: { name: string }) => c.name === 'Fighter C1') as {
+      id: string;
+    };
+    const c2 = created.combatants.find((c: { name: string }) => c.name === 'Warlock C2') as {
+      id: string;
+    };
+
+    // Seed Stunned condition on C1 only.
+    // PHB Appendix A p.292: Stunned — incapacitated, can't move or take actions.
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: c1.id,
+      conditionName: 'Stunned',
+      appliedByCombatantId: null,
+    });
+
+    // Seed Hex effect on C2 only.
+    // PHB p.251: Hex — caster-sourced effect, disadvantage on ability checks.
+    await db.insert(encounterCombatantEffects).values({
+      combatantId: c2.id,
+      effectName: 'Hex',
+      sourceCombatantId: null,
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${created.id}`,
+      headers: { authorization: `Bearer ${charlie.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    const bodyC1 = body.combatants.find((c: { name: string }) => c.name === 'Fighter C1');
+    const bodyC2 = body.combatants.find((c: { name: string }) => c.name === 'Warlock C2');
+
+    // C1: Stunned condition present, effects empty (Hex must NOT leak here).
+    expect(bodyC1.conditions).toEqual([{ name: 'Stunned', appliedByCombatantId: null }]);
+    expect(bodyC1.effects).toEqual([]);
+
+    // C2: effects contain Hex, conditions empty (Stunned must NOT leak here).
+    expect(bodyC2.conditions).toEqual([]);
+    expect(bodyC2.effects).toEqual([{ name: 'Hex', sourceCombatantId: null }]);
   });
 
   it('T6: PATCH /:id/combatants/:cid HP=0 → advance skips it (AE-COMBATANT-HP-PATCH-05)', async () => {
