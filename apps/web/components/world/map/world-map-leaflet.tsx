@@ -159,7 +159,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
         center={MAP_CENTER}
         zoom={INITIAL_ZOOM}
         minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
+        maxZoom={MAX_ZOOM + 1}
         bounds={MAP_BOUNDS}
         maxBounds={MAP_BOUNDS}
         maxBoundsViscosity={1.0}
@@ -171,15 +171,19 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
          * TileLayer — tms={false} (default) matches tile generation (Y-DOWN rows).
          * The Y-flip for marker placement is in worldToLatLng (coords.ts).
          * Do NOT set tms={true} here — that would double-flip the tiles.
+         *
+         * maxZoom=MAX_ZOOM+1 / maxNativeZoom=MAX_ZOOM: Leaflet upscales the native
+         * z5 tiles for zoom level 6. No new tiles are needed — maxNativeZoom stays
+         * at MAX_ZOOM so Leaflet knows not to request z6 tiles from storage.
          */}
         <TileLayer
           url={tileUrl}
           tms={false}
           tileSize={256}
           minZoom={MIN_ZOOM}
-          maxZoom={MAX_ZOOM}
+          maxZoom={MAX_ZOOM + 1}
           // Native tiles only go up to MAX_ZOOM; Leaflet upscales the z5 tiles for
-          // any zoom beyond that instead of requesting non-existent tiles.
+          // zoom level MAX_ZOOM+1 instead of requesting non-existent tiles.
           maxNativeZoom={MAX_ZOOM}
           minNativeZoom={MIN_ZOOM}
           bounds={MAP_BOUNDS}
