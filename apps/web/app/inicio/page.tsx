@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { getActiveWorld } from '@/lib/active-world';
+import { getActiveCharacter } from '@/lib/active-character';
 import { getViewPreference } from '@/lib/role';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
 import { QuickActions } from '@/components/inicio/quick-actions';
@@ -38,17 +39,6 @@ interface UserCampaignRow {
   sessionsCount: number;
   nextSession: string | null;
   pendingFichas: number | null;
-}
-
-interface RosterRow {
-  id: string;
-  worldId: string;
-  name: string;
-  status: string;
-  xp: number;
-  lineage: string;
-  hpCurrent: number | null;
-  hpMax: number | null;
 }
 
 interface SheetResponse {
@@ -154,14 +144,14 @@ export default async function InicioPage() {
 // ---------------------------------------------------------------------------
 
 async function PlayerView({ token, worldSwitcher, callerRole }: { token?: string; worldSwitcher?: ReactNode; callerRole?: 'gm' | 'player' | null }) {
-  // Fetch campaigns and roster in parallel
-  const [campaignsResult, rosterResult] = await Promise.allSettled([
+  // Fetch campaigns and active character in parallel (REQ-AC-RES-02: getActiveCharacter inside allSettled).
+  // getActiveCharacter replaces the previous roster[0] heuristic (REQ-AC-INI-01).
+  const [campaignsResult, activeCharResult] = await Promise.allSettled([
     token ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token) : Promise.resolve(null),
-    token ? api.get<{ data: RosterRow[] }>('/characters?status=active', token) : Promise.resolve(null),
+    getActiveCharacter(token),
   ]);
 
   const campaigns = campaignsResult.status === 'fulfilled' ? campaignsResult.value?.data ?? [] : [];
-  const roster = rosterResult.status === 'fulfilled' ? rosterResult.value?.data ?? [] : [];
 
   // Nearest future session from player's campaigns
   const campaignWithSession = campaigns
@@ -179,27 +169,30 @@ async function PlayerView({ token, worldSwitcher, callerRole }: { token?: string
     };
   }
 
-  // First active character + sheet data
-  const firstChar = roster[0] ?? null;
+  // Active character resolved via cookie lens (REQ-AC-INI-01).
+  // The serial sheet fetch (AC + initiative) fires AFTER the active character is resolved —
+  // this is intentional and unchanged: the roster allSettled is parallel; only the sheet
+  // detail is serial (same as before, REQ-AC-RES-02 note).
+  const activeChar = activeCharResult.status === 'fulfilled' ? (activeCharResult.value ?? null) : null;
   let charData: ActiveCharacter | null = null;
 
-  if (firstChar) {
+  if (activeChar) {
     const sheetResult = await (token
-      ? api.get<SheetResponse>(`/characters/${firstChar.id}/sheet`, token).catch(() => null)
+      ? api.get<SheetResponse>(`/characters/${activeChar.id}/sheet`, token).catch(() => null)
       : Promise.resolve(null));
 
     const ac = sheetResult?.sheet?.armorClass?.value ?? 0;
     const init = sheetResult?.sheet?.initiative ?? 0;
     const hp =
-      firstChar.hpCurrent !== null && firstChar.hpMax !== null
-        ? `${firstChar.hpCurrent}/${firstChar.hpMax}`
+      activeChar.hpCurrent !== null && activeChar.hpMax !== null
+        ? `${activeChar.hpCurrent}/${activeChar.hpMax}`
         : '—';
 
     charData = {
-      id: firstChar.id,
-      name: firstChar.name,
-      initial: firstChar.name[0]?.toUpperCase() ?? '?',
-      lineage: firstChar.lineage,
+      id: activeChar.id,
+      name: activeChar.name,
+      initial: activeChar.name[0]?.toUpperCase() ?? '?',
+      lineage: activeChar.lineage,
       hp,
       ac,
       init,
