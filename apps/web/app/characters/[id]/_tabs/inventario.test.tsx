@@ -30,12 +30,16 @@ vi.mock('../actions', () => ({
   updateInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
   removeInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
   searchCompendiumItems: vi.fn().mockResolvedValue([]),
+  // FIX 2: InventoryDetailIsland now calls fetchInventoryDetail Server Action
+  // instead of a raw client fetch. Omitting this export throws at runtime in tests.
+  fetchInventoryDetail: vi.fn(),
 }));
+
+// Import mocked action so round-trip tests can control its resolved value.
+import { fetchInventoryDetail } from '../actions';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Reset any global fetch mock
-  vi.unstubAllGlobals();
 });
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
@@ -113,12 +117,9 @@ function makeEnrichedItem(overrides: Partial<EnrichedInventoryItem> = {}): Enric
   };
 }
 
-/** Mock global fetch for the InventoryDetailIsland detail fetch */
+/** Set the fetchInventoryDetail Server Action mock return value for a given detail. */
 function mockDetailFetch(detail: InventoryDetailResponse) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve({ detail }),
-  }));
+  vi.mocked(fetchInventoryDetail).mockResolvedValue({ ok: true, detail });
 }
 
 function makeArmorDetail(instanceId: string, equipped: boolean): InventoryDetailResponse {

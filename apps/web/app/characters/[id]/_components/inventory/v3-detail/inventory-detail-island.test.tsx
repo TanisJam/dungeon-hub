@@ -4,7 +4,7 @@
  * Reqs: WIDI-ISLAND-01 (spec #1070)
  * Design: DBE1, DBE2 (design #1071) — event delegation on single root.
  *
- * Uses RTL + vi.fn() for fetch mock.
+ * Uses RTL + vi.fn() mocking fetchInventoryDetail Server Action (FIX 2).
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,15 +12,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { InventoryDetailIsland } from './inventory-detail-island';
 import type { InventoryDetailResponse } from '@/lib/sheet-types';
 
-// Mock actions
+// Mock actions — must include fetchInventoryDetail (FIX 2: component migrated from
+// raw client fetch to Server Action; omitting this export throws at runtime in tests).
 vi.mock('../../../actions', () => ({
   updateInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
   removeInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
   addInventoryItem: vi.fn().mockResolvedValue({ ok: true }),
   searchCompendiumItems: vi.fn().mockResolvedValue([]),
+  fetchInventoryDetail: vi.fn(),
 }));
 
-// Mock fetch for the detail API call
+// Import the mocked action so we can control its resolved value per-test.
+import { fetchInventoryDetail } from '../../../actions';
+
 const WEAPON_DETAIL: InventoryDetailResponse = {
   instanceId: 'abc-123',
   v3Type: 'weapon',
@@ -43,23 +47,13 @@ const WEAPON_DETAIL: InventoryDetailResponse = {
   magicBonus: 0,
 };
 
-function mockFetch(detail: InventoryDetailResponse) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: true,
-    json: () => Promise.resolve({ detail }),
-  }));
-}
-
-function setupMockFetch() {
-  mockFetch(WEAPON_DETAIL);
-}
-
 const CHAR_ID = 'ch-11111111';
 
 describe('InventoryDetailIsland — WIDI-ISLAND-01', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupMockFetch();
+    // Default: fetchInventoryDetail returns the weapon detail fixture.
+    vi.mocked(fetchInventoryDetail).mockResolvedValue({ ok: true, detail: WEAPON_DETAIL });
   });
 
   it('clicking a row button opens the detail sheet with correct instanceId', async () => {
@@ -117,8 +111,8 @@ describe('InventoryDetailIsland — WIDI-ISLAND-01', () => {
     fireEvent.click(rowBtn);
     await waitFor(() => screen.getByRole('dialog'));
 
-    // fetch should have been called only once (second open = cache hit)
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    // fetchInventoryDetail should have been called only once (second open = cache hit)
+    expect(vi.mocked(fetchInventoryDetail)).toHaveBeenCalledTimes(1);
   });
 
   it('closing the sheet sets openInstanceId to null', async () => {
