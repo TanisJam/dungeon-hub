@@ -45,18 +45,6 @@ export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
           </div>
         );
       })}
-
-      {/* Códex — the character's knowledge codex grid. A route link (sub-page), NOT a ?tab=. */}
-      {/* REQ-CCB-WEB-05 (character-codex-browser): retargeted from /codex/bestiario → /codex */}
-      <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
-        <Link
-          href={`/characters/${characterId}/codex`}
-          className="rounded-pill px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap bg-surface border border-line text-ink-mute hover:text-ink hover:bg-paper-soft"
-        >
-          Códex
-        </Link>
-        <div className="h-0.5 w-4 rounded-full opacity-0" />
-      </div>
     </nav>
   );
 }
