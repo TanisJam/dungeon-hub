@@ -99,7 +99,7 @@ export default async function CompendiumCategoryPage({
     <AppShell title={config.label} subtitle="COMPENDIUM">
       <CompendiumList
         category={category as CompendiumCategory}
-        campaignId={campaignId}
+        scope={{ campaign: campaignId }}
         worldId={worldId}
         accessToken={token}
         initialRows={initialRows}

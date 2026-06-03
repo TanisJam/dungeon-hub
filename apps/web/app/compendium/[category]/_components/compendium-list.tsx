@@ -12,12 +12,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { CATEGORY_CONFIG } from '../_config/registry';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
-import { searchCompendium } from '../actions';
+import { searchCompendium, type CompendiumScope } from '../actions';
 import { DetailSheet } from './detail-sheet';
 
 interface CompendiumListProps {
   category: CompendiumCategory;
-  campaignId: string;
+  /** scope — XOR: {campaign} for /compendium browser; {world} for /codex player view. */
+  scope: CompendiumScope;
   worldId: string | null;
   accessToken: string;
   initialRows: unknown[];
@@ -30,10 +31,11 @@ interface CompendiumListProps {
  * CompendiumList — generic paginated + searchable list island.
  * Clones the debounce + stale-drop pattern from inventory/picker.tsx verbatim.
  * REQ-CBROWSE-04: debounced search. REQ-CBROWSE-09: 44px tap targets @375px.
+ * codex-rehome ADR-2: scope prop replaces bare campaignId — supports both {campaign} and {world}.
  */
 export function CompendiumList({
   category,
-  campaignId,
+  scope,
   worldId,
   accessToken,
   initialRows,
@@ -65,7 +67,7 @@ export function CompendiumList({
     setSearching(true);
     const myReqId = ++reqIdRef.current;
     const handle = setTimeout(async () => {
-      const res = await searchCompendium(category, campaignId, trimmed, 0);
+      const res = await searchCompendium(category, scope, trimmed, 0);
       if (reqIdRef.current === myReqId) {
         setResults(res.rows);
         setTotalCount(res.total);
@@ -74,13 +76,15 @@ export function CompendiumList({
       }
     }, 200);
     return () => clearTimeout(handle);
-  }, [query, category, campaignId, initialRows, initialTotal]);
+  // scope is a stable object reference passed from RSC — serialized by value.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, category, JSON.stringify(scope), initialRows, initialTotal]);
 
   async function handleLoadMore() {
     if (loadingMore || offset >= totalCount) return;
     setLoadingMore(true);
     const trimmed = query.trim();
-    const res = await searchCompendium(category, campaignId, trimmed, offset);
+    const res = await searchCompendium(category, scope, trimmed, offset);
     setResults((prev) => [...prev, ...res.rows]);
     setTotalCount(res.total);
     setOffset((prev) => prev + res.rows.length);
@@ -145,7 +149,7 @@ export function CompendiumList({
           open={true}
           category={category}
           row={selected}
-          campaignId={campaignId}
+          scope={scope}
           worldId={worldId}
           accessToken={accessToken}
           config={config}

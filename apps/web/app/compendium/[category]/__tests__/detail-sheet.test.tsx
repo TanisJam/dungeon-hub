@@ -36,7 +36,7 @@ vi.mock('@/components/ui', () => ({
 import { DetailSheet } from '../_components/detail-sheet';
 import { getCompendiumDetail } from '@/app/compendium/[category]/actions';
 
-const CAMPAIGN_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+const CAMPAIGN_SCOPE = { campaign: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' } as const;
 
 const SPELL_ROW = {
   slug: 'fireball',
@@ -90,7 +90,7 @@ describe('DetailSheet — ADR-4, REQ-CBROWSE-06', () => {
         open={true}
         category="spells"
         row={SPELL_ROW}
-        campaignId={CAMPAIGN_ID}
+        scope={CAMPAIGN_SCOPE}
         worldId="world-id"
         accessToken="token"
         config={mockConfig}
@@ -109,7 +109,7 @@ describe('DetailSheet — ADR-4, REQ-CBROWSE-06', () => {
         open={true}
         category="spells"
         row={SPELL_ROW}
-        campaignId={CAMPAIGN_ID}
+        scope={CAMPAIGN_SCOPE}
         worldId="world-id"
         accessToken="token"
         config={mockConfig}
@@ -133,7 +133,7 @@ describe('DetailSheet — ADR-4, REQ-CBROWSE-06', () => {
         open={true}
         category="spells"
         row={SPELL_ROW}
-        campaignId={CAMPAIGN_ID}
+        scope={CAMPAIGN_SCOPE}
         worldId="world-id"
         accessToken="token"
         config={mockConfig}
@@ -155,7 +155,7 @@ describe('DetailSheet — ADR-4, REQ-CBROWSE-06', () => {
         open={true}
         category="spells"
         row={SPELL_ROW}
-        campaignId={CAMPAIGN_ID}
+        scope={CAMPAIGN_SCOPE}
         worldId="world-id"
         accessToken="token"
         config={mockConfig}
@@ -176,7 +176,7 @@ describe('DetailSheet — ADR-4, REQ-CBROWSE-06', () => {
         open={false}
         category="spells"
         row={SPELL_ROW}
-        campaignId={CAMPAIGN_ID}
+        scope={CAMPAIGN_SCOPE}
         worldId="world-id"
         accessToken="token"
         config={mockConfig}

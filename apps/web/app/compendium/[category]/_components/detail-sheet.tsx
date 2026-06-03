@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { V3Sheet } from '@/components/ui';
 import { CompendiumEntriesWithTerms } from '@/components/compendium/term/CompendiumEntriesWithTerms';
 import type { Entry } from '@/components/compendium/types';
-import { getCompendiumDetail } from '../actions';
+import { getCompendiumDetail, type CompendiumScope } from '../actions';
 import type { CategoryConfig } from '../_config/registry';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 
@@ -18,7 +18,8 @@ interface DetailSheetProps {
   category: CompendiumCategory;
   /** The list-hit row (slug + source + name at minimum). */
   row: unknown;
-  campaignId: string;
+  /** scope — XOR: {campaign} for /compendium browser; {world} for /codex player view. */
+  scope: CompendiumScope;
   worldId: string | null;
   accessToken: string;
   config: CategoryConfig;
@@ -35,7 +36,7 @@ export function DetailSheet({
   open,
   category,
   row,
-  campaignId,
+  scope,
   worldId,
   accessToken,
   config,
@@ -69,7 +70,7 @@ export function DetailSheet({
     setLoading(true);
     setError(false);
 
-    getCompendiumDetail(category, campaignId, slug, source)
+    getCompendiumDetail(category, scope, slug, source)
       .then((result) => {
         if (cancelled) return;
         if (result === null) {
@@ -86,8 +87,9 @@ export function DetailSheet({
       });
 
     return () => { cancelled = true; };
+  // scope is a stable value-object from RSC — JSON.stringify prevents stale closure issues.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, category, campaignId, rowRecord.slug, rowRecord.source]);
+  }, [open, category, JSON.stringify(scope), rowRecord.slug, rowRecord.source]);
 
   const detailRecord = detail as Record<string, unknown> | null;
   const entries = detailRecord?.data
