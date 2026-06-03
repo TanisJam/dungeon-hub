@@ -34,6 +34,7 @@ vi.mock('next/navigation', () => ({
 function makePoiRow(overrides: Partial<PoiRow> = {}): PoiRow {
   return {
     id: 'poi-1',
+    worldId: 'world-1',
     hexId: 'hex-1',
     name: 'Test POI',
     description: null,

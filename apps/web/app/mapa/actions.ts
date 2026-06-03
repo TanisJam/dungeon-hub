@@ -196,7 +196,8 @@ export type PoiStatus = 'unknown' | 'discovered' | 'cleared';
 
 export interface PoiRow {
   id: string;
-  hexId: string;
+  worldId: string;
+  hexId: string | null;
   name: string;
   description: string | null;
   dmNotes: string | null;
