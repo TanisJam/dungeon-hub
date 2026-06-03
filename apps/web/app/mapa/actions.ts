@@ -280,6 +280,28 @@ export async function createPoi(
 }
 
 // ---------------------------------------------------------------------------
+// createWorldPoi — DM-only. Creates a free-floating POI (hexId: null).
+// REQ-PWC-ACTION-01: mirrors createPoi pattern; calls POST /worlds/:worldId/pois.
+// No caller yet in Batch A — Batch B wires the create-mode UI.
+// ---------------------------------------------------------------------------
+
+export async function createWorldPoi(
+  worldId: string,
+  body: PoiBody,
+): Promise<ActionResult<PoiRow>> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'No autenticado', status: 401 };
+
+  try {
+    const created = await api.post<PoiRow>(`/worlds/${worldId}/pois`, body, token);
+    revalidatePath('/mapa');
+    return { ok: true, data: created };
+  } catch (err) {
+    return handleApiError(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // updatePoi — DM-only.
 // ---------------------------------------------------------------------------
 
