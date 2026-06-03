@@ -59,6 +59,18 @@ interface WorldMapLeafletProps {
    * REQ-PLACE-TAP-04.
    */
   placement: PlacementTarget | null;
+  /**
+   * Create-mode flag (REQ-PWC-CREATE-03, ADR-4).
+   * When true, CreateModeClickCatcher is mounted — a map tap captures coords for a new POI.
+   * Mutual exclusion with placement: FAB is suppressed when placement != null, so both
+   * catchers are NEVER co-mounted (REQ-PWC-CREATE-05).
+   */
+  creating: boolean;
+  /**
+   * Callback fired when DM taps the map in create-mode.
+   * Receives clamped worldX/worldY coords; bubbles up to MapClientWrapper to open the create sheet.
+   */
+  onCreateAt: (worldX: number, worldY: number) => void;
 }
 
 /**
@@ -107,7 +119,29 @@ function PlaceModeClickCatcher({ onPlace }: { onPlace: (x: number, y: number) =>
   return null;
 }
 
-export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }: WorldMapLeafletProps) {
+/**
+ * CreateModeClickCatcher — useMapEvents child mounted ONLY during create-mode.
+ *
+ * REQ-PWC-CREATE-03: while active, a tap on the map captures worldX/worldY for a NEW POI
+ * via the onCreate callback. Mirrors PlaceModeClickCatcher exactly (same latLngToWorld +
+ * clamp pattern). CONDITIONALLY MOUNTED so when NOT in create-mode there is no click
+ * listener at all — normal taps pan/open popups as before.
+ *
+ * Mutual exclusion (REQ-PWC-CREATE-05): creating and placement (place-mode URL param)
+ * are structurally disjoint — the FAB that sets creating=true is suppressed when
+ * placement != null. These two catchers are NEVER co-mounted.
+ */
+function CreateModeClickCatcher({ onCreate }: { onCreate: (x: number, y: number) => void }) {
+  useMapEvents({
+    click(e) {
+      const { worldX, worldY } = latLngToWorld(e.latlng.lat, e.latlng.lng);
+      onCreate(clamp(worldX, 0, IMAGE_W), clamp(worldY, 0, IMAGE_H));
+    },
+  });
+  return null;
+}
+
+export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt }: WorldMapLeafletProps) {
   const router = useRouter();
 
   /**
@@ -140,13 +174,13 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
   }, []);
 
   /**
-   * Auto-close drawer when place-mode activates (REQ-PML-DRAWER-04, ADR-5).
-   * Conditional render below ALSO unmounts the toggle + drawer in place-mode,
-   * but this effect resets drawerOpen so re-entering map-mode doesn't pop it back.
+   * Auto-close drawer when place-mode OR create-mode activates (REQ-PML-DRAWER-04, ADR-5).
+   * Conditional render below ALSO unmounts the toggle + drawer in both modes,
+   * but this effect resets drawerOpen so re-entering normal map-mode doesn't pop it back.
    */
   useEffect(() => {
-    if (placement) setDrawerOpen(false);
-  }, [placement]);
+    if (placement || creating) setDrawerOpen(false);
+  }, [placement, creating]);
 
   /**
    * commitCoords — persist drag/tap result via Server Action + repaint.
@@ -281,6 +315,16 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
         )}
 
         {/*
+         * CreateModeClickCatcher — conditionally mounted ONLY in create-mode (REQ-PWC-CREATE-03).
+         * A map tap captures coords for a NEW free-floating POI, bubbles to MapClientWrapper
+         * which opens the V3Sheet create form. NEVER co-mounted with PlaceModeClickCatcher
+         * (REQ-PWC-CREATE-05 — the FAB is suppressed when placement != null).
+         */}
+        {creating && (
+          <CreateModeClickCatcher onCreate={onCreateAt} />
+        )}
+
+        {/*
          * MapFlyTo — null-return child that calls map.flyTo() via useMap().
          * MUST be inside <MapContainer> (only place where useMap() resolves).
          * Fresh flyTarget object per POI row tap → re-fly on same POI works.
@@ -291,12 +335,12 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
 
       {/*
        * POI drawer toggle + panel — rendered as siblings of <MapContainer> so they
-       * overlay the map. Conditionally unmounted in place-mode (ADR-5):
-       *   - toggle + drawer DOM is GONE while placement is active → zero z/gesture conflict
-       *     with PlaceModeBanner (z-30) and PlaceModeClickCatcher.
+       * overlay the map. Conditionally unmounted in place-mode AND create-mode (ADR-5):
+       *   - toggle + drawer DOM is GONE while placement or creating is active → zero z/gesture
+       *     conflict with banners (z-30) and click catchers.
        * REQ-PML-DRAWER-02, REQ-PML-DRAWER-04.
        */}
-      {!placement && (
+      {!placement && !creating && (
         <>
           {/*
            * Toggle button — bottom-LEFT, z-30, above drawer (z-20) and map (z-10).

@@ -8,7 +8,6 @@ import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { HexClientWrapper } from '@/components/world/map/hex-client-wrapper';
 import { MapClientWrapper } from '@/components/world/map/map-client-wrapper';
-import { MapToggle } from '@/components/world/map/map-toggle';
 import { V3Empty } from '@/components/ui';
 import type { HexRow, PoiRow } from './actions';
 import { listAllPois } from './actions';
@@ -36,7 +35,8 @@ export default async function MapaPage({
 }) {
   // Resolve searchParams first (Next.js 15 async searchParams)
   const { view, place } = await searchParams;
-  const activeMapView = view === 'mapa' ? 'mapa' : 'lista';
+  // REQ-PWC-IA-01: map is the default view — no ?view or ?view=mapa → mapa; ?view=lista → lista.
+  const activeMapView = view === 'lista' ? 'lista' : 'mapa';
 
   const supabase = await createClient();
   const {
@@ -119,22 +119,21 @@ export default async function MapaPage({
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >
-      {/* REQ-WM-02: Lista|Mapa segmented toggle — thumb-reachable at 375px */}
-      <MapToggle activeView={activeMapView} />
-
-      {/* REQ-WM-02: Branch on view — Lista shows hex list, Mapa shows Leaflet island */}
+      {/* REQ-WM-02 / REQ-PWC-IA-01: Branch on view — Mapa is default; Lista accessible via discreet control */}
       {activeMapView === 'mapa' ? (
         /*
          * REQ-WM-03: MapClientWrapper wraps the Leaflet island with ssr:false.
          * The island breaks out of AppShell max-w-sm via fixed positioning.
          * supabaseUrl is derived from NEXT_PUBLIC_SUPABASE_URL (no new env var — ADR-1).
          * REQ-POI-MARKER-02: pois + effectiveView forwarded for the marker layer.
+         * REQ-PWC-CREATE-01: worldId threaded for DM create-mode FAB.
          */
         <MapClientWrapper
           supabaseUrl={env.SUPABASE_URL}
           pois={pois}
           effectiveView={effectiveView}
           placement={placementTarget}
+          worldId={aw.id}
         />
       ) : (
         <HexClientWrapper
