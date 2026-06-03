@@ -14,6 +14,8 @@
  * B2: worldId + creating/pendingCoords state for DM tap-to-create (REQ-PWC-CREATE-01..05).
  *     IA: discreet hex-list access control (REQ-PWC-IA-02). MapToggle removed (REQ-PWC-IA-01).
  * B2 Refinement: editingPoi state + edit V3Sheet; onEditPoi wired to WorldMapLeaflet popup buttons.
+ * B2 Refinement 2: movingPoi + pendingMoveCoords state for drag-to-move with confirm (MoveBanner
+ *   Listo/Cancelar). Replaces the previous place-mode wiring for the popup "Mover" button.
  *
  * REQ-WM-03 (ssr:false requirement).
  */
@@ -124,6 +126,55 @@ function CreateModeBanner({ onCancel }: { onCancel: () => void }) {
   );
 }
 
+/**
+ * MoveBanner — fixed overlay shown while DM is in drag-to-move mode for a specific POI.
+ *
+ * B2 Refinement 2: "Moviendo {name}" + Listo + Cancelar buttons.
+ * Listo saves the dragged position (or no-ops if no drag happened).
+ * Cancelar discards and returns the marker to its original position.
+ * Same z/position contract as CreateModeBanner (z-30, top-[120px]).
+ */
+function MoveBanner({
+  name,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
+      data-testid="move-mode-banner"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="truncate text-sm font-medium">Moviendo {name}</p>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="min-h-[44px] min-w-[44px] rounded-md bg-surface/20 px-3 py-1 text-sm font-medium text-surface transition-colors hover:bg-surface/30"
+          aria-label="Confirmar nueva posición"
+          data-testid="move-banner-listo"
+        >
+          Listo
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-[44px] min-w-[44px] rounded-md border border-surface/30 px-3 py-1 text-sm font-medium text-surface transition-colors hover:bg-surface/10"
+          aria-label="Cancelar movimiento"
+          data-testid="move-banner-cancelar"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function MapClientWrapper({
   supabaseUrl,
   pois,
@@ -153,6 +204,23 @@ export function MapClientWrapper({
    * create-mode or place-mode (those are map-layer interactions; the sheet is a portal overlay).
    */
   const [editingPoi, setEditingPoi] = useState<PoiRow | null>(null);
+
+  /**
+   * Move-mode state (B2 Refinement 2 — drag-to-move with confirm).
+   * `movingPoi`         — the POI whose marker is currently draggable + pulsing.
+   * `pendingMoveCoords` — updated on each dragend; null until the first drag.
+   *
+   * State machine:
+   *   Popup "Mover" tap → setMovingPoi(poi)   (WorldMapLeaflet calls onStartMove)
+   *   Marker dragend    → setPendingMoveCoords({worldX,worldY})  (onMoveDrag)
+   *   Listo             → save pendingMoveCoords (or original if no drag) → exit
+   *   Cancelar          → discard → movingPoi marker reverts (pendingMoveCoords clears)
+   *
+   * Mutual exclusion: cannot enter move-mode while creating or placeActive.
+   * The movingPoi marker is the ONLY draggable one; all others remain static.
+   */
+  const [movingPoi, setMovingPoi] = useState<PoiRow | null>(null);
+  const [pendingMoveCoords, setPendingMoveCoords] = useState<{ worldX: number; worldY: number } | null>(null);
 
   const placeActive = placement != null;
 
@@ -218,6 +286,49 @@ export function MapClientWrapper({
     router.refresh();
   }
 
+  /**
+   * Called by WorldMapLeaflet when DM taps "Mover" in a popup.
+   * Enters drag-to-move mode for that specific POI (B2 Refinement 2).
+   * Guard: cannot enter move-mode while create-mode or place-mode is active.
+   */
+  function handleStartMove(poi: PoiRow) {
+    if (creating || placeActive) return;
+    setMovingPoi(poi);
+    setPendingMoveCoords(null);
+  }
+
+  /**
+   * Called by WorldMapLeaflet on each dragend of the moving marker.
+   * Updates the pending position (not yet saved).
+   */
+  function handleMoveDrag(worldX: number, worldY: number) {
+    setPendingMoveCoords({ worldX, worldY });
+  }
+
+  /**
+   * "Listo" — save the pending position (or original if no drag happened) and exit move-mode.
+   */
+  async function handleMoveConfirm() {
+    if (!movingPoi) return;
+    const coords = pendingMoveCoords ?? { worldX: movingPoi.worldX!, worldY: movingPoi.worldY! };
+    // Only persist if a drag actually happened (pendingMoveCoords is non-null).
+    if (pendingMoveCoords) {
+      await updatePoi(movingPoi.id, coords);
+    }
+    setMovingPoi(null);
+    setPendingMoveCoords(null);
+    router.refresh();
+  }
+
+  /**
+   * "Cancelar" — discard drag, revert marker to original position (pendingMoveCoords clears
+   * so WorldMapLeaflet falls back to poi.worldX/worldY), no save.
+   */
+  function handleMoveCancel() {
+    setMovingPoi(null);
+    setPendingMoveCoords(null);
+  }
+
   return (
     <>
       {/* Place-mode banner (Slice 3) */}
@@ -233,14 +344,23 @@ export function MapClientWrapper({
         <CreateModeBanner onCancel={handleCancelCreate} />
       )}
 
+      {/* Move-mode banner (B2 Refinement 2) — shown while DM is dragging a POI to a new position */}
+      {movingPoi && (
+        <MoveBanner
+          name={movingPoi.name}
+          onConfirm={() => { void handleMoveConfirm(); }}
+          onCancel={handleMoveCancel}
+        />
+      )}
+
       {/*
        * DM-only create FAB (REQ-PWC-CREATE-01, ADR-6).
        * bottom: calc(...) — inline style (NOT Tailwind bottom-*) for safe-area compliance.
        * right-4: bottom-RIGHT corner, opposite from B1 drawer toggle (bottom-LEFT).
-       * Suppressed during place-mode AND during create-mode (REQ-PWC-CREATE-05 + ADR-6).
+       * Suppressed during place-mode, create-mode, AND move-mode (REQ-PWC-CREATE-05 + ADR-6).
        * z-30: above map (z-10), below sheets (z-50).
        */}
-      {effectiveView === 'dm' && !placeActive && !creating && (
+      {effectiveView === 'dm' && !placeActive && !creating && !movingPoi && (
         <button
           type="button"
           onClick={handleStartCreate}
@@ -260,7 +380,7 @@ export function MapClientWrapper({
        * Suppressed during create/place modes (focus clarity).
        * ≥44px tap target. z-30 (same layer as FAB/banners, above map).
        */}
-      {!creating && !placeActive && (
+      {!creating && !placeActive && !movingPoi && (
         <button
           type="button"
           onClick={() => router.push('?view=lista')}
@@ -328,6 +448,10 @@ export function MapClientWrapper({
         creating={creating}
         onCreateAt={handleCreateAt}
         onEditPoi={setEditingPoi}
+        movingPoiId={movingPoi?.id ?? null}
+        pendingMoveCoords={pendingMoveCoords}
+        onStartMove={handleStartMove}
+        onMoveDrag={handleMoveDrag}
       />
     </>
   );

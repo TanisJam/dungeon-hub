@@ -29,7 +29,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { worldToLatLng, latLngToWorld, IMAGE_W, IMAGE_H, MAX_ZOOM } from '@/lib/world/map/coords';
 import { createMarkerIcon } from './map-marker-icon';
@@ -77,6 +77,28 @@ interface WorldMapLeafletProps {
    * Only wired when effectiveView === 'dm'.
    */
   onEditPoi: (poi: PoiRow) => void;
+  /**
+   * ID of the POI currently in drag-to-move mode (B2 Refinement 2).
+   * That marker becomes draggable + shows pulse animation; all others stay static.
+   * null when no move-mode is active.
+   */
+  movingPoiId: string | null;
+  /**
+   * Pending drag position for the moving marker.
+   * When non-null, the moving marker's position is controlled by this value.
+   * When null (no drag yet, or after Cancelar), falls back to poi.worldX/worldY.
+   */
+  pendingMoveCoords: { worldX: number; worldY: number } | null;
+  /**
+   * Called when DM taps "Mover" in a popup — enters move-mode for that POI.
+   * Closes the popup and fires onStartMove(poi) to MapClientWrapper.
+   */
+  onStartMove: (poi: PoiRow) => void;
+  /**
+   * Called on each dragend of the moving marker with the new clamped worldX/worldY.
+   * Bubbles to MapClientWrapper to update pendingMoveCoords.
+   */
+  onMoveDrag: (worldX: number, worldY: number) => void;
 }
 
 /**
@@ -147,7 +169,21 @@ function CreateModeClickCatcher({ onCreate }: { onCreate: (x: number, y: number)
   return null;
 }
 
-export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt, onEditPoi }: WorldMapLeafletProps) {
+/**
+ * MapPopupCloser — null-return child that closes all open Leaflet popups when
+ * `active` flips from false to true. Used to close the POI popup automatically
+ * when DM taps "Mover" and move-mode activates (B2 Refinement 2).
+ * Must be inside <MapContainer> to call useMap().
+ */
+function MapPopupCloser({ active }: { active: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (active) map.closePopup();
+  }, [active, map]);
+  return null;
+}
+
+export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt, onEditPoi, movingPoiId, pendingMoveCoords, onStartMove, onMoveDrag }: WorldMapLeafletProps) {
   const router = useRouter();
 
   /**
@@ -180,13 +216,13 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
   }, []);
 
   /**
-   * Auto-close drawer when place-mode OR create-mode activates (REQ-PML-DRAWER-04, ADR-5).
-   * Conditional render below ALSO unmounts the toggle + drawer in both modes,
+   * Auto-close drawer when place-mode, create-mode, OR move-mode activates (REQ-PML-DRAWER-04, ADR-5).
+   * Conditional render below ALSO unmounts the toggle + drawer in all modes,
    * but this effect resets drawerOpen so re-entering normal map-mode doesn't pop it back.
    */
   useEffect(() => {
-    if (placement || creating) setDrawerOpen(false);
-  }, [placement, creating]);
+    if (placement || creating || movingPoiId) setDrawerOpen(false);
+  }, [placement, creating, movingPoiId]);
 
   // commitCoords was used by the now-removed drag handler (Slice 3).
   // Place-mode tap (PlaceModeClickCatcher) calls updatePoi directly inline.
@@ -266,37 +302,52 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
          */}
         {pois
           .filter((p) => p.worldX != null && p.worldY != null)
-          .map((p) => (
-            <Marker
-              key={p.id}
-              position={worldToLatLng(p.worldX!, p.worldY!)}
-              icon={createMarkerIcon(p.status)}
-            >
-              <Popup>
-                <PoiDetail poi={p} isDM={effectiveView === 'dm'} />
-                {effectiveView === 'dm' && (
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onEditPoi(p)}
-                      className="min-h-[44px] flex-1 rounded-md bg-ink px-3 py-1 text-sm font-medium text-surface"
-                      data-testid={`poi-edit-btn-${p.id}`}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`?view=mapa&place=${p.id}`)}
-                      className="min-h-[44px] flex-1 rounded-md border border-ink px-3 py-1 text-sm font-medium text-ink"
-                      data-testid={`poi-move-btn-${p.id}`}
-                    >
-                      Mover
-                    </button>
-                  </div>
-                )}
-              </Popup>
-            </Marker>
-          ))}
+          .map((p) => {
+            const isMoving = p.id === movingPoiId;
+            // Controlled position: use pendingMoveCoords while dragging; fall back to stored coords.
+            const markerPos = isMoving && pendingMoveCoords
+              ? worldToLatLng(pendingMoveCoords.worldX, pendingMoveCoords.worldY)
+              : worldToLatLng(p.worldX!, p.worldY!);
+            return (
+              <Marker
+                key={p.id}
+                position={markerPos}
+                icon={createMarkerIcon(p.status, isMoving)}
+                draggable={isMoving}
+                eventHandlers={isMoving ? {
+                  dragend(e) {
+                    const latlng = (e.target as L.Marker).getLatLng();
+                    const { worldX, worldY } = latLngToWorld(latlng.lat, latlng.lng);
+                    onMoveDrag(clamp(worldX, 0, IMAGE_W), clamp(worldY, 0, IMAGE_H));
+                  },
+                } : undefined}
+              >
+                <Popup>
+                  <PoiDetail poi={p} isDM={effectiveView === 'dm'} />
+                  {effectiveView === 'dm' && !isMoving && (
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEditPoi(p)}
+                        className="min-h-[44px] flex-1 rounded-md bg-ink px-3 py-1 text-sm font-medium text-surface"
+                        data-testid={`poi-edit-btn-${p.id}`}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onStartMove(p)}
+                        className="min-h-[44px] flex-1 rounded-md border border-ink px-3 py-1 text-sm font-medium text-ink"
+                        data-testid={`poi-move-btn-${p.id}`}
+                      >
+                        Mover
+                      </button>
+                    </div>
+                  )}
+                </Popup>
+              </Marker>
+            );
+          })}
 
         {/*
          * PlaceModeClickCatcher — conditionally mounted ONLY in place-mode.
@@ -333,6 +384,13 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
          * REQ-PML-FLYTO-01, REQ-PML-FLYTO-02.
          */}
         <MapFlyTo target={flyTarget} />
+
+        {/*
+         * MapPopupCloser — closes all open popups when move-mode activates (B2 Refinement 2).
+         * Fired when DM taps "Mover" → movingPoiId becomes non-null → popup closes automatically.
+         * MUST be inside <MapContainer> for useMap() to resolve.
+         */}
+        <MapPopupCloser active={movingPoiId != null} />
       </MapContainer>
 
       {/*
@@ -342,7 +400,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
        *     conflict with banners (z-30) and click catchers.
        * REQ-PML-DRAWER-02, REQ-PML-DRAWER-04.
        */}
-      {!placement && !creating && (
+      {!placement && !creating && !movingPoiId && (
         <>
           {/*
            * Toggle button — bottom-LEFT, z-30, above drawer (z-20) and map (z-10).

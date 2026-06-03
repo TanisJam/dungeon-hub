@@ -176,6 +176,22 @@
   }
 }
 
+/* ── POI move-mode pulse animation ── */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes poi-pulse {
+    0%, 100% { transform: scale(1);   opacity: 1;    }
+    50%       { transform: scale(1.2); opacity: 0.75; }
+  }
+  .poi-marker--moving .poi-marker-inner {
+    animation: poi-pulse 1s ease-in-out infinite;
+  }
+}
+/* Static fallback for reduced-motion: no animation, just the outline ring */
+.poi-marker--moving .poi-marker-inner {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
 /* ── Inicio screen — scoped extensions ── */
 .inicio-hero-bg {
   background:
