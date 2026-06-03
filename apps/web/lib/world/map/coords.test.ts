@@ -1,57 +1,53 @@
 /**
- * coords.test.ts — Y-axis lock for Leaflet CRS.Simple world map.
+ * coords.test.ts — pixel↔Leaflet lock for the CRS.Simple world map.
  *
- * REQ-WM-04: The Y-axis convention MUST be resolved and locked by unit test
- * before any marker depends on it. A silent mirror bug (Y-axis inversion) on a
- * symmetric-looking map is invisible to visual inspection — only a unit test
- * catches it deterministically.
+ * REQ-WM-04: The pixel↔LatLng convention MUST be locked by unit test before any
+ * marker depends on it. A silent mirror/scale bug on a map is invisible to visual
+ * inspection — only a unit test catches it deterministically.
  *
- * Convention (from ADR-2):
- *   - Tiles are generated Y-DOWN (row 0 = top of image, standard ImageMagick order).
- *   - Leaflet CRS.Simple has Y increasing UPWARD (origin at bottom-left).
- *   - The flip lives in worldToLatLng, NOT in `tms` flag or image preprocessing.
- *   - worldToLatLng(x, y) = [H - y, x]  where H = 6600 (image height in pixels)
- *   - latLngToWorld(lat, lng) = { worldX: lng, worldY: H - lat }
+ * Convention (from ADR-2 — standard deep-zoom pyramid, native res at MAX_ZOOM):
+ *   - SCALE = 2^MAX_ZOOM = 32. Native resolution lands at zoom MAX_ZOOM (5).
+ *   - worldToLatLng(x, y) = [-y / SCALE, x / SCALE]   (Y-flip via the negative sign)
+ *   - latLngToWorld(lat, lng) = { worldX: lng * SCALE, worldY: -lat * SCALE }
  *
- * Corner assertions (canonical — do not change without updating the coords.ts comment):
- *   Image top-left  (worldX=0,    worldY=0)    → Leaflet [6600, 0]      (lat=H, lng=0)
- *   Image bot-right (worldX=10200,worldY=6600) → Leaflet [0,    10200]  (lat=0, lng=W)
+ * Corner assertions (canonical — keep in sync with the coords.ts comment):
+ *   Image top-left  (0,     0)    → Leaflet [0,        0]
+ *   Image bot-right (10200, 6600) → Leaflet [-206.25,  318.75]
  */
 
 import { describe, it, expect } from 'vitest';
-import { worldToLatLng, latLngToWorld } from './coords';
+import { worldToLatLng, latLngToWorld, SCALE } from './coords';
 
 const H = 6600; // image height
 const W = 10200; // image width
 
-describe('worldToLatLng — Y-axis flip (REQ-WM-04)', () => {
-  it('top-left pixel (0,0) maps to Leaflet [H, 0] — image top = Leaflet max-lat', () => {
-    // Image top-left: worldX=0, worldY=0
-    // Leaflet CRS.Simple: lat = H - worldY = 6600; lng = worldX = 0
-    // This ensures the image top-left renders at the visual top-left of the map.
-    expect(worldToLatLng(0, 0)).toEqual([H, 0]);
+describe('worldToLatLng — pixel→Leaflet (REQ-WM-04)', () => {
+  it('SCALE is 2^MAX_ZOOM = 32 (native res at max zoom)', () => {
+    expect(SCALE).toBe(32);
   });
 
-  it('bottom-right pixel (W,H) maps to Leaflet [0, W] — image bottom = Leaflet min-lat', () => {
-    // Image bottom-right: worldX=10200, worldY=6600
-    // Leaflet: lat = H - worldY = 0; lng = worldX = 10200
-    expect(worldToLatLng(W, H)).toEqual([0, W]);
+  it('top-left pixel (0,0) maps to Leaflet [0, 0] — image top-left = map top-left', () => {
+    expect(worldToLatLng(0, 0)).toEqual([0, 0]);
   });
 
-  it('center pixel maps correctly', () => {
-    // Center of a 10200×6600 image
-    const cx = W / 2; // 5100
-    const cy = H / 2; // 3300
-    // lat = H - cy = 6600 - 3300 = 3300; lng = cx = 5100
-    expect(worldToLatLng(cx, cy)).toEqual([3300, 5100]);
+  it('bottom-right pixel (W,H) maps to Leaflet [-H/SCALE, W/SCALE]', () => {
+    expect(worldToLatLng(W, H)).toEqual([-H / SCALE, W / SCALE]); // [-206.25, 318.75]
   });
 
-  it('top-right corner maps to Leaflet [H, W]', () => {
-    expect(worldToLatLng(W, 0)).toEqual([H, W]);
+  it('center pixel maps to the bounds center', () => {
+    expect(worldToLatLng(W / 2, H / 2)).toEqual([-H / 2 / SCALE, W / 2 / SCALE]); // [-103.125, 159.375]
   });
 
-  it('bottom-left corner maps to Leaflet [0, 0]', () => {
-    expect(worldToLatLng(0, H)).toEqual([0, 0]);
+  it('top-right corner (W,0) maps to Leaflet [0, W/SCALE]', () => {
+    expect(worldToLatLng(W, 0)).toEqual([0, W / SCALE]);
+  });
+
+  it('bottom-left corner (0,H) maps to Leaflet [-H/SCALE, 0] — top stays above bottom', () => {
+    const [topLat] = worldToLatLng(0, 0);
+    const [bottomLat] = worldToLatLng(0, H);
+    expect(worldToLatLng(0, H)).toEqual([-H / SCALE, 0]);
+    // No mirror: the image top must have a HIGHER latitude than the bottom.
+    expect(topLat).toBeGreaterThan(bottomLat);
   });
 });
 
@@ -73,12 +69,11 @@ describe('latLngToWorld — inverse transform', () => {
     expect(latLngToWorld(lat, lng)).toEqual({ worldX, worldY });
   });
 
-  it('Leaflet [0,0] → worldX=0, worldY=H (bottom-left)', () => {
-    // Leaflet lat=0, lng=0 → worldY = H - 0 = 6600; worldX = 0
-    expect(latLngToWorld(0, 0)).toEqual({ worldX: 0, worldY: H });
+  it('Leaflet [0,0] → worldX=0, worldY=0 (top-left)', () => {
+    expect(latLngToWorld(0, 0)).toEqual({ worldX: 0, worldY: 0 });
   });
 
-  it('Leaflet [H,W] → worldX=W, worldY=0 (top-right)', () => {
-    expect(latLngToWorld(H, W)).toEqual({ worldX: W, worldY: 0 });
+  it('Leaflet [-H/SCALE, W/SCALE] → worldX=W, worldY=H (bottom-right)', () => {
+    expect(latLngToWorld(-H / SCALE, W / SCALE)).toEqual({ worldX: W, worldY: H });
   });
 });

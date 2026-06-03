@@ -6,13 +6,12 @@
  * 'use client' is required — Leaflet reads window/document and cannot run on the server.
  * This file is dynamically imported with ssr:false by MapClientWrapper.
  *
- * Y-AXIS CONVENTION (ADR-2, REQ-WM-04 — read this before touching bounds or TileLayer):
+ * DEEP-ZOOM + Y-AXIS CONVENTION (ADR-2, REQ-WM-04 — read before touching bounds/TileLayer):
+ *   - Pyramid: zoom MAX_ZOOM (5) = native res; lower zooms downscale. tms={false}.
  *   - Tiles are generated Y-DOWN (row 0 = top of image, standard ImageMagick order).
- *   - TileLayer uses tms={false} (default). Do NOT change this.
- *   - Leaflet CRS.Simple has Y increasing UPWARD (origin bottom-left).
- *   - Bounds: [[0,0],[H,W]] = [[0,0],[6600,10200]] in Leaflet [lat,lng] space.
- *   - All world pixel coords are placed via worldToLatLng(x, y) from lib/world/map/coords.ts.
- *   - The flip is entirely in that pure function — do NOT replicate it here.
+ *   - Bounds + every marker are placed via worldToLatLng(x, y) from coords.ts
+ *     (= [-y/SCALE, x/SCALE], SCALE=2^MAX_ZOOM). The scale + Y-flip live ONLY there.
+ *   - Do NOT hardcode bounds or replicate the flip/scale here.
  *   See lib/world/map/coords.ts for the full explanation.
  *
  * LAYOUT — AppShell breakout (ADR-4):
@@ -30,6 +29,7 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
+import { worldToLatLng, MAX_ZOOM } from '@/lib/world/map/coords';
 
 // Import Leaflet CSS — required for map tiles and controls to render correctly.
 // Next.js handles this import via its CSS bundler when the component is client-only.
@@ -40,25 +40,28 @@ interface WorldMapLeafletProps {
   supabaseUrl: string;
 }
 
+/** Source image pixel dimensions (data/Sword-Coast-Map_HighRes.jpg). */
+const IMAGE_W = 10200;
+const IMAGE_H = 6600;
+
 /**
- * IMAGE BOUNDS in Leaflet CRS.Simple [lat, lng] space:
- *   lat axis = Y (increases upward in Leaflet, so max lat = H = 6600 = image top)
- *   lng axis = X (increases rightward, so max lng = W = 10200 = image right)
- *
- * bounds[0] = [0,    0]     = bottom-left  = image bottom-left pixel
- * bounds[1] = [6600, 10200] = top-right    = image top-right pixel
+ * IMAGE BOUNDS in Leaflet CRS.Simple [lat, lng] space, derived from the SAME
+ * worldToLatLng transform used for markers (single source of truth — no duplicated
+ * flip/scale). Corners: top-left (0,0)→[0,0], bottom-right (W,H)→[-206.25, 318.75].
+ * latLngBounds normalizes to SW/NE regardless of corner order.
  */
-const MAP_BOUNDS: L.LatLngBoundsExpression = [
-  [0, 0],
-  [6600, 10200],
-];
+const MAP_BOUNDS: L.LatLngBounds = L.latLngBounds(
+  worldToLatLng(0, 0),
+  worldToLatLng(IMAGE_W, IMAGE_H),
+);
 
 /** Center of the map at initial load. */
-const MAP_CENTER: L.LatLngExpression = [3300, 5100];
+const MAP_CENTER: L.LatLngExpression = worldToLatLng(IMAGE_W / 2, IMAGE_H / 2);
 
 const MIN_ZOOM = 0;
-const MAX_ZOOM = 5;
-const INITIAL_ZOOM = 0;
+// MAX_ZOOM (= native-resolution level) imported from coords.ts to stay in lock-step
+// with the tile pyramid + the pixel↔LatLng scale.
+const INITIAL_ZOOM = 1;
 
 export function WorldMapLeaflet({ supabaseUrl }: WorldMapLeafletProps) {
   /**
@@ -117,9 +120,15 @@ export function WorldMapLeaflet({ supabaseUrl }: WorldMapLeafletProps) {
         <TileLayer
           url={tileUrl}
           tms={false}
+          tileSize={256}
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
+          // Native tiles only go up to MAX_ZOOM; Leaflet upscales the z5 tiles for
+          // any zoom beyond that instead of requesting non-existent tiles.
+          maxNativeZoom={MAX_ZOOM}
+          minNativeZoom={MIN_ZOOM}
           bounds={MAP_BOUNDS}
+          noWrap
           attribution="Sword Coast — Forgotten Realms"
         />
       </MapContainer>

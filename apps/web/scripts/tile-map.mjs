@@ -28,7 +28,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, renameSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
@@ -49,6 +49,9 @@ const IMAGE_H = 6600;
 const TILE_SIZE = 256;
 const MIN_ZOOM = 0;
 const MAX_ZOOM = 5;
+// JPEG quality for emitted tiles. 90 = visually lossless for map labels at a
+// reasonable size; tiles are encoded ONCE from the resized source (no double pass).
+const JPEG_QUALITY = 90;
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
 
@@ -109,22 +112,27 @@ async function ensureBucket() {
 
 /**
  * Compute the tile grid dimensions for a given zoom level.
- * Tiles use standard slippy-map subdivision: at z=0 the full image fits in a
- * single tile row×col grid. Each zoom level doubles in each axis.
+ *
+ * STANDARD DEEP-ZOOM PYRAMID: zoom MAX_ZOOM = NATIVE resolution; each lower zoom
+ * HALVES the image (downscale). This is the inverse of a "z0=native, upscale"
+ * scheme — which would 32× UPSCALE at z5 (≈1M tiles + an OOM-class resize).
  *
  * For CRS.Simple + 256px tiles, at zoom z:
- *   scale = 2^z
- *   cols  = ceil(IMAGE_W * scale / TILE_SIZE)
- *   rows  = ceil(IMAGE_H * scale / TILE_SIZE)
+ *   scale   = 2^(z - MAX_ZOOM)            (= 1 at MAX_ZOOM, <1 below)
+ *   scaledW = round(IMAGE_W * scale)
+ *   cols    = ceil(scaledW / TILE_SIZE)
  *
- * ImageMagick's -crop handles the boundary tiles (they are smaller than 256×256
- * but that is valid — Leaflet renders partial edge tiles correctly).
+ * Total ≈ 1398 tiles (z5:1040, z4:260, z3:70, z2:20, z1:6, z0:2).
+ * ImageMagick's -crop handles boundary tiles (smaller than 256×256 — valid;
+ * Leaflet renders partial edge tiles correctly).
  */
 function tileDimensions(z) {
-  const scale = Math.pow(2, z);
-  const cols = Math.ceil((IMAGE_W * scale) / TILE_SIZE);
-  const rows = Math.ceil((IMAGE_H * scale) / TILE_SIZE);
-  return { scale, cols, rows };
+  const scale = Math.pow(2, z - MAX_ZOOM);
+  const scaledW = Math.max(1, Math.round(IMAGE_W * scale));
+  const scaledH = Math.max(1, Math.round(IMAGE_H * scale));
+  const cols = Math.ceil(scaledW / TILE_SIZE);
+  const rows = Math.ceil(scaledH / TILE_SIZE);
+  return { scale, scaledW, scaledH, cols, rows };
 }
 
 /**
@@ -135,44 +143,51 @@ function tileDimensions(z) {
  * TILE_SIZE×TILE_SIZE pieces with ImageMagick's -crop.
  */
 function sliceZoomLevel(z, singleTile = false) {
-  const { scale, cols, rows } = tileDimensions(z);
-  const scaledW = Math.round(IMAGE_W * scale);
-  const scaledH = Math.round(IMAGE_H * scale);
+  const { scaledW, scaledH, cols, rows } = tileDimensions(z);
+  console.log(`  z=${z}: ${cols}×${rows} tiles (${scaledW}×${scaledH}px)`);
 
-  // Only z0/0/0 in smoke mode
-  const colRange = singleTile ? 1 : cols;
-  const rowRange = singleTile ? 1 : rows;
+  mkdirSync(TILES_DIR, { recursive: true });
 
-  console.log(`  z=${z}: ${cols}×${rows} tiles (scale ×${scale}, ${scaledW}×${scaledH}px)`);
+  // Smoke mode: a single corner tile (z/0/0) is enough to validate the pipeline.
+  // Resize + crop in ONE pass — no intermediate JPEG, so the tile is a single
+  // encode from the source (no generational loss).
+  if (singleTile) {
+    mkdirSync(join(TILES_DIR, String(z), '0'), { recursive: true });
+    execSync(
+      `convert "${SOURCE_IMAGE}" -resize ${scaledW}x${scaledH}! ` +
+        `-crop ${TILE_SIZE}x${TILE_SIZE}+0+0 +repage -quality ${JPEG_QUALITY} ` +
+        `"${join(TILES_DIR, String(z), '0', '0.jpg')}"`,
+      { stdio: 'pipe' },
+    );
+    return;
+  }
 
-  // Create output dirs
-  for (let x = 0; x < colRange; x++) {
+  // ONE-SHOT resize + crop: a single decode of the source resizes in memory and
+  // emits ALL tiles for this zoom in row-major order (left→right, top→bottom).
+  // No intermediate file → each tile is encoded exactly ONCE from the resized
+  // pixels (no double-JPEG generational loss), and the 67MP source is decoded
+  // once per zoom instead of once per tile (minutes → seconds).
+  const scratch = join(TILES_DIR, `_scratch_z${z}`);
+  rmSync(scratch, { recursive: true, force: true });
+  mkdirSync(scratch, { recursive: true });
+  execSync(
+    `convert "${SOURCE_IMAGE}" -resize ${scaledW}x${scaledH}! ` +
+      `-crop ${TILE_SIZE}x${TILE_SIZE} +repage +adjoin -quality ${JPEG_QUALITY} ` +
+      `"${join(scratch, 'out_%d.jpg')}"`,
+    { stdio: 'pipe' },
+  );
+
+  // Map row-major scene index → {z}/{x}/{y}.jpg  (x = i % cols, y = floor(i / cols)).
+  for (let x = 0; x < cols; x++) {
     mkdirSync(join(TILES_DIR, String(z), String(x)), { recursive: true });
   }
-
-  // Use ImageMagick to resize then crop each tile individually.
-  // We use a loop to avoid writing a huge intermediate file to disk.
-  // For large zoom levels this is slow but correct and memory-safe.
-  for (let y = 0; y < rowRange; y++) {
-    for (let x = 0; x < colRange; x++) {
-      const outPath = join(TILES_DIR, String(z), String(x), `${y}.jpg`);
-      const cropX = x * TILE_SIZE;
-      const cropY = y * TILE_SIZE;
-
-      // Crop region (may be smaller at edges — ImageMagick clips automatically)
-      const cmd = [
-        'convert',
-        `"${SOURCE_IMAGE}"`,
-        `-resize ${scaledW}x${scaledH}!`,
-        `-crop ${TILE_SIZE}x${TILE_SIZE}+${cropX}+${cropY}`,
-        '+repage',
-        '-quality 85',
-        `"${outPath}"`,
-      ].join(' ');
-
-      execSync(cmd, { stdio: 'pipe' });
-    }
+  for (let i = 0; i < cols * rows; i++) {
+    const x = i % cols;
+    const y = Math.floor(i / cols);
+    renameSync(join(scratch, `out_${i}.jpg`), join(TILES_DIR, String(z), String(x), `${y}.jpg`));
   }
+
+  rmSync(scratch, { recursive: true, force: true });
 }
 
 /**
