@@ -27,7 +27,7 @@
  * REQ-PLACE-TAP-04, REQ-PLACE-BOUNDS-02.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -38,6 +38,9 @@ import type { EffectiveView } from '@/components/world/_shell/world-entity-shell
 import { PoiDetail } from './poi-detail';
 import { updatePoi } from '@/app/mapa/actions';
 import type { PlacementTarget } from './map-client-wrapper';
+import { MapFlyTo } from './map-fly-to';
+import type { FlyTarget } from './map-fly-to';
+import { PoiMapDrawer } from './poi-map-drawer';
 
 // Import Leaflet CSS — required for map tiles and controls to render correctly.
 // Next.js handles this import via its CSS bundler when the component is client-only.
@@ -108,6 +111,19 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
   const router = useRouter();
 
   /**
+   * POI list drawer state (REQ-PML-DRAWER-01, ADR-1).
+   * Ephemeral client state — no URL needed (all state owners are in this subtree).
+   */
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  /**
+   * Fly-to target — set by PoiMapDrawer row taps, read by <MapFlyTo> inside <MapContainer>.
+   * Always a FRESH object per click so useEffect([target]) re-runs even for the same POI
+   * (REQ-PML-FLYTO-02, ADR-2 — do NOT add a value-equality guard).
+   */
+  const [flyTarget, setFlyTarget] = useState<FlyTarget | null>(null);
+
+  /**
    * Leaflet has a default-icon PNG resolution issue with webpack/Next.js bundlers.
    * Since we use divIcon for all markers (map-marker-icon.ts), we suppress the
    * default icon setup to prevent console errors about missing marker-icon.png.
@@ -122,6 +138,15 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
       shadowUrl: '',
     });
   }, []);
+
+  /**
+   * Auto-close drawer when place-mode activates (REQ-PML-DRAWER-04, ADR-5).
+   * Conditional render below ALSO unmounts the toggle + drawer in place-mode,
+   * but this effect resets drawerOpen so re-entering map-mode doesn't pop it back.
+   */
+  useEffect(() => {
+    if (placement) setDrawerOpen(false);
+  }, [placement]);
 
   /**
    * commitCoords — persist drag/tap result via Server Action + repaint.
@@ -250,7 +275,62 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement }:
             }}
           />
         )}
+
+        {/*
+         * MapFlyTo — null-return child that calls map.flyTo() via useMap().
+         * MUST be inside <MapContainer> (only place where useMap() resolves).
+         * Fresh flyTarget object per POI row tap → re-fly on same POI works.
+         * REQ-PML-FLYTO-01, REQ-PML-FLYTO-02.
+         */}
+        <MapFlyTo target={flyTarget} />
       </MapContainer>
+
+      {/*
+       * POI drawer toggle + panel — rendered as siblings of <MapContainer> so they
+       * overlay the map. Conditionally unmounted in place-mode (ADR-5):
+       *   - toggle + drawer DOM is GONE while placement is active → zero z/gesture conflict
+       *     with PlaceModeBanner (z-30) and PlaceModeClickCatcher.
+       * REQ-PML-DRAWER-02, REQ-PML-DRAWER-04.
+       */}
+      {!placement && (
+        <>
+          {/*
+           * Toggle button — bottom-LEFT, z-30, above drawer (z-20) and map (z-10).
+           * Inline style for bottom (NOT Tailwind bottom-* class) to respect iOS
+           * safe-area-inset-bottom — same pattern as the map container itself.
+           * REQ-PML-DRAWER-02, ADR-4.
+           */}
+          <button
+            type="button"
+            onClick={() => setDrawerOpen((v) => !v)}
+            className="fixed left-4 z-30 flex min-h-[44px] items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface shadow-xl"
+            style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px) + 16px)' }}
+            aria-label={drawerOpen ? 'Cerrar lista de puntos' : 'Abrir lista de puntos'}
+            aria-expanded={drawerOpen}
+            data-testid="poi-drawer-toggle"
+          >
+            Puntos
+          </button>
+
+          {/*
+           * PoiMapDrawer — fixed-positioned overlay panel with the POI list.
+           * NOT a portal, NOT V3Sheet, does NOT lock body scroll.
+           * Closed panel is pointer-events-none + off-screen to never block map pan.
+           * REQ-PML-DRAWER-01, REQ-PML-DRAWER-03.
+           */}
+          <PoiMapDrawer
+            pois={pois}
+            effectiveView={effectiveView}
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            onFlyTo={(poi) => {
+              // Always create a NEW object so useEffect([target]) re-runs for re-fly
+              // (REQ-PML-FLYTO-02 — do NOT add a value-equality guard).
+              setFlyTarget({ x: poi.worldX!, y: poi.worldY!, poiId: poi.id });
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

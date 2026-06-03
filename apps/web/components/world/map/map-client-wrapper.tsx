@@ -67,7 +67,7 @@ interface MapClientWrapperProps {
 function PlaceModeBanner({ name, onCancel }: { name: string; onCancel: () => void }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-20 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
+      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
       data-testid="place-mode-banner"
       role="status"
       aria-live="polite"
