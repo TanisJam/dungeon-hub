@@ -10,7 +10,10 @@
 import { describe, it, expect } from 'vitest';
 import type { HexStatus } from '../../../src/use-cases/map/load-hex.js';
 import type { LoadedPoiWithHexStatus } from '../../../src/use-cases/map/load-poi.js';
-import { filterWorldPoisForPlayer } from '../../../src/use-cases/map/load-poi.js';
+import {
+  filterWorldPoisForPlayer,
+  stripParentHexStatus,
+} from '../../../src/use-cases/map/load-poi.js';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
@@ -140,5 +143,83 @@ describe('filterWorldPoisForPlayer', () => {
     expect(ids).toContain('poi-d');
     expect(ids).not.toContain('poi-b');
     expect(ids).not.toContain('poi-c');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W-01: stripParentHexStatus — GM wire shape (W-01 closeout)
+//
+// The GM route branch does: raw.map(stripParentHexStatus) before returning.
+// These tests assert the function's contract directly:
+//   - parentHexStatus is removed (never reaches the wire)
+//   - All other LoadedPoi fields (incl. dmNotes + unknown status) are preserved
+//
+// This ensures a future refactor that drops .map(stripParentHexStatus) from the
+// GM branch will be caught immediately by a failing test rather than only by TS.
+// ---------------------------------------------------------------------------
+
+describe('stripParentHexStatus', () => {
+  it('removes parentHexStatus from GM output (wire safety — W-01)', () => {
+    const poi = makePoi({
+      id: 'gm-poi-1',
+      status: 'discovered',
+      parentHexStatus: 'explored',
+    });
+    const result = stripParentHexStatus(poi);
+    expect('parentHexStatus' in result).toBe(false);
+  });
+
+  it('preserves dmNotes in GM output (GM sees everything — W-01)', () => {
+    const poi = makePoi({
+      id: 'gm-poi-2',
+      status: 'discovered',
+      parentHexStatus: 'unexplored',
+      dmNotes: 'secret dungeon entrance here',
+    });
+    const result = stripParentHexStatus(poi);
+    expect(result.dmNotes).toBe('secret dungeon entrance here');
+  });
+
+  it('preserves status=unknown in GM output (GM sees all statuses — W-01)', () => {
+    const poi = makePoi({
+      id: 'gm-poi-3',
+      status: 'unknown',
+      parentHexStatus: 'unexplored',
+    });
+    const result = stripParentHexStatus(poi);
+    // GM path does NOT filter by status — unknown POIs remain
+    expect(result.status).toBe('unknown');
+    expect('parentHexStatus' in result).toBe(false);
+  });
+
+  it('preserves all remaining LoadedPoi fields (W-01)', () => {
+    const createdAt = new Date('2024-01-01T00:00:00Z');
+    const updatedAt = new Date('2024-06-01T00:00:00Z');
+    const poi = makePoi({
+      id: 'gm-poi-4',
+      hexId: 'hex-gm',
+      name: 'Dragon Lair',
+      description: 'A dark cave',
+      dmNotes: 'BBEG hideout',
+      status: 'cleared',
+      worldX: 12.5,
+      worldY: -7.3,
+      createdAt,
+      updatedAt,
+      parentHexStatus: 'rumored',
+    });
+    const result = stripParentHexStatus(poi);
+    expect(result.id).toBe('gm-poi-4');
+    expect(result.hexId).toBe('hex-gm');
+    expect(result.name).toBe('Dragon Lair');
+    expect(result.description).toBe('A dark cave');
+    expect(result.dmNotes).toBe('BBEG hideout');
+    expect(result.status).toBe('cleared');
+    expect(result.worldX).toBe(12.5);
+    expect(result.worldY).toBe(-7.3);
+    expect(result.createdAt).toBe(createdAt);
+    expect(result.updatedAt).toBe(updatedAt);
+    // parentHexStatus must be absent
+    expect('parentHexStatus' in result).toBe(false);
   });
 });
