@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
  *   (i) Tap-to-place round-trip: null-coord POI → Colocar en mapa → place mode → tap → persist.
  *   (j) Round-trip persistence: coord committed via tap survives page reload.
  *   (k) Cancelar exits place-mode without writing coords.
- *   (l) Popup button gating: DM popup has Editar/Mover buttons; player popup does not.
+ *   (l) Popup button gating: DM popup has Editar/Mover; Mover enters move-mode (banner+Listo/Cancelar); player popup does not.
  *   (m) Player gating: no "Colocar en mapa" button in player view.
  *
  * B2 additions (REQ-PWC-CREATE-01..05, REQ-PWC-IA-01..03):
@@ -42,9 +42,10 @@ import { test, expect } from '@playwright/test';
  * when no seeded coords exist in the E2E world. Assertions are container/no-crash
  * by default, with conditional tap-to-open when a marker IS present.
  *
- * B2-Refinement (manual gate — NOT in this E2E):
+ * B2-Refinement 2 (manual gate — NOT in this E2E):
  *   375px viewport: tap marker → popup shows Editar/Mover buttons; tap Editar → edit sheet opens;
- *   tap Mover → enters place-mode → tap → POI repositioned. Verify on real device.
+ *   tap Mover → popup closes + move-mode banner appears + dot pulses/becomes draggable;
+ *   drag dot to new position → Listo saves; Cancelar reverts. Verify on real device.
  *
  * B2-IAx (manual gate — NOT in this E2E):
  *   375px viewport visual review: FAB (bottom-right) vs drawer toggle (bottom-left) vs
@@ -414,15 +415,21 @@ test('T3: Cancelar exits place-mode without writing coords', async ({ page }) =>
 });
 
 /**
- * T4: Edit/move popup button gating (replaces removed drag-mode gating).
+ * T4: Edit/move popup button gating + move-mode banner (B2 Refinement 2).
  *
  * B2 Refinement: DM drag removed — markers are static, edit/move gated behind popup buttons.
- * DM view: tapping a marker opens a popup containing "Editar" and "Mover" buttons.
- * Player view: tapping a marker opens a popup WITHOUT those DM-only buttons.
- * Conditional: skipped entirely when zero placed markers exist in the E2E world (ADR-4 tolerance).
+ * B2 Refinement 2: "Mover" now enters drag-to-move mode (NOT place-mode).
+ *   - DM popup has Editar/Mover buttons.
+ *   - Tapping "Mover" closes the popup and shows the move-mode banner
+ *     ("Moviendo {name}") with Listo and Cancelar buttons (NOT ?place= URL).
+ *   - Tapping "Cancelar" exits move-mode (banner gone, no URL change).
+ *   - Player popup has neither button.
+ *
+ * Conditional: skipped when zero placed markers exist in the E2E world (ADR-4 tolerance).
+ * Drag-persist is a MANUAL gate (Playwright cannot reliably drive Leaflet marker drags).
  */
-test('T4: DM popup shows Editar/Mover buttons; player popup does not', async ({ browser }) => {
-  // DM view: assert popup buttons are present when a marker exists
+test('T4: DM popup shows Editar/Mover buttons; Mover opens move-mode banner; player popup does not', async ({ browser }) => {
+  // DM view: assert popup buttons and move-mode banner behavior
   {
     const dmCtx = await browser.newContext();
     const page = await dmCtx.newPage();
@@ -444,6 +451,20 @@ test('T4: DM popup shows Editar/Mover buttons; player popup does not', async ({ 
         // DM-only popup buttons must be present
         await expect(popup.getByRole('button', { name: 'Editar' })).toBeVisible({ timeout: 3_000 });
         await expect(popup.getByRole('button', { name: 'Mover' })).toBeVisible({ timeout: 3_000 });
+
+        // Tap "Mover" → should enter move-mode, NOT navigate to ?place=
+        await popup.getByRole('button', { name: 'Mover' }).click();
+
+        // Move-mode: banner with Listo + Cancelar must appear; URL must NOT have ?place=
+        const moveBanner = page.locator('[data-testid="move-mode-banner"]');
+        await expect(moveBanner).toBeVisible({ timeout: 5_000 });
+        await expect(page.locator('[data-testid="move-banner-listo"]')).toBeVisible({ timeout: 3_000 });
+        await expect(page.locator('[data-testid="move-banner-cancelar"]')).toBeVisible({ timeout: 3_000 });
+        await expect(page).not.toHaveURL(/place=/, { timeout: 1_000 });
+
+        // Tap Cancelar → move-mode exits, banner gone
+        await page.locator('[data-testid="move-banner-cancelar"]').click();
+        await expect(moveBanner).not.toBeVisible({ timeout: 3_000 });
       }
       // Zero markers: valid baseline — no assertion needed (ADR-4 tolerance)
     } finally {
