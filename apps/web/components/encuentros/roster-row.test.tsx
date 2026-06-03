@@ -67,6 +67,20 @@ describe('RosterList', () => {
     expect(goblinRow.querySelector('[data-action-economy]')).toBeNull();
   });
 
+  it('REQ-WCO-WEB-04c: own row surfaces attacksRemaining count', () => {
+    const withAttacks: EncounterCombatant[] = [
+      { ...combatants[0]!, attacksRemaining: 2 },
+      combatants[1]!,
+    ];
+    const { container } = render(
+      <RosterList combatants={withAttacks} currentCombatantId="a" ownCombatantId="a" />,
+    );
+    const miraRow = container.querySelector('[data-combatant-id="a"]')!;
+    const attacks = miraRow.querySelector('[data-attacks-remaining]');
+    expect(attacks).not.toBeNull();
+    expect(attacks!.textContent).toContain('2');
+  });
+
   // REQ-WCO-WEB-03: ConditionBadges rendered in roster row
   it('REQ-WCO-WEB-03e: condition badge "Prone" appears on a combatant row that has it', () => {
     const withCondition: EncounterCombatant[] = [

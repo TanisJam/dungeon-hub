@@ -81,6 +81,13 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
                 >
                   R
                 </span>
+                <span
+                  title="Ataques restantes"
+                  data-attacks-remaining
+                  aria-label={`${c.attacksRemaining} ataques restantes`}
+                >
+                  ⚔{c.attacksRemaining}
+                </span>
               </span>
             )}
           </li>
