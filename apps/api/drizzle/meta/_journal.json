@@ -246,6 +246,13 @@
       "when": 1780443473475,
       "tag": "0035_character_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1780500000000,
+      "tag": "0036_poi_world_level",
+      "breakpoints": true
     }
   ]
 }

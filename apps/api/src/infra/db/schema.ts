@@ -398,27 +398,35 @@ export const hexes = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// pois — Points of Interest dentro de un hex.
+// pois — Points of Interest del mundo (hexcrawl + free-floating).
+//
+// poi-world-level (PR#1): re-anchored from hex → world directly.
+//   worldId: NOT NULL FK → worlds(id) ON DELETE CASCADE (primary parent).
+//   hexId:   NULLABLE FK → hexes(id) ON DELETE SET NULL (last-known location,
+//            NPC model — DM work survives hex deletion).
+//
+// Free-floating POIs (hexId = null) are valid; they appear in world-scope
+// queries but are not gated by hex visibility cascade.
 //
 // Status canonical (DM lo setea libremente, sugerido):
 //   unknown → discovered → cleared
 //
-// Visibility (sigue el patrón de hex):
+// Visibility (hybrid model — poi-world-level):
 //   - DM ve todos los POIs (incluyendo unknown + dmNotes).
-//   - Players solo ven `status != 'unknown'`, NUNCA `dmNotes`.
-//   - Cascade: si el hex parent NO es visible al player, los POIs tampoco.
+//   - Players ven status != 'unknown', NUNCA dmNotes.
+//   - Hex-bound POIs (hexId set): cascade from parent hex status.
+//   - Free-floating POIs (hexId null): status gate only.
 //
-// Coords (worldX, worldY) opcionales — pin placement fino dentro del hex
-// cuando llegue el render continuo (Leaflet/MapLibre). Usualmente caen dentro
-// del bbox del hex pero no es hard-rule.
+// Coords (worldX, worldY) opcionales — pin placement fino.
 // ---------------------------------------------------------------------------
 export const pois = pgTable(
   'pois',
   {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-    hexId: uuid('hex_id')
+    worldId: uuid('world_id')
       .notNull()
-      .references(() => hexes.id, { onDelete: 'cascade' }),
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    hexId: uuid('hex_id').references(() => hexes.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
     /** Descripción visible para players (lo que se sabe del POI). */
     description: text('description'),
@@ -436,6 +444,7 @@ export const pois = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    index('idx_pois_world').on(t.worldId),
     index('idx_pois_hex').on(t.hexId),
     index('idx_pois_status').on(t.status),
   ],
