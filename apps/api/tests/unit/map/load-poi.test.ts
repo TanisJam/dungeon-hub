@@ -1,10 +1,12 @@
 /**
  * Unit tests for filterWorldPoisForPlayer (pure helper — no DB, no HTTP).
  *
- * RED phase: these tests MUST fail before filterWorldPoisForPlayer is implemented.
- * GREEN phase: implement the function in load-poi.ts.
+ * poi-world-level: extended to cover hybrid visibility model —
+ *   - Hex-bound POIs (hexId set): hex-status cascade gate + POI-status gate.
+ *   - Free-floating POIs (hexId null): POI-status gate only (no hex cascade).
  *
- * REQ-POI-CASCADE-01, REQ-POI-CASCADE-02 (spec #1687).
+ * REQ-POI-CASCADE-01, REQ-POI-CASCADE-02 (spec #1687),
+ * REQ-POIWL-VIS-01, REQ-POIWL-VIS-02 (spec #1710).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -25,6 +27,7 @@ function makePoi(
   return {
     id: 'poi-1',
     hexId: 'hex-1',
+    worldId: 'world-1',
     name: 'Test POI',
     description: null,
     dmNotes: null,
@@ -33,7 +36,7 @@ function makePoi(
     worldY: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    parentHexStatus: 'explored' as HexStatus,
+    parentHexStatus: 'explored' as HexStatus | null,
     ...overrides,
   };
 }
@@ -143,6 +146,51 @@ describe('filterWorldPoisForPlayer', () => {
     expect(ids).toContain('poi-d');
     expect(ids).not.toContain('poi-b');
     expect(ids).not.toContain('poi-c');
+  });
+
+  // ---------------------------------------------------------------------------
+  // REQ-POIWL-VIS-02: Free-floating POI hybrid visibility (poi-world-level)
+  //
+  // Free-floating POIs (hexId = null, parentHexStatus = null) skip the hex-status
+  // cascade entirely. Only the POI-level status gate applies:
+  //   status != 'unknown' → visible; status == 'unknown' → hidden.
+  // ---------------------------------------------------------------------------
+
+  it('includes a free-floating POI with status=discovered (REQ-POIWL-VIS-02)', () => {
+    // FREE-FLOATING: hexId null, parentHexStatus null — no hex cascade.
+    const poi = makePoi({ hexId: null, parentHexStatus: null, status: 'discovered' });
+    const result = filterWorldPoisForPlayer([poi]);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe('poi-1');
+  });
+
+  it('excludes a free-floating POI with status=unknown (REQ-POIWL-VIS-02)', () => {
+    // FREE-FLOATING: hexId null, parentHexStatus null — only status gate.
+    const poi = makePoi({ hexId: null, parentHexStatus: null, status: 'unknown' });
+    const result = filterWorldPoisForPlayer([poi]);
+    expect(result).toHaveLength(0);
+  });
+
+  it('includes a free-floating POI with status=cleared (REQ-POIWL-VIS-02)', () => {
+    const poi = makePoi({ hexId: null, parentHexStatus: null, status: 'cleared' });
+    const result = filterWorldPoisForPlayer([poi]);
+    expect(result).toHaveLength(1);
+  });
+
+  it('mixed list including free-floating POIs (REQ-POIWL-VIS-01 + REQ-POIWL-VIS-02)', () => {
+    const pois: LoadedPoiWithHexStatus[] = [
+      makePoi({ id: 'hex-visible', hexId: 'h1', status: 'discovered', parentHexStatus: 'explored' }),    // included
+      makePoi({ id: 'hex-unexplored', hexId: 'h2', status: 'discovered', parentHexStatus: 'unexplored' }), // excluded (hex cascade)
+      makePoi({ id: 'float-discovered', hexId: null, parentHexStatus: null, status: 'discovered' }),     // included
+      makePoi({ id: 'float-unknown', hexId: null, parentHexStatus: null, status: 'unknown' }),            // excluded (status gate)
+    ];
+    const result = filterWorldPoisForPlayer(pois);
+    expect(result).toHaveLength(2);
+    const ids = result.map((p) => p.id);
+    expect(ids).toContain('hex-visible');
+    expect(ids).toContain('float-discovered');
+    expect(ids).not.toContain('hex-unexplored');
+    expect(ids).not.toContain('float-unknown');
   });
 });
 
