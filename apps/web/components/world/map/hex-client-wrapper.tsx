@@ -21,6 +21,7 @@
 // REQ-MAP-01, REQ-GATE-01.
 
 import { useState, useCallback, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { WorldEntityShell } from '@/components/world/_shell/world-entity-shell';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
 import { HexRowView } from './hex-row';
@@ -50,6 +51,8 @@ export function HexClientWrapper({
   effectiveView,
   initialHexes,
 }: HexClientWrapperProps) {
+  const router = useRouter();
+
   // ─── Lazy POI cache ────────────────────────────────────────────────────────────
   // Cache loaded POIs per hexId. This is a Map so re-expanding doesn't re-fetch.
   // The Map is stored in state so updates (after POI create/delete) propagate correctly.
@@ -182,17 +185,35 @@ export function HexClientWrapper({
   }
 
   return (
-    <WorldEntityShell<HexRow, HexRow>
-      items={initialHexes}
-      total={initialHexes.length}
-      effectiveView={effectiveView}
-      searchPlaceholder="Buscar ubicaciones…"
-      onSearch={onSearch}
-      onLoadDetail={onLoadDetail}
-      renderRow={renderRow}
-      renderDetail={renderDetail}
-      renderForm={renderForm}
-      onDelete={onDelete}
-    />
+    <>
+      {/*
+       * REQ-PWC-IA-03: Back-to-map control.
+       * Discreet affordance from ?view=lista back to the map (default view).
+       * ≥44px tap target. Positioned at the top of the hex list view.
+       */}
+      <div className="mb-3 flex">
+        <button
+          type="button"
+          onClick={() => router.push('?view=mapa')}
+          className="flex min-h-[44px] items-center gap-2 rounded-md border border-line bg-paper px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
+          aria-label="Ver mapa"
+          data-testid="back-to-map"
+        >
+          ← Ver mapa
+        </button>
+      </div>
+      <WorldEntityShell<HexRow, HexRow>
+        items={initialHexes}
+        total={initialHexes.length}
+        effectiveView={effectiveView}
+        searchPlaceholder="Buscar ubicaciones…"
+        onSearch={onSearch}
+        onLoadDetail={onLoadDetail}
+        renderRow={renderRow}
+        renderDetail={renderDetail}
+        renderForm={renderForm}
+        onDelete={onDelete}
+      />
+    </>
   );
 }
