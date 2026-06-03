@@ -615,7 +615,8 @@ export async function grantKnowledge(
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
 
-  revalidatePath(`/characters/${characterId}/codex/bestiario`);
+  // Retargeted from /codex/bestiario → /codex (character-codex-browser Slice 1')
+  revalidatePath(`/characters/${characterId}/codex`);
   revalidatePath(`/characters/${characterId}`);
   return { ok: true };
 }

@@ -29,7 +29,7 @@ import {
 import {
   searchCompendiumMonsters,
   type CompendiumMonsterHit,
-} from '../codex/bestiario/actions';
+} from './dm-grant-panel-actions';
 
 type CallerRole = 'gm' | 'player' | null;
 type Tab = 'xp' | 'gold' | 'item' | 'bestiary';

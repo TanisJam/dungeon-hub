@@ -24,7 +24,9 @@ vi.mock('../actions', () => ({
   searchCompendiumItems: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../codex/bestiario/actions', () => ({
+// Mock path updated: dm-grant-panel now imports from './dm-grant-panel-actions'
+// (moved from ../codex/bestiario/actions as part of character-codex-browser Slice 1')
+vi.mock('./dm-grant-panel-actions', () => ({
   searchCompendiumMonsters: vi.fn().mockResolvedValue([]),
 }));
 
@@ -302,7 +304,7 @@ describe('DmGrantPanel — Bestiario tab (REQ-CK-WEB-01)', () => {
   });
 
   it('picks monster from typeahead → calls grantKnowledge with kind=bestiary, modal closes', async () => {
-    const { searchCompendiumMonsters } = await import('../codex/bestiario/actions');
+    const { searchCompendiumMonsters } = await import('./dm-grant-panel-actions');
     const { grantKnowledge } = await import('../actions');
 
     vi.mocked(searchCompendiumMonsters).mockResolvedValue([

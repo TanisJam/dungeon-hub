@@ -1,5 +1,19 @@
 'use server';
 
+/**
+ * Server Actions for DmGrantPanel — monster typeahead search.
+ *
+ * Moved from app/characters/[id]/codex/bestiario/actions.ts as part of
+ * character-codex-browser Slice 1' (the bespoke bestiario directory was removed).
+ *
+ * DmGrantPanel imports this action for the "Bestiario" tab typeahead.
+ * Kept separate from the scoped codex actions (codex/[kind]/actions.ts)
+ * which handle the player-facing knowledge browser (Approach A isolation).
+ *
+ * REQ-CK-WEB-01 (spec #1626, character-codex)
+ * REQ-CCB-MIG-01 (spec character-codex-browser — searchCompendiumMonsters MUST survive)
+ */
+
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 
