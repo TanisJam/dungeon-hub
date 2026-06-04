@@ -53,6 +53,8 @@
   --color-danger:            #CC4444;
   --color-danger-soft:       rgba(204, 68, 68, 0.12);
   --color-danger-soft-border: rgba(204, 68, 68, 0.25);
+  --color-arcane:             #6F86C9;
+  --color-arcane-deep:        #4C63A6;
 
   /* ── On-color tokens (dark ink for text on colored backgrounds) ── */
   --color-on-accent:   #1A1208;

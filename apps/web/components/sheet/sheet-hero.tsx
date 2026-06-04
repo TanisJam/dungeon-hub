@@ -107,11 +107,8 @@ export function SheetHero({
         {!isMaxLevel && (
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${xpFill}%`,
-                background: 'linear-gradient(to right, #6F86C9, #4C63A6)',
-              }}
+              className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-arcane to-arcane-deep"
+              style={{ width: `${xpFill}%` }}
             />
           </div>
         )}
