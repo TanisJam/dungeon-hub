@@ -65,7 +65,7 @@ export function RageControlsIsland({
         aria-label={isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
         disabled={isDisabled}
         onClick={handleClick}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         {isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
       </Button>

@@ -97,7 +97,7 @@ export function AttackSheetIsland({ isOwnTurn = true, actionUsed = false }: Prop
         aria-label="Atacar"
         disabled={triggerDisabled}
         onClick={handleOpen}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         Atacar
       </Button>
@@ -179,7 +179,8 @@ export function AttackSheetIsland({ isOwnTurn = true, actionUsed = false }: Prop
             <Button
               tone="ghost"
               onClick={handleClose}
-              className="w-full min-h-[44px] mt-2"
+              fullWidth
+              className="mt-2"
             >
               Cerrar
             </Button>

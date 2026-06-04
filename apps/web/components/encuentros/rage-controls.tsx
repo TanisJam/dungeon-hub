@@ -98,7 +98,7 @@ export function RageControls({
         aria-label={isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
         disabled={isDisabled || isPending}
         onClick={handleClick}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         {isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
       </Button>

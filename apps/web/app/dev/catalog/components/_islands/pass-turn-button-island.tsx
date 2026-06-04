@@ -31,7 +31,7 @@ export function PassTurnButtonIsland({ isOwnTurn = true }: Props) {
         aria-label="Pasar turno"
         disabled={!isOwnTurn}
         onClick={handleClick}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         Pasar Turno
       </Button>

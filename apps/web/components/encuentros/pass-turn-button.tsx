@@ -41,7 +41,7 @@ export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }:
         aria-label="Pasar turno"
         disabled={!isOwnTurn || isPending}
         onClick={handleClick}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         Pasar Turno
       </Button>

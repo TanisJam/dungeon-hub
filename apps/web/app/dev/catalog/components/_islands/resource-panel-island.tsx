@@ -97,7 +97,7 @@ export function ResourcePanelIsland({ resources }: Props) {
           tone="ghost"
           aria-label="Descanso corto"
           onClick={handleShortRest}
-          className="w-full min-h-[44px]"
+          fullWidth
         >
           Descanso corto
         </Button>
@@ -105,7 +105,7 @@ export function ResourcePanelIsland({ resources }: Props) {
           tone="ghost"
           aria-label="Descanso largo"
           onClick={handleLongRest}
-          className="w-full min-h-[44px]"
+          fullWidth
         >
           Descanso largo
         </Button>

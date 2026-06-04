@@ -106,7 +106,7 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
           aria-label="Descanso corto"
           disabled={isPending}
           onClick={handleShortRest}
-          className="w-full min-h-[44px]"
+          fullWidth
         >
           Descanso corto
         </Button>
@@ -115,7 +115,7 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
           aria-label="Descanso largo"
           disabled={isPending}
           onClick={handleLongRest}
-          className="w-full min-h-[44px]"
+          fullWidth
         >
           Descanso largo
         </Button>

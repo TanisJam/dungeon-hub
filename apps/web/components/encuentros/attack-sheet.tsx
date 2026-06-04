@@ -144,7 +144,7 @@ export function AttackSheet({
         aria-label="Atacar"
         disabled={triggerDisabled || isPending}
         onClick={handleOpen}
-        className="w-full min-h-[44px]"
+        fullWidth
       >
         Atacar
       </Button>
@@ -241,7 +241,8 @@ export function AttackSheet({
             <Button
               tone="ghost"
               onClick={handleClose}
-              className="w-full min-h-[44px] mt-2"
+              fullWidth
+              className="mt-2"
             >
               Cerrar
             </Button>
