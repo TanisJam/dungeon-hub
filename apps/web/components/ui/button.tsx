@@ -6,6 +6,7 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 interface ButtonAsButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: ButtonTone;
   size?: ButtonSize;
+  fullWidth?: boolean;
   asChild?: false;
   children: ReactNode;
 }
@@ -13,6 +14,7 @@ interface ButtonAsButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 interface ButtonAsChildProps {
   tone?: ButtonTone;
   size?: ButtonSize;
+  fullWidth?: boolean;
   asChild: true;
   children: ReactNode;
   href?: string;
@@ -49,12 +51,13 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: 'text-base px-5 py-3.5 rounded-[14px]',
 };
 
-function buildClasses(tone: ButtonTone, size: ButtonSize, extra?: string): string {
+function buildClasses(tone: ButtonTone, size: ButtonSize, fullWidth?: boolean, extra?: string): string {
   return [
     'inline-flex items-center justify-center gap-2 font-bold',
     'border transition-all active:translate-y-px',
     toneClasses[tone],
     sizeClasses[size],
+    fullWidth ? 'w-full min-h-[44px]' : '',
     extra ?? '',
   ]
     .join(' ')
@@ -62,7 +65,7 @@ function buildClasses(tone: ButtonTone, size: ButtonSize, extra?: string): strin
 }
 
 export function Button(props: ButtonProps) {
-  const { tone = 'cta', size = 'md', children } = props;
+  const { tone = 'cta', size = 'md', fullWidth, children } = props;
 
   if (props.asChild === true) {
     const { href, target, rel, className } = props;
@@ -71,18 +74,18 @@ export function Button(props: ButtonProps) {
         href={href}
         target={target}
         rel={rel}
-        className={buildClasses(tone, size, className)}
+        className={buildClasses(tone, size, fullWidth, className)}
       >
         {children}
       </a>
     );
   }
 
-  const { asChild: _asChild, tone: _tone, size: _size, children: _children, className: _className, ...rest } = props as ButtonAsButtonProps;
+  const { asChild: _asChild, tone: _tone, size: _size, fullWidth: _fullWidth, children: _children, className: _className, ...rest } = props as ButtonAsButtonProps;
   return (
     <button
       type={rest.type ?? 'button'}
-      className={buildClasses(tone, size, _className)}
+      className={buildClasses(tone, size, fullWidth, _className)}
       {...rest}
     >
       {children}
