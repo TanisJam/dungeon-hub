@@ -17,10 +17,12 @@ export function buildMatrix(entry: ComponentEntry): VariantCombination[] {
     const combos = entry.explicitCombos ?? [];
     return combos.map((partial) => {
       const props = { ...base, ...partial };
-      const axisValues: Record<string, string | boolean> = {};
-      // Treat every key in partial as an axis value for labeling purposes
+      const axisValues: Record<string, string | number | boolean> = {};
+      // Treat every key in partial as an axis value for labeling purposes.
+      // Numbers (e.g. Icon size/strokeWidth) MUST be included — otherwise two
+      // combos differing only by numeric props collapse to the same label.
       for (const [k, v] of Object.entries(partial)) {
-        if (typeof v === 'string' || typeof v === 'boolean') {
+        if (typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number') {
           axisValues[k] = v;
         }
       }
@@ -62,7 +64,7 @@ function extractSchemaDefaults(entry: ComponentEntry): Record<string, unknown> {
   return defaults;
 }
 
-function deriveLabel(axisValues: Record<string, string | boolean>): string {
+function deriveLabel(axisValues: Record<string, string | number | boolean>): string {
   const values = Object.values(axisValues);
   if (values.length === 0) return 'default';
   return values.map((v) => String(v)).join(' · ');

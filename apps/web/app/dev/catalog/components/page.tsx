@@ -106,8 +106,8 @@ export default function ComponentsPage() {
 
                   {/* Variant matrix — each combo in its own Frame375 */}
                   <div className="space-y-2">
-                    {combos.map((combo) => (
-                      <Frame375 key={combo.label} label={combo.label}>
+                    {combos.map((combo, i) => (
+                      <Frame375 key={`${combo.label}-${i}`} label={combo.label}>
                         <div className="p-3">
                           {entry.render(entry.fixedProps
                             ? { ...entry.fixedProps, ...combo.props } as Parameters<typeof entry.render>[0]

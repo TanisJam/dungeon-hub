@@ -22,8 +22,8 @@ export type VariantAxes = Record<string, readonly (string | boolean)[]>;
 
 /** One resolved cell in the variant matrix. */
 export interface VariantCombination {
-  /** Per-axis chosen values, e.g. { tone: 'cta', size: 'md' } */
-  axisValues: Record<string, string | boolean>;
+  /** Per-axis chosen values, e.g. { tone: 'cta', size: 'md' } or { name: 'shield', size: 32 } */
+  axisValues: Record<string, string | number | boolean>;
   /** Full resolved props = schema defaults + fixedProps + axisValues */
   props: Record<string, unknown>;
   /** Human label derived from axis values joined with ' · ' */

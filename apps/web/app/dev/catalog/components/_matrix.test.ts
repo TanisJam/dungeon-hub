@@ -52,6 +52,22 @@ describe('buildMatrix', () => {
     expect(combo.label).toBe('cta · md');
   });
 
+  it('(f) list-mode combos differing only by numeric props get distinct labels', () => {
+    // Regression: Icon lists shield at size 20 and size 32. Numeric props were
+    // dropped from the label, collapsing both to "shield" → duplicate React key.
+    const entry = makeEntry({
+      matrixMode: 'list',
+      explicitCombos: [
+        { name: 'shield', size: 20 },
+        { name: 'shield', size: 32 },
+      ],
+    });
+    const [a, b] = buildMatrix(entry);
+    expect(a.label).not.toBe(b.label);
+    expect(a.label).toBe('shield · 20');
+    expect(b.label).toBe('shield · 32');
+  });
+
   it('(e) schema defaults merged under fixedProps, then axisValues', () => {
     const entry = makeEntry({
       propsSchema: {
