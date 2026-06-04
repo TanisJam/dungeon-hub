@@ -1,3 +1,4 @@
+// Snapshot frozen at Slice 4 (dev-design-catalog). Live debt tracking moved to SDD per-change artifacts in engram.
 /**
  * Diagnostics view — Server Component.
  * Renders the design debt audit (from exploration sdd/dev-design-catalog/explore)

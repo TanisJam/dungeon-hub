@@ -6,7 +6,19 @@
  * - Radii
  * - Shadows
  * - Motion
+ *
+ * Token data is sourced from apps/web/lib/design-tokens.ts — edit there, not here.
  */
+
+import {
+  COLORS,
+  FONT_FAMILIES,
+  TYPE_SCALE,
+  RADII,
+  SHADOWS,
+  MOTION,
+  type ColorToken,
+} from '@/lib/design-tokens';
 
 // ── WCAG AA contrast helper (relative luminance) ──
 function relativeLuminance(hex: string): number {
@@ -35,87 +47,6 @@ function aaPass(fg: string, bg: string): boolean {
 const PAPER = '#0B0A12';
 const INK   = '#F4EAD5';
 
-// ── Token data (mirrors globals.css @theme) ──
-type ColorToken = { name: string; hex: string; note?: string };
-
-const COLORS: ColorToken[] = [
-  { name: 'paper',              hex: '#0B0A12' },
-  { name: 'paper-soft',         hex: '#13111C' },
-  { name: 'surface',            hex: '#1A1726' },
-  { name: 'surface-soft',       hex: '#221E30' },
-  { name: 'ink',                hex: '#F4EAD5' },
-  { name: 'ink-soft',           hex: '#C9BFA8' },
-  { name: 'ink-mute',           hex: '#8B8273' },
-  { name: 'line',               hex: '#3A3145' },
-  { name: 'line-soft',          hex: '#26212F' },
-  { name: 'primary',            hex: '#5BB3C9', note: 'arcane cyan' },
-  { name: 'primary-deep',       hex: '#3A8FA8' },
-  { name: 'primary-soft',       hex: '#1A2F38' },
-  { name: 'accent',             hex: '#D4A24C', note: 'copper' },
-  { name: 'accent-deep',        hex: '#A87528' },
-  { name: 'accent-soft',        hex: '#3A2D17' },
-  { name: 'secondary',          hex: '#A85A8E', note: 'magenta' },
-  { name: 'secondary-deep',     hex: '#7F3F6B' },
-  { name: 'secondary-soft',     hex: '#2E1A28' },
-  { name: 'success',            hex: '#6BA368' },
-  { name: 'warning',            hex: '#E0A82E', note: 'hotter amber — distinct from copper accent' },
-  { name: 'warning-soft',       hex: '#3A2D17' },
-  { name: 'warning-deep',       hex: '#B07A1E' },
-  { name: 'danger',             hex: '#CC4444' },
-  { name: 'on-accent',          hex: '#1A1208', note: 'dark text on accent/copper backgrounds' },
-  { name: 'on-secondary',       hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
-];
-
-type TypographyToken = { name: string; stack: string; cls: string };
-const FONT_FAMILIES: TypographyToken[] = [
-  { name: 'display (font-display)', stack: 'Noto Serif Georgian, Georgia, serif', cls: 'font-display' },
-  { name: 'sans (font-sans)',       stack: 'Inter, ui-sans-serif, system-ui, sans-serif', cls: 'font-sans' },
-  { name: 'script (font-script)',   stack: 'M PLUS Rounded, system-ui, sans-serif', cls: 'font-script' },
-  { name: 'mono (font-mono)',       stack: 'JetBrains Mono, ui-monospace, SF Mono, Menlo, monospace', cls: 'font-mono' },
-];
-
-type ScaleEntry = { name: string; size: string; utility: string };
-const TYPE_SCALE: ScaleEntry[] = [
-  { name: 'text-micro',    size: '9px',  utility: 'lh 1.4' },
-  { name: 'text-caption',  size: '11px', utility: 'lh 1.4' },
-  { name: 'text-eyebrow',  size: '10px', utility: 'sans, 700, uppercase, tracking-wide' },
-  { name: 'text-footnote', size: '13px', utility: 'lh 1.45' },
-  { name: 'text-body',     size: '15px', utility: 'lh 1.5' },
-  { name: 'text-body-lg',  size: '17px', utility: 'lh 1.5' },
-  { name: 'text-subhead',  size: '19px', utility: 'lh 1.4' },
-  { name: 'text-title',    size: '22px', utility: 'lh 1.3' },
-  { name: 'text-headline', size: '26px', utility: 'lh 1.25' },
-  { name: 'text-stat',     size: '28px', utility: 'display, 700, tabular-nums' },
-  { name: 'text-display',  size: '30px', utility: 'lh 1.2' },
-];
-
-type RadiusToken = { name: string; value: string; utilityClass: string };
-const RADII: RadiusToken[] = [
-  { name: 'radius-sm',   value: '8px',   utilityClass: 'rounded-sm' },
-  { name: 'radius-md',   value: '12px',  utilityClass: 'rounded-md' },
-  { name: 'radius-lg',   value: '18px',  utilityClass: 'rounded-lg' },
-  { name: 'radius-pill', value: '999px', utilityClass: 'rounded-pill' },
-];
-
-type ShadowToken = { name: string; value: string };
-const SHADOWS: ShadowToken[] = [
-  { name: 'shadow-stamp-sm', value: '0 1px 2px rgba(0,0,0,0.4)' },
-  { name: 'shadow-stamp-md', value: '0 6px 16px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)' },
-  { name: 'shadow-stamp-lg', value: '0 16px 40px rgba(0,0,0,0.6)' },
-  { name: 'shadow-glow-primary',   value: '0 0 0 1px rgba(91,179,201,0.45), 0 0 24px rgba(91,179,201,0.28)' },
-  { name: 'shadow-glow-accent',    value: '0 0 0 1px rgba(212,162,76,0.50), 0 0 16px rgba(212,162,76,0.22)' },
-  { name: 'shadow-glow-secondary', value: '0 0 0 1px rgba(168,90,142,0.45), 0 0 16px rgba(168,90,142,0.20)' },
-];
-
-type MotionToken = { name: string; type: 'duration' | 'ease'; value: string };
-const MOTION: MotionToken[] = [
-  { name: '--dur-fast', type: 'duration', value: '120ms' },
-  { name: '--dur-base', type: 'duration', value: '200ms' },
-  { name: '--dur-slow', type: 'duration', value: '320ms' },
-  { name: '--ease-out',    type: 'ease', value: 'cubic-bezier(0.16, 1, 0.3, 1)' },
-  { name: '--ease-in-out', type: 'ease', value: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-];
-
 // ── Sub-components ──
 
 function SectionHead({ title }: { title: string }) {
@@ -127,6 +58,33 @@ function SectionHead({ title }: { title: string }) {
 }
 
 function ColorRow({ token }: { token: ColorToken }) {
+  // rgba / non-hex tokens: skip WCAG contrast (not computable from rgba string alone)
+  if (token.displayOnly) {
+    return (
+      <div className="flex items-center gap-3 py-2 border-b border-line-soft">
+        {/* Swatch — inline rgba value */}
+        <div
+          className="w-10 h-10 rounded-md flex-shrink-0 border border-line"
+          style={{ backgroundColor: token.hex }}
+        />
+        {/* Name + value */}
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-xs text-ink font-semibold">{token.name}</div>
+          <div className="font-mono text-[10px] text-ink-mute">{token.hex}</div>
+          {token.note && (
+            <div className="text-[9px] text-warning-deep mt-0.5">{token.note}</div>
+          )}
+        </div>
+        {/* No WCAG badges for rgba — value is context-dependent */}
+        <div className="flex gap-1 flex-shrink-0">
+          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-surface text-ink-mute">
+            N/A
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const passOnPaper = aaPass(token.hex, PAPER);
   const passOnInk   = aaPass(token.hex, INK);
 
@@ -176,6 +134,7 @@ export default function TokensPage() {
         All tokens from <code className="font-mono text-ink-soft">globals.css @theme</code>.
         AA contrast checked against <code className="font-mono text-ink-soft">paper</code> (#0B0A12)
         and <code className="font-mono text-ink-soft">ink</code> (#F4EAD5) at 4.5:1 threshold.
+        rgba tokens show N/A (context-dependent opacity).
       </p>
 
       {/* ── Colors ── */}

@@ -25,6 +25,7 @@
    ============================================================ */
 
 @theme {
+  /* Token values mirrored for dev catalog in apps/web/lib/design-tokens.ts — keep in sync. */
   /* ── Colors: Obsidiana (default) ── */
   --color-paper:         #0B0A12;
   --color-paper-soft:    #13111C;
