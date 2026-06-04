@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 // ui/ primitives
 import { Button } from '@/components/ui/button';
+import { CharacterCard } from '@/components/ui/character-card';
 import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { DashedCTA } from '@/components/ui/dashed-cta';
 import { ListRow } from '@/components/ui/list-row';
@@ -242,6 +243,73 @@ const characterPortraitEntry: ComponentEntry = {
       size={p.size as 'md' | 'sm'}
       className={p.className as string | undefined}
     />
+  ),
+};
+
+const characterCardEntry: ComponentEntry = {
+  id: 'character-card',
+  name: 'CharacterCard',
+  group: 'ui',
+  notes: 'Card-strip atom unifying personaje-card and active-character-card. Structure: outer wrapper div (border/ring via className) + <Link> (CharacterPortrait + content slot + chevron ›) + optional action slot (outside Link). Border variant controlled by className prop — callers pass the CSS class directly.',
+  propsSchema: {
+    href:            { kind: 'string',  default: '/characters/1',                    label: 'href' },
+    name:            { kind: 'string',  default: 'Brann Cuervosombrío',              label: 'Character name' },
+    portraitClassName: { kind: 'string', label: 'Portrait extra classes (e.g. border-r border-line)' },
+    className:       { kind: 'string',  label: 'Root wrapper extra classes (border/ring treatment)' },
+    children:        { kind: 'node',    label: 'Content column slot' },
+    action:          { kind: 'node',    label: 'Action slot (outside Link)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // Default — plain border
+    {
+      href: '/characters/1',
+      name: 'Brann Cuervosombrío',
+      portraitClassName: 'border-r border-line',
+      children: (
+        <div className="flex flex-col gap-1">
+          <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">Brann Cuervosombrío</div>
+          <div className="font-sans text-xs italic text-ink-mute">Semielfo · Bardo 4</div>
+        </div>
+      ),
+    },
+    // Active highlight (personaje-card highlight=true treatment)
+    {
+      href: '/characters/2',
+      name: 'Arken Drûm',
+      portraitClassName: 'border-r border-line',
+      className: 'personajes-char-card-active',
+      children: (
+        <div className="flex flex-col gap-1">
+          <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">Arken Drûm</div>
+          <div className="font-sans text-xs italic text-ink-mute">Enano · Guerrero 6</div>
+        </div>
+      ),
+    },
+    // Accent ring (active-character-card treatment)
+    {
+      href: '/characters/3',
+      name: 'Lyra Luminosa',
+      portraitClassName: 'border-r border-accent',
+      className: 'border-accent ring-1 ring-accent/30 hover:border-accent',
+      children: (
+        <div className="flex flex-col gap-1">
+          <div className="font-display text-[15px] font-bold leading-tight tracking-tight text-ink">Lyra Luminosa</div>
+          <div className="font-sans text-xs italic text-ink-mute">Humana · Clérigo 3</div>
+        </div>
+      ),
+    },
+  ],
+  render: (p) => (
+    <CharacterCard
+      href={p.href as string}
+      name={p.name as string}
+      portraitClassName={p.portraitClassName as string | undefined}
+      className={p.className as string | undefined}
+      action={p.action as ReactNode}
+    >
+      {p.children as ReactNode}
+    </CharacterCard>
   ),
 };
 
@@ -604,6 +672,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   iconEntry,
   dashedCtaEntry,
   characterPortraitEntry,
+  characterCardEntry,
   listRowEntry,
   questRowEntry,
   sectionHeadEntry,
