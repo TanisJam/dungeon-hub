@@ -1,4 +1,5 @@
 import { SectionHead } from '@/components/ui/section-head';
+import { QuestRow } from '@/components/ui/quest-row';
 import type { PendingFichaSummary, QuestSinTocar } from '../types';
 import { PendientesFichaCard } from './pendientes-ficha-card';
 
@@ -23,20 +24,11 @@ export function PendientesSheetContent({ fichas, quests }: Props) {
         <SectionHead title="Quests pendientes" meta={quests.length} />
         <ul className="mt-2 flex flex-col gap-2">
           {quests.map((quest) => (
-            <li
+            <QuestRow
               key={quest.id}
-              data-quest-row
-              className="flex items-center gap-3 rounded-xl bg-surface-raised px-3 py-2.5"
-            >
-              <span className="inicio-row-quest-ic flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-base">
-                📜
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-ink truncate">{quest.title}</p>
-                <p className="text-xs text-ink-mute mt-0.5">Último cambio: {quest.lastChange}</p>
-              </div>
-              <span className="text-ink-mute text-base flex-shrink-0">›</span>
-            </li>
+              title={quest.title}
+              subtitle={`Último cambio: ${quest.lastChange}`}
+            />
           ))}
         </ul>
       </section>

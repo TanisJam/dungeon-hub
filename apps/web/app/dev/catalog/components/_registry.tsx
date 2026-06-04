@@ -4,7 +4,9 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { DashedCTA } from '@/components/ui/dashed-cta';
+import { ListRow } from '@/components/ui/list-row';
 import { Pill } from '@/components/ui/pill';
+import { QuestRow } from '@/components/ui/quest-row';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { SectionHead } from '@/components/ui/section-head';
@@ -240,6 +242,58 @@ const characterPortraitEntry: ComponentEntry = {
       size={p.size as 'md' | 'sm'}
       className={p.className as string | undefined}
     />
+  ),
+};
+
+const listRowEntry: ComponentEntry = {
+  id: 'list-row',
+  name: 'ListRow',
+  group: 'ui',
+  notes: 'Flat divider-style list row. Props: title (required), subtitle? (second line, truncated), trailing? (ReactNode slot — Pill, badge, etc.), className?. Covers NpcRow / FactionRow / EventRow / JournalRow / HexRow.',
+  propsSchema: {
+    title:    { kind: 'string', default: 'Varis Sombraluz',  label: 'Title' },
+    subtitle: { kind: 'string', label: 'Subtitle (optional)' },
+    trailing: { kind: 'node',   label: 'Trailing slot (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { title: 'Varis Sombraluz',   trailing: <Pill tone="primary" size="sm">Vivo</Pill> },
+    { title: 'Los Cazadores',     trailing: <Pill tone="stone"   size="sm">Dormida</Pill> },
+    { title: 'Batalla de la Loma', subtitle: '12 ene. 2024', trailing: <Pill tone="amber" size="sm">Solo DM</Pill> },
+    { title: 'Hex (3,4)',          subtitle: 'Bosque',        trailing: <Pill tone="primary" size="sm">Explorada</Pill> },
+    { title: 'Una entrada de diario con un título muy largo que debería truncarse correctamente' },
+  ],
+  render: (p) => (
+    <ListRow
+      title={p.title as string}
+      subtitle={p.subtitle as string | undefined}
+      trailing={p.trailing as ReactNode}
+    />
+  ),
+};
+
+const questRowEntry: ComponentEntry = {
+  id: 'quest-row',
+  name: 'QuestRow',
+  group: 'ui',
+  notes: 'Card-row atom for dm quest lists. rounded-xl bg-surface-raised. Props: title, subtitle (lastChange line), className?. Icon cell (📜 + inicio-row-quest-ic) + trailing chevron (›). Zero-visual-change replacement for copy-pasted block in quests-sin-tocar-list + pendientes-sheet-content.',
+  propsSchema: {
+    title:    { kind: 'string', default: 'El correo perdido',           label: 'Title' },
+    subtitle: { kind: 'string', default: 'Último cambio: hace 3 días',  label: 'Subtitle' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { title: 'El correo perdido',   subtitle: 'Último cambio: hace 3 días' },
+    { title: 'La torre del pacto',  subtitle: 'Último cambio: hace 5 días' },
+    { title: 'Un quest con título muy largo que debería truncarse en la card-row', subtitle: 'Último cambio: ayer' },
+  ],
+  render: (p) => (
+    <ul className="w-full">
+      <QuestRow
+        title={p.title as string}
+        subtitle={p.subtitle as string}
+      />
+    </ul>
   ),
 };
 
@@ -550,6 +604,8 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   iconEntry,
   dashedCtaEntry,
   characterPortraitEntry,
+  listRowEntry,
+  questRowEntry,
   sectionHeadEntry,
   crowMarkEntry,
   discordIconEntry,
