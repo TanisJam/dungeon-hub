@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { DashedCTA } from '@/components/ui/dashed-cta';
 import { V3Sheet } from '@/components/ui/sheet';
 import type { WorldRow } from '@/lib/api';
 import type { CallerRole } from '@/lib/active-world';
@@ -111,15 +111,11 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
             <p className="font-sans text-sm text-ink-mute">
               Todavía no tenés ningún mundo. ¡Creá el primero!
             </p>
-            <Link
-              href="/campanas/new"
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
-            >
+            <DashedCTA href="/campanas/new" onClick={() => setOpen(false)} className="px-4 py-3">
               {/* TODO world-ia Part 3: migrate to POST /worlds */}
               <span className="text-lg text-accent">+</span>
               <span>Crear mundo</span>
-            </Link>
+            </DashedCTA>
           </div>
         ) : (
           <div className="flex flex-col gap-1">
@@ -148,15 +144,11 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
             })}
 
             {/* Create world CTA at bottom of the list */}
-            <Link
-              href="/campanas/new"
-              onClick={() => setOpen(false)}
-              className="mt-2 flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
-            >
+            <DashedCTA href="/campanas/new" onClick={() => setOpen(false)} className="mt-2 min-h-[44px] px-4 py-3">
               {/* TODO world-ia Part 3: migrate to POST /worlds */}
               <span className="text-lg text-accent">+</span>
               <span>Crear mundo</span>
-            </Link>
+            </DashedCTA>
           </div>
         )}
       </V3Sheet>

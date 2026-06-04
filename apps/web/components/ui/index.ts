@@ -24,3 +24,6 @@ export { FormLabel } from './form-label';
 export { FormInput } from './form-input';
 export { FormErrorAlert } from './form-error-alert';
 export { FormSubmitButton } from './form-submit-button';
+
+export { DashedCTA } from './dashed-cta';
+export type { DashedCTAProps } from './dashed-cta';

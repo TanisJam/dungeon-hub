@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 // ui/ primitives
 import { Button } from '@/components/ui/button';
+import { DashedCTA } from '@/components/ui/dashed-cta';
 import { Pill } from '@/components/ui/pill';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -183,6 +184,35 @@ const iconEntry: ComponentEntry = {
       size={p.size as number}
       strokeWidth={p.strokeWidth as number}
     />
+  ),
+};
+
+const dashedCtaEntry: ComponentEntry = {
+  id: 'dashed-cta',
+  name: 'DashedCTA',
+  group: 'ui',
+  notes: 'Polymorphic "add new" dashed-border CTA. Renders <button> by default, <Link> when href provided. disabled=true applies cursor-not-allowed opacity-70 (no hover). Default padding p-4; override via className.',
+  propsSchema: {
+    children:  { kind: 'node',    default: 'Crear elemento',  label: 'Label' },
+    disabled:  { kind: 'boolean', default: false,              label: 'Disabled' },
+    className: { kind: 'string',  label: 'Extra classes (override padding)' },
+    href:      { kind: 'string',  label: 'href (renders Link when provided)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { children: 'Iniciar campaña nueva' },
+    { children: 'Crear mundo', href: '/campanas/new' },
+    { children: 'Crear mundo', href: '/campanas/new', className: 'px-4 py-3' },
+    { children: 'Iniciar encuentro nuevo', disabled: true },
+  ],
+  render: (p) => (
+    <DashedCTA
+      href={p.href as string | undefined}
+      disabled={p.disabled as boolean | undefined}
+      className={p.className as string | undefined}
+    >
+      {p.children as ReactNode}
+    </DashedCTA>
   ),
 };
 
@@ -508,6 +538,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   pillEntry,
   cardEntry,
   iconEntry,
+  dashedCtaEntry,
   sectionHeadEntry,
   crowMarkEntry,
   discordIconEntry,

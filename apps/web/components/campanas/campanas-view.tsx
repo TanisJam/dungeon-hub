@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { SectionHead } from '@/components/ui/section-head';
+import { DashedCTA } from '@/components/ui/dashed-cta';
 import { V3CampCard } from './camp-card';
 import type { CampaignSummary } from './types';
 
@@ -21,13 +21,10 @@ export function CampanasView({ role, campaigns }: Props) {
             <V3CampCard key={c.id} campaign={c} />
           ))}
         </div>
-        <Link
-          href="/campanas/new"
-          className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line p-4 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
-        >
+        <DashedCTA href="/campanas/new">
           <span className="text-lg text-accent">+</span>
           <span>Iniciar campaña nueva</span>
-        </Link>
+        </DashedCTA>
       </div>
     );
   }

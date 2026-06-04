@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Pill } from '@/components/ui/pill';
+import { DashedCTA } from '@/components/ui/dashed-cta';
 import { V3Empty } from '@/components/ui/empty';
 import type { EncounterSummary } from './types';
 
@@ -52,16 +53,10 @@ export function EncuentrosListView({ role, rows }: Props) {
           </Link>
         ))
       )}
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        title="Próximamente"
-        className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line p-4 font-sans text-[13px] font-semibold text-ink-mute cursor-not-allowed opacity-70 transition-colors"
-      >
+      <DashedCTA disabled title="Próximamente">
         <span className="text-lg text-accent">+</span>
         <span>Iniciar encuentro nuevo</span>
-      </button>
+      </DashedCTA>
     </div>
   );
 }
