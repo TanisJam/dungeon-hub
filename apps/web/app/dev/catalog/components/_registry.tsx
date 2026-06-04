@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
 
+// wizard/ components (presentational)
+import { StatTile } from '@/components/wizard/stat-tile';
+import { ReviewBanner } from '@/components/wizard/review-banner';
+import { NumberedReviewCard } from '@/components/wizard/numbered-review-card';
+import { PublishedSplash } from '@/components/wizard/published-splash';
+
 // ui/ primitives
 import { Button } from '@/components/ui/button';
 import { CharacterCard } from '@/components/ui/character-card';
@@ -32,6 +38,12 @@ import { RoleSwitcherIsland } from './_islands/role-switcher-island';
 import { V3SheetIsland } from './_islands/v3-sheet-island';
 import { FormInputIsland } from './_islands/form-input-island';
 import { ToastIsland } from './_islands/toast-island';
+// wizard/ interactive islands
+import { StatTileIsland } from './_islands/stat-tile-island';
+import { ChoiceCardIsland } from './_islands/choice-card-island';
+import { ChoiceListIsland } from './_islands/choice-list-island';
+import { CharacterNameInputIsland } from './_islands/character-name-input-island';
+import { WizardFooterNavIsland } from './_islands/wizard-footer-nav-island';
 
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
@@ -741,6 +753,223 @@ const formSubmitButtonEntry: ComponentEntry = {
   ),
 };
 
+// ── wizard/ group ─────────────────────────────────────────────────────────────
+
+const statTileEntry: ComponentEntry = {
+  id: 'stat-tile',
+  name: 'StatTile',
+  group: 'wizard',
+  notes: "Ability score cell. Shows label (FUE/DES/CON/INT/SAB/CAR), numeric value, and modifier. Unassigned state: dashed border + em-dash. Selected state (isLastSelected): accent ring + bg-accent-soft. Interactive: tap toggles isLastSelected in the island.",
+  propsSchema: {
+    ability: { kind: 'enum', options: ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const, default: 'str', label: 'Ability' },
+    value: { kind: 'number', default: 15, label: 'Score (null = unassigned)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { ability: 'str', value: 15 },
+    { ability: 'dex', value: 14 },
+    { ability: 'con', value: 13 },
+    { ability: 'int', value: 8 },
+    { ability: 'wis', value: 10 },
+    { ability: 'cha', value: 12 },
+    { ability: 'str', value: null },
+  ],
+  render: (p) => (
+    <div className="w-24">
+      <StatTileIsland
+        ability={p.ability as string}
+        value={p.value as number | null}
+      />
+    </div>
+  ),
+};
+
+const reviewBannerEntry: ComponentEntry = {
+  id: 'review-banner',
+  name: 'ReviewBanner',
+  group: 'wizard',
+  notes: 'Dark gradient hero banner shown at the wizard review step. Props: name, aventureroOf?, raceClassSummary, levelPill?, classPill?, subclassPill?. Stamp badge (LISTO P/APROBAR) always visible top-right.',
+  propsSchema: {
+    name:             { kind: 'string', default: 'Brann Cuervosombrío',  label: 'Character name' },
+    aventureroOf:     { kind: 'string', label: 'World name (optional)' },
+    raceClassSummary: { kind: 'string', default: 'Semielfo · Bardo 4',   label: 'Race/class line' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    {
+      name: 'Brann Cuervosombrío',
+      aventureroOf: 'Aventurero de Los Reinos Olvidados',
+      raceClassSummary: 'Semielfo · Bardo 4',
+    },
+    {
+      name: 'Arken Drûm',
+      raceClassSummary: 'Enano · Guerrero 6',
+    },
+  ],
+  render: (p) => (
+    <ReviewBanner
+      name={p.name as string}
+      aventureroOf={p.aventureroOf as string | undefined}
+      raceClassSummary={p.raceClassSummary as string}
+      levelPill={{ label: 'Nivel 4' }}
+      classPill={{ label: 'Bardo', tone: 'secondary' }}
+      subclassPill={{ label: 'Colegio del Conocimiento', tone: 'accent' }}
+    />
+  ),
+};
+
+const numberedReviewCardEntry: ComponentEntry = {
+  id: 'numbered-review-card',
+  name: 'NumberedReviewCard',
+  group: 'wizard',
+  notes: 'Review step summary card. Props: num, title, subtitle?, pills?: PillItem[], editHref. Number badge uses accent-soft bg. Edit link (✎ Editar) top-right.',
+  propsSchema: {
+    num:      { kind: 'string', default: '1',        label: 'Number badge' },
+    title:    { kind: 'string', default: 'Semielfo', label: 'Title' },
+    subtitle: { kind: 'string', label: 'Subtitle (optional)' },
+    editHref: { kind: 'string', default: '#',        label: 'Edit href' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { num: '1', title: 'Semielfo', subtitle: 'Visión en la oscuridad · Resistencia feérica', editHref: '#' },
+    { num: '2', title: 'Bardo', subtitle: 'Colegio del Conocimiento', editHref: '#' },
+    {
+      num: '3',
+      title: 'Héroe del Pueblo',
+      editHref: '#',
+    },
+    { num: '4', title: 'Equipo inicial', editHref: '#' },
+  ],
+  render: (p) => (
+    <NumberedReviewCard
+      num={p.num as string}
+      title={p.title as string}
+      subtitle={p.subtitle as string | undefined}
+      pills={[
+        { label: 'Percepción' },
+        { label: 'Historia' },
+      ]}
+      editHref={p.editHref as string}
+    />
+  ),
+};
+
+const publishedSplashEntry: ComponentEntry = {
+  id: 'published-splash',
+  name: 'PublishedSplash',
+  group: 'wizard',
+  notes: 'Final wizard step shown after character submission. Dark gradient announcement card + Pill "Enviado al DM" + CTA link to character profile.',
+  propsSchema: {
+    characterId:   { kind: 'string', default: 'demo-id',              label: 'Character ID' },
+    characterName: { kind: 'string', default: 'Brann Cuervosombrío',  label: 'Character name' },
+    raceLabel:     { kind: 'string', default: 'Semielfo',             label: 'Race label' },
+    classLabel:    { kind: 'string', default: 'Bardo',                label: 'Class label' },
+    level:         { kind: 'number', default: 1,                      label: 'Level' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { characterId: 'demo-id', characterName: 'Brann Cuervosombrío', raceLabel: 'Semielfo', classLabel: 'Bardo', level: 1 },
+    { characterId: 'demo-id', characterName: 'Arken Drûm', raceLabel: 'Enano', classLabel: 'Guerrero', level: 1 },
+  ],
+  render: (p) => (
+    <PublishedSplash
+      characterId={p.characterId as string}
+      characterName={p.characterName as string}
+      raceLabel={p.raceLabel as string | undefined}
+      classLabel={p.classLabel as string | undefined}
+      level={p.level as number}
+    />
+  ),
+};
+
+const choiceCardEntry: ComponentEntry = {
+  id: 'choice-card',
+  name: 'ChoiceCard',
+  group: 'wizard',
+  notes: 'Wizard selection card. Header row: gradient icon-square + title + subtitle + pills + check/chevron. Inline detail expands below when selected. Tap to toggle selected state. Interactive via ChoiceCardIsland.',
+  propsSchema: {
+    title:    { kind: 'string', default: 'Humano', label: 'Title' },
+    subtitle: { kind: 'string', label: 'Subtitle (optional)' },
+    iconName: { kind: 'enum',   options: ['user', 'sparkle', 'shield', 'scroll', 'sword', 'heart', 'crown', 'compass'] as const, default: 'sparkle', label: 'Icon' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { title: 'Humano',   subtitle: 'Versátil y ambicioso',      iconName: 'user' },
+    { title: 'Elfo',     subtitle: 'Gracia, percepción y magia', iconName: 'sparkle' },
+    { title: 'Enano',    subtitle: 'Resistencia y tradición',    iconName: 'shield' },
+    { title: 'Halfling', subtitle: 'Suerte y agilidad',          iconName: 'heart' },
+  ],
+  render: (p) => (
+    <ChoiceCardIsland
+      title={p.title as string}
+      subtitle={p.subtitle as string | undefined}
+      iconName={p.iconName as Parameters<typeof ChoiceCardIsland>[0]['iconName']}
+    />
+  ),
+};
+
+const choiceListEntry: ComponentEntry = {
+  id: 'choice-list',
+  name: 'ChoiceList',
+  group: 'wizard',
+  notes: 'Vertical list of ChoiceCards with single-select. selectedKey toggles: tap selected → deselects. Detail expands inline when selected. Fixture uses 4 race options (Human / Elf / Dwarf / Halfling). Interactive via ChoiceListIsland.',
+  propsSchema: {},
+  render: () => <ChoiceListIsland />,
+};
+
+const characterNameInputEntry: ComponentEntry = {
+  id: 'character-name-input',
+  name: 'CharacterNameInput',
+  group: 'wizard',
+  notes: 'Debounced autosave name input shown at wizard review step. Controlled input with idle/saving/saved status feedback. Catalog island simulates save (no real server action — shows "✓ Guardado" after 600ms on blur).',
+  propsSchema: {
+    initialName: { kind: 'string', default: 'Brann Cuervosombrío', label: 'Initial name' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { initialName: 'Brann Cuervosombrío' },
+    { initialName: '' },
+  ],
+  render: (p) => (
+    <CharacterNameInputIsland initialName={p.initialName as string} />
+  ),
+};
+
+const wizardFooterNavEntry: ComponentEntry = {
+  id: 'wizard-footer-nav',
+  name: 'WizardFooterNav',
+  group: 'wizard',
+  notes: 'Fixed-to-bottom footer: ← Atrás ghost button + CTA next button. backHref=undefined → Atrás disabled. pending=true → loading bar + "Guardando…". nextIcon: arrow-right | check. onNext is a no-op in the catalog preview. Note: fixed positioning is visible within the Frame375 scroll area.',
+  propsSchema: {
+    nextLabel:  { kind: 'string',  default: 'Siguiente', label: 'Next label' },
+    nextIcon:   { kind: 'enum',    options: ['arrow-right', 'check'] as const, default: 'arrow-right', label: 'Next icon' },
+    pending:    { kind: 'boolean', default: false,        label: 'Pending' },
+    disabled:   { kind: 'boolean', default: false,        label: 'Disabled' },
+    backHref:   { kind: 'string',  label: 'Back href (optional; absent → Atrás disabled)' },
+    error:      { kind: 'string',  label: 'Error message (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { nextLabel: 'Siguiente', nextIcon: 'arrow-right', pending: false, disabled: false, backHref: '#' },
+    { nextLabel: 'Siguiente', nextIcon: 'arrow-right', pending: false, disabled: false },
+    { nextLabel: 'Publicar personaje', nextIcon: 'check', pending: false, disabled: false, backHref: '#' },
+    { nextLabel: 'Siguiente', nextIcon: 'arrow-right', pending: true, disabled: false, backHref: '#' },
+    { nextLabel: 'Siguiente', nextIcon: 'arrow-right', pending: false, disabled: true, backHref: '#', error: 'Seleccioná una raza antes de continuar.' },
+  ],
+  render: (p) => (
+    <div className="relative" style={{ minHeight: '120px' }}>
+      <WizardFooterNavIsland
+        backHref={p.backHref as string | undefined}
+        nextLabel={p.nextLabel as string | undefined}
+        nextIcon={p.nextIcon as 'arrow-right' | 'check' | undefined}
+        pending={p.pending as boolean | undefined}
+        disabled={p.disabled as boolean | undefined}
+        error={p.error as string | null | undefined}
+      />
+    </div>
+  ),
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -769,6 +998,15 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   stepperEntry,
   // sheet/
   v3SheetEntry,
+  // wizard/
+  statTileEntry,
+  reviewBannerEntry,
+  numberedReviewCardEntry,
+  publishedSplashEntry,
+  choiceCardEntry,
+  choiceListEntry,
+  characterNameInputEntry,
+  wizardFooterNavEntry,
   // form/
   formLabelEntry,
   formInputEntry,
