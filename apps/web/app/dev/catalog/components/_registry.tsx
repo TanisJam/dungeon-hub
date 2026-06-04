@@ -6,6 +6,15 @@ import { ReviewBanner } from '@/components/wizard/review-banner';
 import { NumberedReviewCard } from '@/components/wizard/numbered-review-card';
 import { PublishedSplash } from '@/components/wizard/published-splash';
 
+// sheet/ organisms (presentational)
+import { SheetHero } from '@/components/sheet/sheet-hero';
+import { VitalGrid } from '@/components/sheet/vital-grid';
+import { AbilityScoreGrid } from '@/components/sheet/ability-score-grid';
+import type { AbilityScoreEntry } from '@/components/sheet/ability-score-grid';
+import { Banner } from '@/components/sheet/banner';
+import { SheetTabs } from '@/components/sheet/sheet-tabs';
+import type { SheetTab } from '@/components/sheet/sheet-tabs';
+
 // ui/ primitives
 import { Button } from '@/components/ui/button';
 import { CharacterCard } from '@/components/ui/character-card';
@@ -661,6 +670,204 @@ const v3SheetEntry: ComponentEntry = {
   render: () => <V3SheetIsland />,
 };
 
+const sheetHeroEntry: ComponentEntry = {
+  id: 'sheet-hero',
+  name: 'SheetHero',
+  group: 'sheet',
+  notes: 'Character sheet hero section. Portrait (conic ring + initials via characterInitials), name, race/class subtitle, level/class/subclass pills, XP bar. ficha-hero-bg gradient. Props: name, raceLabel?, classLabel?, subclassLabel?, level, xpCurrent, xpNextThreshold.',
+  propsSchema: {
+    name:            { kind: 'string', default: 'Brann Cuervosombrío',        label: 'Character name' },
+    raceLabel:       { kind: 'string', label: 'Race label (optional)' },
+    classLabel:      { kind: 'string', label: 'Class label (optional)' },
+    subclassLabel:   { kind: 'string', label: 'Subclass label (optional)' },
+    level:           { kind: 'number', default: 4,                            label: 'Level' },
+    xpCurrent:       { kind: 'number', default: 4200,                         label: 'XP current' },
+    xpNextThreshold: { kind: 'number', default: 6500,                         label: 'XP next threshold' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // Full — race + class + subclass, mid XP
+    {
+      name: 'Brann Cuervosombrío',
+      raceLabel: 'Semielfo',
+      classLabel: 'Bardo',
+      subclassLabel: 'Colegio del Conocimiento',
+      level: 4,
+      xpCurrent: 4200,
+      xpNextThreshold: 6500,
+    },
+    // No subclass, high XP near threshold
+    {
+      name: 'Arken Drûm',
+      raceLabel: 'Enano',
+      classLabel: 'Guerrero',
+      level: 6,
+      xpCurrent: 21000,
+      xpNextThreshold: 23000,
+    },
+    // Max level (20) — XP bar hidden, MAX label
+    {
+      name: 'Lyra Luminosa',
+      raceLabel: 'Humana',
+      classLabel: 'Clérigo',
+      level: 20,
+      xpCurrent: 355000,
+      xpNextThreshold: 355000,
+    },
+  ],
+  render: (p) => (
+    <SheetHero
+      name={p.name as string}
+      raceLabel={p.raceLabel as string | undefined}
+      classLabel={p.classLabel as string | undefined}
+      subclassLabel={p.subclassLabel as string | undefined}
+      level={p.level as number}
+      xpCurrent={p.xpCurrent as number}
+      xpNextThreshold={p.xpNextThreshold as number}
+    />
+  ),
+};
+
+const vitalGridEntry: ComponentEntry = {
+  id: 'vital-grid',
+  name: 'VitalGrid',
+  group: 'sheet',
+  notes: 'HP / AC / Initiative 3-cell grid. HP cell: ficha-vital-hp peach gradient + HP bar. AC cell: ficha-vital-ac cyan glow ring. Init cell: ficha-vital-init copper glow ring. hpEditorSlot?: absolute-positioned slot for DM editor affordance (omit in catalog).',
+  propsSchema: {
+    hpCurrent:    { kind: 'number', default: 28,   label: 'HP current' },
+    hpMax:        { kind: 'number', default: 36,   label: 'HP max' },
+    hpTemp:       { kind: 'number', label: 'Temp HP (optional)' },
+    ac:           { kind: 'number', default: 14,   label: 'AC' },
+    initiative:   { kind: 'number', default: 2,    label: 'Initiative modifier' },
+    armorFormula: { kind: 'string', label: 'Armor formula (optional)' },
+    walkSpeed:    { kind: 'number', label: 'Walk speed ft (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // Normal — mid HP, AC with formula, speed
+    {
+      hpCurrent: 28, hpMax: 36, ac: 14, initiative: 2,
+      armorFormula: 'Cuero (12 + DES)',
+      walkSpeed: 30,
+    },
+    // Low HP — bar at ~20%
+    {
+      hpCurrent: 7, hpMax: 36, ac: 14, initiative: 2,
+    },
+    // Temp HP visible
+    {
+      hpCurrent: 28, hpMax: 36, hpTemp: 8, ac: 16, initiative: 3,
+      armorFormula: 'Malla (16)',
+    },
+    // Unknown (all null) — dashes
+    {
+      hpCurrent: null as unknown as number,
+      hpMax: null as unknown as number,
+      ac: null as unknown as number,
+      initiative: null as unknown as number,
+    },
+  ],
+  render: (p) => (
+    <VitalGrid
+      hp={{ current: p.hpCurrent as number | null, max: p.hpMax as number | null, temp: p.hpTemp as number | undefined }}
+      ac={p.ac as number | null}
+      initiative={p.initiative as number | null}
+      armorFormula={p.armorFormula as string | undefined}
+      walkSpeed={p.walkSpeed as number | undefined}
+    />
+  ),
+};
+
+// Fixture scores used across AbilityScoreGrid combos
+const _abilityScoresFull: Record<string, AbilityScoreEntry> = {
+  str: { score: 16, modifier: 3 },
+  dex: { score: 14, modifier: 2 },
+  con: { score: 15, modifier: 2 },
+  int: { score: 10, modifier: 0 },
+  wis: { score: 8,  modifier: -1 },
+  cha: { score: 18, modifier: 4 },
+};
+
+const _abilityScoresLow: Record<string, AbilityScoreEntry> = {
+  str: { score: 8,  modifier: -1 },
+  dex: { score: 12, modifier: 1 },
+  con: { score: 10, modifier: 0 },
+  int: { score: 13, modifier: 1 },
+  wis: { score: 14, modifier: 2 },
+  cha: { score: 9,  modifier: -1 },
+};
+
+const abilityScoreGridEntry: ComponentEntry = {
+  id: 'ability-score-grid',
+  name: 'AbilityScoreGrid',
+  group: 'sheet',
+  notes: '6-cell 3×2 grid of ability scores (FUE/DES/CON/INT/SAB/CAR). Each tile: label (9px uppercase tracking), score (2xl display), modifier (xs). bg-paper-soft per tile.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // Fighter-like: high STR/CON
+    { _label: 'Fighter-profile (STR 16 / CHA 18)' },
+    // All-moderate wizard-like: high INT/WIS
+    { _label: 'Wizard-profile (STR 8 / INT 13)' },
+  ],
+  render: (p) => (
+    <AbilityScoreGrid
+      scores={(p._label as string)?.includes('Fighter')
+        ? (_abilityScoresFull as Parameters<typeof AbilityScoreGrid>[0]['scores'])
+        : (_abilityScoresLow as Parameters<typeof AbilityScoreGrid>[0]['scores'])
+      }
+    />
+  ),
+};
+
+const bannerEntry: ComponentEntry = {
+  id: 'sheet-banner',
+  name: 'Banner',
+  group: 'sheet',
+  notes: 'Reusable notification banner. tone: amber (bg-warning-soft / text-warning-deep / border-warning) | ink (bg-ink / text-surface) | stone (bg-paper-soft / text-ink-soft / border-line). Full-width, rounded-md, text-sm font-medium text-center.',
+  propsSchema: {
+    tone:     { kind: 'enum',    options: ['amber', 'ink', 'stone'] as const, default: 'amber', label: 'Tone' },
+    children: { kind: 'node',    default: 'Mensaje del sistema',              label: 'Content' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { tone: 'amber', children: 'Personaje pendiente de aprobación del DM.' },
+    { tone: 'ink',   children: 'Tu turno — realizá una acción.' },
+    { tone: 'stone', children: 'Vista de solo lectura. Pedí al DM que habilite edición.' },
+  ],
+  render: (p) => (
+    <Banner tone={p.tone as 'amber' | 'ink' | 'stone'}>
+      {p.children as ReactNode}
+    </Banner>
+  ),
+};
+
+const sheetTabsEntry: ComponentEntry = {
+  id: 'sheet-tabs',
+  name: 'SheetTabs',
+  group: 'sheet',
+  notes: 'Horizontal scrollable tab strip for the character sheet (ScrollNav as="nav"). 6 tabs: Resumen / Habilidades / Hechizos / Recursos / Inventario / Notas. Active tab gets ficha-tab-active style + accent underline indicator. Server-safe: uses next/link (no handlers).',
+  propsSchema: {
+    activeTab:   { kind: 'enum', options: ['resumen', 'habilidades', 'hechizos', 'recursos', 'inventario', 'notas'] as const, default: 'resumen', label: 'Active tab' },
+    characterId: { kind: 'string', default: 'demo-char-id', label: 'Character ID' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { activeTab: 'resumen',     characterId: 'demo-char-id' },
+    { activeTab: 'habilidades', characterId: 'demo-char-id' },
+    { activeTab: 'hechizos',    characterId: 'demo-char-id' },
+    { activeTab: 'recursos',    characterId: 'demo-char-id' },
+    { activeTab: 'inventario',  characterId: 'demo-char-id' },
+    { activeTab: 'notas',       characterId: 'demo-char-id' },
+  ],
+  render: (p) => (
+    <SheetTabs
+      activeTab={p.activeTab as SheetTab}
+      characterId={p.characterId as string}
+    />
+  ),
+};
+
 // ── form/ group ───────────────────────────────────────────────────────────────
 
 const formLabelEntry: ComponentEntry = {
@@ -998,6 +1205,11 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   stepperEntry,
   // sheet/
   v3SheetEntry,
+  sheetHeroEntry,
+  vitalGridEntry,
+  abilityScoreGridEntry,
+  bannerEntry,
+  sheetTabsEntry,
   // wizard/
   statTileEntry,
   reviewBannerEntry,
