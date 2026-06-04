@@ -2243,6 +2243,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     const campaign = await loadWorldById(character.worldId);
     if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+    const worldRefData = await loadWorldRefData(character.worldId);
+    if (!worldRefData) return reply.code(500).send({ error: 'WORLD_REF_DATA_MISSING' });
 
     const backgroundData = await loadBackgroundData({
       slug: body.background.slug,
@@ -2264,6 +2266,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const result = validateBackgroundSelection({
       backgroundData,
       rulesProfile: campaign.rulesProfile,
+      worldRefData,
       ...(body.skillChoices !== undefined ? { skillChoices: body.skillChoices } : {}),
       ...(body.languageChoices !== undefined ? { languageChoices: body.languageChoices } : {}),
       ...(body.toolChoices !== undefined ? { toolChoices: body.toolChoices } : {}),

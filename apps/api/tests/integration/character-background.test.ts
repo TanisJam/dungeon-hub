@@ -895,3 +895,84 @@ describe('PUT /characters/:id/background — Custom Background customization', (
     expect(bg.customization.mixedPool.shape).toBe('lang2');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Language pool membership gate — background write path (language-pool-validation)
+// PHB p.123 — chosen language must be in Standard ∪ Exotic tables enabled by world.
+// The route must inject worldRefData into validateBackgroundSelection.
+// READ-PATH TOLERANCE: a character with a legacy out-of-pool language must still GET 200.
+// ---------------------------------------------------------------------------
+describe('PUT /characters/:id/background — language pool membership gate (PHB p.123)', () => {
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { name: 'Lang Pool Gate Campaign' },
+      })
+      .then((r) => r.json());
+
+    const character = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { worldId: campaign.worldId, name: 'Lang Pool Test Char' },
+      })
+      .then((r) => r.json());
+    characterId = character.id;
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('LP-API-1: Sage with a non-PHB language (klingon) → 400 BACKGROUND_LANGUAGE_NOT_IN_POOL', async () => {
+    // PHB p.123 — 'klingon' is not in the Standard or Exotic language tables.
+    // The API must inject worldRefData into validateBackgroundSelection and reject the request.
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: { slug: 'sage', source: 'PHB' },
+        languageChoices: ['elvish', 'klingon'],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe('VALIDATION_FAILED');
+    const issues = body.issues as Array<{ code: string; language?: string }>;
+    expect(issues.some((i) => i.code === 'BACKGROUND_LANGUAGE_NOT_IN_POOL' && i.language === 'klingon')).toBe(true);
+  });
+
+  it('LP-API-2: Sage with valid PHB languages → 200 ok', async () => {
+    // PHB p.123 — 'dwarvish' (Standard) and 'sylvan' (Exotic) are both valid choices.
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${characterId}/background`,
+      headers: { authorization: `Bearer ${user.accessToken}` },
+      payload: {
+        background: { slug: 'sage', source: 'PHB' },
+        languageChoices: ['dwarvish', 'sylvan'],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const bg = res.json().data.background;
+    expect(bg.slug).toBe('sage');
+    expect(bg.languages).toContain('dwarvish');
+    expect(bg.languages).toContain('sylvan');
+  });
+});
