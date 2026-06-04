@@ -84,7 +84,7 @@ export type TargetStatus = 'draft' | 'pending_approval' | 'active';
  * Example for Barbarian (Soldier background):
  *   Soldier fixed skills: Athletics + Intimidation (PHB p.140 — Soldier).
  *   Barbarian pool: Animal Handling, Athletics, Intimidation, Nature, Perception, Survival (PHB p.49).
- *   Safe choices (no overlap with Soldier fixed): ['animal-handling', 'survival'].
+ *   Safe choices (no overlap with Soldier fixed): ['animal handling', 'survival'].
  */
 export interface ClassOverride {
   slug: string;
@@ -174,7 +174,7 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
   // 4. Class — defaults to Fighter PHB. Override via classOverride for other classes (e.g. Barbarian).
   // Skill choices must NOT overlap with Soldier's fixed skills (Athletics + Intimidation).
   // Fighter defaults: Acrobatics + Survival (safe with Soldier).
-  // Barbarian override: use ['animal-handling', 'survival'] (safe with Soldier — PHB p.49, p.140).
+  // Barbarian override: use ['animal handling', 'survival'] (safe with Soldier — PHB p.49, p.140).
   await apiCall('PUT', `/api/v1/characters/${charId}/class`, ownerJwt, {
     class: { slug: classSlug, source: classSource },
     level: 1,

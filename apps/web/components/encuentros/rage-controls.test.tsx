@@ -154,4 +154,28 @@ describe('RageControls — REQ-WCR-WEB-UI-01', () => {
       );
     });
   });
+
+  // FIX W2: isRaging===true but NOT own turn → Terminar Furia must be disabled
+  // (PHB p.48 — Rage: enter/end as bonus action on OWN TURN only)
+  it('(W2) isRaging===true + isOwnTurn===false → Terminar Furia is disabled', () => {
+    render(<RageControls {...BASE_PROPS} isRaging={true} isOwnTurn={false} />);
+    const btn = screen.getByRole('button', { name: /terminar furia/i });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  // FIX S8: action returns FORBIDDEN → permission error message renders
+  // (rage-controls.tsx ~L84-86: setActionError for FORBIDDEN code)
+  it('(S8) FORBIDDEN from activateRage → permission error message renders', async () => {
+    vi.mocked(activateRage).mockResolvedValueOnce({
+      ok: false,
+      code: 'FORBIDDEN',
+    } as never);
+
+    render(<RageControls {...BASE_PROPS} />);
+    fireEvent.click(screen.getByRole('button', { name: /entrar en furia/i }));
+
+    // findByRole waits for the element to appear after the async state update
+    const alertEl = await screen.findByRole('alert');
+    expect(alertEl.textContent).toContain('No tienes permiso para realizar esta acción.');
+  });
 });

@@ -395,7 +395,44 @@ test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
     const updatedRemaining = parseInt(updatedCounterText?.trim().split('/')[0] ?? '1', 10);
     expect(updatedRemaining, 'Rage uses must decrement after activating').toBe(initialRemaining - 1);
 
-    // ── Step 10: Screenshot for visual review (non-fatal) ─────────────────
+    // ── Step 10: Assert "Terminar Furia" is disabled after activation ───────
+    // PHB p.48 — both entering and ending Rage require a bonus action.
+    // After activation this turn, bonusActionUsed=true → "Terminar Furia" disabled.
+    // This is correct game behavior: you cannot spend the bonus action TWICE in one turn.
+    await expect(endRageBtn).toBeDisabled();
+
+    // ── Step 11: Advance turn twice via API to complete a full round ─────────
+    // PHB p.48 end-early rule: Rage ends if the turn ends with no attack OR damage.
+    // We advance Barbarian → Goblin → Barbarian. The end-early check fires on the
+    // Barbarian's outgoing turn (raged_attacked_hostile=false, raged_took_damage=false),
+    // removing the Raging condition. This IS correct PHB behavior.
+    // Full deactivate-click test (with Rage surviving across a turn) requires attack
+    // infrastructure (weapon instance + attack/apply endpoints) not yet in E2E scope.
+    try {
+      const encState1 = await apiCall<{ version: number }>('GET', `/api/v1/encounters/${encounterId}`, dmJwt);
+      await apiCall('POST', `/api/v1/encounters/${encounterId}/advance-turn`, dmJwt, { version: encState1.version });
+      const encState2 = await apiCall<{ version: number }>('GET', `/api/v1/encounters/${encounterId}`, dmJwt);
+      await apiCall('POST', `/api/v1/encounters/${encounterId}/advance-turn`, dmJwt, { version: encState2.version });
+    } catch (err) {
+      test.fail(true, `Could not advance turn: ${err}`);
+      return;
+    }
+
+    // ── Step 12: Reload + assert Rage ended (end-early fired) ────────────────
+    // After reload: it is the Barbarian's turn again, Rage ended per end-early,
+    // isRaging=false, bonusActionUsed=false → "Entrar en Furia" enabled again.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(new RegExp(`/encuentros/${encounterId}`), { timeout: 10_000 });
+
+    // Assert: "Raging" badge disappeared (Rage ended on advance-turn per PHB end-early).
+    await expect(ragingBadge.first()).not.toBeVisible({ timeout: 15_000 });
+
+    // Assert: "Entrar en Furia" button is back and enabled (can enter Rage again).
+    const reactivateBtn = page.getByRole('button', { name: /entrar en furia/i });
+    await expect(reactivateBtn).toBeVisible({ timeout: 10_000 });
+    await expect(reactivateBtn).toBeEnabled();
+
+    // ── Step 13: Screenshot for visual review (non-fatal) ─────────────────
     await page.screenshot({
       path: `e2e/.screenshots/barbarian-rage-${Date.now()}.png`,
     }).catch(() => {});
