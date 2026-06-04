@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Icon } from '@/components/ui/icon';
-import { ViewOnlySectionSheet } from './view-only-section-sheet';
+import { SectionAffordance } from './section-affordance';
 import type { CharacterStatus } from '@/lib/sheet-types';
 
 interface ClassEntry {
@@ -29,8 +27,6 @@ export function ClassSection({
   isDm,
   classes,
 }: ClassSectionProps) {
-  const [open, setOpen] = useState(false);
-
   const display = (
     <div className="space-y-1">
       {classes.map((c) => (
@@ -42,25 +38,14 @@ export function ClassSection({
   );
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Editar clase"
-        onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
-      >
-        <Icon name="edit" size={14} />
-      </button>
-
-      <ViewOnlySectionSheet
-        title="Clase"
-        currentDisplay={display}
-        characterStatus={characterStatus}
-        isDm={isDm}
-        wizardStepHref={`/characters/${characterId}/wizard/class`}
-        open={open}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <SectionAffordance
+      ariaLabel="Editar clase"
+      title="Clase"
+      characterStatus={characterStatus}
+      isDm={isDm}
+      wizardStepHref={`/characters/${characterId}/wizard/class`}
+    >
+      {display}
+    </SectionAffordance>
   );
 }

@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Icon } from '@/components/ui/icon';
-import { ViewOnlySectionSheet } from './view-only-section-sheet';
+import { SectionAffordance } from './section-affordance';
 import type { CharacterStatus } from '@/lib/sheet-types';
 
 interface RaceSectionProps {
@@ -25,8 +23,6 @@ export function RaceSection({
   raceName,
   subraceName,
 }: RaceSectionProps) {
-  const [open, setOpen] = useState(false);
-
   const display = (
     <div className="space-y-1">
       <p className="text-sm text-ink">{raceName}</p>
@@ -35,25 +31,14 @@ export function RaceSection({
   );
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Editar linaje"
-        onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
-      >
-        <Icon name="edit" size={14} />
-      </button>
-
-      <ViewOnlySectionSheet
-        title="Linaje"
-        currentDisplay={display}
-        characterStatus={characterStatus}
-        isDm={isDm}
-        wizardStepHref={`/characters/${characterId}/wizard/race`}
-        open={open}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <SectionAffordance
+      ariaLabel="Editar linaje"
+      title="Linaje"
+      characterStatus={characterStatus}
+      isDm={isDm}
+      wizardStepHref={`/characters/${characterId}/wizard/race`}
+    >
+      {display}
+    </SectionAffordance>
   );
 }

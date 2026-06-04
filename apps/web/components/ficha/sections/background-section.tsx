@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { Icon } from '@/components/ui/icon';
-import { ViewOnlySectionSheet } from './view-only-section-sheet';
+import { SectionAffordance } from './section-affordance';
 import type { CharacterStatus } from '@/lib/sheet-types';
 
 interface BackgroundSectionProps {
@@ -27,8 +25,6 @@ export function BackgroundSection({
   featureName,
   skillProficiencies,
 }: BackgroundSectionProps) {
-  const [open, setOpen] = useState(false);
-
   const display = (
     <div className="space-y-1">
       <p className="text-sm text-ink capitalize">{backgroundName}</p>
@@ -42,25 +38,14 @@ export function BackgroundSection({
   );
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Editar trasfondo"
-        onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
-      >
-        <Icon name="edit" size={14} />
-      </button>
-
-      <ViewOnlySectionSheet
-        title="Trasfondo"
-        currentDisplay={display}
-        characterStatus={characterStatus}
-        isDm={isDm}
-        wizardStepHref={`/characters/${characterId}/wizard/background`}
-        open={open}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <SectionAffordance
+      ariaLabel="Editar trasfondo"
+      title="Trasfondo"
+      characterStatus={characterStatus}
+      isDm={isDm}
+      wizardStepHref={`/characters/${characterId}/wizard/background`}
+    >
+      {display}
+    </SectionAffordance>
   );
 }
