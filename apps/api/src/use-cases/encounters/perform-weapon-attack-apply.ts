@@ -15,7 +15,8 @@
  * REQ-ATK-APPLY-02: server derives and rolls damage — client supplies NO damage value.
  * REQ-ATK-VERSION-01: optimistic CAS — WHERE version=$incoming; 0 rows = 409.
  * REQ-ATK-TURN-01: attacker must be currentCombatantId.
- * REQ-ATK-AUTH-01: GM-only (enforced at route layer; use-case receives callerId for audit).
+ * REQ-ATK-AUTH-01: owner-OR-GM gate — assertCombatantOwnerOrGm enforces ownership (Step 3b);
+ *   callerId/callerRole are the authoritative gate inputs, not merely audit fields.
  * REQ-ATK-NPC-01: NPC target (characterId null) — updates encounter_combatants directly.
  */
 

@@ -97,13 +97,15 @@ const AttackActionBodySchema = z.object({
 /**
  * POST /encounters/:id/actions/attack/apply — engine mutation slice (FIRST mutation).
  *
- * GM-only. Server-authoritative: rolls d20, resolves target AC, derives DiceExpr,
- * rolls damage with crypto RNG, clamps HP, persists atomically.
+ * Owner-or-GM gate (C2). Server-authoritative: rolls d20, resolves target AC, derives
+ * DiceExpr, rolls damage with crypto RNG, clamps HP, persists atomically.
+ * A campaign member may attack with a combatant they own (assertCombatantOwnerOrGm);
+ * the GM may attack with any combatant.
  *
  * REQ-ROUTE-BODY-01: `crit` REMOVED — server derives crit from rollToHit.
  * REQ-ATK-APPLY-02: client supplies NO damage or crit value — server derives both.
  * REQ-ATK-VERSION-01: optimistic CAS — version mismatch → 409 VERSION_CONFLICT.
- * REQ-ATK-AUTH-01: GM-only (memberRole check).
+ * REQ-ATK-AUTH-01: owner-OR-GM gate — member attacks own combatant; GM attacks any.
  */
 const AttackApplyBody = z
   .object({

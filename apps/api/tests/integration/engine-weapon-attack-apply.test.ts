@@ -1514,6 +1514,11 @@ describe('Security Matrix — C2 attack/apply gate relaxation (REQ-WCA-API-01, R
       });
 
       expect(res.statusCode).toBe(403);
+      // SEC-M-02 hardening: prove this is the OWNERSHIP 403 (assertCombatantOwnerOrGm),
+      // not the membership 403 from the route-level null-role guard.
+      // Both paths emit { error: 'FORBIDDEN' } — the distinction is that this caller IS
+      // a member (role='player') so the route gate passes, and the use-case fires.
+      expect(res.json().error).toBe('FORBIDDEN');
     },
   );
 
@@ -1667,6 +1672,70 @@ describe('Security Matrix — C2 attack/apply gate relaxation (REQ-WCA-API-01, R
       const body = res.json();
       expect(body.error).toBe('VALIDATION_FAILED');
       expect(body.issues.some((i: { code: string }) => i.code === 'TARGET_NOT_NPC')).toBe(true);
+    },
+  );
+
+  // ── ROW 7: player ACTION_ALREADY_USED — engine gate fires on player path ────────
+
+  it(
+    'SEC-M-07: player (owns attacker, own turn, NPC target) — second attack on same turn → 400 ACTION_ALREADY_USED (REQ-WCA-API-04)',
+    async () => {
+      // Security matrix row 7 (player caller variant — W-6b fix).
+      // APPLY-T14b (existing) only tests this with the GM token; this test proves
+      // the ACTION_ALREADY_USED engine gate fires equally on the player path
+      // (Steps 3b + 4b — assertCombatantOwnerOrGm passes, then budget gate fires).
+      //
+      // PHB p.198: "Most creatures have only one action on their turn."
+      // L1 Fighter has no Extra Attack — second attack same turn must be rejected.
+      const app = await getTestApp();
+
+      const enc = await makeEncounter('SEC-M-07 player ACTION_ALREADY_USED', {
+        attackerCharId: playerCharId,
+        npcAc: 1,   // ac=1 guarantees the first hit so the action budget is consumed
+        npcHp: 50,
+      });
+
+      const attackerCombatantId: string = enc.currentCombatantId;
+      const npcTargetId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== attackerCombatantId,
+      )?.id ?? '';
+
+      // First attack — player owns the attacker, it is their turn, NPC target → 200.
+      const first = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+      expect(first.statusCode).toBe(200);
+
+      // Reload version after first attack (budget tx + HP tx bump the version).
+      const afterFirst = await getEncounter(enc.id);
+
+      // Second attack on the same turn → ACTION_ALREADY_USED.
+      // The ownership and turn checks pass (player still owns the combatant; it is
+      // still their turn). Only the action-budget gate fires (Step 4b in the use-case).
+      const second = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: afterFirst.version,
+        },
+      });
+
+      expect(second.statusCode).toBe(400);
+      const body = second.json();
+      expect(body.error).toBe('VALIDATION_FAILED');
+      expect(body.issues.some((i: { code: string }) => i.code === 'ACTION_ALREADY_USED')).toBe(true);
     },
   );
 
