@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { V3Sheet } from '@/components/ui/sheet';
 import { SpellKnownEditor } from './spell-known-editor';
-import { createClient } from '@/lib/supabase/client';
-import { api } from '@/lib/api';
+import { useSpellOptions } from './use-spell-options';
 import type { SpellRef } from './save-spell-known-action';
 
 interface AvailableSpell {
@@ -30,12 +29,6 @@ interface SpellKnownSectionEditorProps {
   currentKnown: SpellRef[];
 }
 
-type FetchState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'loaded'; data: SpellOptionsResponse }
-  | { status: 'error'; message: string };
-
 /**
  * SpellKnownSectionEditor — amber wand pencil + lazy fetch + V3Sheet.
  * DM-only affordance for setting known spells. Visually distinct: amber wand icon.
@@ -48,34 +41,7 @@ export function SpellKnownSectionEditor({
   currentKnown,
 }: SpellKnownSectionEditorProps) {
   const [open, setOpen] = useState(false);
-  const [fetchState, setFetchState] = useState<FetchState>({ status: 'idle' });
-
-  // Lazy fetch when sheet opens
-  useEffect(() => {
-    if (!open) return;
-    setFetchState({ status: 'loading' });
-
-    (async () => {
-      try {
-        const supabase = createClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const accessToken = session?.access_token;
-
-        const data = await api.get<SpellOptionsResponse>(
-          `/characters/${characterId}/classes/${classSlug}/spells/options`,
-          accessToken,
-        );
-        setFetchState({ status: 'loaded', data });
-      } catch (err) {
-        setFetchState({
-          status: 'error',
-          message: err instanceof Error ? err.message : 'Error al cargar hechizos.',
-        });
-      }
-    })();
-  }, [open, characterId, classSlug]);
+  const fetchState = useSpellOptions<SpellOptionsResponse>(characterId, classSlug, open);
 
   function handleClose() {
     setOpen(false);
