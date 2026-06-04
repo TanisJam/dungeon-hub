@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { saveSpellKnown } from './save-spell-known-action';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 
 interface AvailableSpell {
   slug: string;
@@ -96,9 +97,7 @@ export function SpellKnownEditor({
         ))}
       </div>
 
-      {error && (
-        <p className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
-      )}
+      <FormErrorAlert message={error} />
 
       <div className="flex gap-2">
         <button

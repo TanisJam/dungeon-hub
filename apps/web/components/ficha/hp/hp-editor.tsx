@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { saveHp } from './save-hp-action';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 
 export type HpValues = {
   current: number;
@@ -126,9 +127,7 @@ export function HPEditor({ characterId, currentHp, isDmHere, onClose }: HPEditor
         />
       </div>
 
-      {error && (
-        <p className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
-      )}
+      <FormErrorAlert message={error} />
 
       <div className="flex gap-2">
         <button

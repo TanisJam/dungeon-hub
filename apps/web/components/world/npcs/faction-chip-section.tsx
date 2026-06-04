@@ -13,6 +13,7 @@ import { useState } from 'react';
 import type { NpcFaction } from '@/app/codex/actions';
 import type { FactionRow } from '@/app/codex/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 
 interface FactionChipSectionProps {
   /** Current faction memberships for this NPC. */
@@ -72,9 +73,9 @@ export function FactionChipSection({
 
       {/* Error message */}
       {actionError && (
-        <p role="alert" className="mb-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
-          {actionError}
-        </p>
+        <div className="mb-2">
+          <FormErrorAlert message={actionError} />
+        </div>
       )}
 
       {/* Chip list */}
