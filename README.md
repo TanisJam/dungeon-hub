@@ -1,124 +1,132 @@
 # Dungeon Hub
 
-Sistema privado de gestión de personajes D&D 5e y campaña West Marches para un grupo de 5 amigos + 1 DM.
+A private D&D 5e (PHB 2014) companion for a West Marches campaign: a shared, persistent world played asynchronously by multiple DMs and players. The app covers character creation and management, a browsable rules compendium, a campaign map with waypoints, a world knowledge layer (lore, factions, NPCs, sessions), and a Discord bot that surfaces sheets and world data in-table. All UI is **mobile-first**; the backend is self-hosted with Supabase + Postgres.
 
-📖 **Docs canónicos:**
-- [`PRD_DnD_WestMarches.md`](./PRD_DnD_WestMarches.md) — visión completa del producto.
-- [`CONSTRAINTS.md`](./CONSTRAINTS.md) — decisiones sobre constraints del reglamento D&D 5e.
-- [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) — plan de implementación de Fase 1.
+For full product scope see [`docs/mvp/definition.md`](./docs/mvp/definition.md). For current build status see [`docs/STATUS.md`](./docs/STATUS.md).
 
 ---
 
-## Stack
-
-- **Backend:** Node.js 22 + Fastify 5 + TypeScript strict.
-- **DB + Auth + Storage:** Supabase self-hosted en Docker.
-- **ORM:** Drizzle (apunta al Postgres de Supabase).
-- **Validación:** Zod.
-- **Tests:** Vitest.
-- **Monorepo:** pnpm workspaces.
-
-## Estructura
+## Monorepo structure
 
 ```
-dungeon_hub/
-├── apps/
-│   └── api/                # Fastify backend
-├── packages/
-│   └── domain/             # Constraint engine + entities (pure TS)
-├── infra/
-│   └── supabase/           # Docker Compose de Supabase self-hosted
-├── scripts/                # Scripts utilitarios (gen-keys, imports, etc.)
-├── CONSTRAINTS.md
-├── IMPLEMENTATION_PLAN.md
-└── PRD_DnD_WestMarches.md
+apps/
+  api/   — Fastify 5 REST API, Drizzle ORM, Supabase Auth JWT validation. Port 4000.
+  web/   — Next.js 15 (App Router) + React 19 + Tailwind 4. Port 3001.
+  bot/   — Discord.js 14 slash-command bot (compendium lookup + character sheet + world data).
+
+packages/
+  domain/             — Pure business logic + Zod schemas. No IO. Single source of rule truth.
+  compendium-import/  — 5etools → Postgres importer (races, classes, spells, items, monsters, …).
+
+infra/
+  supabase/           — Self-hosted Supabase stack via Docker Compose (Postgres, Auth, Studio).
+
+data/
+  5etools/            — Upstream rule data (treated as input, not truth — PHB 2014 wins).
+
+scripts/              — Utility scripts (key generation, etc.).
 ```
 
 ---
 
-## Quickstart (primera vez)
+## Quickstart
+
+### Prerequisites
+
+- Node >= 22, pnpm 10.7
+- Docker (for the Supabase stack)
+
+### First-time setup
 
 ```bash
-# 1. Instalar deps
+# 1. Install dependencies
 pnpm install
 
-# 2. Bootstrap Supabase (clona el docker-compose oficial)
+# 2. Bootstrap Supabase Docker Compose
 pnpm supabase:bootstrap
 
-# 3. Generar secrets (JWT, anon key, service role, etc.)
+# 3. Generate secrets (JWT, anon key, service role, etc.)
 pnpm gen:keys
-# → Te imprime las variables. Pegalas en:
-#    - infra/supabase/.env
-#    - apps/api/.env
-# (en infra/supabase/ y apps/api/ hay env.example como referencia)
+# Paste the printed values into:
+#   infra/supabase/.env    (use infra/supabase/.env.example as template)
+#   apps/api/.env          (use apps/api/.env.example as template)
 
-# 4. Levantar Supabase
+# 4. Start the Supabase stack
 pnpm supabase:up
+# Wait ~15–30 s on first boot
 
-# 5. Generar y aplicar migraciones de Drizzle
-pnpm --filter @dungeon-hub/api db:generate
+# 5. Run migrations and import compendium data
 pnpm --filter @dungeon-hub/api db:migrate
+pnpm --filter @dungeon-hub/api import:5etools
+pnpm --filter @dungeon-hub/api seed-modifier-definitions
 
-# 6. Aplicar el SQL custom (FK + trigger auth → public.users)
-#    Usamos el psql que viene en el container de Supabase, no necesitás instalarlo local
-sudo docker exec -i supabase-db psql -U postgres -d postgres \
-  < apps/api/drizzle/custom/0001-auth-mirror-trigger.sql
-
-# 7. Levantar el API
-pnpm dev
+# 6. Apply custom SQL (triggers, special indexes — idempotent)
+for f in apps/api/drizzle/custom/0001-auth-mirror-trigger.sql \
+         apps/api/drizzle/custom/0002-hexes-unique-nulls-not-distinct.sql \
+         apps/api/drizzle/custom/0003-hexes-unique-world-nulls-not-distinct.sql; do
+  sudo docker exec -i supabase-db psql -U postgres -d postgres < "$f"
+done
 ```
 
-Healthcheck: `curl http://localhost:4000/api/v1/health`
+### Daily stack startup
 
-Debería responder:
-```json
-{ "status": "ok", "db": "up", "uptime": 1.23, "timestamp": "..." }
-```
-
----
-
-## Workflow diario
+`pnpm dev` at the root only starts the API. A full local stack requires four processes:
 
 ```bash
-pnpm supabase:up        # Si no está corriendo
-pnpm dev                # Arranca el API con hot reload
+# Terminal 1 — Supabase (if not already running)
+pnpm supabase:up
+
+# Terminal 2 — API
+pnpm dev
+# or: pnpm --filter @dungeon-hub/api dev
+
+# Terminal 3 — Web
+pnpm --filter @dungeon-hub/web dev
+
+# Terminal 4 — Bot (optional, needs apps/bot/.env)
+pnpm --filter @dungeon-hub/bot dev
 ```
 
-## URLs útiles
+### Service URLs
 
-| Servicio | URL | Para qué |
-|----------|-----|----------|
-| API | http://localhost:4000 | Backend de Dungeon Hub |
-| Supabase Studio | http://localhost:3000 | Dashboard de la DB |
-| Supabase Kong | http://localhost:8000 | Gateway de Auth y APIs |
-| Postgres (directo) | localhost:5433 | Conexión directa para Drizzle / DDL |
-| Supavisor (pooler) | localhost:5432 | Pooler de conexiones (para app en prod) |
-| Supavisor (transaction) | localhost:6543 | Pooler modo transaction |
-
----
-
-## Fases del proyecto
-
-Ver [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md) para el plan detallado.
-
-- ✅ **Fase 1.0** — Foundation (monorepo + Supabase + healthcheck)
-- ⏳ **Fase 1.1** — Import de 5etools
-- ⏳ **Fase 1.2** — Compendium API
-- ⏳ **Fase 1.3** — Character CRUD básico
-- ⏳ **Fase 1.4** — Constraint Engine v1
-- ⏳ **Fase 1.5** — Stats calculados
-- ⏳ **Fase 1.6** — Inventario Fase A
-- ⏳ **Fase 1.7** — Spellcasting
-- ⏳ **Fase 1.8** — Level Up + Rests
+| Service | URL | Notes |
+|---|---|---|
+| Web app | http://localhost:3001 | Next.js frontend |
+| API | http://localhost:4000 | `GET /api/v1/health` to verify |
+| Supabase Studio | http://localhost:3000 | DB dashboard |
+| Supabase Kong | http://localhost:8000 | Auth gateway |
+| Postgres (direct) | localhost:5433 | Drizzle connection target |
 
 ---
 
-## Convenciones
+## Testing & typechecking
 
-- Commits: [Conventional Commits](https://www.conventionalcommits.org/).
-- TS strict mode + `noUncheckedIndexedAccess`.
-- Constraint engine en `packages/domain` es **puro** — sin IO, sin DB, sin HTTP. Se testea con Vitest sin levantar nada.
+```bash
+# Run all tests (unit + integration + component)
+pnpm test
+
+# Per-package
+pnpm --filter @dungeon-hub/domain test
+pnpm --filter @dungeon-hub/api test
+pnpm --filter @dungeon-hub/web test
+pnpm --filter @dungeon-hub/bot test
+
+# E2E (Playwright — full stack must be running)
+pnpm --filter @dungeon-hub/web test:e2e
+
+# Typecheck (use this instead of build for verification)
+pnpm typecheck
+```
 
 ---
 
-*Hecho para aventureros, por aventureros.*
+## Where to read more
+
+| Doc | What it covers |
+|---|---|
+| [`docs/mvp/definition.md`](./docs/mvp/definition.md) | MVP scope — the authoritative feature list and current status |
+| [`docs/STATUS.md`](./docs/STATUS.md) | Build status snapshot |
+| [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Remaining work and priority order |
+| [`CLAUDE.md`](./CLAUDE.md) | Project conventions for code, testing, architecture, and AI agents |
+| [`docs/onboarding/`](./docs/onboarding/) | Operator checklist, DM onboarding, E2E setup |
+| [`docs/manuals/dsl.md`](./docs/manuals/dsl.md) | Compendium entity DSL reference |

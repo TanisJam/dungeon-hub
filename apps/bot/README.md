@@ -1,48 +1,47 @@
 # @dungeon-hub/bot
 
-Discord bot que expone el compendium y el world state de Dungeon Hub via slash commands.
+Discord bot that exposes the Dungeon Hub compendium, character sheets, and West Marches world data via slash commands.
 
 ## Setup
 
-### 1. Crear la aplicación de Discord
+### 1. Create the Discord application
 
-1. Ir a https://discord.com/developers/applications → "New Application".
-2. **Bot tab** → reset token → guardar como `DISCORD_TOKEN`.
+1. Go to https://discord.com/developers/applications → "New Application".
+2. **Bot tab** → reset token → save as `DISCORD_TOKEN`.
 3. **General Information** → `APPLICATION ID` → `DISCORD_CLIENT_ID`.
 4. **OAuth2 → URL Generator**:
    - Scopes: `bot`, `applications.commands`.
    - Bot permissions: `Send Messages`, `Embed Links`, `Use Slash Commands`.
-5. Abrir la URL generada en el navegador e invitar al bot al servidor del grupo.
-6. Tomar el ID del servidor (right-click → Copy Server ID, requiere Developer Mode en Discord) → `DISCORD_GUILD_ID`.
+5. Open the generated URL in the browser and invite the bot to the group server.
+6. Copy the server ID (right-click → Copy Server ID, requires Developer Mode in Discord) → `DISCORD_GUILD_ID`.
 
-### 2. Crear el user "bot" en Supabase
+### 2. Create the bot user in Supabase
 
-El bot se autentica como un user real de Supabase con rol `player`, agregado como miembro de la campaña.
+The bot authenticates as a real Supabase user with role `player`, added as a campaign member.
 
 ```sql
--- Vía dashboard de Supabase Studio (http://localhost:3000):
--- 1. Authentication → Add user → email/password (ej: bot@dungeonhub.local).
--- 2. Anotar el UUID del user generado.
--- 3. En SQL editor, agregarlo a public.users (si no se replicó automáticamente):
+-- Via Supabase Studio dashboard (http://localhost:3000):
+-- 1. Authentication → Add user → email/password (e.g. bot@dungeonhub.local).
+-- 2. Note the generated user UUID.
+-- 3. In the SQL editor, add it to public.users (if not mirrored automatically):
 INSERT INTO public.users (id, username, role)
 VALUES ('<user-uuid>', 'dungeonhub-bot', 'player')
 ON CONFLICT (id) DO NOTHING;
 
--- 4. Agregarlo como miembro de la campaña que va a atender:
-INSERT INTO campaign_members (campaign_id, user_id, role)
-VALUES ('<campaign-uuid>', '<user-uuid>', 'player');
+-- 4. Grant the bot the impersonation flag:
+UPDATE public.users SET can_impersonate = true WHERE username = 'dungeonhub-bot';
 ```
 
-### 3. Variables de entorno
+### 3. Environment variables
 
-Crear `apps/bot/.env` con:
+Create `apps/bot/.env`:
 
 ```
 NODE_ENV=development
 
 DISCORD_TOKEN=...
 DISCORD_CLIENT_ID=...
-DISCORD_GUILD_ID=...    # vacío para registro global
+DISCORD_GUILD_ID=...    # leave blank for global registration
 
 API_BASE_URL=http://localhost:4000
 
@@ -52,87 +51,89 @@ SUPABASE_ANON_KEY=...
 BOT_EMAIL=bot@dungeonhub.local
 BOT_PASSWORD=...
 
-CAMPAIGN_ID=...    # UUID de la campaña que el bot atiende
+CAMPAIGN_ID=...    # UUID of the campaign the bot serves
 ```
 
-### 4. Levantar
+See `docs/onboarding/operator-checklist.md §G2` for the full env var reference and production setup.
+
+### 4. Start the bot
 
 ```bash
-# Instalar deps (desde el root del monorepo)
+# Install deps (from the monorepo root)
 pnpm install
 
-# Registrar los slash commands en Discord (correr una vez por cambio de comandos)
+# Register slash commands in Discord (run once after any command change)
 pnpm --filter @dungeon-hub/bot register-commands
 
-# Levantar el bot en watch mode
+# Start the bot in watch mode
 pnpm --filter @dungeon-hub/bot dev
 ```
 
-Si `DISCORD_GUILD_ID` está seteado, los comandos aparecen instantáneamente en ese server.
-Sin guild ID, los comandos se registran globalmente y pueden tardar hasta 1h en propagar.
+If `DISCORD_GUILD_ID` is set, commands appear instantly in that server. Without a guild ID, global registration can take up to 1 h to propagate.
 
-## Comandos disponibles
+---
 
-### Compendium (5e SRD)
+## Available commands
 
-| Comando | Descripción |
+All compendium commands (`/spell`, `/feat`, `/item`, `/race`, `/class`, `/monster`) support live autocomplete. When a query matches multiple entries, the bot shows the first result with a picker component to jump to the others.
+
+### Compendium (5e PHB 2014)
+
+| Command | Description |
 |---------|-------------|
-| `/spell <name>` | Detalles de un hechizo (casting time, range, components, classes, bonus subclasses, descripción) |
-| `/feat <name>` | Detalles de un feat (prerequisite, ASI grant, descripción) |
-| `/item <name>` | Detalles de un item (type, weight, cost, properties, damage/AC, magic effects) |
-| `/race <name>` | Detalles de una race o subrace (size, speed, ASIs, languages, traits) |
-| `/class <name> [level]` | Detalles de una clase (hit die, saves, proficiencies, features por nivel) |
-| `/monster <name> [cr]` | Statblock completo (CR, AC, HP, abilities, saves, immunities, actions, legendary). Filtro `cr` opcional: `5`, `1/4`, `5-10`, `<=2`, `>=20`. |
+| `/spell <name>` | Spell details (casting time, range, components, classes, description) |
+| `/feat <name>` | Feat details (prerequisite, ASI grant, description) |
+| `/item <name>` | Item/equipment details (type, weight, cost, properties, damage/AC) |
+| `/race <name>` | Race or subrace details (size, speed, ASIs, languages, traits) |
+| `/class <name>` | Class details (hit die, saves, proficiencies, features by level) |
+| `/monster <name>` | Full stat block (CR, AC, HP, abilities, saves, immunities, actions, legendary) |
 
-Todos los comandos de compendium soportan autocompletado en vivo. Si tu query
-matchea varios entries, el bot muestra el primero con un dropdown abajo para
-saltar a los otros.
+### Identity (account linking)
 
-### Identity (vinculación de cuenta)
-
-| Comando | Descripción |
+| Command | Description |
 |---------|-------------|
-| `/link` | Genera un link de un solo uso para vincular tu Discord con tu cuenta del backend |
-| `/whoami` | Muestra tu Discord ID + estado de vinculación |
+| `/link` | Generate a one-time link to connect your Discord to your backend account |
+| `/unlink` | Disconnect your Discord from the backend (reversible with `/link`) |
+| `/whoami` | Show your Discord ID and link status |
 
-El primer uso de cualquier comando de personaje (`/character ...`) requiere
-hacer `/link` primero. El flow es:
+The first use of any character command requires `/link` first:
 
-1. `/link` → el bot te manda una URL privada (ephemeral)
-2. Abrís la URL en el navegador, te logueás en la web app con tu cuenta de Supabase
-3. Confirmás la vinculación
-4. Ya podés usar todos los comandos de personaje
+1. `/link` → the bot sends you a private (ephemeral) URL
+2. Open the URL in a browser, log in with your Supabase account
+3. Confirm the link
+4. All character commands are now available
 
-**Setup inicial (una sola vez)**: el bot user en el backend tiene que tener el
-flag `can_impersonate=true`. Una vez tras crear el user en Supabase Studio:
+### Character (requires account link)
 
-```sql
-UPDATE public.users SET can_impersonate = true WHERE username = 'dungeonhub-bot';
--- O por id del auth.users, si preferís:
--- UPDATE public.users SET can_impersonate = true WHERE id = '<bot-user-uuid>';
-```
-
-### Character (requiere vinculación)
-
-| Comando | Descripción |
+| Command | Description |
 |---------|-------------|
-| `/character list` | Lista tus characters en la campaña |
-| `/character show <name>` | Ficha completa (HP, AC, abilities, saves, skills, slots) |
-| `/character hp <name> <delta> [note]` | Aplicar daño (delta negativo) o curación (delta positivo). Temp HP absorbe daño primero. |
-| `/character rest <name> <type>` | Short o long rest. Short refresca recursos sin gastar hit dice; long restaura HP/slots/exhaustion. |
+| `/character list` | List your active characters in the campaign |
+| `/character show <name>` | Full sheet (HP, AC, abilities, saves, skills, spell slots) |
+| `/character hp <name> <delta> [note]` | Apply damage (negative delta) or healing (positive). Temp HP absorbs damage first. |
+| `/character rest <name> <type>` | Short or long rest. Short refreshes short-rest resources; long restores HP, slots, and exhaustion. |
+
+`/mi-hoja` is a shortcut for `/character show` when you have exactly one active character — no arguments needed.
 
 ### West Marches (campaign-scoped)
 
-| Comando | Descripción |
+| Command | Description |
 |---------|-------------|
-| `/session list [status]` | Lista de sesiones, opcionalmente filtradas por status |
-| `/session show <session>` | Detalle de una sesión (fechas, level range, participants) |
-| `/world events [tag]` | Timeline de world events |
-| `/world factions` | Factions de la campaña |
-| `/world npcs [status]` | NPCs con status y faction/hex |
-| `/lore list [tag]` | Entries del journal/lore |
-| `/lore show <entry>` | Body completo de una entry |
-| `/map list [scope]` | Hexes (top-level por defecto, o todos los visibles) |
-| `/map show <hex>` | Hex + sus POIs |
+| `/session list [status]` | List sessions, optionally filtered by status |
+| `/session show <session>` | Session details (dates, level range, participants) |
+| `/world events [tag]` | Timeline of world events, optional tag filter |
+| `/world factions` | Factions in the campaign |
+| `/world npcs [status]` | NPCs with status and faction/hex |
+| `/lore list [tag]` | Campaign journal/lore entries, optional tag filter |
+| `/lore show <entry>` | Full body of a lore entry |
+| `/map list [scope]` | Hexes (top-level by default, or all visible) |
+| `/map show <hex>` | Hex details + its POIs |
 
-Pendientes — ver roadmap en el PRD.
+---
+
+## Tests
+
+```bash
+pnpm --filter @dungeon-hub/bot test
+```
+
+Unit tests only (Vitest). No E2E — smoke manually against a live Discord server.
