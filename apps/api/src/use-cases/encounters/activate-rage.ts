@@ -72,13 +72,10 @@ export async function activateRage(input: {
   encounterId: string;
   ragerId: string; // encounter_combatants.id of the barbarian
   version: number;
-  callerId?: string;   // JWT userId of the caller (required for player authz; omit = GM-only legacy)
-  callerRole?: 'gm' | 'player'; // member role in the campaign
+  callerId: string;          // JWT userId of the caller (REQ-WCR-AUTH-01)
+  callerRole: 'gm' | 'player'; // member role in the campaign
 }): Promise<ActivateRageResult> {
-  const { encounterId, ragerId, version } = input;
-  // Default to 'gm' for legacy callers that don't pass caller identity.
-  const callerId = input.callerId ?? '';
-  const callerRole = input.callerRole ?? 'gm';
+  const { encounterId, ragerId, version, callerId, callerRole } = input;
 
   // ── Step 1: Load encounter ────────────────────────────────────────────────────
   const [encounterRow] = await db

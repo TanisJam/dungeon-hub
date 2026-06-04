@@ -1274,22 +1274,13 @@ describe('engine-rage — Security Matrix (REQ-WCR-AUTH-01, REQ-WCR-ROUTE-01)', 
   // ── S3: Player → another player's PC → 403 FORBIDDEN ─────────────────────────
 
   it('WCR-T3: S3 activate-rage — player → other player PC → 403 FORBIDDEN', async () => {
-    const { encounterId, otherPcCombatantId, version } =
+    const { encounterId, version } =
       await makeFreshSecurityEncounter('WCR-T3');
-    // Player attempts to rage otherPlayer's combatant (not their turn for otherPc either,
-    // but authz is checked after turn guard — however otherPcCombatantId is NOT current,
-    // so NOT_YOUR_TURN fires first. To test FORBIDDEN, we need to use barbarianCombatantId
-    // with the WRONG player token. Player owns barbarianChar, so otherPlayer calling
-    // activate for barbarianCombatantId → FORBIDDEN).
-    // Barbarian is on their turn (initiative=20), otherPlayer attacks barbarianCombatantId
-    // → turn guard passes (it IS barb's turn), but ownership fails → FORBIDDEN.
-    const result = await activateRageAs(otherPlayer.accessToken, encounterId, otherPcCombatantId, version);
-    // otherPcCombatantId is NOT current (initiative=10 vs barbarian initiative=20 who is current).
-    // So this will be 409 NOT_YOUR_TURN. Let's instead use barbarianCombatantId with otherPlayer:
-    // barbarianCombatantId IS on its turn, but is owned by player not otherPlayer → FORBIDDEN.
-    const result2 = await activateRageAs(otherPlayer.accessToken, encounterId, await getBarbarianCombatantId(encounterId), version);
-    expect(result2.statusCode, `WCR-T3 expected 403: ${JSON.stringify(result2.body)}`).toBe(403);
-    expect(result2.body.error).toBe('FORBIDDEN');
+    // barbarianCombatantId IS on its turn (initiative=20), and is owned by `player`.
+    // otherPlayer attempting to rage it → turn guard passes, ownership check fails → FORBIDDEN.
+    const result = await activateRageAs(otherPlayer.accessToken, encounterId, await getBarbarianCombatantId(encounterId), version);
+    expect(result.statusCode, `WCR-T3 expected 403: ${JSON.stringify(result.body)}`).toBe(403);
+    expect(result.body.error).toBe('FORBIDDEN');
 
     async function getBarbarianCombatantId(encId: string): Promise<string> {
       const app = await getTestApp();

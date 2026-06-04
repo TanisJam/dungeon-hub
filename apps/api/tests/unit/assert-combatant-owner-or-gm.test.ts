@@ -159,4 +159,27 @@ describe('assertCombatantOwnerOrGm — REQ-WCR-AUTH-01', () => {
 
     expect(result).toEqual({ ok: false, code: 'NOT_FOUND' });
   });
+
+  // AUTH-U6: GM with a callerId that owns nothing → { ok: true }.
+  // Documents that the GM short-circuit ignores callerId entirely;
+  // it only cares about callerRole === 'gm', NOT about character ownership.
+  it('AUTH-U6: GM caller with unrelated callerId → { ok: true } (callerId irrelevant for GM)', async () => {
+    // Combatant IS found but belongs to a completely different user.
+    const combatantChain = makeSelectChain([
+      { id: COMBATANT_ID, characterId: CHARACTER_ID },
+    ]);
+    mockDb.select.mockReturnValueOnce(combatantChain);
+    // Character lookup must NOT be called — GM short-circuit fires before it.
+
+    const result = await assertCombatantOwnerOrGm({
+      encounterId: ENCOUNTER_ID,
+      combatantId: COMBATANT_ID,
+      callerId: 'ffffffff-ffff-ffff-ffff-ffffffffffff', // owns nothing
+      callerRole: 'gm',
+    });
+
+    expect(result).toEqual({ ok: true });
+    // Only 1 DB call (combatant load); character lookup was skipped.
+    expect(mockDb.select).toHaveBeenCalledTimes(1);
+  });
 });
