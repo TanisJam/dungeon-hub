@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 import { StatsForm } from './_form';
 
 type StatGen = { standardArray: boolean; pointBuy: boolean; roll: boolean };
@@ -39,7 +39,8 @@ export default async function StatsStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="01"
         title="Atributos"
         meta="Paso 1 de 6"

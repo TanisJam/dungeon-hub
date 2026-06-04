@@ -119,7 +119,7 @@ test.describe('character builder wizard', () => {
     });
 
     await test.step('revisión: verificar contenido (incluye card Hechizos) + publicar', async () => {
-      // El review (post-E.6) tiene: NumberedSectionHead "06 Revisión",
+      // El review (post-E.6) tiene: SectionHead size="md" "06 Revisión",
       // ReviewBanner con character name, AbilityScoreGrid, y 4 NumberedReviewCards
       // incluyendo la nueva card "05 Hechizos" (non-caster → sin hechizos guardados).
       await expect(page.locator('text=Revisión').first()).toBeVisible();

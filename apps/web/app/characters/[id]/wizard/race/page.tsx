@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { effectiveAsiSlots, type AbilityKey, type RaceData } from './_parsers';
 import { RacePicker, type RaceEntry, type FeatEntry, type CantripEntry } from './_picker';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 
 type RaceRow = {
   id: string;
@@ -209,7 +209,8 @@ export default async function RaceStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="02"
         title="Linaje"
         meta="Paso 2 de 6"

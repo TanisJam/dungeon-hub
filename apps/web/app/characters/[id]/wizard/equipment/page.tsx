@@ -10,7 +10,7 @@ import type {
   BackgroundStartingEquipment,
   EquipmentSelections,
 } from '@dungeon-hub/domain/character/starting-equipment';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 import { EquipmentPicker } from './_picker';
 
 // ─── API response types ───────────────────────────────────────────────────────
@@ -87,7 +87,8 @@ export default async function EquipmentStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="05"
         title="Equipo"
         meta="Paso 5 de 7"

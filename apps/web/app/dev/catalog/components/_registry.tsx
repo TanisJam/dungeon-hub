@@ -15,7 +15,6 @@ import { V3Empty } from '@/components/ui/empty';
 import { AppShell } from '@/components/layout/app-shell';
 import { TopBar } from '@/components/layout/topbar';
 import { NavProgress } from '@/components/layout/nav-progress';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 // form/ primitives
 import { FormLabel } from '@/components/ui/form-label';
@@ -220,23 +219,32 @@ const sectionHeadEntry: ComponentEntry = {
   id: 'section-head',
   name: 'SectionHead',
   group: 'ui',
-  notes: 'Props: num (optional), title, meta (optional).',
+  notes: "Props: size ('sm'|'md', default 'sm'), num (optional), title, meta (optional), description (optional). size='sm': original compact density (items-baseline, pb-1, text-xs pill). size='md': wizard density (mb-5 wrapper, items-center, h-6 pill). B5: merged NumberedSectionHead into SectionHead via size prop.",
   propsSchema: {
-    num:   { kind: 'string', label: 'Num (optional)' },
-    title: { kind: 'string', default: 'Abilities', label: 'Title' },
-    meta:  { kind: 'node',   label: 'Meta (optional)' },
+    size:        { kind: 'enum',   options: ['sm', 'md'] as const, default: 'sm',       label: 'Size' },
+    num:         { kind: 'string', label: 'Num (optional)' },
+    title:       { kind: 'string', default: 'Abilities',           label: 'Title' },
+    meta:        { kind: 'node',   label: 'Meta (optional)' },
+    description: { kind: 'string', label: 'Description (optional)' },
   },
   matrixMode: 'list',
   explicitCombos: [
-    { title: 'Abilities' },
-    { num: '1', title: 'Choose Race' },
-    { num: '★', title: 'Special', meta: '3 slots' },
+    // size='sm' variants
+    { size: 'sm', title: 'Abilities' },
+    { size: 'sm', num: '1', title: 'Choose Race' },
+    { size: 'sm', num: '★', title: 'Special', meta: '3 slots' },
+    // size='md' variants (wizard density)
+    { size: 'md', num: '01', title: 'Atributos', meta: 'Paso 1 de 6', description: 'Asigná los seis atributos.' },
+    { size: 'md', num: '2',  title: 'Class Features', meta: '3 choices' },
+    { size: 'md', num: '3',  title: 'Background', description: 'Your background defines who you were before adventuring.' },
   ],
   render: (p) => (
     <SectionHead
+      size={p.size as 'sm' | 'md'}
       num={p.num as string | number | undefined}
       title={p.title as string}
       meta={p.meta as ReactNode}
+      description={p.description as string | undefined}
     />
   ),
 };
@@ -400,32 +408,6 @@ const stepperEntry: ComponentEntry = {
   ),
 };
 
-const numberedSectionHeadEntry: ComponentEntry = {
-  id: 'numbered-section-head',
-  name: 'NumberedSectionHead',
-  group: 'layout',
-  notes: 'Props: num, title, meta?, description?.',
-  propsSchema: {
-    num:         { kind: 'string', default: '1',            label: 'Num' },
-    title:       { kind: 'string', default: 'Choose race', label: 'Title' },
-    meta:        { kind: 'string', label: 'Meta (optional)' },
-    description: { kind: 'string', label: 'Description (optional)' },
-  },
-  matrixMode: 'list',
-  explicitCombos: [
-    { num: '1', title: 'Choose your race' },
-    { num: '2', title: 'Class Features', meta: '3 choices' },
-    { num: '3', title: 'Background', description: 'Your background defines who you were before becoming an adventurer.' },
-  ],
-  render: (p) => (
-    <NumberedSectionHead
-      num={p.num as string}
-      title={p.title as string}
-      meta={p.meta as string | undefined}
-      description={p.description as string | undefined}
-    />
-  ),
-};
 
 // ── sheet/ group ──────────────────────────────────────────────────────────────
 
@@ -550,7 +532,6 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   roleSwitcherEntry,
   navProgressEntry,
   stepperEntry,
-  numberedSectionHeadEntry,
   // sheet/
   v3SheetEntry,
   // form/

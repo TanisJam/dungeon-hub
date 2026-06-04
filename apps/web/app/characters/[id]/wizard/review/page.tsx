@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { ActivateForm } from './_activate-form';
 import { Card } from '@/components/ui';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 import { ReviewBanner } from '@/components/wizard/review-banner';
 import { NumberedReviewCard } from '@/components/wizard/numbered-review-card';
 import { CharacterNameInput } from '@/components/wizard/character-name-input';
@@ -223,7 +223,8 @@ export default async function ReviewStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="06"
         title="Revisión"
         meta="Paso 6 de 6"

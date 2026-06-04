@@ -7,7 +7,7 @@ import type {
   BackgroundCompendiumData,
   Customization,
 } from '@dungeon-hub/domain/character/background';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 
 type BgRow = { id: string; slug: string; source: string; name: string };
 type BgDetail = BgRow & { data: BackgroundData };
@@ -92,7 +92,8 @@ export default async function BackgroundStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="04"
         title="Trasfondo"
         meta="Paso 4 de 6"

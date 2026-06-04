@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { requiresL1Subclass, type ClassData } from './_parsers';
 import { ClassPicker, type ClassEntry, type SubclassRow } from './_picker';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 
 type ClassRow = { id: string; slug: string; source: string; name: string };
 type ClassDetail = ClassRow & { data: ClassData };
@@ -74,7 +74,8 @@ export default async function ClassStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="03"
         title="Clase"
         meta="Paso 3 de 6"

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import type { AppliedClass as DomainAppliedClass } from '@dungeon-hub/domain/character/class';
 import { classifyCaster } from '@dungeon-hub/domain/character/spellcasting';
-import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
+import { SectionHead } from '@/components/ui/section-head';
 import { NoPicksPanel } from './_no-picks-panel';
 import { SinglePickerView } from './_single-picker-view';
 import { MulticlassSpellsView, type CasterTabData } from './_multiclass-view';
@@ -180,7 +180,8 @@ export default async function SpellsStepPage({ params }: Props) {
     const primaryClass = allClasses[0]!;
     return (
       <section>
-        <NumberedSectionHead
+        <SectionHead
+          size="md"
           num="05"
           title="Hechizos"
           meta="Paso 5 de 6"
@@ -210,7 +211,8 @@ export default async function SpellsStepPage({ params }: Props) {
     if (!hasPicks(limits)) {
       return (
         <section>
-          <NumberedSectionHead
+          <SectionHead
+            size="md"
             num="05"
             title="Hechizos"
             meta="Paso 5 de 6"
@@ -239,7 +241,8 @@ export default async function SpellsStepPage({ params }: Props) {
 
     return (
       <section>
-        <NumberedSectionHead
+        <SectionHead
+          size="md"
           num="05"
           title="Hechizos"
           meta="Paso 5 de 6"
@@ -293,7 +296,8 @@ export default async function SpellsStepPage({ params }: Props) {
 
   return (
     <section>
-      <NumberedSectionHead
+      <SectionHead
+        size="md"
         num="05"
         title="Hechizos"
         meta="Paso 5 de 6"
