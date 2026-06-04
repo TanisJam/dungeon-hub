@@ -11,6 +11,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { activateRage, deactivateRage } from '@/app/encuentros/[id]/actions';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   combatantId: string;
@@ -119,15 +120,15 @@ export function RageControls({
       </p>
 
       {/* Full-width ≥44px button (mobile-first 375px) */}
-      <button
-        type="button"
+      <Button
+        tone="ghost"
         aria-label={isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
         disabled={isDisabled || isPending}
         onClick={handleClick}
-        className="w-full min-h-[44px] rounded text-sm font-semibold border border-line disabled:opacity-40"
+        className="w-full min-h-[44px]"
       >
         {isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ClassResourceView } from '@/lib/sheet-types';
 import { useResource, restoreResource, shortRest, longRest } from '@/app/encuentros/[id]/actions';
+import { Button } from '@/components/ui/button';
 
 // Display name map — mirrors the subset shown in RecursosTab (recursos.tsx).
 // PHB references: Ki Points PHB p.76, Second Wind PHB p.72, etc.
@@ -121,48 +122,50 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
               {remaining}&nbsp;/&nbsp;{r.max}
             </span>
             {/* REQ-WCO-WEB-05: Use + Restore buttons — min 44px touch targets */}
-            <button
-              type="button"
+            <Button
+              tone="ghost"
+              size="sm"
               aria-label="Usar"
               disabled={isPending || remaining <= 0}
               onClick={() => handleUse(r.slug)}
-              className="min-h-[44px] px-3 text-xs font-semibold rounded border border-line disabled:opacity-40"
+              className="min-h-[44px]"
             >
               Usar
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              tone="ghost"
+              size="sm"
               aria-label="Restaurar"
               disabled={isPending || r.used <= 0}
               onClick={() => handleRestore(r.slug)}
-              className="min-h-[44px] px-3 text-xs font-semibold rounded border border-line disabled:opacity-40"
+              className="min-h-[44px]"
             >
               Restaurar
-            </button>
+            </Button>
           </div>
         );
       })}
 
       {/* Rest buttons — full width, ≥44px touch target */}
       <div className="flex flex-col gap-2 pt-2 border-t border-line">
-        <button
-          type="button"
+        <Button
+          tone="ghost"
           aria-label="Descanso corto"
           disabled={isPending}
           onClick={handleShortRest}
-          className="w-full min-h-[44px] rounded text-sm font-semibold border border-line disabled:opacity-40"
+          className="w-full min-h-[44px]"
         >
           Descanso corto
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          tone="ghost"
           aria-label="Descanso largo"
           disabled={isPending}
           onClick={handleLongRest}
-          className="w-full min-h-[44px] rounded text-sm font-semibold border border-line disabled:opacity-40"
+          className="w-full min-h-[44px]"
         >
           Descanso largo
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { V3Sheet } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 import { attackApplyAction } from '@/app/encuentros/[id]/actions';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 import type { EncounterCombatant } from './types';
@@ -142,15 +143,15 @@ export function AttackSheet({
   return (
     <>
       {/* REQ-WCA-WEB-UI-01: full-width ≥44px trigger button */}
-      <button
-        type="button"
+      <Button
+        tone="ghost"
         aria-label="Atacar"
         disabled={triggerDisabled || isPending}
         onClick={handleOpen}
-        className="w-full min-h-[44px] rounded text-sm font-semibold border border-line disabled:opacity-40"
+        className="w-full min-h-[44px]"
       >
         Atacar
-      </button>
+      </Button>
 
       <V3Sheet open={open} onClose={handleClose} title="Atacar">
         {/* ── Error banner (persists across steps) ─────────────────────────── */}
@@ -241,13 +242,13 @@ export function AttackSheet({
               </>
             )}
 
-            <button
-              type="button"
+            <Button
+              tone="ghost"
               onClick={handleClose}
-              className="w-full min-h-[44px] rounded text-sm font-semibold border border-line mt-2"
+              className="w-full min-h-[44px] mt-2"
             >
               Cerrar
-            </button>
+            </Button>
           </div>
         )}
       </V3Sheet>

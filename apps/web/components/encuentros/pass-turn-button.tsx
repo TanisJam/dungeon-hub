@@ -10,6 +10,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { passTurn } from '@/app/encuentros/[id]/actions';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   encounterId: string;
@@ -51,15 +52,15 @@ export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }:
       )}
 
       {/* Full-width ≥44px button (mobile-first 375px — CLAUDE.md §2) */}
-      <button
-        type="button"
+      <Button
+        tone="ghost"
         aria-label="Pasar turno"
         disabled={!isOwnTurn || isPending}
         onClick={handleClick}
-        className="w-full min-h-[44px] rounded text-sm font-semibold border border-line disabled:opacity-40"
+        className="w-full min-h-[44px]"
       >
         Pasar Turno
-      </button>
+      </Button>
     </div>
   );
 }
