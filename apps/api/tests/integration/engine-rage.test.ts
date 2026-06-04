@@ -981,3 +981,512 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     expect(await isRaging(barbarianCombatantId)).toBe(true);
   });
 });
+
+// ── Security Matrix — REQ-WCR-AUTH-01 / REQ-WCR-ROUTE-01 ─────────────────────
+//
+// 6 rows × 2 routes (activate + deactivate) = 12 tests (WCR-T1..T12).
+//
+// S1: GM → any combatant → 200
+// S2: Player, own turn → own PC combatant → 200
+// S3: Player, own turn → another player's PC combatant → 403 FORBIDDEN
+// S4: Player, own turn → NPC combatant (characterId null) → 404 NOT_FOUND
+// S5: Non-member → any combatant → 403 FORBIDDEN
+// S6: Player, NOT own turn → own combatant → 409 NOT_YOUR_TURN
+//
+// All scenarios use real Supabase + Postgres.
+
+describe('engine-rage — Security Matrix (REQ-WCR-AUTH-01, REQ-WCR-ROUTE-01)', () => {
+  let gm: TestUser;
+  let player: TestUser;
+  let otherPlayer: TestUser;
+  let nonMember: TestUser;
+  let campaignId: string;
+  let worldId: string;
+  let barbarianCharId: string;
+  let otherPlayerCharId: string;
+
+  const expectOkMatrix = async (label: string, res: { statusCode: number; body: string }) => {
+    if (res.statusCode !== 200 && res.statusCode !== 201) {
+      throw new Error(`${label}: expected 200/201, got ${res.statusCode} — ${res.body}`);
+    }
+  };
+
+  /**
+   * Create an encounter with:
+   * - Barbarian (player's character, PC, initiative=20 → first turn)
+   * - Another player's PC (otherPlayer's character, initiative=10)
+   * - NPC goblin (initiative=5, characterId null)
+   *
+   * Returns the combatant IDs by type.
+   */
+  const makeFreshSecurityEncounter = async (name: string) => {
+    const app = await getTestApp();
+
+    const enc = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          campaignId,
+          name,
+          combatants: [
+            {
+              name: 'Player Barbarian',
+              kind: 'pc',
+              characterId: barbarianCharId,
+              initiative: 20,
+              hpCurrent: 20,
+              hpMax: 20,
+            },
+            {
+              name: 'Other Player PC',
+              kind: 'pc',
+              characterId: otherPlayerCharId,
+              initiative: 10,
+              hpCurrent: 20,
+              hpMax: 20,
+            },
+            {
+              name: 'NPC Goblin',
+              kind: 'npc',
+              initiative: 5,
+              hpCurrent: 10,
+              hpMax: 10,
+              ac: 15,
+            },
+          ],
+        },
+      })
+      .then((r) => r.json());
+
+    // Barbarian has highest initiative → first combatant.
+    const barbarianCombatantId = enc.currentCombatantId as string;
+    const otherPcCombatantId = enc.combatants.find(
+      (c: { id: string; characterId: string | null }) =>
+        c.id !== barbarianCombatantId && c.characterId !== null,
+    )?.id as string;
+    const npcCombatantId = enc.combatants.find(
+      (c: { id: string; characterId: string | null }) => c.characterId === null,
+    )?.id as string;
+
+    return {
+      encounterId: enc.id as string,
+      version: enc.version as number,
+      barbarianCombatantId,
+      otherPcCombatantId,
+      npcCombatantId,
+    };
+  };
+
+  /** POST activate-rage with a specific user's token. */
+  const activateRageAs = async (
+    token: string,
+    encounterId: string,
+    ragerId: string,
+    version: number,
+  ) => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/actions/activate-rage`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { ragerId, version },
+    });
+    return { statusCode: res.statusCode, body: res.json() };
+  };
+
+  /** POST deactivate-rage with a specific user's token. */
+  const deactivateRageAs = async (
+    token: string,
+    encounterId: string,
+    ragerId: string,
+    version: number,
+  ) => {
+    const app = await getTestApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/actions/deactivate-rage`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { ragerId, version },
+    });
+    return { statusCode: res.statusCode, body: res.json() };
+  };
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    gm = await createTestUser();
+    player = await createTestUser();
+    otherPlayer = await createTestUser();
+    nonMember = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { name: 'Security Matrix Test Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id as string;
+    worldId = campaign.worldId as string;
+
+    // Add player and otherPlayer as campaign members (role=player).
+    const { db } = await import('../../src/infra/db/client.js');
+    const { campaignMembers } = await import('../../src/infra/db/schema.js');
+    await db.insert(campaignMembers).values([
+      { campaignId, userId: player.id, role: 'player' },
+      { campaignId, userId: otherPlayer.id, role: 'player' },
+    ]);
+
+    // Create barbarian character owned by player (via GM — DM grants approval).
+    const barbarianCharRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Security Matrix Barbarian' },
+      })
+      .then((r) => r.json());
+    barbarianCharId = barbarianCharRes.id as string;
+
+    // Set class to barbarian L1 BEFORE transferring ownership (GM must own to set class).
+    await expectOkMatrix(
+      'security-matrix-set-class',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${barbarianCharId}/class`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { class: { slug: 'barbarian', source: 'PHB' }, level: 1, skillChoices: ['athletics', 'animal handling'] },
+      }),
+    );
+
+    // Transfer ownership to player by directly updating userId in DB.
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    await db
+      .update(characters)
+      .set({ userId: player.id })
+      .where(eq(characters.id, barbarianCharId));
+
+    // Create a character owned by otherPlayer.
+    const otherCharRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Security Matrix OtherPlayer PC' },
+      })
+      .then((r) => r.json());
+    otherPlayerCharId = otherCharRes.id as string;
+
+    await db
+      .update(characters)
+      .set({ userId: otherPlayer.id })
+      .where(eq(characters.id, otherPlayerCharId));
+  });
+
+  afterAll(async () => {
+    await deleteTestUser(gm.id);
+    await deleteTestUser(player.id);
+    await deleteTestUser(otherPlayer.id);
+    await deleteTestUser(nonMember.id);
+    await closeTestApp();
+  });
+
+  // ── S1: GM → any combatant → 200 ─────────────────────────────────────────────
+
+  it('WCR-T1: S1 activate-rage — GM → any combatant → 200', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T1');
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    // Reset rage-uses to ensure activation is possible.
+    const [row] = await db.select().from(characters).where(eq(characters.id, barbarianCharId)).limit(1);
+    if (row) {
+      const data = row.data as Record<string, unknown>;
+      const cu = { ...((data['classResourcesUsed'] as Record<string, number>) ?? {}), 'barbarian:rage-uses': 0 };
+      await db.update(characters).set({ data: { ...data, classResourcesUsed: cu }, updatedAt: new Date() }).where(eq(characters.id, barbarianCharId));
+    }
+
+    const result = await activateRageAs(gm.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T1 expected 200: ${JSON.stringify(result.body)}`).toBe(200);
+  });
+
+  it('WCR-T7: S1 deactivate-rage — GM → any combatant → 200', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T7');
+    // Insert Raging so deactivate has something to remove.
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: barbarianCombatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: barbarianCombatantId,
+      turnAnchorEntityId: barbarianCombatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining: 10,
+    });
+
+    const result = await deactivateRageAs(gm.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T7 expected 200: ${JSON.stringify(result.body)}`).toBe(200);
+  });
+
+  // ── S2: Player, own turn → own PC → 200 ──────────────────────────────────────
+
+  it('WCR-T2: S2 activate-rage — player on own turn → own PC → 200', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T2');
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(characters).where(eq(characters.id, barbarianCharId)).limit(1);
+    if (row) {
+      const data = row.data as Record<string, unknown>;
+      const cu = { ...((data['classResourcesUsed'] as Record<string, number>) ?? {}), 'barbarian:rage-uses': 0 };
+      await db.update(characters).set({ data: { ...data, classResourcesUsed: cu }, updatedAt: new Date() }).where(eq(characters.id, barbarianCharId));
+    }
+
+    // Barbarian is current combatant (initiative=20 → first turn).
+    const result = await activateRageAs(player.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T2 expected 200: ${JSON.stringify(result.body)}`).toBe(200);
+  });
+
+  it('WCR-T8: S2 deactivate-rage — player on own turn → own PC → 200', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T8');
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: barbarianCombatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: barbarianCombatantId,
+      turnAnchorEntityId: barbarianCombatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining: 10,
+    });
+
+    const result = await deactivateRageAs(player.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T8 expected 200: ${JSON.stringify(result.body)}`).toBe(200);
+  });
+
+  // ── S3: Player → another player's PC → 403 FORBIDDEN ─────────────────────────
+
+  it('WCR-T3: S3 activate-rage — player → other player PC → 403 FORBIDDEN', async () => {
+    const { encounterId, version } =
+      await makeFreshSecurityEncounter('WCR-T3');
+    // barbarianCombatantId IS on its turn (initiative=20), and is owned by `player`.
+    // otherPlayer attempting to rage it → turn guard passes, ownership check fails → FORBIDDEN.
+    const result = await activateRageAs(otherPlayer.accessToken, encounterId, await getBarbarianCombatantId(encounterId), version);
+    expect(result.statusCode, `WCR-T3 expected 403: ${JSON.stringify(result.body)}`).toBe(403);
+    expect(result.body.error).toBe('FORBIDDEN');
+
+    async function getBarbarianCombatantId(encId: string): Promise<string> {
+      const app = await getTestApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/encounters/${encId}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+      const enc = res.json();
+      return enc.currentCombatantId as string;
+    }
+  });
+
+  it('WCR-T9: S3 deactivate-rage — player → other player PC → 403 FORBIDDEN', async () => {
+    const { encounterId, version } =
+      await makeFreshSecurityEncounter('WCR-T9');
+    // Get barbarianCombatantId (it's on its turn, owned by player).
+    const app = await getTestApp();
+    const encRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/encounters/${encounterId}`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+    });
+    const barbarianCombatantId = encRes.json().currentCombatantId as string;
+
+    // Insert Raging.
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: barbarianCombatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: barbarianCombatantId,
+      turnAnchorEntityId: barbarianCombatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining: 10,
+    });
+
+    // otherPlayer tries to deactivate player's barbarian → FORBIDDEN.
+    const result = await deactivateRageAs(otherPlayer.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T9 expected 403: ${JSON.stringify(result.body)}`).toBe(403);
+    expect(result.body.error).toBe('FORBIDDEN');
+  });
+
+  // ── S4: Player → NPC combatant → 404 NOT_FOUND ───────────────────────────────
+
+  it('WCR-T4: S4 activate-rage — player → NPC combatant (characterId null) → 404 NOT_FOUND', async () => {
+    // NPC is NOT on their turn (initiative=5, barbarian is current with 20).
+    // We need to be on the NPC's turn to avoid NOT_YOUR_TURN blocking first.
+    // BUT: per ADR-1 gate order, turn check fires BEFORE authz.
+    // With the barbarian's turn active: targeting npcCombatantId → NOT_YOUR_TURN (409).
+    // To test the NPC→NOT_FOUND path, we need the NPC to be the current combatant.
+    // We'll advance 2 turns so the NPC is active.
+    const { encounterId, npcCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T4');
+
+    const app = await getTestApp();
+
+    // Advance turn past barbarian (barbarian has been given longsword by this point? No — this is
+    // a new character with no items). Advance to NPC turn: advance twice (barb→otherPC→npc).
+    let v = version;
+    const adv1 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    }).then((r) => r.json() as { version: number; currentCombatantId: string });
+    v = adv1.version;
+
+    const adv2 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    }).then((r) => r.json() as { version: number; currentCombatantId: string });
+    v = adv2.version;
+
+    // Now NPC should be current combatant.
+    expect(adv2.currentCombatantId).toBe(npcCombatantId);
+
+    // Player targets NPC (characterId null) while it is their turn.
+    const result = await activateRageAs(player.accessToken, encounterId, npcCombatantId, v);
+    expect(result.statusCode, `WCR-T4 expected 404: ${JSON.stringify(result.body)}`).toBe(404);
+    expect(result.body.error).toBe('NOT_FOUND');
+  });
+
+  it('WCR-T10: S4 deactivate-rage — player → NPC combatant → 404 NOT_FOUND', async () => {
+    const { encounterId, npcCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T10');
+
+    const app = await getTestApp();
+    let v = version;
+    const adv1 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    }).then((r) => r.json() as { version: number; currentCombatantId: string });
+    v = adv1.version;
+
+    const adv2 = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version: v },
+    }).then((r) => r.json() as { version: number; currentCombatantId: string });
+    v = adv2.version;
+
+    expect(adv2.currentCombatantId).toBe(npcCombatantId);
+
+    // Insert Raging on NPC (even though NPC, deactivate should still return NOT_FOUND
+    // when targeted by a player because characterId is null).
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: npcCombatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: npcCombatantId,
+      turnAnchorEntityId: npcCombatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining: 10,
+    });
+
+    const result = await deactivateRageAs(player.accessToken, encounterId, npcCombatantId, v);
+    expect(result.statusCode, `WCR-T10 expected 404: ${JSON.stringify(result.body)}`).toBe(404);
+    expect(result.body.error).toBe('NOT_FOUND');
+  });
+
+  // ── S5: Non-member → any combatant → 403 FORBIDDEN ───────────────────────────
+
+  it('WCR-T5: S5 activate-rage — non-member → any combatant → 403 FORBIDDEN', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T5');
+    const result = await activateRageAs(nonMember.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T5 expected 403: ${JSON.stringify(result.body)}`).toBe(403);
+    expect(result.body.error).toBe('FORBIDDEN');
+  });
+
+  it('WCR-T11: S5 deactivate-rage — non-member → any combatant → 403 FORBIDDEN', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T11');
+    const result = await deactivateRageAs(nonMember.accessToken, encounterId, barbarianCombatantId, version);
+    expect(result.statusCode, `WCR-T11 expected 403: ${JSON.stringify(result.body)}`).toBe(403);
+    expect(result.body.error).toBe('FORBIDDEN');
+  });
+
+  // ── S6: Player, NOT own turn → own combatant → 409 NOT_YOUR_TURN ─────────────
+
+  it('WCR-T6: S6 activate-rage — player → own combatant but NOT own turn → 409 NOT_YOUR_TURN', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T6');
+
+    // Advance turn past barbarian so otherPlayer's PC is current.
+    const app = await getTestApp();
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version },
+    });
+
+    const newVersion = await getSecurityVersion(encounterId);
+    // Player tries to rage their own combatant but it's not their turn.
+    const result = await activateRageAs(player.accessToken, encounterId, barbarianCombatantId, newVersion);
+    expect(result.statusCode, `WCR-T6 expected 409: ${JSON.stringify(result.body)}`).toBe(409);
+    expect(result.body.error).toBe('NOT_YOUR_TURN');
+
+    async function getSecurityVersion(encId: string): Promise<number> {
+      const { db } = await import('../../src/infra/db/client.js');
+      const { encounters } = await import('../../src/infra/db/schema.js');
+      const { eq } = await import('drizzle-orm');
+      const [row] = await db.select({ version: encounters.version }).from(encounters).where(eq(encounters.id, encId)).limit(1);
+      return row?.version ?? -1;
+    }
+  });
+
+  it('WCR-T12: S6 deactivate-rage — player → own combatant but NOT own turn → 409 NOT_YOUR_TURN', async () => {
+    const { encounterId, barbarianCombatantId, version } =
+      await makeFreshSecurityEncounter('WCR-T12');
+
+    const app = await getTestApp();
+    // Advance past barbarian.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/advance-turn`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { version },
+    });
+
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounters, encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+
+    const newVersion = (await db.select({ version: encounters.version }).from(encounters).where(eq(encounters.id, encounterId)).limit(1))[0]?.version ?? -1;
+
+    // Insert Raging on barbarian (so deactivate has something to attempt).
+    await db.insert(encounterCombatantConditions).values({
+      combatantId: barbarianCombatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: barbarianCombatantId,
+      turnAnchorEntityId: barbarianCombatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining: 10,
+    });
+
+    const result = await deactivateRageAs(player.accessToken, encounterId, barbarianCombatantId, newVersion);
+    expect(result.statusCode, `WCR-T12 expected 409: ${JSON.stringify(result.body)}`).toBe(409);
+    expect(result.body.error).toBe('NOT_YOUR_TURN');
+  });
+});

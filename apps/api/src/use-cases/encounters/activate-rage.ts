@@ -5,13 +5,15 @@
  * Costs one bonus action + one barbarian:rage-uses charge. Ends concentration.
  * Cannot be activated while wearing heavy armor.
  *
- * Flow (ADR-3 engine-rage):
+ * Flow (ADR-3 engine-rage + ADR-2 web-combat-rage):
  *
  * PRE-TX (fail-fast reads, cheapest-abort-first):
  *   1. Load encounter + version pre-check.
- *   2. Turn guard: currentCombatantId !== ragerId → NOT_YOUR_TURN.
- *   3. PC guard: characterId null → reject.
- *   4. Incapacitated gate.
+ *   2. Load combatant.
+ *   3. Turn guard: currentCombatantId !== ragerId → NOT_YOUR_TURN.
+ *   3b. [REQ-WCR-AUTH-01] assertCombatantOwnerOrGm → FORBIDDEN / NOT_FOUND.
+ *   4. PC guard: characterId null → reject.
+ *   4a. Incapacitated gate.
  *   5. Bonus-action gate: bonusActionUsed === true → BONUS_ACTION_ALREADY_USED.
  *   6. Load character → derive barbarianLevel → maxFor. Non-barbarian → RAGE_NOT_AVAILABLE.
  *   7. Rage-use gate: used >= max → RESOURCE_OVER_LIMIT.
@@ -24,7 +26,7 @@
  *   12. breakConcentration(ragerId's characterId, tx) — rager's own concentration.
  *   13. INSERT encounter_combatant_conditions ('Raging', turnsRemaining=10, anchor=ragerId, boundary='end').
  *
- * REQ-RAGE-01, REQ-RAGE-02 (PHB p.48).
+ * REQ-RAGE-01, REQ-RAGE-02 (PHB p.48). REQ-WCR-ACT-01.
  */
 
 import { eq, and, sql } from 'drizzle-orm';
@@ -39,6 +41,7 @@ import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import { loadItemDataDetailMany } from '../characters/load-item-data.js';
 import { classifyItem } from '@dungeon-hub/domain/character/inventory';
 import { breakConcentration } from '../engine/concentration-service.js';
+import { assertCombatantOwnerOrGm } from './assert-combatant-owner-or-gm.js';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 
@@ -50,6 +53,8 @@ export type ActivateRageResult =
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_YOUR_TURN' }
   | { ok: false; code: 'VERSION_CONFLICT' }
+  // REQ-WCR-AUTH-01 — caller is not the owner of this combatant's character
+  | { ok: false; code: 'FORBIDDEN' }
   // engine-incapacitated-gating (PHB p.290 — can't take actions)
   | { ok: false; code: 'ACTOR_INCAPACITATED' }
   // Bonus action already used this turn (PHB p.48 — bonus action cost)
@@ -67,8 +72,10 @@ export async function activateRage(input: {
   encounterId: string;
   ragerId: string; // encounter_combatants.id of the barbarian
   version: number;
+  callerId: string;          // JWT userId of the caller (REQ-WCR-AUTH-01)
+  callerRole: 'gm' | 'player'; // member role in the campaign
 }): Promise<ActivateRageResult> {
-  const { encounterId, ragerId, version } = input;
+  const { encounterId, ragerId, version, callerId, callerRole } = input;
 
   // ── Step 1: Load encounter ────────────────────────────────────────────────────
   const [encounterRow] = await db
@@ -96,6 +103,23 @@ export async function activateRage(input: {
   // ── Step 3: Turn guard ────────────────────────────────────────────────────────
   if (encounterRow.currentCombatantId !== ragerId) {
     return { ok: false, code: 'NOT_YOUR_TURN' };
+  }
+
+  // ── Step 3b: Owner-OR-GM authz (REQ-WCR-AUTH-01, ADR-2) ─────────────────────
+  // Runs AFTER turn guard (VERSION_CONFLICT / NOT_YOUR_TURN are cheaper to surface first)
+  // and BEFORE economy gates and CAS tx (authz must precede mutation + resource disclosure).
+  const authzResult = await assertCombatantOwnerOrGm({
+    encounterId,
+    combatantId: ragerId,
+    callerId,
+    callerRole,
+  });
+  if (!authzResult.ok) {
+    if (authzResult.code === 'FORBIDDEN') {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    // NOT_FOUND from the helper (NPC target or missing combatant).
+    return { ok: false, code: 'NOT_FOUND', target: 'combatant' };
   }
 
   // ── Step 4: PC guard ─────────────────────────────────────────────────────────

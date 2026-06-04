@@ -6,14 +6,14 @@
  *
  * Costs one bonus action. Removes the 'Raging' condition.
  *
- * Flow (ADR-7 engine-rage):
- *   PRE-TX: turn guard → bonus-action gate (BONUS_ACTION_ALREADY_USED) → confirm 'Raging' present.
+ * Flow (ADR-7 engine-rage + ADR-2 web-combat-rage):
+ *   PRE-TX: turn guard → [REQ-WCR-AUTH-01] assertCombatantOwnerOrGm → bonus-action gate → confirm 'Raging'.
  *   IN-TX:  CAS version → UPDATE bonus_action_used=true → DELETE 'Raging' row.
  *
  * NOTE: we do NOT reset the ledger flags here (single-reset-point invariant per ADR-4).
  * The flags reset at turn-end in advance-encounter-turn regardless.
  *
- * REQ-RAGE-10 (PHB p.48).
+ * REQ-RAGE-10 (PHB p.48). REQ-WCR-DEACT-01.
  */
 
 import { eq, and } from 'drizzle-orm';
@@ -23,6 +23,7 @@ import {
   encounterCombatants,
   encounterCombatantConditions,
 } from '../../infra/db/schema.js';
+import { assertCombatantOwnerOrGm } from './assert-combatant-owner-or-gm.js';
 
 // ── Output ─────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ export type DeactivateRageResult =
   | { ok: false; code: 'ENCOUNTER_NOT_ACTIVE' }
   | { ok: false; code: 'NOT_YOUR_TURN' }
   | { ok: false; code: 'VERSION_CONFLICT' }
+  // REQ-WCR-AUTH-01 — caller is not the owner of this combatant's character
+  | { ok: false; code: 'FORBIDDEN' }
   // Bonus action already used this turn (PHB p.48 — deactivation costs bonus action)
   | { ok: false; code: 'BONUS_ACTION_ALREADY_USED' }
   // Not currently raging — nothing to deactivate
@@ -43,8 +46,10 @@ export async function deactivateRage(input: {
   encounterId: string;
   ragerId: string; // encounter_combatants.id
   version: number;
+  callerId: string;          // JWT userId of the caller (REQ-WCR-AUTH-01)
+  callerRole: 'gm' | 'player'; // member role in the campaign
 }): Promise<DeactivateRageResult> {
-  const { encounterId, ragerId, version } = input;
+  const { encounterId, ragerId, version, callerId, callerRole } = input;
 
   // ── Step 1: Load encounter ────────────────────────────────────────────────────
   const [encounterRow] = await db
@@ -72,6 +77,23 @@ export async function deactivateRage(input: {
   // ── Step 3: Turn guard ────────────────────────────────────────────────────────
   if (encounterRow.currentCombatantId !== ragerId) {
     return { ok: false, code: 'NOT_YOUR_TURN' };
+  }
+
+  // ── Step 3b: Owner-OR-GM authz (REQ-WCR-AUTH-01, ADR-2) ─────────────────────
+  // Runs AFTER turn guard and BEFORE economy gates. The helper internally loads
+  // the character row (+1 indexed read — accepted per ADR-2, keeps helper self-contained).
+  const authzResult = await assertCombatantOwnerOrGm({
+    encounterId,
+    combatantId: ragerId,
+    callerId,
+    callerRole,
+  });
+  if (!authzResult.ok) {
+    if (authzResult.code === 'FORBIDDEN') {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    // NOT_FOUND from the helper (NPC target or missing combatant).
+    return { ok: false, code: 'NOT_FOUND', target: 'combatant' };
   }
 
   // ── Step 4: Bonus-action gate (PHB p.48 — ends as a bonus action) ────────────

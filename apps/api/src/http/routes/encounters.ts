@@ -1219,9 +1219,9 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
   );
 
   // ---- POST /encounters/:id/actions/activate-rage -------------------------
-  // engine-rage: Barbarian Rage activation (PHB p.48). GM-only.
+  // engine-rage: Barbarian Rage activation (PHB p.48). Owner-OR-GM.
   // Costs one bonus action + one barbarian:rage-uses charge. Breaks concentration.
-  // REQ-RAGE-01, REQ-RAGE-02.
+  // REQ-RAGE-01, REQ-RAGE-02. REQ-WCR-ACT-01, REQ-WCR-ROUTE-01.
   const ActivateRageBody = z.object({
     ragerId: z.string().uuid(),
     version: z.number().int().nonnegative(),
@@ -1250,14 +1250,18 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
 
       const role = await memberRole(encRow.campaignId, userId);
-      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+      // Non-members (role === null) are rejected at the route level (membership gate only).
+      // Owner-OR-GM resolution is delegated to the use-case via assertCombatantOwnerOrGm.
+      if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
 
-      const result = await activateRage({ encounterId: id, ragerId, version });
+      const result = await activateRage({ encounterId: id, ragerId, version, callerId: userId, callerRole: role });
 
       if (!result.ok) {
         switch (result.code) {
           case 'NOT_FOUND':
             return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
           case 'ENCOUNTER_NOT_ACTIVE':
           case 'NOT_YOUR_TURN':
           case 'VERSION_CONFLICT':
@@ -1281,9 +1285,9 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
   );
 
   // ---- POST /encounters/:id/actions/deactivate-rage -----------------------
-  // engine-rage: Barbarian voluntary Rage end (PHB p.48). GM-only.
+  // engine-rage: Barbarian voluntary Rage end (PHB p.48). Owner-OR-GM.
   // Costs one bonus action. Removes 'Raging' condition.
-  // REQ-RAGE-10.
+  // REQ-RAGE-10. REQ-WCR-DEACT-01, REQ-WCR-ROUTE-01.
   const DeactivateRageBody = z.object({
     ragerId: z.string().uuid(),
     version: z.number().int().nonnegative(),
@@ -1312,14 +1316,18 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
 
       const role = await memberRole(encRow.campaignId, userId);
-      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+      // Non-members (role === null) are rejected at the route level (membership gate only).
+      // Owner-OR-GM resolution is delegated to the use-case via assertCombatantOwnerOrGm.
+      if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
 
-      const result = await deactivateRage({ encounterId: id, ragerId, version });
+      const result = await deactivateRage({ encounterId: id, ragerId, version, callerId: userId, callerRole: role });
 
       if (!result.ok) {
         switch (result.code) {
           case 'NOT_FOUND':
             return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
           case 'ENCOUNTER_NOT_ACTIVE':
           case 'NOT_YOUR_TURN':
           case 'VERSION_CONFLICT':
