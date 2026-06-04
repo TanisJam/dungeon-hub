@@ -21,40 +21,43 @@ import { TabBarIsland } from './_islands/tabbar-island';
 import { RoleSwitcherIsland } from './_islands/role-switcher-island';
 import { V3SheetIsland } from './_islands/v3-sheet-island';
 
-export type ComponentGroup = 'ui' | 'layout' | 'sheet' | 'wizard';
+// Re-export types for page.tsx
+export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
+import type { ComponentEntry } from './_registry-types';
 
-export interface VariantCase {
-  label: string;
-  node: ReactNode;
-}
-
-export interface ComponentEntry {
-  id: string;
-  name: string;
-  group: ComponentGroup;
-  notes?: string;
-  variants: VariantCase[];
-}
-
-// ── ui/ group ──
+// ── ui/ group ─────────────────────────────────────────────────────────────────
 
 const buttonEntry: ComponentEntry = {
   id: 'button',
   name: 'Button',
   group: 'ui',
   notes: 'ButtonTone: cta | green | ghost. ButtonSize: sm | md | lg.',
-  variants: [
-    // tones × md size
-    { label: 'cta/md',   node: <Button tone="cta"   size="md">Save Character</Button> },
-    { label: 'green/md', node: <Button tone="green" size="md">Confirm</Button> },
-    { label: 'ghost/md', node: <Button tone="ghost" size="md">Cancel</Button> },
-    // sizes × cta
-    { label: 'cta/sm',   node: <Button tone="cta"   size="sm">Small CTA</Button> },
-    { label: 'cta/lg',   node: <Button tone="cta"   size="lg">Large CTA</Button> },
-    // disabled state
-    { label: 'cta/disabled',   node: <Button tone="cta"   size="md" disabled>Disabled</Button> },
-    { label: 'ghost/disabled', node: <Button tone="ghost" size="md" disabled>Disabled Ghost</Button> },
+  propsSchema: {
+    tone:     { kind: 'enum',    options: ['cta', 'green', 'ghost'] as const, default: 'cta',   label: 'Tone' },
+    size:     { kind: 'enum',    options: ['sm', 'md', 'lg'] as const,        default: 'md',    label: 'Size' },
+    disabled: { kind: 'boolean', default: false,                                                label: 'Disabled' },
+    children: { kind: 'node',    default: 'Save Character',                                     label: 'Label' },
+  },
+  fixedProps: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { tone: 'cta',   size: 'md', disabled: false, children: 'Save Character' },
+    { tone: 'green', size: 'md', disabled: false, children: 'Confirm' },
+    { tone: 'ghost', size: 'md', disabled: false, children: 'Cancel' },
+    { tone: 'cta',   size: 'sm', disabled: false, children: 'Small CTA' },
+    { tone: 'cta',   size: 'lg', disabled: false, children: 'Large CTA' },
+    { tone: 'cta',   size: 'md', disabled: true,  children: 'Disabled' },
+    { tone: 'ghost', size: 'md', disabled: true,  children: 'Disabled Ghost' },
   ],
+  render: (p) => (
+    <Button
+      tone={p.tone as 'cta' | 'green' | 'ghost'}
+      size={p.size as 'sm' | 'md' | 'lg'}
+      disabled={p.disabled as boolean}
+    >
+      {p.children as ReactNode}
+    </Button>
+  ),
 };
 
 const pillEntry: ComponentEntry = {
@@ -62,16 +65,30 @@ const pillEntry: ComponentEntry = {
   name: 'Pill',
   group: 'ui',
   notes: 'Semantic tones: primary (cyan) | accent (copper) | secondary (magenta) | ink | stone | amber. Renamed in Slice 4.',
-  variants: [
-    { label: 'primary/md',   node: <Pill tone="primary"   size="md">Active</Pill> },
-    { label: 'accent/md',    node: <Pill tone="accent"    size="md">Player</Pill> },
-    { label: 'secondary/md', node: <Pill tone="secondary" size="md">DM</Pill> },
-    { label: 'ink/md',       node: <Pill tone="ink"       size="md">Ink</Pill> },
-    { label: 'stone/md',     node: <Pill tone="stone"     size="md">Stone</Pill> },
-    { label: 'amber/md',     node: <Pill tone="amber"     size="md">Amber</Pill> },
-    { label: 'primary/sm',   node: <Pill tone="primary"   size="sm">Active sm</Pill> },
-    { label: 'accent/sm',    node: <Pill tone="accent"    size="sm">Player sm</Pill> },
+  propsSchema: {
+    tone:     { kind: 'enum', options: ['primary', 'accent', 'secondary', 'ink', 'stone', 'amber'] as const, default: 'primary', label: 'Tone' },
+    size:     { kind: 'enum', options: ['sm', 'md'] as const,                                                 default: 'md',      label: 'Size' },
+    children: { kind: 'node', default: 'Label',                                                               label: 'Label' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { tone: 'primary',   size: 'md', children: 'Active' },
+    { tone: 'accent',    size: 'md', children: 'Player' },
+    { tone: 'secondary', size: 'md', children: 'DM' },
+    { tone: 'ink',       size: 'md', children: 'Ink' },
+    { tone: 'stone',     size: 'md', children: 'Stone' },
+    { tone: 'amber',     size: 'md', children: 'Amber' },
+    { tone: 'primary',   size: 'sm', children: 'Active sm' },
+    { tone: 'accent',    size: 'sm', children: 'Player sm' },
   ],
+  render: (p) => (
+    <Pill
+      tone={p.tone as 'primary' | 'accent' | 'secondary' | 'ink' | 'stone' | 'amber'}
+      size={p.size as 'sm' | 'md'}
+    >
+      {p.children as ReactNode}
+    </Pill>
+  ),
 };
 
 const cardEntry: ComponentEntry = {
@@ -79,10 +96,15 @@ const cardEntry: ComponentEntry = {
   name: 'Card',
   group: 'ui',
   notes: 'CardVariant: surface | surface-soft | ink.',
-  variants: [
+  propsSchema: {
+    variant:  { kind: 'enum', options: ['surface', 'surface-soft', 'ink'] as const, default: 'surface', label: 'Variant' },
+    children: { kind: 'node', default: undefined,                                                       label: 'Content' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
     {
-      label: 'surface',
-      node: (
+      variant: 'surface',
+      children: (
         <Card variant="surface" className="p-4">
           <p className="text-sm text-ink">Surface card</p>
           <p className="text-xs text-ink-mute">Default variant — border + shadow-stamp-md</p>
@@ -90,8 +112,8 @@ const cardEntry: ComponentEntry = {
       ),
     },
     {
-      label: 'surface-soft',
-      node: (
+      variant: 'surface-soft',
+      children: (
         <Card variant="surface-soft" className="p-4">
           <p className="text-sm text-ink">Surface-soft card</p>
           <p className="text-xs text-ink-mute">Lighter bg + shadow-stamp-sm</p>
@@ -99,8 +121,8 @@ const cardEntry: ComponentEntry = {
       ),
     },
     {
-      label: 'ink',
-      node: (
+      variant: 'ink',
+      children: (
         <Card variant="ink" className="p-4">
           <p className="text-sm text-ink">Ink card</p>
           <p className="text-xs text-ink-mute">Gradient hero treatment</p>
@@ -108,6 +130,8 @@ const cardEntry: ComponentEntry = {
       ),
     },
   ],
+  // render returns the pre-built node from explicitCombos (children carries the full Card JSX)
+  render: (p) => p.children as ReactNode,
 };
 
 const iconEntry: ComponentEntry = {
@@ -115,30 +139,43 @@ const iconEntry: ComponentEntry = {
   name: 'Icon',
   group: 'ui',
   notes: '28 SVG icons. Props: name, size (default 20), strokeWidth (default 1.5).',
-  variants: [
-    { label: 'shield/20',    node: <Icon name="shield"   size={20} /> },
-    { label: 'sword/20',     node: <Icon name="sword"    size={20} /> },
-    { label: 'scroll/20',    node: <Icon name="scroll"   size={20} /> },
-    { label: 'user/20',      node: <Icon name="user"     size={20} /> },
-    { label: 'dice/20',      node: <Icon name="dice"     size={20} /> },
-    { label: 'sparkle/20',   node: <Icon name="sparkle"  size={20} /> },
-    { label: 'heart/20',     node: <Icon name="heart"    size={20} /> },
-    { label: 'wand/20',      node: <Icon name="wand"     size={20} /> },
-    { label: 'crown/20',     node: <Icon name="crown"    size={20} /> },
-    { label: 'compass/20',   node: <Icon name="compass"  size={20} /> },
-    { label: 'book/20',      node: <Icon name="book"     size={20} /> },
-    { label: 'home/20',      node: <Icon name="home"     size={20} /> },
-    { label: 'eye/20',       node: <Icon name="eye"      size={20} /> },
-    { label: 'check/20',     node: <Icon name="check"    size={20} /> },
-    { label: 'plus/20',      node: <Icon name="plus"     size={20} /> },
-    { label: 'minus/20',     node: <Icon name="minus"    size={20} /> },
-    { label: 'edit/20',      node: <Icon name="edit"     size={20} /> },
-    { label: 'bag/20',       node: <Icon name="bag"      size={20} /> },
-    { label: 'bolt/20',      node: <Icon name="bolt"     size={20} /> },
-    { label: 'arrow-left/20', node: <Icon name="arrow-left"  size={20} /> },
-    { label: 'arrow-right/20', node: <Icon name="arrow-right" size={20} /> },
-    { label: 'shield/32',    node: <Icon name="shield"   size={32} strokeWidth={1} /> },
+  propsSchema: {
+    name:        { kind: 'enum',   options: ['shield','sword','scroll','user','dice','sparkle','heart','wand','crown','compass','book','home','eye','check','plus','minus','edit','bag','bolt','arrow-left','arrow-right','flame','bow','cross','leaf','star','feather','hammer'] as const, default: 'shield', label: 'Name' },
+    size:        { kind: 'number', default: 20,  label: 'Size' },
+    strokeWidth: { kind: 'number', default: 1.5, label: 'Stroke Width' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { name: 'shield',      size: 20, strokeWidth: 1.75 },
+    { name: 'sword',       size: 20, strokeWidth: 1.75 },
+    { name: 'scroll',      size: 20, strokeWidth: 1.75 },
+    { name: 'user',        size: 20, strokeWidth: 1.75 },
+    { name: 'dice',        size: 20, strokeWidth: 1.75 },
+    { name: 'sparkle',     size: 20, strokeWidth: 1.75 },
+    { name: 'heart',       size: 20, strokeWidth: 1.75 },
+    { name: 'wand',        size: 20, strokeWidth: 1.75 },
+    { name: 'crown',       size: 20, strokeWidth: 1.75 },
+    { name: 'compass',     size: 20, strokeWidth: 1.75 },
+    { name: 'book',        size: 20, strokeWidth: 1.75 },
+    { name: 'home',        size: 20, strokeWidth: 1.75 },
+    { name: 'eye',         size: 20, strokeWidth: 1.75 },
+    { name: 'check',       size: 20, strokeWidth: 1.75 },
+    { name: 'plus',        size: 20, strokeWidth: 1.75 },
+    { name: 'minus',       size: 20, strokeWidth: 1.75 },
+    { name: 'edit',        size: 20, strokeWidth: 1.75 },
+    { name: 'bag',         size: 20, strokeWidth: 1.75 },
+    { name: 'bolt',        size: 20, strokeWidth: 1.75 },
+    { name: 'arrow-left',  size: 20, strokeWidth: 1.75 },
+    { name: 'arrow-right', size: 20, strokeWidth: 1.75 },
+    { name: 'shield',      size: 32, strokeWidth: 1 },
   ],
+  render: (p) => (
+    <Icon
+      name={p.name as Parameters<typeof Icon>[0]['name']}
+      size={p.size as number}
+      strokeWidth={p.strokeWidth as number}
+    />
+  ),
 };
 
 const sectionHeadEntry: ComponentEntry = {
@@ -146,11 +183,24 @@ const sectionHeadEntry: ComponentEntry = {
   name: 'SectionHead',
   group: 'ui',
   notes: 'Props: num (optional), title, meta (optional).',
-  variants: [
-    { label: 'title only',         node: <SectionHead title="Abilities" /> },
-    { label: 'with num',           node: <SectionHead num={1} title="Choose Race" /> },
-    { label: 'with num + meta',    node: <SectionHead num="★" title="Special" meta="3 slots" /> },
+  propsSchema: {
+    num:   { kind: 'string', label: 'Num (optional)' },
+    title: { kind: 'string', default: 'Abilities', label: 'Title' },
+    meta:  { kind: 'node',   label: 'Meta (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { title: 'Abilities' },
+    { num: '1', title: 'Choose Race' },
+    { num: '★', title: 'Special', meta: '3 slots' },
   ],
+  render: (p) => (
+    <SectionHead
+      num={p.num as string | number | undefined}
+      title={p.title as string}
+      meta={p.meta as ReactNode}
+    />
+  ),
 };
 
 const crowMarkEntry: ComponentEntry = {
@@ -158,9 +208,8 @@ const crowMarkEntry: ComponentEntry = {
   name: 'CrowMark',
   group: 'ui',
   notes: 'App logo mark. No props.',
-  variants: [
-    { label: 'default', node: <CrowMark /> },
-  ],
+  propsSchema: {},
+  render: () => <CrowMark />,
 };
 
 const discordIconEntry: ComponentEntry = {
@@ -168,10 +217,15 @@ const discordIconEntry: ComponentEntry = {
   name: 'DiscordIcon',
   group: 'ui',
   notes: 'Discord SVG glyph. Props: size (default 20).',
-  variants: [
-    { label: 'size 24', node: <DiscordIcon size={24} /> },
-    { label: 'size 32', node: <DiscordIcon size={32} /> },
+  propsSchema: {
+    size: { kind: 'number', default: 20, label: 'Size' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { size: 24 },
+    { size: 32 },
   ],
+  render: (p) => <DiscordIcon size={p.size as number} />,
 };
 
 const emptyEntry: ComponentEntry = {
@@ -179,53 +233,58 @@ const emptyEntry: ComponentEntry = {
   name: 'V3Empty',
   group: 'ui',
   notes: 'Empty state component. Props: glyph (IconName), title, sub (optional).',
-  variants: [
-    { label: 'title only',       node: <V3Empty glyph="scroll" title="No results" /> },
-    { label: 'with sub',         node: <V3Empty glyph="dice" title="Nothing here" sub="Try adjusting your filters or search query." /> },
+  propsSchema: {
+    glyph:  { kind: 'enum',   options: ['scroll', 'dice', 'shield', 'user'] as const, default: 'scroll', label: 'Glyph' },
+    title:  { kind: 'string', default: 'No results',                                                      label: 'Title' },
+    sub:    { kind: 'string', label: 'Sub (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { glyph: 'scroll', title: 'No results' },
+    { glyph: 'dice',   title: 'Nothing here', sub: 'Try adjusting your filters or search query.' },
   ],
+  render: (p) => (
+    <V3Empty
+      glyph={p.glyph as Parameters<typeof V3Empty>[0]['glyph']}
+      title={p.title as string}
+      sub={p.sub as string | undefined}
+    />
+  ),
 };
 
-// ── layout/ group ──
+// ── layout/ group ─────────────────────────────────────────────────────────────
 
 const topbarEntry: ComponentEntry = {
   id: 'topbar',
   name: 'TopBar',
   group: 'layout',
   notes: 'Props: title, subtitle?, right?, canBeDM?, hasNotif?, backHref?, roleDefault?.',
-  variants: [
-    {
-      label: 'default',
-      node: (
-        <div className="bg-paper rounded-md overflow-hidden">
-          <TopBar title="Inicio" canBeDM={false} />
-        </div>
-      ),
-    },
-    {
-      label: 'with subtitle + notif',
-      node: (
-        <div className="bg-paper rounded-md overflow-hidden">
-          <TopBar title="Campañas" subtitle="3 activas" hasNotif canBeDM={false} />
-        </div>
-      ),
-    },
-    {
-      label: 'with back arrow',
-      node: (
-        <div className="bg-paper rounded-md overflow-hidden">
-          <TopBar title="Ficha de Personaje" backHref="/personajes" canBeDM={false} />
-        </div>
-      ),
-    },
-    {
-      label: 'with role switcher',
-      node: (
-        <div className="bg-paper rounded-md overflow-hidden">
-          <TopBar title="Inicio" canBeDM roleDefault="player" />
-        </div>
-      ),
-    },
+  propsSchema: {
+    title:    { kind: 'string',  default: 'Inicio', label: 'Title' },
+    subtitle: { kind: 'string',  label: 'Subtitle (optional)' },
+    hasNotif: { kind: 'boolean', default: false,    label: 'Has Notification' },
+    backHref: { kind: 'string',  label: 'Back href (optional)' },
+    canBeDM:  { kind: 'boolean', default: false,    label: 'Can Be DM' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { title: 'Inicio',              canBeDM: false },
+    { title: 'Campañas',            subtitle: '3 activas', hasNotif: true,  canBeDM: false },
+    { title: 'Ficha de Personaje',  backHref: '/personajes',                canBeDM: false },
+    { title: 'Inicio',              canBeDM: true,        roleDefault: 'player' },
   ],
+  render: (p) => (
+    <div className="bg-paper rounded-md overflow-hidden">
+      <TopBar
+        title={p.title as string}
+        subtitle={p.subtitle as string | undefined}
+        hasNotif={p.hasNotif as boolean | undefined}
+        backHref={p.backHref as string | undefined}
+        canBeDM={p.canBeDM as boolean}
+        roleDefault={p.roleDefault as 'player' | 'dm' | undefined}
+      />
+    </div>
+  ),
 };
 
 const appShellEntry: ComponentEntry = {
@@ -233,18 +292,17 @@ const appShellEntry: ComponentEntry = {
   name: 'AppShell',
   group: 'layout',
   notes: 'Full page shell: TopBar + main + TabBar. Shown without TabBar to avoid fixed-position clash in catalog.',
-  variants: [
-    {
-      label: 'shell (no tabbar)',
-      node: (
-        <div className="relative bg-paper rounded-md overflow-hidden" style={{ height: '200px' }}>
-          <AppShell title="Personajes" showTabBar={false} canBeDM={false}>
-            <p className="text-sm text-ink-mute">Page content renders here inside max-w-sm px-4 py-4.</p>
-          </AppShell>
-        </div>
-      ),
-    },
-  ],
+  propsSchema: {
+    title:   { kind: 'string', default: 'Personajes', label: 'Title' },
+    canBeDM: { kind: 'boolean', default: false,        label: 'Can Be DM' },
+  },
+  render: () => (
+    <div className="relative bg-paper rounded-md overflow-hidden" style={{ height: '200px' }}>
+      <AppShell title="Personajes" showTabBar={false} canBeDM={false}>
+        <p className="text-sm text-ink-mute">Page content renders here inside max-w-sm px-4 py-4.</p>
+      </AppShell>
+    </div>
+  ),
 };
 
 const tabbarEntry: ComponentEntry = {
@@ -252,9 +310,8 @@ const tabbarEntry: ComponentEntry = {
   name: 'TabBar',
   group: 'layout',
   notes: 'Client component. Shown via TabBarIsland (static preview wrapper) to avoid route dependency in catalog.',
-  variants: [
-    { label: 'player tabs (interactive)', node: <TabBarIsland /> },
-  ],
+  propsSchema: {},
+  render: () => <TabBarIsland />,
 };
 
 const roleSwitcherEntry: ComponentEntry = {
@@ -262,9 +319,8 @@ const roleSwitcherEntry: ComponentEntry = {
   name: 'RoleSwitcher',
   group: 'layout',
   notes: 'Client component. Animated pill — Jugador/DM. Writes dh:role cookie on toggle.',
-  variants: [
-    { label: 'default (player)', node: <RoleSwitcherIsland /> },
-  ],
+  propsSchema: {},
+  render: () => <RoleSwitcherIsland />,
 };
 
 const navProgressEntry: ComponentEntry = {
@@ -272,17 +328,13 @@ const navProgressEntry: ComponentEntry = {
   name: 'NavProgress',
   group: 'layout',
   notes: 'Top progress bar, activates on client-side navigation. Nothing visible at rest — renders null when inactive.',
-  variants: [
-    {
-      label: 'at rest (null)',
-      node: (
-        <div className="px-3 py-2 bg-surface rounded text-xs text-ink-mute">
-          NavProgress renders <code className="font-mono text-ink-soft">null</code> when no navigation is in progress.
-          It activates automatically when a &lt;Link&gt; is clicked.
-        </div>
-      ),
-    },
-  ],
+  propsSchema: {},
+  render: () => (
+    <div className="px-3 py-2 bg-surface rounded text-xs text-ink-mute">
+      NavProgress renders <code className="font-mono text-ink-soft">null</code> when no navigation is in progress.
+      It activates automatically when a &lt;Link&gt; is clicked.
+    </div>
+  ),
 };
 
 const stepperEntry: ComponentEntry = {
@@ -290,28 +342,24 @@ const stepperEntry: ComponentEntry = {
   name: 'Stepper',
   group: 'layout',
   notes: 'Client component. Wizard step progress bar. Requires a characterId. Shown as static rendering below.',
-  variants: [
-    {
-      label: 'static layout',
-      node: (
-        <div className="overflow-x-auto px-1 py-2">
-          <ol className="flex items-center gap-1.5 min-w-max">
-            {['Atributos', 'Linaje', 'Clase', 'Trasfondo', 'Equipo', 'Hechizos', 'Revisión'].map((label, i) => (
-              <li key={label} className="flex items-center gap-1.5 shrink-0">
-                <span
-                  className={`inline-flex items-center h-7 ${i === 1 ? 'gap-2 rounded-pill bg-ink pl-1 pr-3 py-1 text-paper text-xs font-semibold' : 'w-7 justify-center rounded-pill text-xs font-semibold ' + (i < 1 ? 'bg-primary-soft text-primary-deep' : 'bg-surface text-ink-mute border border-line')}`}
-                >
-                  {i + 1}
-                  {i === 1 && <span className="text-xs font-semibold">{label}</span>}
-                </span>
-                {i < 6 && <span className="text-line text-xs select-none">›</span>}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ),
-    },
-  ],
+  propsSchema: {},
+  render: () => (
+    <div className="overflow-x-auto px-1 py-2">
+      <ol className="flex items-center gap-1.5 min-w-max">
+        {['Atributos', 'Linaje', 'Clase', 'Trasfondo', 'Equipo', 'Hechizos', 'Revisión'].map((label, i) => (
+          <li key={label} className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`inline-flex items-center h-7 ${i === 1 ? 'gap-2 rounded-pill bg-ink pl-1 pr-3 py-1 text-paper text-xs font-semibold' : 'w-7 justify-center rounded-pill text-xs font-semibold ' + (i < 1 ? 'bg-primary-soft text-primary-deep' : 'bg-surface text-ink-mute border border-line')}`}
+            >
+              {i + 1}
+              {i === 1 && <span className="text-xs font-semibold">{label}</span>}
+            </span>
+            {i < 6 && <span className="text-line text-xs select-none">›</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  ),
 };
 
 const numberedSectionHeadEntry: ComponentEntry = {
@@ -319,26 +367,40 @@ const numberedSectionHeadEntry: ComponentEntry = {
   name: 'NumberedSectionHead',
   group: 'layout',
   notes: 'Props: num, title, meta?, description?.',
-  variants: [
-    { label: 'basic',                node: <NumberedSectionHead num="1" title="Choose your race" /> },
-    { label: 'with meta',            node: <NumberedSectionHead num="2" title="Class Features" meta="3 choices" /> },
-    { label: 'with description',     node: <NumberedSectionHead num="3" title="Background" description="Your background defines who you were before becoming an adventurer." /> },
+  propsSchema: {
+    num:         { kind: 'string', default: '1',            label: 'Num' },
+    title:       { kind: 'string', default: 'Choose race', label: 'Title' },
+    meta:        { kind: 'string', label: 'Meta (optional)' },
+    description: { kind: 'string', label: 'Description (optional)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { num: '1', title: 'Choose your race' },
+    { num: '2', title: 'Class Features', meta: '3 choices' },
+    { num: '3', title: 'Background', description: 'Your background defines who you were before becoming an adventurer.' },
   ],
+  render: (p) => (
+    <NumberedSectionHead
+      num={p.num as string}
+      title={p.title as string}
+      meta={p.meta as string | undefined}
+      description={p.description as string | undefined}
+    />
+  ),
 };
 
-// ── sheet/ group ──
+// ── sheet/ group ──────────────────────────────────────────────────────────────
 
 const v3SheetEntry: ComponentEntry = {
   id: 'v3-sheet',
   name: 'V3Sheet',
   group: 'sheet',
   notes: 'Client component. Portal-based bottom modal. Props: open, onClose, title?, labelledBy?, children.',
-  variants: [
-    { label: 'open/close demo', node: <V3SheetIsland /> },
-  ],
+  propsSchema: {},
+  render: () => <V3SheetIsland />,
 };
 
-// ── Registry export ──
+// ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
   // ui/
