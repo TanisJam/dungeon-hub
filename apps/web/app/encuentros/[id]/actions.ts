@@ -107,6 +107,54 @@ export async function deactivateRage(
   return { ok: true };
 }
 
+// ─── passTurn ─────────────────────────────────────────────────────────────────
+// POST /encounters/:id/actions/pass-turn  { version }
+// REQ-WCPT-WEB-ACTION-01 — player passes own turn (PHB p.189 — VTT convenience).
+// combatantId validated locally but NOT sent in body (body is { version } only).
+// Authz is server-derived (currentCombatantId) — no caller-supplied combatantId needed.
+
+export async function passTurn(
+  encounterId: string,
+  combatantId: string,
+  version: number,
+): Promise<EncounterActionResult> {
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
+  if (!IdSchema.safeParse(combatantId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid combatant ID' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { ok: false, code: 'UNAUTHORIZED' };
+
+  try {
+    await api.post(
+      `/encounters/${encounterId}/actions/pass-turn`,
+      { version },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    if (err instanceof ApiError && err.status === 409) {
+      return { ok: false, code: 'VERSION_CONFLICT' };
+    }
+    const msg =
+      err instanceof ApiError
+        ? (err.body as { error?: string } | null)?.error
+        : undefined;
+    return { ok: false, code: 'API_ERROR', message: msg };
+  }
+
+  revalidatePath(`/encuentros/${encounterId}`);
+  return { ok: true };
+}
+
 // ─── useResource ─────────────────────────────────────────────────────────────
 // POST /characters/:id/resources/use  { slug, amount? }
 

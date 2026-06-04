@@ -23,6 +23,8 @@ import { TurnBanner } from '@/components/encuentros/turn-banner';
 import { RefreshButton } from '@/components/encuentros/refresh-button';
 import { ResourcePanel } from '@/components/encuentros/resource-panel';
 import { RageControls } from '@/components/encuentros/rage-controls';
+import { PlayerActionPanel } from '@/components/encuentros/player-action-panel';
+import { PassTurnButton } from '@/components/encuentros/pass-turn-button';
 import type { EncounterDetail } from '@/components/encuentros/types';
 import type { ClassResourceView, SheetResponse } from '@/lib/sheet-types';
 
@@ -172,6 +174,19 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
               version={detail.version}
             />
           </section>
+        )}
+
+        {/* REQ-WCPT-WEB-UI-01: PlayerActionPanel — only on own turn in active encounter.
+            Placed BELOW Rage section, ABOVE Recursos — turn-level actions (ADR-5). */}
+        {ownCombatant != null && isOwnTurn && detail.status === 'active' && (
+          <PlayerActionPanel>
+            <PassTurnButton
+              encounterId={detail.id}
+              combatantId={ownCombatant.id}
+              version={detail.version}
+              isOwnTurn={isOwnTurn}
+            />
+          </PlayerActionPanel>
         )}
 
         {/* REQ-WCO-WEB-05: ResourcePanel — only when player has an own combatant */}
