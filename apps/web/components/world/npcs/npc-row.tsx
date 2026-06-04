@@ -1,7 +1,7 @@
 // NpcRow — renders one NPC list row.
 // REQ-NPC-01: name + status pill, ≥44px (wrapper provides min-h-[44px]).
 
-import { Pill } from '@/components/ui';
+import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { NpcRow as NpcRowData, NpcStatus } from '@/app/codex/actions';
 
@@ -25,11 +25,13 @@ const STATUS_TONES: Record<NpcStatus, PillTone> = {
 
 export function NpcRowView({ row }: NpcRowProps) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2">
-      <span className="flex-1 text-sm font-medium text-ink">{row.name}</span>
-      <Pill tone={STATUS_TONES[row.status]} size="sm">
-        {STATUS_LABELS[row.status]}
-      </Pill>
-    </div>
+    <ListRow
+      title={row.name}
+      trailing={
+        <Pill tone={STATUS_TONES[row.status]} size="sm">
+          {STATUS_LABELS[row.status]}
+        </Pill>
+      }
+    />
   );
 }

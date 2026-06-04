@@ -2,8 +2,10 @@
 // Shows: name | terrain | status (static pill, no filter chips — ADR-4).
 // REQ-MAP-01.
 // B2: STATUS_STYLE raw-tw-colors removed; status pills now use <Pill> with design tokens.
+// C2: adopted ListRow (title=name, subtitle=terrain, trailing=status Pill).
 
 import type { HexRow, HexStatus } from '@/app/mapa/actions';
+import { ListRow } from '@/components/ui/list-row';
 import { Pill } from '@/components/ui/pill';
 import { HEX_STATUS_TONE } from './status-tones';
 
@@ -22,23 +24,20 @@ interface HexRowViewProps {
 export function HexRowView({ row }: HexRowViewProps) {
   const label = STATUS_LABEL[row.status] ?? row.status;
   const tone = HEX_STATUS_TONE[row.status] ?? 'stone';
+  const name = row.name ?? `Hex (${row.q},${row.r})`;
 
   return (
-    <div className="flex min-h-[44px] items-center gap-3 py-2">
-      {/* Name + terrain */}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink">
-          {row.name ?? `Hex (${row.q},${row.r})`}
-        </p>
-        {row.terrain && (
-          <p className="truncate text-xs text-ink-soft">{row.terrain}</p>
-        )}
-      </div>
-
-      {/* Status pill — static, no filter (ADR-4) */}
-      <Pill tone={tone} size="sm">
-        {label}
-      </Pill>
+    <div className="min-h-[44px] flex items-center">
+      <ListRow
+        title={name}
+        subtitle={row.terrain ?? undefined}
+        trailing={
+          <Pill tone={tone} size="sm">
+            {label}
+          </Pill>
+        }
+        className="flex-1"
+      />
     </div>
   );
 }

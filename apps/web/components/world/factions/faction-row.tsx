@@ -1,7 +1,7 @@
 // FactionRow — renders one faction list row.
 // REQ-FAC-01: name + state pill, ≥44px (wrapper provides min-h-[44px]).
 
-import { Pill } from '@/components/ui';
+import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { FactionRow as FactionRowData, FactionState } from '@/app/codex/actions';
 
@@ -25,11 +25,13 @@ const STATE_TONES: Record<FactionState, PillTone> = {
 
 export function FactionRowView({ row }: FactionRowProps) {
   return (
-    <div className="flex items-center justify-between gap-2 py-2">
-      <span className="flex-1 text-sm font-medium text-ink">{row.name}</span>
-      <Pill tone={STATE_TONES[row.state]} size="sm">
-        {STATE_LABELS[row.state]}
-      </Pill>
-    </div>
+    <ListRow
+      title={row.name}
+      trailing={
+        <Pill tone={STATE_TONES[row.state]} size="sm">
+          {STATE_LABELS[row.state]}
+        </Pill>
+      }
+    />
   );
 }

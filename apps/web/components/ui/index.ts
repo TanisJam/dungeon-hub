@@ -30,3 +30,9 @@ export type { DashedCTAProps } from './dashed-cta';
 
 export { CharacterPortrait } from './character-portrait';
 export type { CharacterPortraitProps } from './character-portrait';
+
+export { ListRow } from './list-row';
+export type { ListRowProps } from './list-row';
+
+export { QuestRow } from './quest-row';
+export type { QuestRowProps } from './quest-row';
