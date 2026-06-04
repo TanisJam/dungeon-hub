@@ -27,3 +27,6 @@ export { FormSubmitButton } from './form-submit-button';
 
 export { DashedCTA } from './dashed-cta';
 export type { DashedCTAProps } from './dashed-cta';
+
+export { CharacterPortrait } from './character-portrait';
+export type { CharacterPortraitProps } from './character-portrait';

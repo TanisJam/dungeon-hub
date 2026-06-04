@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 // ui/ primitives
 import { Button } from '@/components/ui/button';
+import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { DashedCTA } from '@/components/ui/dashed-cta';
 import { Pill } from '@/components/ui/pill';
 import { Card } from '@/components/ui/card';
@@ -212,6 +213,33 @@ const dashedCtaEntry: ComponentEntry = {
     >
       {p.children as ReactNode}
     </DashedCTA>
+  ),
+};
+
+const characterPortraitEntry: ComponentEntry = {
+  id: 'character-portrait',
+  name: 'CharacterPortrait',
+  group: 'ui',
+  notes: 'Avatar-portrait atom. size="md" (72px square, accent-gold gradient) + size="sm" (48px round, magenta radial). Never hardcodes hex — uses personajes-portrait / pendientes-portrait CSS classes. Layout props (border-r etc.) passed via className.',
+  propsSchema: {
+    name: { kind: 'string', default: 'Brann Cuervosombrío', label: 'Character name' },
+    size: { kind: 'enum', options: ['md', 'sm'] as const, default: 'md', label: 'Size' },
+    className: { kind: 'string', label: 'Extra classes (layout / border)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { name: 'Brann Cuervosombrío', size: 'md' },
+    { name: 'Brann Cuervosombrío', size: 'md', className: 'border-r border-line' },
+    { name: 'Arken Drûm',          size: 'md', className: 'border-r border-accent' },
+    { name: 'Lyra',                size: 'sm' },
+    { name: '   ',                 size: 'md' },
+  ],
+  render: (p) => (
+    <CharacterPortrait
+      name={p.name as string}
+      size={p.size as 'md' | 'sm'}
+      className={p.className as string | undefined}
+    />
   ),
 };
 
@@ -521,6 +549,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   cardEntry,
   iconEntry,
   dashedCtaEntry,
+  characterPortraitEntry,
   sectionHeadEntry,
   crowMarkEntry,
   discordIconEntry,

@@ -747,6 +747,10 @@
 .ficha-portrait-ring {
   background: conic-gradient(from 180deg, #E8946F 0%, #6F86C9 40%, #B6829F 70%, #E8946F 100%);
 }
+/* Inner fill of the portrait ring — replaces hardcoded inline style */
+.ficha-portrait-inner {
+  background: linear-gradient(135deg, #2A2240 0%, #1B1428 100%);
+}
 /* HP tile — peach gradient (was inline) */
 .ficha-vital-hp {
   background: linear-gradient(135deg, rgba(251,229,216,0.9) 0%, rgba(232,148,111,0.3) 100%);
