@@ -5,13 +5,12 @@
 // and short/long rest buttons. Calls route-local Server Actions; handles
 // VERSION_CONFLICT with a toast + router.refresh() per D4.
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
-import type { ClassResourceView } from '@/lib/sheet-types';
 import { useResource, restoreResource, shortRest, longRest } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
 import { Toast } from '@/components/ui/toast';
 import { useToast } from '@/lib/use-toast';
+import { useEncounterAction } from './use-encounter-action';
+import type { ClassResourceView } from '@/lib/sheet-types';
 
 // Display name map — mirrors the subset shown in RecursosTab (recursos.tsx).
 // PHB references: Ki Points PHB p.76, Second Wind PHB p.72, etc.
@@ -35,60 +34,25 @@ type Props = {
 };
 
 export function ResourcePanel({ characterId, encounterId, resources }: Props) {
-  const router = useRouter();
   const { message: toast, showToast } = useToast();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const { isPending, actionError, runAction } = useEncounterAction({
+    onConflict: () => showToast('El estado cambió, actualizando...'),
+  });
 
-  async function handleUse(slug: string) {
-    startTransition(async () => {
-      setActionError(null);
-      const result = await useResource(characterId, encounterId, slug);
-      if (!result.ok) {
-        if (result.code === 'VERSION_CONFLICT') {
-          // REQ-WCO-WEB-07: stale-page handling
-          showToast('El estado cambió, actualizando...');
-          router.refresh();
-        } else {
-          setActionError(result.message ?? 'Error al usar el recurso');
-        }
-      }
-    });
+  function handleUse(slug: string) {
+    runAction(() => useResource(characterId, encounterId, slug));
   }
 
-  async function handleRestore(slug: string) {
-    startTransition(async () => {
-      setActionError(null);
-      const result = await restoreResource(characterId, encounterId, slug);
-      if (!result.ok) {
-        if (result.code === 'VERSION_CONFLICT') {
-          showToast('El estado cambió, actualizando...');
-          router.refresh();
-        } else {
-          setActionError(result.message ?? 'Error al restaurar el recurso');
-        }
-      }
-    });
+  function handleRestore(slug: string) {
+    runAction(() => restoreResource(characterId, encounterId, slug));
   }
 
-  async function handleShortRest() {
-    startTransition(async () => {
-      setActionError(null);
-      const result = await shortRest(characterId, encounterId);
-      if (!result.ok) {
-        setActionError(result.message ?? 'Error al realizar descanso corto');
-      }
-    });
+  function handleShortRest() {
+    runAction(() => shortRest(characterId, encounterId));
   }
 
-  async function handleLongRest() {
-    startTransition(async () => {
-      setActionError(null);
-      const result = await longRest(characterId, encounterId);
-      if (!result.ok) {
-        setActionError(result.message ?? 'Error al realizar descanso largo');
-      }
-    });
+  function handleLongRest() {
+    runAction(() => longRest(characterId, encounterId));
   }
 
   return (

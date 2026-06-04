@@ -7,11 +7,11 @@
 // No optimistic UI. VERSION_CONFLICT → router.refresh() + close (mirrors RageControls).
 // PHB p.189-190, 192 — weapon attack costs the Action for the turn.
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { attackApplyAction } from '@/app/encuentros/[id]/actions';
+import { useEncounterAction } from './use-encounter-action';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 import type { EncounterCombatant } from './types';
 
@@ -69,13 +69,16 @@ export function AttackSheet({
   isOwnTurn,
   actionUsed,
 }: Props) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>('weapon');
   const [selectedWeapon, setSelectedWeapon] = useState<EnrichedInventoryItem | null>(null);
-  const [attackError, setAttackError] = useState<string | null>(null);
   const [attackResult, setAttackResult] = useState<AttackResult | null>(null);
-  const [isPending, startTransition] = useTransition();
+
+  // ADR-3: VERSION_CONFLICT → router.refresh() + close via onConflict callback.
+  const { isPending, actionError: attackError, runAction } = useEncounterAction({
+    fallbackError: 'Error al realizar el ataque. Intentá nuevamente.',
+    onConflict: () => setOpen(false),
+  });
 
   // REQ-WCA-WEB-UI-01: trigger hidden when no weapons or no NPC targets
   const hasWeapons = equippedWeapons.length > 0;
@@ -89,7 +92,6 @@ export function AttackSheet({
     // Reset state on each open
     setStep('weapon');
     setSelectedWeapon(null);
-    setAttackError(null);
     setAttackResult(null);
     setOpen(true);
   }
@@ -106,8 +108,7 @@ export function AttackSheet({
   function handlePickTarget(target: EncounterCombatant) {
     if (!selectedWeapon) return;
 
-    startTransition(async () => {
-      setAttackError(null);
+    runAction(async () => {
       const res = await attackApplyAction(
         encounterId,
         attackerCombatantId,
@@ -116,27 +117,22 @@ export function AttackSheet({
         version,
       );
 
-      if (!res.ok) {
-        if (res.code === 'VERSION_CONFLICT') {
-          // ADR-3: stale state — refresh and close (mirrors RageControls/PassTurnButton pattern)
-          router.refresh();
-          setOpen(false);
-          return;
-        }
-        if (res.code === 'FORBIDDEN') {
-          setAttackError('No tienes permiso para realizar esta acción.');
-          return;
-        }
-        if (res.code === 'TARGET_NOT_NPC') {
-          setAttackError('El objetivo seleccionado no es un NPC. Recargá la página e intentá nuevamente.');
-          return;
-        }
-        setAttackError(res.message ?? 'Error al realizar el ataque. Intentá nuevamente.');
-        return;
+      // Normalize TARGET_NOT_NPC with its component-specific message so the
+      // hook's generic error branch sets the correct text.
+      if (!res.ok && res.code === 'TARGET_NOT_NPC') {
+        return {
+          ...res,
+          message: 'El objetivo seleccionado no es un NPC. Recargá la página e intentá nuevamente.',
+        };
       }
 
-      setAttackResult(res.result as AttackResult);
-      setStep('result');
+      // On success advance to result step.
+      if (res.ok) {
+        setAttackResult(res.result as AttackResult);
+        setStep('result');
+      }
+
+      return res;
     });
   }
 

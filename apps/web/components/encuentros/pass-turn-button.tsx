@@ -7,10 +7,9 @@
 // FORBIDDEN → inline error.
 // PHB p.189 — a creature may take fewer actions and declare its turn complete.
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { passTurn } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
+import { useEncounterAction } from './use-encounter-action';
 
 type Props = {
   encounterId: string;
@@ -22,27 +21,12 @@ type Props = {
 };
 
 export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }: Props) {
-  const router = useRouter();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const { isPending, actionError, runAction } = useEncounterAction({
+    fallbackError: 'Error al pasar el turno.',
+  });
 
   function handleClick() {
-    startTransition(async () => {
-      setActionError(null);
-      const result = await passTurn(encounterId, combatantId, version);
-      if (!result.ok) {
-        if (result.code === 'VERSION_CONFLICT') {
-          // ADR-4: stale-page handling — same pattern as ResourcePanel / RageControls.
-          router.refresh();
-        } else if (result.code === 'FORBIDDEN') {
-          setActionError('No tienes permiso para realizar esta acción.');
-        } else {
-          setActionError(result.message ?? 'Error al pasar el turno.');
-        }
-      }
-      // On success: revalidatePath in Server Action triggers SC re-render.
-      // No optimistic state update needed (REQ-WCPT-WEB-UI-01).
-    });
+    runAction(() => passTurn(encounterId, combatantId, version));
   }
 
   return (

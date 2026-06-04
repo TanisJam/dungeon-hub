@@ -8,12 +8,11 @@
 // VERSION_CONFLICT → router.refresh() (mirrors ResourcePanel pattern).
 // PHB p.48 — Rage: enter/end as a bonus action on own turn.
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { activateRage, deactivateRage } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
 import { Toast } from '@/components/ui/toast';
 import { useToast } from '@/lib/use-toast';
+import { useEncounterAction } from './use-encounter-action';
 
 type Props = {
   combatantId: string;
@@ -54,10 +53,11 @@ export function RageControls({
   rageUnlimited,
   version,
 }: Props) {
-  const router = useRouter();
   const { message: toast, showToast } = useToast();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const { isPending, actionError, runAction } = useEncounterAction({
+    fallbackError: 'Error al cambiar estado de Furia.',
+    onConflict: () => showToast('El estado cambió, actualizando...'),
+  });
 
   // Button is disabled when:
   //   - not own turn (PHB: must be own turn to use a bonus action)
@@ -70,24 +70,8 @@ export function RageControls({
     (!isRaging && !rageUnlimited && rageUsesRemaining <= 0);
 
   function handleClick() {
-    startTransition(async () => {
-      setActionError(null);
-      const action = isRaging ? deactivateRage : activateRage;
-      const result = await action(encounterId, combatantId, version);
-      if (!result.ok) {
-        if (result.code === 'VERSION_CONFLICT') {
-          // ADR-4: stale-page handling — same pattern as ResourcePanel
-          showToast('El estado cambió, actualizando...');
-          router.refresh();
-        } else if (result.code === 'FORBIDDEN') {
-          setActionError('No tienes permiso para realizar esta acción.');
-        } else {
-          setActionError(result.message ?? 'Error al cambiar estado de Furia.');
-        }
-      }
-      // On success: revalidatePath in Server Action triggers SC re-render.
-      // No optimistic state update needed (REQ-WCR-WEB-UI-01).
-    });
+    const action = isRaging ? deactivateRage : activateRage;
+    runAction(() => action(encounterId, combatantId, version));
   }
 
   return (
