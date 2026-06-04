@@ -70,11 +70,11 @@ const pillEntry: ComponentEntry = {
   id: 'pill',
   name: 'Pill',
   group: 'ui',
-  notes: 'Semantic tones: primary (cyan) | accent (copper) | secondary (magenta) | ink | stone | amber. Renamed in Slice 4.',
+  notes: 'Semantic tones: primary (cyan) | accent (copper) | secondary (magenta) | ink | stone | amber | danger | success. B2: danger+success added.',
   propsSchema: {
-    tone:     { kind: 'enum', options: ['primary', 'accent', 'secondary', 'ink', 'stone', 'amber'] as const, default: 'primary', label: 'Tone' },
-    size:     { kind: 'enum', options: ['sm', 'md'] as const,                                                 default: 'md',      label: 'Size' },
-    children: { kind: 'node', default: 'Label',                                                               label: 'Label' },
+    tone:     { kind: 'enum', options: ['primary', 'accent', 'secondary', 'ink', 'stone', 'amber', 'danger', 'success'] as const, default: 'primary', label: 'Tone' },
+    size:     { kind: 'enum', options: ['sm', 'md'] as const,                                                                      default: 'md',      label: 'Size' },
+    children: { kind: 'node', default: 'Label',                                                                                    label: 'Label' },
   },
   matrixMode: 'list',
   explicitCombos: [
@@ -84,12 +84,14 @@ const pillEntry: ComponentEntry = {
     { tone: 'ink',       size: 'md', children: 'Ink' },
     { tone: 'stone',     size: 'md', children: 'Stone' },
     { tone: 'amber',     size: 'md', children: 'Amber' },
+    { tone: 'danger',    size: 'md', children: 'Danger' },
+    { tone: 'success',   size: 'md', children: 'Success' },
     { tone: 'primary',   size: 'sm', children: 'Active sm' },
     { tone: 'accent',    size: 'sm', children: 'Player sm' },
   ],
   render: (p) => (
     <Pill
-      tone={p.tone as 'primary' | 'accent' | 'secondary' | 'ink' | 'stone' | 'amber'}
+      tone={p.tone as 'primary' | 'accent' | 'secondary' | 'ink' | 'stone' | 'amber' | 'danger' | 'success'}
       size={p.size as 'sm' | 'md'}
     >
       {p.children as ReactNode}

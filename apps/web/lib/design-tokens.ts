@@ -43,6 +43,8 @@ export const COLORS: ColorToken[] = [
   { name: 'secondary-soft-border', hex: 'rgba(168, 90, 142, 0.30)', displayOnly: true },
   { name: 'secondary-soft-bg',     hex: 'rgba(168, 90, 142, 0.22)', displayOnly: true },
   { name: 'success',            hex: '#6BA368' },
+  // Alpha-derived success token (hex/poi status pills — B2 pill-consolidation)
+  { name: 'success-soft',       hex: 'rgba(107, 163, 104, 0.12)', displayOnly: true },
   { name: 'warning',            hex: '#E0A82E', note: 'hotter amber — distinct from copper accent' },
   { name: 'warning-soft',       hex: '#3A2D17' },
   { name: 'warning-deep',       hex: '#B07A1E' },

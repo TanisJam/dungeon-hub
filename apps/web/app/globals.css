@@ -46,6 +46,7 @@
   --color-secondary-deep:#7F3F6B;
   --color-secondary-soft:#2E1A28;
   --color-success:           #6BA368;
+  --color-success-soft:      rgba(107, 163, 104, 0.12);
   --color-warning:           #E0A82E;
   --color-warning-soft:      #3A2D17;
   --color-warning-deep:      #B07A1E;
@@ -1478,6 +1479,7 @@
   --color-secondary:     #A85A8E;
   --color-secondary-deep:#7F3F6B;
   --color-secondary-soft:#2E1A28;
+  --color-success-soft:          rgba(107, 163, 104, 0.12);
   --color-danger:            #CC4444;
   --color-danger-soft:       rgba(204, 68, 68, 0.12);
   --color-danger-soft-border: rgba(204, 68, 68, 0.25);
