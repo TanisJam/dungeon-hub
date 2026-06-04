@@ -38,6 +38,7 @@ import {
 import { consumeSpellSlot, computeSpellSlots } from '@dungeon-hub/domain/character/spellcasting';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { buildAttackContext } from './build-attack-context.js';
+import { assertCombatantOwnerOrGm } from './assert-combatant-owner-or-gm.js';
 import { resolveResistance } from './resolve-resistance.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
@@ -71,6 +72,16 @@ export interface PerformWeaponAttackApplyInput {
   attackerId: string;          // encounter_combatants.id (NOT character.id)
   targetId: string;            // encounter_combatants.id
   weaponInstanceId: string;    // inventory instance UUID
+  /**
+   * ID of the caller (from request.user.sub). Forwarded from the route layer.
+   * Required for assertCombatantOwnerOrGm (REQ-WCA-API-01 — C2 gate relaxation).
+   */
+  callerId: string;
+  /**
+   * Campaign role of the caller ('gm' | 'player'). Forwarded from the route layer.
+   * Required for assertCombatantOwnerOrGm and TARGET_NOT_NPC gating (REQ-WCA-API-02).
+   */
+  callerRole: 'gm' | 'player';
   /** Caller-asserted runtime decisions (for Sneak Attack predicates, etc.). */
   runtimeDecisions?: Record<string, boolean>;
   /**
@@ -232,7 +243,11 @@ export type PerformWeaponAttackApplyResult =
   | { ok: false; code: 'DIVINE_SMITE_SLOT_NOT_AVAILABLE' } // slot exhausted / level too high
   // engine-action-economy: per-turn Attack action budget (REQ-AE-04, REQ-AE-06).
   // action_used===true && attacks_remaining===0 → action fully spent for this turn (PHB p.198).
-  | { ok: false; code: 'ACTION_ALREADY_USED' };
+  | { ok: false; code: 'ACTION_ALREADY_USED' }
+  // C2 — REQ-WCA-API-02: player-only guard that prevents attacking a PC target.
+  // Fires AFTER target load, BEFORE any mutation (budget tx). Gated on callerRole==='player'
+  // so the GM path stays unaffected (ADR-1 LOCK — CLAUDE.md project conventions).
+  | { ok: false; code: 'TARGET_NOT_NPC' };
 
 // ── perform-weapon-attack-apply ────────────────────────────────────────────────
 
@@ -268,6 +283,8 @@ export async function performWeaponAttackApply(
     divineSmiteSlotLevel,
     divineSmiteUndead,
     version,
+    callerId,
+    callerRole,
   } = input;
 
   // ── Step 1: Load encounter ────────────────────────────────────────────────────
@@ -309,6 +326,29 @@ export async function performWeaponAttackApply(
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
+  // ── Step 3b: Owner-or-GM auth gate (REQ-WCA-API-01 — C2 gate relaxation) ────────
+  // Replaces the old inline NPC-attacker check (Step 5, L334-336) which was GM-only-compatible
+  // only because the route enforced GM-only before use-case entry.
+  // assertCombatantOwnerOrGm ADR-1 ordering: after turn guard, BEFORE target load/mutation.
+  //   GM caller: short-circuits immediately → ok:true (no ownership check).
+  //   Player caller: must own the attacker combatant's character → FORBIDDEN if not.
+  //   NPC attacker + player caller: characterId null → NOT_FOUND (no FORBIDDEN leak).
+  // FORBIDDEN and NOT_FOUND from the helper are folded into the use-case result union.
+  const authResult = await assertCombatantOwnerOrGm({
+    encounterId,
+    combatantId: attackerId,
+    callerId,
+    callerRole,
+  });
+  if (!authResult.ok) {
+    // NOT_FOUND from helper → attacker combatant missing or NPC targeted by player (no info leak).
+    // FORBIDDEN from helper → attacker owned by a different player.
+    if (authResult.code === 'NOT_FOUND') {
+      return { ok: false, code: 'NOT_FOUND', target: 'attacker' };
+    }
+    return { ok: false, code: 'FORBIDDEN' };
+  }
+
   // ── Step 4: Load target combatant (explicit select: hp, ac, kind, characterId) ─
   // REQ: target SELECT must explicitly include ac, kind, characterId for resolveTargetAc.
   const [targetCombatant] = await db
@@ -327,10 +367,23 @@ export async function performWeaponAttackApply(
 
   if (!targetCombatant) return { ok: false, code: 'NOT_FOUND', target: 'target' };
 
-  // ── Step 5: NPC attacker guard — GM-only route uses attacker characterId ──────
-  // For the apply endpoint the route already enforces GM-only (403 guard at route).
-  // If the attacker is an NPC (characterId null), buildAttackContext will NOT have a
-  // characterId — this endpoint only supports PC attackers (weapon on sheet).
+  // ── Step 4b: TARGET_NOT_NPC guard (REQ-WCA-API-02 — player-only) ───────────────
+  // Fires AFTER target load (need characterId), BEFORE budget tx (no mutation committed).
+  // Defense-in-depth: blocks player from attacking a PC target even if UI filtering missed it.
+  // GATED on callerRole==='player' ONLY — GM path must remain unaffected (ADR-1 LOCK).
+  // A player targeting a PC → 400 VALIDATION_FAILED {code:'TARGET_NOT_NPC'} (CLAUDE.md §6).
+  // NOTE: reactionOffered path (PHB p.275 Shield) only fires for PC targets (predicate `kind==='pc'`);
+  //   since player callers can never reach that path here, reactionOffered is never triggered for C2.
+  if (targetCombatant.characterId !== null && callerRole === 'player') {
+    return { ok: false, code: 'TARGET_NOT_NPC' };
+  }
+
+  // ── Step 5: NPC attacker guard — ensure attacker is a PC (has characterId) ────
+  // Step 3b (assertCombatantOwnerOrGm) already handles NPC-attacker for player callers
+  // (returns NOT_FOUND when characterId is null). This guard catches the edge case where
+  // a GM might attempt to attack with an NPC combatant that has no character sheet — the
+  // GM path skips the ownership check, so we guard here to prevent buildAttackContext
+  // from failing with a misleading NOT_FOUND on the character.
   if (attackerCombatant.characterId === null || attackerCombatant.characterId === undefined) {
     return { ok: false, code: 'NOT_FOUND', target: 'character' };
   }

@@ -347,15 +347,20 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         .limit(1);
       if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      // GM-only gate (REQ-ATK-AUTH-01).
+      // C2 gate relaxation (REQ-WCA-API-01): member-with-ownership gate replaces GM-only.
+      // Non-members (role === null) are rejected here before use-case entry.
+      // Players are allowed through — the use-case enforces per-combatant ownership via
+      // assertCombatantOwnerOrGm. GMs remain unaffected (helper short-circuits for gm).
       const role = await memberRole(encRow.campaignId, userId);
-      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+      if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
 
       const result = await performWeaponAttackApply({
         encounterId: id,
         attackerId,
         targetId,
         weaponInstanceId,
+        callerId: userId,
+        callerRole: role,
         ...(runtimeDecisions !== undefined ? { runtimeDecisions } : {}),
         // exactOptionalPropertyTypes: only spread when defined (avoids passing undefined).
         ...(targetNpcSaveMod !== undefined ? { targetNpcSaveMod } : {}),
@@ -379,6 +384,14 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'NO_TARGET_AC' }],
+            });
+          // C2 — REQ-WCA-API-02: player attacked a PC target (defense-in-depth guard).
+          // Category error (not a value mismatch) → no expectedCount/gotCount (CLAUDE.md §6).
+          // Mirrors NO_TARGET_AC mapping above.
+          case 'TARGET_NOT_NPC':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'TARGET_NOT_NPC' }],
             });
           // Slice 3b-ii pre-roll guards — FAIL-FAST before any roll or mutation.
           // CLAUDE.md §6: 400 VALIDATION_FAILED with issues[{ code }].

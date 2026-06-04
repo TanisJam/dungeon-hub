@@ -954,6 +954,74 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
     },
   );
 
+  // ── APPLY-T14b: ACTION_ALREADY_USED — matrix row 7 (pre-existing engine gate, regression) ──────
+
+  it(
+    'APPLY-T14b: actionUsed=true + attacksRemaining=0 → 400 ACTION_ALREADY_USED (REQ-WCA-API-04, security matrix row 7)',
+    async () => {
+      // Security matrix row 7: action already used → existing engine gate preserved post-C2.
+      // PHB p.198 — Attack action can only be taken once per turn (L1 Fighter, no Extra Attack).
+      // Setup: fire a valid GM attack (row 8) first to consume the action, then fire again.
+      const app = await getTestApp();
+
+      const freshEnc = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: 'APPLY-T14b action-already-used (matrix row 7)',
+            combatants: [
+              { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
+              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 40, hpMax: 40, ac: 1 },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const attackerId: string = freshEnc.currentCombatantId;
+      const targetId: string = freshEnc.combatants.find(
+        (c: { id: string }) => c.id !== attackerId,
+      )?.id ?? '';
+
+      // First attack consumes the action (ac=1 → guaranteed hit).
+      const first = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId,
+          targetId,
+          weaponInstanceId: longswordInstanceId,
+          version: freshEnc.version,
+        },
+      });
+      expect(first.statusCode).toBe(200);
+
+      // Reload version after first attack (bumped by the budget tx + HP tx).
+      const afterFirst = await getEncounter(freshEnc.id);
+
+      // Second attack on same turn → ACTION_ALREADY_USED.
+      const second = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId,
+          targetId,
+          weaponInstanceId: longswordInstanceId,
+          version: afterFirst.version,
+        },
+      });
+
+      expect(second.statusCode).toBe(400);
+      const body = second.json();
+      expect(body.error).toBe('VALIDATION_FAILED');
+      expect(body.issues.some((i: { code: string }) => i.code === 'ACTION_ALREADY_USED')).toBe(true);
+    },
+  );
+
   // ── APPLY-T15: PC target AC derivation — Cloak of Protection +1 (SUGGESTION 2 / Scenario 13) ──
 
   it(
@@ -1144,6 +1212,563 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
       // character is deleted in afterAll (FK: ownerCharacterId → characters.id CASCADE).
       // No explicit cleanup needed here. The cloakItemId is unused post-assertion.
       void cloakItemId;
+    },
+  );
+});
+
+// ── Security Matrix: C2 — Player Weapon Attack vs NPC (REQ-WCA-API-01..04) ────
+//
+// 9-row normative matrix from the spec (sdd/web-combat-attack/spec, Security Matrix).
+// Each row is an isolated it() with its own fresh encounter to avoid inter-test state.
+//
+// Legend:
+//   gm       = campaign GM (role='gm')
+//   player   = campaign member (role='player'), owns `playerCharId`
+//   player2  = campaign member (role='player'), owns a second character — used for
+//              row 2 (attacker owned by another player)
+//   nonMember = user with no campaignMembers row — for row 4
+
+describe('Security Matrix — C2 attack/apply gate relaxation (REQ-WCA-API-01, REQ-WCA-API-02, REQ-WCA-API-04)', () => {
+  let gm: TestUser;
+  let player: TestUser;
+  let player2: TestUser;
+  let nonMember: TestUser;
+
+  let campaignId: string;
+  let worldId: string;
+
+  // Attacker: Fighter owned by `player`.
+  let playerCharId: string;
+  let playerLongswordInstanceId: string;
+
+  // Second Fighter owned by `player2` (for row 2 — another player's combatant).
+  let player2CharId: string;
+  let player2LongswordInstanceId: string;
+
+  // Third character: a PC target (owned by gm) for TARGET_NOT_NPC tests.
+  let pcTargetCharId: string;
+
+  const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+    if (res.statusCode !== 200 && res.statusCode !== 201) {
+      throw new Error(`${label}: expected 200/201, got ${res.statusCode} — ${res.body}`);
+    }
+  };
+
+  const getEncounter = async (id: string) => {
+    const app = await getTestApp();
+    return app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/encounters/${id}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      })
+      .then((r) => r.json());
+  };
+
+  /** Create a fresh encounter with player's fighter (initiative=20) vs NPC goblin (initiative=5). */
+  const makeEncounter = async (name: string, opts: {
+    attackerCharId: string;
+    npcAc?: number;
+    npcHp?: number;
+    attackerInitiative?: number;
+    npcInitiative?: number;
+    extraCombatants?: Array<{ name: string; kind: 'pc' | 'npc'; characterId?: string; initiative: number; hpCurrent: number; hpMax: number; ac?: number }>;
+  }) => {
+    const app = await getTestApp();
+    const { attackerCharId, npcAc = 1, npcHp = 30, attackerInitiative = 20, npcInitiative = 5, extraCombatants = [] } = opts;
+    return app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          campaignId,
+          name,
+          combatants: [
+            { name: 'Player Fighter', kind: 'pc', characterId: attackerCharId, initiative: attackerInitiative, hpCurrent: 12, hpMax: 12 },
+            { name: 'Goblin', kind: 'npc', initiative: npcInitiative, hpCurrent: npcHp, hpMax: npcHp, ac: npcAc },
+            ...extraCombatants,
+          ],
+        },
+      })
+      .then((r) => r.json());
+  };
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    gm = await createTestUser();
+    player = await createTestUser();
+    player2 = await createTestUser();
+    nonMember = await createTestUser();
+
+    // ── Campaign + world ──────────────────────────────────────────────────────
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { name: 'Security Matrix Test Campaign (C2)' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+    worldId = campaign.worldId;
+
+    // player and player2 join as members; nonMember does NOT join.
+    await addCampaignAndWorldMember(campaignId, player.id, 'player');
+    await addCampaignAndWorldMember(campaignId, player2.id, 'player');
+
+    // ── Fighter character owned by `player` — STR 15 (+2), longsword ─────────
+    const playerChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { worldId, name: 'Aldric (player, C2 matrix)' },
+      })
+      .then((r) => r.json());
+    playerCharId = playerChar.id;
+
+    await expectOk('player-stats', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${playerCharId}/stats`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { method: 'standard-array', scores: { str: 15, dex: 12, con: 14, int: 8, wis: 10, cha: 13 } },
+    }));
+
+    await expectOk('player-class', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${playerCharId}/class`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { class: { slug: 'fighter', source: 'PHB' }, level: 1, skillChoices: ['athletics', 'perception'] },
+    }));
+
+    await expectOk('player-longsword', await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${playerCharId}/inventory`,
+      headers: { authorization: `Bearer ${player.accessToken}` },
+      payload: { item: { slug: 'longsword', source: 'PHB' }, state: 'equipped' },
+    }));
+
+    const playerSheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${playerCharId}/sheet`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      })
+      .then((r) => r.json());
+    playerLongswordInstanceId = playerSheet.inventory?.find(
+      (i: { itemSlug: string }) => i.itemSlug === 'longsword',
+    )?.instanceId ?? '';
+
+    // ── Fighter owned by `player2` — for row 2 (another player's attacker) ───
+    const player2Char = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${player2.accessToken}` },
+        payload: { worldId, name: 'Brennan (player2, C2 matrix)' },
+      })
+      .then((r) => r.json());
+    player2CharId = player2Char.id;
+
+    await expectOk('player2-stats', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${player2CharId}/stats`,
+      headers: { authorization: `Bearer ${player2.accessToken}` },
+      payload: { method: 'standard-array', scores: { str: 15, dex: 12, con: 14, int: 8, wis: 10, cha: 13 } },
+    }));
+
+    await expectOk('player2-class', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${player2CharId}/class`,
+      headers: { authorization: `Bearer ${player2.accessToken}` },
+      payload: { class: { slug: 'fighter', source: 'PHB' }, level: 1, skillChoices: ['athletics', 'perception'] },
+    }));
+
+    await expectOk('player2-longsword', await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${player2CharId}/inventory`,
+      headers: { authorization: `Bearer ${player2.accessToken}` },
+      payload: { item: { slug: 'longsword', source: 'PHB' }, state: 'equipped' },
+    }));
+
+    const player2Sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${player2CharId}/sheet`,
+        headers: { authorization: `Bearer ${player2.accessToken}` },
+      })
+      .then((r) => r.json());
+    player2LongswordInstanceId = player2Sheet.inventory?.find(
+      (i: { itemSlug: string }) => i.itemSlug === 'longsword',
+    )?.instanceId ?? '';
+
+    // ── PC target character owned by `gm` — for TARGET_NOT_NPC tests ─────────
+    // (rows 6 + 9: PC target should trigger 400 for players, not for GM)
+    const pcTargetChar = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Lyra (PC target, C2 matrix)' },
+      })
+      .then((r) => r.json());
+    pcTargetCharId = pcTargetChar.id;
+
+    await expectOk('pc-target-stats', await app.inject({
+      method: 'PUT',
+      url: `/api/v1/characters/${pcTargetCharId}/stats`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { method: 'standard-array', scores: { str: 10, dex: 14, con: 13, int: 12, wis: 15, cha: 8 } },
+    }));
+  });
+
+  afterAll(async () => {
+    if (gm) await deleteTestUser(gm.id);
+    if (player) await deleteTestUser(player.id);
+    if (player2) await deleteTestUser(player2.id);
+    if (nonMember) await deleteTestUser(nonMember.id);
+    await closeTestApp();
+  });
+
+  // ── ROW 1: caller owns attacker, own turn, NPC target → 200 + HP drops ───────
+
+  it(
+    'SEC-M-01: player owns attacker, own turn, NPC target → 200 + target HP drops (REQ-WCA-API-01, REQ-WCA-API-03)',
+    async () => {
+      // PHB p.194 — d20 + attack bonus vs AC; NPC target with ac=1 guarantees a hit.
+      // Security matrix row 1: the golden path for player attack.
+      const app = await getTestApp();
+      const enc = await makeEncounter('SEC-M-01 player owns attacker', {
+        attackerCharId: playerCharId,
+        npcAc: 1,
+        npcHp: 40,
+      });
+
+      // player's combatant has the highest initiative (20).
+      const attackerCombatantId: string = enc.currentCombatantId;
+      const npcTargetId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== attackerCombatantId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      // REQ-WCA-API-01: player attack succeeds (200) when ownership + turn are valid.
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      // Assert the response has the correct shape (hit or miss — nat-1 is a valid miss at ac=1).
+      expect(typeof body.hit).toBe('boolean');
+
+      // If it hit, verify HP persisted.
+      if (body.hit) {
+        expect(typeof body.newHp).toBe('number');
+        expect(body.newHp).toBeLessThan(40);
+        const afterEnc = await getEncounter(enc.id);
+        const npcAfter = afterEnc.combatants.find((c: { id: string }) => c.id === npcTargetId);
+        expect(npcAfter?.hpCurrent).toBe(body.newHp);
+      }
+    },
+  );
+
+  // ── ROW 2: attacker owned by another player → 403 ────────────────────────────
+
+  it(
+    'SEC-M-02: player calls attack/apply with attacker owned by another player → 403 FORBIDDEN (REQ-WCA-API-01)',
+    async () => {
+      // Security matrix row 2: player A tries to attack with player B's combatant.
+      // PHB: only the character owner controls their combatant.
+      // `player` attacks but `player2`'s combatant is the attacker.
+      const app = await getTestApp();
+
+      // Encounter: player2's fighter (initiative=20) has the turn; player tries to use it.
+      const enc = await makeEncounter('SEC-M-02 another player attacker', {
+        attackerCharId: player2CharId,   // attacker belongs to player2
+        npcAc: 1,
+      });
+
+      const attackerCombatantId: string = enc.currentCombatantId; // player2's combatant
+      const npcTargetId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== attackerCombatantId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` }, // player, not player2
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: player2LongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      expect(res.statusCode).toBe(403);
+    },
+  );
+
+  // ── ROW 3: NPC attacker + player caller → 404 (no FORBIDDEN leak) ────────────
+
+  it(
+    'SEC-M-03: NPC attacker + player caller → 404 NOT_FOUND (REQ-WCA-API-01 — no FORBIDDEN information leak)',
+    async () => {
+      // Security matrix row 3: player tries to use an NPC as an attacker.
+      // assertCombatantOwnerOrGm returns NOT_FOUND for NPC+player (hides existence of NPC control).
+      // PHB: players only control their own characters.
+      const app = await getTestApp();
+      const enc = await makeEncounter('SEC-M-03 NPC attacker', {
+        attackerCharId: playerCharId,
+        npcAc: 1,
+        attackerInitiative: 5,    // player's fighter has LOW initiative
+        npcInitiative: 20,        // NPC has the turn
+      });
+
+      // NPC combatant has the highest initiative — it IS the currentCombatantId.
+      const npcAttackerId: string = enc.currentCombatantId; // NPC's combatant
+      const playerCombatantId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== npcAttackerId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: npcAttackerId,    // NPC — player has no ownership
+          targetId: playerCombatantId,  // doesn't matter (gate fires first)
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      // NOT_FOUND (404), not FORBIDDEN (403) — no info leak (REQ-WCA-API-01 NPC scenario).
+      expect(res.statusCode).toBe(404);
+    },
+  );
+
+  // ── ROW 4: non-member caller → 403 ───────────────────────────────────────────
+
+  it(
+    'SEC-M-04: non-member caller (role=null) → 403 FORBIDDEN before use-case (REQ-WCA-API-01)',
+    async () => {
+      // Security matrix row 4: caller has no campaignMembers row at all.
+      // Route-level membership gate fires first — use-case is never entered.
+      const app = await getTestApp();
+      const enc = await makeEncounter('SEC-M-04 non-member', { attackerCharId: playerCharId });
+
+      const attackerCombatantId: string = enc.currentCombatantId;
+      const npcTargetId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== attackerCombatantId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${nonMember.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      expect(res.statusCode).toBe(403);
+    },
+  );
+
+  // ── ROW 5: not attacker's turn → 409 NOT_YOUR_TURN ───────────────────────────
+
+  it(
+    'SEC-M-05: player attacks but it is not their combatant\'s turn → 409 NOT_YOUR_TURN (REQ-WCA-API-04)',
+    async () => {
+      // Security matrix row 5: player owns attacker but the NPC has the initiative.
+      // Turn guard (Step 3) fires before the owner check would matter.
+      // PHB p.189: "On your turn, you can move … and take one action."
+      const app = await getTestApp();
+      const enc = await makeEncounter('SEC-M-05 not your turn', {
+        attackerCharId: playerCharId,
+        attackerInitiative: 5,    // player's fighter goes LAST
+        npcInitiative: 20,        // NPC's turn
+      });
+
+      // NPC is currentCombatantId — player's fighter is NOT the current combatant.
+      const npcTurnCombatantId: string = enc.currentCombatantId;
+      const playerCombatantId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== npcTurnCombatantId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: playerCombatantId,  // player's fighter — but NOT current
+          targetId: npcTurnCombatantId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('NOT_YOUR_TURN');
+    },
+  );
+
+  // ── ROW 6: PC target + player caller → 400 TARGET_NOT_NPC ────────────────────
+
+  it(
+    'SEC-M-06: player attacks a PC target → 400 VALIDATION_FAILED TARGET_NOT_NPC (REQ-WCA-API-02)',
+    async () => {
+      // Security matrix row 6: player tries to attack another PC combatant.
+      // TARGET_NOT_NPC guard fires after target load, before any mutation.
+      // PHB: this engine path is for NPC targets only (player vs monster); PC-vs-PC is out of scope.
+      const app = await getTestApp();
+
+      // Encounter: player's fighter (initiative=20), NPC (initiative=5), Lyra PC (initiative=10).
+      const enc = await makeEncounter('SEC-M-06 PC target', {
+        attackerCharId: playerCharId,
+        npcAc: 1,
+        extraCombatants: [
+          { name: 'Lyra', kind: 'pc', characterId: pcTargetCharId, initiative: 10, hpCurrent: 8, hpMax: 8 },
+        ],
+      });
+
+      const attackerCombatantId: string = enc.currentCombatantId; // player's fighter
+      // Find Lyra's PC combatant (characterId === pcTargetCharId).
+      const lyraId: string = enc.combatants.find(
+        (c: { characterId: string | null }) => c.characterId === pcTargetCharId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: lyraId,              // PC target — should trigger TARGET_NOT_NPC
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      // REQ-WCA-API-02: PC target by player → 400 VALIDATION_FAILED { code: TARGET_NOT_NPC }.
+      expect(res.statusCode).toBe(400);
+      const body = res.json();
+      expect(body.error).toBe('VALIDATION_FAILED');
+      expect(body.issues.some((i: { code: string }) => i.code === 'TARGET_NOT_NPC')).toBe(true);
+    },
+  );
+
+  // ── ROW 8: GM attacks NPC → 200 (no regression) ──────────────────────────────
+
+  it(
+    'SEC-M-08: GM attacks NPC → 200 (no regression from C2 refactor) (REQ-WCA-API-04)',
+    async () => {
+      // Security matrix row 8: GM path must be byte-identical to pre-C2.
+      // assertCombatantOwnerOrGm short-circuits immediately for GM callers.
+      // PHB: GM controls all NPCs and encounter state.
+      // Uses `player`'s fighter character but called by gm — gm is campaign member.
+      const app = await getTestApp();
+
+      // Use a GM-owned attack encounter (gm is the campaign creator / GM).
+      // The attacker character belongs to `player` but the GM is calling — that's OK
+      // because assertCombatantOwnerOrGm skips ownership checks for GM.
+      const enc = await makeEncounter('SEC-M-08 GM attacks NPC regression', {
+        attackerCharId: playerCharId,
+        npcAc: 1,
+      });
+
+      const attackerCombatantId: string = enc.currentCombatantId;
+      const npcTargetId: string = enc.combatants.find(
+        (c: { id: string }) => c.id !== attackerCombatantId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${enc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: npcTargetId,
+          weaponInstanceId: playerLongswordInstanceId,
+          version: enc.version,
+        },
+      });
+
+      // GM attack must succeed — no regression from C2.
+      // REQ-WCA-API-04: GM path stays byte-identical; route allows the attack.
+      // We only assert 200 + correct response shape; not `hit:true` (nat-1 is a valid miss).
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      // Either hit or miss — both shapes are valid GM regression proof.
+      expect(typeof body.hit).toBe('boolean');
+    },
+  );
+
+  // ── ROW 9: GM attacks PC → NOT 400 TARGET_NOT_NPC ────────────────────────────
+
+  it(
+    'SEC-M-09: GM attacks a PC target → 200 (TARGET_NOT_NPC gate must NOT fire for GM) (REQ-WCA-API-02)',
+    async () => {
+      // Security matrix row 9: TARGET_NOT_NPC is gated on callerRole==='player' ONLY.
+      // GM must be able to attack PCs (e.g. control a hostile NPC/PC combatant) — the
+      // ADR-1 design decision locks this: "gate TARGET_NOT_NPC on callerRole==='player' only."
+      // PHB: GM has full authority over NPC actions, including attacking any target.
+      //
+      // We need a GM-owned attacker (pc combatant) hitting Lyra (pc combatant).
+      // Use player2's fighter as attacker with player2LongswordInstanceId.
+      const app = await getTestApp();
+
+      // Encounter: player2's fighter (initiative=20, GM calls it), Lyra PC (initiative=5).
+      const rawEnc = await app
+        .inject({
+          method: 'POST',
+          url: '/api/v1/encounters',
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            campaignId,
+            name: 'SEC-M-09 GM attacks PC (no TARGET_NOT_NPC)',
+            combatants: [
+              { name: 'Brennan (GM controls)', kind: 'pc', characterId: player2CharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
+              { name: 'Lyra (PC target)', kind: 'pc', characterId: pcTargetCharId, initiative: 5, hpCurrent: 8, hpMax: 8 },
+            ],
+          },
+        })
+        .then((r) => r.json());
+
+      const attackerCombatantId: string = rawEnc.currentCombatantId;
+      const lyraId: string = rawEnc.combatants.find(
+        (c: { characterId: string | null }) => c.characterId === pcTargetCharId,
+      )?.id ?? '';
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/v1/encounters/${rawEnc.id}/actions/attack/apply`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          attackerId: attackerCombatantId,
+          targetId: lyraId,
+          weaponInstanceId: player2LongswordInstanceId,
+          version: rawEnc.version,
+        },
+      });
+
+      // GM attacks a PC → must NOT return 400 TARGET_NOT_NPC.
+      // The TARGET_NOT_NPC guard is callerRole==='player' ONLY (ADR-1 LOCK).
+      expect(res.statusCode).not.toBe(400);
+      // GM path expects 200 (attack completes) — no FORBIDDEN, no TARGET_NOT_NPC.
+      expect(res.statusCode).toBe(200);
     },
   );
 });
