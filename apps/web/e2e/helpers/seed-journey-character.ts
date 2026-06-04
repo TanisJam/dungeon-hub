@@ -76,6 +76,23 @@ export async function getFixtureWorldId(dmJwt: string): Promise<string> {
 
 export type TargetStatus = 'draft' | 'pending_approval' | 'active';
 
+/**
+ * Optional class override for seedJourneyCharacter.
+ * When provided, replaces the default Human Fighter/Soldier class.
+ * skillChoices must NOT conflict with the background's fixed skills.
+ *
+ * Example for Barbarian (Soldier background):
+ *   Soldier fixed skills: Athletics + Intimidation (PHB p.140 — Soldier).
+ *   Barbarian pool: Animal Handling, Athletics, Intimidation, Nature, Perception, Survival (PHB p.49).
+ *   Safe choices (no overlap with Soldier fixed): ['animal handling', 'survival'].
+ */
+export interface ClassOverride {
+  slug: string;
+  source: string;
+  /** Skill choices that do NOT conflict with the background's fixed skills. */
+  skillChoices: string[];
+}
+
 export interface SeedCharacterOptions {
   /** JWT of the character owner. */
   ownerJwt: string;
@@ -89,6 +106,13 @@ export interface SeedCharacterOptions {
   targetStatus?: TargetStatus;
   /** XP to grant after approval (DM action, active chars only). 300 = L2 eligible. */
   xpGrant?: number;
+  /**
+   * Optional class override. When absent, defaults to Human Fighter/Soldier
+   * (backward-compatible with all existing callers).
+   * The background always stays Soldier PHB — caller must ensure skillChoices
+   * do not conflict with Soldier's fixed Athletics+Intimidation.
+   */
+  classOverride?: ClassOverride;
 }
 
 export interface SeededCharacter {
@@ -113,7 +137,16 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
     name,
     targetStatus = 'active',
     xpGrant = 0,
+    classOverride,
   } = opts;
+
+  // Default class is Human Fighter / Soldier (backward-compatible with all existing callers).
+  // classOverride replaces only the class call; race and background stay the same.
+  const classSlug = classOverride?.slug ?? 'fighter';
+  const classSource = classOverride?.source ?? 'PHB';
+  // Fighter default skillChoices: Acrobatics + Survival (no overlap with Soldier's fixed Athletics+Intimidation).
+  // Override caller is responsible for choosing non-conflicting skills.
+  const classSkillChoices = classOverride?.skillChoices ?? ['acrobatics', 'survival'];
 
   // 1. Create
   const created = await apiCall<{ id: string }>('POST', '/api/v1/characters', ownerJwt, {
@@ -138,14 +171,14 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
     languageChoices: ['elvish'],
   });
 
-  // 4. Class — Fighter PHB, pick 2 skills that don't conflict with Soldier's fixed skills.
-  // Soldier has fixed: athletics + intimidation. Fighter must NOT pick those.
-  // Fighter PHB skill pool: Acrobatics, Animal Handling, Athletics, History, Insight,
-  // Intimidation, Perception, Survival. Pick Acrobatics + Survival (no overlap).
+  // 4. Class — defaults to Fighter PHB. Override via classOverride for other classes (e.g. Barbarian).
+  // Skill choices must NOT overlap with Soldier's fixed skills (Athletics + Intimidation).
+  // Fighter defaults: Acrobatics + Survival (safe with Soldier).
+  // Barbarian override: use ['animal handling', 'survival'] (safe with Soldier — PHB p.49, p.140).
   await apiCall('PUT', `/api/v1/characters/${charId}/class`, ownerJwt, {
-    class: { slug: 'fighter', source: 'PHB' },
+    class: { slug: classSlug, source: classSource },
     level: 1,
-    skillChoices: ['acrobatics', 'survival'],
+    skillChoices: classSkillChoices,
   });
 
   // 5. Background — Soldier PHB (fixed skills: athletics + intimidation, dice-set tool)

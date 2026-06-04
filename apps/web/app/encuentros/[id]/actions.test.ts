@@ -7,6 +7,8 @@
  * FIX 5 (SUGGESTION): VERSION_CONFLICT on useResource/restoreResource does NOT
  * call router.refresh() (that happens in the client component, ResourcePanel).
  * The action just returns { ok: false, code: 'VERSION_CONFLICT' }.
+ *
+ * REQ-WCR-WEB-ACT-01: activateRage and deactivateRage Server Actions.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -26,6 +28,8 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
+// createClient mock — kept as a stable resolved value; individual tests that need
+// to override session use vi.mocked(...).mockResolvedValueOnce(...)
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: {
@@ -44,6 +48,7 @@ vi.mock('@/app/encuentros/actions', () => ({}));
 const VALID_CHAR_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const VALID_ENC_ID  = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const BAD_ENC_ID    = 'not-a-uuid';
+const VALID_COMBATANT_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 describe('route-local [id]/actions — encounterId UUID validation (FIX 4)', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -110,5 +115,125 @@ describe('route-local [id]/actions — encounterId UUID validation (FIX 4)', () 
     const result = await longRest(VALID_CHAR_ID, VALID_ENC_ID);
     expect(result).toEqual({ ok: true });
     expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
+  });
+});
+
+// ── activateRage / deactivateRage — REQ-WCR-WEB-ACT-01 ───────────────────────
+
+describe('activateRage — REQ-WCR-WEB-ACT-01', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('invalid combatantId → VALIDATION_FAILED, no api call', async () => {
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(VALID_ENC_ID, 'not-a-uuid', 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('invalid encounterId → VALIDATION_FAILED, no api call', async () => {
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(BAD_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('200 → ok:true, revalidatePath called', async () => {
+    vi.mocked(api.post).mockResolvedValue(undefined);
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 5);
+    expect(result).toEqual({ ok: true });
+    expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
+    expect(api.post).toHaveBeenCalledWith(
+      `/encounters/${VALID_ENC_ID}/actions/activate-rage`,
+      { ragerId: VALID_COMBATANT_ID, version: 5 },
+      'test-token',
+    );
+  });
+
+  it('403 → FORBIDDEN', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(403, { error: 'FORBIDDEN' }, 'FORBIDDEN'),
+    );
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'FORBIDDEN' });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('409 VERSION_CONFLICT → VERSION_CONFLICT', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(409, { error: 'VERSION_CONFLICT' }, 'VERSION_CONFLICT'),
+    );
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VERSION_CONFLICT' });
+  });
+
+  it('400 rule error (NOT_YOUR_TURN) → API_ERROR with message', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(400, { error: 'NOT_YOUR_TURN' }, 'NOT_YOUR_TURN'),
+    );
+    const { activateRage } = await import('./actions');
+    const result = await activateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'API_ERROR', message: expect.anything() });
+  });
+});
+
+describe('deactivateRage — REQ-WCR-WEB-ACT-01', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('invalid combatantId → VALIDATION_FAILED, no api call', async () => {
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(VALID_ENC_ID, 'not-a-uuid', 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('invalid encounterId → VALIDATION_FAILED, no api call', async () => {
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(BAD_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('200 → ok:true, revalidatePath called', async () => {
+    vi.mocked(api.post).mockResolvedValue(undefined);
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 5);
+    expect(result).toEqual({ ok: true });
+    expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
+    expect(api.post).toHaveBeenCalledWith(
+      `/encounters/${VALID_ENC_ID}/actions/deactivate-rage`,
+      { ragerId: VALID_COMBATANT_ID, version: 5 },
+      'test-token',
+    );
+  });
+
+  it('403 → FORBIDDEN', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(403, { error: 'FORBIDDEN' }, 'FORBIDDEN'),
+    );
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'FORBIDDEN' });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('409 VERSION_CONFLICT → VERSION_CONFLICT', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(409, { error: 'VERSION_CONFLICT' }, 'VERSION_CONFLICT'),
+    );
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VERSION_CONFLICT' });
+  });
+
+  it('400 rule error → API_ERROR with message', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(400, { error: 'BONUS_ACTION_ALREADY_USED' }, 'BONUS_ACTION_ALREADY_USED'),
+    );
+    const { deactivateRage } = await import('./actions');
+    const result = await deactivateRage(VALID_ENC_ID, VALID_COMBATANT_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'API_ERROR', message: expect.anything() });
   });
 });
