@@ -10,9 +10,12 @@
 // The design says "each hex row (or the hex detail sheet)" — this uses the sheet variant.
 //
 // REQ-MAP-01, REQ-GATE-01: dmNotes absent for players (not just hidden).
+// B2: STATUS_STYLE raw-tw-colors removed; status pill now uses <Pill> with design tokens.
 
 import type { HexRow, HexStatus, PoiRow, PoiBody } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
+import { Pill } from '@/components/ui/pill';
+import { HEX_STATUS_TONE } from './status-tones';
 import { PoiAccordion } from './poi-accordion';
 
 const STATUS_LABEL: Record<HexStatus, string> = {
@@ -20,13 +23,6 @@ const STATUS_LABEL: Record<HexStatus, string> = {
   rumored: 'Rumoreada',
   explored: 'Explorada',
   cleared: 'Despejada',
-};
-
-const STATUS_STYLE: Record<HexStatus, string> = {
-  unexplored: 'bg-stone-100 text-stone-600',
-  rumored: 'bg-amber-100 text-amber-700',
-  explored: 'bg-blue-100 text-blue-700',
-  cleared: 'bg-green-100 text-green-700',
 };
 
 interface HexDetailViewProps {
@@ -50,7 +46,7 @@ export function HexDetailView({
 }: HexDetailViewProps) {
   const isDM = effectiveView === 'dm';
   const label = STATUS_LABEL[detail.status] ?? detail.status;
-  const style = STATUS_STYLE[detail.status] ?? 'bg-stone-100 text-stone-600';
+  const tone = HEX_STATUS_TONE[detail.status] ?? 'stone';
 
   return (
     <div className="space-y-4">
@@ -64,14 +60,9 @@ export function HexDetailView({
       {/* Status pill */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-ink-soft uppercase tracking-wide">Estado</span>
-        <span
-          className={[
-            'rounded-full px-2 py-0.5 text-xs font-medium',
-            style,
-          ].join(' ')}
-        >
+        <Pill tone={tone} size="sm">
           {label}
-        </span>
+        </Pill>
       </div>
 
       {/* Terrain */}

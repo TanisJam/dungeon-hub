@@ -21,11 +21,15 @@
  *   Closed panel is pointer-events-none so it never blocks map pan while off-screen.
  *
  * REQ-PML-DRAWER-01, REQ-PML-DRAWER-03, REQ-PML-LIST-01, REQ-PML-LIST-02, REQ-PML-FLYTO-01.
+ *
+ * B2: POI_STATUS_STYLE raw-tw-colors removed. Status badges now use <Pill> via POI_STATUS_TONE.
  */
 
 import type { PoiRow } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import { POI_STATUS_LABEL, POI_STATUS_STYLE } from './poi-detail';
+import { Pill } from '@/components/ui/pill';
+import { POI_STATUS_LABEL } from './poi-detail';
+import { POI_STATUS_TONE } from './status-tones';
 
 export interface PoiMapDrawerProps {
   /** Role-filtered POI list — already server-filtered; drawer just renders it. */
@@ -143,14 +147,9 @@ function PoiRow({ poi, onFlyTo }: PoiRowProps) {
   const hasCoords = poi.worldX != null && poi.worldY != null;
 
   const badge = (
-    <span
-      className={[
-        'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-        POI_STATUS_STYLE[poi.status] ?? 'bg-stone-100 text-stone-600',
-      ].join(' ')}
-    >
+    <Pill tone={POI_STATUS_TONE[poi.status] ?? 'stone'} size="sm">
       {POI_STATUS_LABEL[poi.status] ?? poi.status}
-    </span>
+    </Pill>
   );
 
   if (hasCoords) {

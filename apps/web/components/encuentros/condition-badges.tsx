@@ -7,6 +7,10 @@
 //  Hex PHB p.251, Hunter's Mark PHB p.251).
 //
 // Presentational Server Component — no 'use client' needed.
+// B2: migrated from raw inline span to <Pill> (tone amber + secondary, size sm).
+//   Note: minor shape change rounded→rounded-pill, px-1.5→px-2 (Pill sm baseline).
+
+import { Pill } from '@/components/ui/pill';
 
 type Props = {
   conditions: string[];
@@ -19,22 +23,14 @@ export function ConditionBadges({ conditions, effects }: Props) {
   return (
     <span className="flex flex-wrap gap-1">
       {conditions.map((name) => (
-        <span
-          key={`cond-${name}`}
-          className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-warning-soft text-warning-deep"
-          data-badge-type="condition"
-        >
+        <Pill key={`cond-${name}`} tone="amber" size="sm">
           {name}
-        </span>
+        </Pill>
       ))}
       {effects.map((name) => (
-        <span
-          key={`effect-${name}`}
-          className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-secondary-soft text-secondary-deep"
-          data-badge-type="effect"
-        >
+        <Pill key={`effect-${name}`} tone="secondary" size="sm">
           {name}
-        </span>
+        </Pill>
       ))}
     </span>
   );

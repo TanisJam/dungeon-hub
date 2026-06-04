@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Pill } from '@/components/ui/pill';
 
 interface PillItem {
   label: string;
@@ -47,12 +48,9 @@ export function NumberedReviewCard({
         {pills && pills.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {pills.map((pill) => (
-              <span
-                key={pill.label}
-                className="inline-flex items-center rounded-pill bg-paper-soft px-2 py-0.5 text-[10px] font-medium text-ink-soft"
-              >
+              <Pill key={pill.label} tone="stone" size="sm">
                 {pill.label}
-              </span>
+              </Pill>
             ))}
           </div>
         )}

@@ -13,21 +13,21 @@
  *   - world-map-leaflet.tsx (Mapa view — inside Leaflet Popup on marker tap)
  *
  * Pure render: no state, no actions, no fetch.
+ *
+ * B2: POI_STATUS_STYLE raw-tw-colors removed. Status badge now uses <Pill> with
+ * design tokens via POI_STATUS_TONE. POI_STATUS_LABEL still exported for consumers.
+ * POI_STATUS_STYLE export is REMOVED — consumers that imported it must migrate.
  */
 
 import type { PoiRow, PoiStatus } from '@/app/mapa/actions';
+import { Pill } from '@/components/ui/pill';
+import { POI_STATUS_TONE } from './status-tones';
 
-// Exported so consumers (poi-accordion, world-map-leaflet) share one palette.
+// Exported so consumers (poi-accordion, world-map-leaflet) share one label palette.
 export const POI_STATUS_LABEL: Record<PoiStatus, string> = {
   unknown: 'Desconocido',
   discovered: 'Descubierto',
   cleared: 'Despejado',
-};
-
-export const POI_STATUS_STYLE: Record<PoiStatus, string> = {
-  unknown: 'bg-stone-100 text-stone-600',
-  discovered: 'bg-blue-100 text-blue-700',
-  cleared: 'bg-green-100 text-green-700',
 };
 
 interface PoiDetailProps {
@@ -41,14 +41,9 @@ export function PoiDetail({ poi, isDM }: PoiDetailProps) {
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <p className="truncate text-sm font-medium text-ink">{poi.name}</p>
-        <span
-          className={[
-            'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-            POI_STATUS_STYLE[poi.status] ?? 'bg-stone-100 text-stone-600',
-          ].join(' ')}
-        >
+        <Pill tone={POI_STATUS_TONE[poi.status] ?? 'stone'} size="sm">
           {POI_STATUS_LABEL[poi.status] ?? poi.status}
-        </span>
+        </Pill>
       </div>
       {poi.description && (
         <p className="mt-0.5 text-xs text-ink-soft line-clamp-2">{poi.description}</p>

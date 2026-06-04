@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { Pill } from '@/components/ui/pill';
 
 export interface PublishedSplashProps {
   characterId: string;
@@ -39,9 +40,9 @@ export function PublishedSplash({
       </div>
 
       {/* Status pill */}
-      <span className="inline-flex items-center gap-1.5 rounded-pill bg-accent-soft px-3 py-1 text-xs font-medium text-accent-deep">
+      <Pill tone="accent" size="md">
         ✓ Enviado al DM para aprobación
-      </span>
+      </Pill>
 
       {/* Subtitle */}
       <p className="max-w-sm text-center text-xs text-ink-mute">
