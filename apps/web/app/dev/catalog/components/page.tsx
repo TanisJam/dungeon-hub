@@ -5,14 +5,15 @@ import { Frame375 } from './_frame-375';
 import { DomainContentIsland } from './_islands/domain-content-island';
 
 const GROUP_LABELS: Record<ComponentGroup, string> = {
-  ui:     'ui/ primitives',
-  layout: 'layout/ components',
-  sheet:  'sheet/ components',
-  wizard: 'wizard/ components',
-  form:   'form/ primitives',
+  ui:          'ui/ primitives',
+  layout:      'layout/ components',
+  sheet:       'sheet/ components',
+  wizard:      'wizard/ components',
+  form:        'form/ primitives',
+  encuentros:  'encuentros/ organisms',
 };
 
-const GROUP_ORDER: ComponentGroup[] = ['ui', 'layout', 'sheet', 'wizard', 'form'];
+const GROUP_ORDER: ComponentGroup[] = ['ui', 'layout', 'sheet', 'wizard', 'form', 'encuentros'];
 
 /**
  * Components gallery — renders every ComponentEntry × buildMatrix combos inside Frame375.
@@ -29,7 +30,7 @@ export default function ComponentsPage() {
       acc[g] = COMPONENT_REGISTRY.filter((e) => e.group === g);
       return acc;
     },
-    { ui: [], layout: [], sheet: [], wizard: [], form: [] }
+    { ui: [], layout: [], sheet: [], wizard: [], form: [], encuentros: [] }
   );
 
   return (

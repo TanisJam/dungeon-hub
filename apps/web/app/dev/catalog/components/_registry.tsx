@@ -15,6 +15,15 @@ import { Banner } from '@/components/sheet/banner';
 import { SheetTabs } from '@/components/sheet/sheet-tabs';
 import type { SheetTab } from '@/components/sheet/sheet-tabs';
 
+// encuentros/ organisms (presentational)
+import { RadialDial } from '@/components/encuentros/radial-dial';
+import { RosterList } from '@/components/encuentros/roster-row';
+import { TurnBanner } from '@/components/encuentros/turn-banner';
+import { ConditionBadges } from '@/components/encuentros/condition-badges';
+import { PlayerActionPanel } from '@/components/encuentros/player-action-panel';
+import { EncuentrosListView } from '@/components/encuentros/encuentros-list-view';
+import type { EncounterCombatant } from '@/components/encuentros/types';
+
 // ui/ primitives
 import { Button } from '@/components/ui/button';
 import { CharacterCard } from '@/components/ui/character-card';
@@ -53,6 +62,14 @@ import { ChoiceCardIsland } from './_islands/choice-card-island';
 import { ChoiceListIsland } from './_islands/choice-list-island';
 import { CharacterNameInputIsland } from './_islands/character-name-input-island';
 import { WizardFooterNavIsland } from './_islands/wizard-footer-nav-island';
+
+// encuentros/ interactive islands
+import { ResourcePanelIsland } from './_islands/resource-panel-island';
+import { AttackSheetIsland } from './_islands/attack-sheet-island';
+import { RageControlsIsland } from './_islands/rage-controls-island';
+import { PassTurnButtonIsland } from './_islands/pass-turn-button-island';
+import { RefreshButtonIsland } from './_islands/refresh-button-island';
+import { TurnControlsIslandCatalog } from './_islands/turn-controls-island-catalog';
 
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
@@ -1177,6 +1194,350 @@ const wizardFooterNavEntry: ComponentEntry = {
   ),
 };
 
+// ── encuentros/ group ─────────────────────────────────────────────────────────
+
+// Shared fixture combatants used across multiple encuentros entries
+const _fixtureCombatants: EncounterCombatant[] = [
+  {
+    id: 'c1',
+    name: 'Brann',
+    kind: 'pc',
+    characterId: 'char-1',
+    initiative: 18,
+    hpCurrent: 28,
+    hpMax: 36,
+    ac: 14,
+    insertionOrder: 1,
+    conditions: [],
+    effects: [],
+    actionUsed: false,
+    bonusActionUsed: false,
+    reactionUsed: false,
+    attacksRemaining: 1,
+  },
+  {
+    id: 'c2',
+    name: 'Arken',
+    kind: 'pc',
+    characterId: 'char-2',
+    initiative: 14,
+    hpCurrent: 42,
+    hpMax: 52,
+    ac: 16,
+    insertionOrder: 2,
+    conditions: [],
+    effects: [],
+    actionUsed: true,
+    bonusActionUsed: false,
+    reactionUsed: false,
+    attacksRemaining: 0,
+  },
+  {
+    id: 'npc1',
+    name: 'Goblin A',
+    kind: 'npc',
+    characterId: null,
+    initiative: 11,
+    hpCurrent: 7,
+    hpMax: 7,
+    ac: 12,
+    insertionOrder: 3,
+    conditions: [{ name: 'Prone', appliedByCombatantId: 'c1' }],
+    effects: [],
+    actionUsed: false,
+    bonusActionUsed: false,
+    reactionUsed: false,
+    attacksRemaining: 1,
+  },
+  {
+    id: 'npc2',
+    name: 'Goblin B',
+    kind: 'npc',
+    characterId: null,
+    initiative: 9,
+    hpCurrent: 0,
+    hpMax: 7,
+    ac: 12,
+    insertionOrder: 4,
+    conditions: [{ name: 'Unconscious', appliedByCombatantId: null }],
+    effects: [],
+    actionUsed: false,
+    bonusActionUsed: false,
+    reactionUsed: false,
+    attacksRemaining: 0,
+  },
+];
+
+const radialDialEntry: ComponentEntry = {
+  id: 'radial-dial',
+  name: 'RadialDial',
+  group: 'encuentros',
+  notes: 'Initiative dial — combatants arranged radially. Each token = first letter of name. Current combatant token gets a highlight ring. Dead combatants (hp=0) dim. Center panel: current name + initiative + HP bar.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // 4 combatants, Brann is current (PC, high init)
+    { _label: '4 combatants — Brann current (PC)' },
+    // 4 combatants, Goblin A is current (NPC mid-init)
+    { _label: '4 combatants — Goblin A current (NPC, prone)' },
+  ],
+  render: (p) => (
+    <RadialDial
+      combatants={_fixtureCombatants}
+      currentCombatantId={(p._label as string).includes('Goblin') ? 'npc1' : 'c1'}
+    />
+  ),
+};
+
+const rosterListEntry: ComponentEntry = {
+  id: 'roster-list',
+  name: 'RosterList',
+  group: 'encuentros',
+  notes: 'Initiative roster — sorted list of combatants (initiative desc, insertionOrder tiebreak). Current row gets current style. Dead rows dim (opacity 0.45). PC vs NPC distinguished by Pill. ConditionBadges inline. Action economy (A/B/R/⚔) shown only for ownCombatantId row.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // Brann is current + own combatant
+    { _label: 'Brann current + own (action economy visible)' },
+    // Arken is current, Brann is own (action economy on Brann, no own-turn indicator)
+    { _label: 'Arken current, Brann own' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const currentId = label.includes('Arken current') ? 'c2' : 'c1';
+    return (
+      <RosterList
+        combatants={_fixtureCombatants}
+        currentCombatantId={currentId}
+        ownCombatantId="c1"
+      />
+    );
+  },
+};
+
+const turnBannerEntry: ComponentEntry = {
+  id: 'turn-banner',
+  name: 'TurnBanner',
+  group: 'encuentros',
+  notes: 'Sticky top banner. isOwnTurn (currentId === ownId) → "Tu turno" with pulsing primary dot. Else → "Turno de {name}". Presentational server component.',
+  propsSchema: {
+    currentCombatantId:   { kind: 'string', default: 'c1',   label: 'Current combatant ID' },
+    ownCombatantId:       { kind: 'string', default: 'c1',   label: 'Own combatant ID (null = spectator)' },
+    currentCombatantName: { kind: 'string', default: 'Brann', label: 'Current combatant name' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // Own turn
+    { currentCombatantId: 'c1', ownCombatantId: 'c1', currentCombatantName: 'Brann' },
+    // Other player's turn
+    { currentCombatantId: 'c2', ownCombatantId: 'c1', currentCombatantName: 'Arken' },
+    // NPC turn (spectator mode — ownCombatantId = null)
+    { currentCombatantId: 'npc1', ownCombatantId: null as unknown as string, currentCombatantName: 'Goblin A' },
+  ],
+  render: (p) => (
+    <TurnBanner
+      currentCombatantId={p.currentCombatantId as string}
+      ownCombatantId={(p.ownCombatantId as string | null) ?? null}
+      currentCombatantName={p.currentCombatantName as string}
+    />
+  ),
+};
+
+const conditionBadgesEntry: ComponentEntry = {
+  id: 'condition-badges',
+  name: 'ConditionBadges',
+  group: 'encuentros',
+  notes: 'PHB Appendix A conditions rendered as amber Pills; spell effects as secondary Pills. Returns null when both arrays are empty (REQ-WCO-WEB-03). B2: migrated from raw inline span to Pill (tone amber+secondary, size sm).',
+  propsSchema: {
+    conditions: { kind: 'string', default: '', label: 'Condition names (display only)' },
+    effects:    { kind: 'string', default: '', label: 'Effect names (display only)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // Condition only
+    { _conditions: ['Prone', 'Poisoned'], _effects: [] },
+    // Effect only
+    { _conditions: [], _effects: ['Bless', "Hunter's Mark"] },
+    // Mixed
+    { _conditions: ['Frightened'], _effects: ['Hex'] },
+    // Empty → renders null
+    { _conditions: [], _effects: [] },
+  ],
+  render: (p) => (
+    <ConditionBadges
+      conditions={p._conditions as string[]}
+      effects={p._effects as string[]}
+    />
+  ),
+};
+
+const resourcePanelEntry: ComponentEntry = {
+  id: 'resource-panel',
+  name: 'ResourcePanel',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. Class resource rows with Use/Restore buttons + short/long rest. Calls useResource/restoreResource/shortRest/longRest server actions in production. Catalog island: fixture resources + local state mutation + Toast feedback. No real server calls.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // Fighter resources
+    {
+      _label: 'Fighter — Second Wind + Indomitable',
+      _resources: [
+        { slug: 'fighter:second-wind',  classSlug: 'fighter', used: 0, max: 1, recoveryTrigger: 'short' as const },
+        { slug: 'fighter:indomitable',  classSlug: 'fighter', used: 1, max: 1, recoveryTrigger: 'long' as const },
+      ],
+    },
+    // Bard resources
+    {
+      _label: 'Bard — Bardic Inspiration',
+      _resources: [
+        { slug: 'bard:bardic-inspiration', classSlug: 'bard', used: 2, max: 4, recoveryTrigger: 'short' as const },
+      ],
+    },
+  ],
+  render: (p) => (
+    <ResourcePanelIsland
+      resources={p._resources as Parameters<typeof ResourcePanelIsland>[0]['resources']}
+    />
+  ),
+};
+
+const attackSheetEntry: ComponentEntry = {
+  id: 'attack-sheet',
+  name: 'AttackSheet',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. 3-step V3Sheet flow: weapon → target → result. Disabled when not own turn or action used. Catalog island: fixture weapons (Espada larga, Daga) + targets (2 Goblins) + stubbed local roll result (no attackApplyAction server call).',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // Own turn, action available
+    { _label: 'Own turn — action available', _isOwnTurn: true,  _actionUsed: false },
+    // Not own turn — button disabled
+    { _label: 'Not own turn — disabled',     _isOwnTurn: false, _actionUsed: false },
+    // Action already spent
+    { _label: 'Action used — disabled',      _isOwnTurn: true,  _actionUsed: true },
+  ],
+  render: (p) => (
+    <AttackSheetIsland
+      isOwnTurn={p._isOwnTurn as boolean}
+      actionUsed={p._actionUsed as boolean}
+    />
+  ),
+};
+
+const playerActionPanelEntry: ComponentEntry = {
+  id: 'player-action-panel',
+  name: 'PlayerActionPanel',
+  group: 'encuentros',
+  notes: "Pure layout shell for turn-action islands. ADR-3: panel = single-column flex gap-2; each action is its OWN island passed as children. 'use client' on the component itself but contains zero state/handlers. Catalog renders with fixture action button children.",
+  propsSchema: {},
+  render: () => (
+    <PlayerActionPanel>
+      <PassTurnButtonIsland isOwnTurn={true} />
+    </PlayerActionPanel>
+  ),
+};
+
+const rageControlsEntry: ComponentEntry = {
+  id: 'rage-controls',
+  name: 'RageControls',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. Barbarian rage toggle. Disabled when not own turn, bonus action spent, or no uses remain. PHB p.48 — Rage uses per level (2@L1 → Unlimited@L20). Catalog island: local isRaging state + use counter + Toast feedback. No real server calls.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // Own turn, not raging, 2 uses left
+    { _label: 'Own turn — 2 uses, not raging', _isOwnTurn: true,  _initialRaging: false, _rageUsesRemaining: 2, _rageMax: 2, _rageUnlimited: false },
+    // Already raging — shows "Terminar Furia"
+    { _label: 'Own turn — currently raging',   _isOwnTurn: true,  _initialRaging: true,  _rageUsesRemaining: 1, _rageMax: 2, _rageUnlimited: false },
+    // L20 unlimited
+    { _label: 'Level 20 — Unlimited',          _isOwnTurn: true,  _initialRaging: false, _rageUsesRemaining: 0, _rageMax: 0, _rageUnlimited: true },
+    // Not own turn — disabled
+    { _label: 'Not own turn — disabled',       _isOwnTurn: false, _initialRaging: false, _rageUsesRemaining: 1, _rageMax: 2, _rageUnlimited: false },
+  ],
+  render: (p) => (
+    <RageControlsIsland
+      isOwnTurn={p._isOwnTurn as boolean}
+      initialRaging={p._initialRaging as boolean}
+      rageUsesRemaining={p._rageUsesRemaining as number}
+      rageMax={p._rageMax as number}
+      rageUnlimited={p._rageUnlimited as boolean}
+    />
+  ),
+};
+
+const passTurnButtonEntry: ComponentEntry = {
+  id: 'pass-turn-button',
+  name: 'PassTurnButton',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. Full-width ≥44px ghost button. Disabled when not own turn. PHB p.189 — creature may declare turn complete. Catalog island: no-op handler + brief status feedback.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Own turn — enabled',     _isOwnTurn: true  },
+    { _label: 'Not own turn — disabled', _isOwnTurn: false },
+  ],
+  render: (p) => (
+    <PassTurnButtonIsland isOwnTurn={p._isOwnTurn as boolean} />
+  ),
+};
+
+const refreshButtonEntry: ComponentEntry = {
+  id: 'refresh-button',
+  name: 'RefreshButton',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. Calls router.refresh() to pull latest encounter state without a full page reload (REQ-WCO-WEB-07). Catalog island: no-op + brief label feedback (does not navigate away from catalog).',
+  propsSchema: {},
+  render: () => <RefreshButtonIsland />,
+};
+
+const turnControlsEntry: ComponentEntry = {
+  id: 'turn-controls',
+  name: 'TurnControls',
+  group: 'encuentros',
+  notes: 'INTERACTIVE — client island. DM-only "Próximo turno →" advance button. TurnControls (presentational) + TurnControlsIsland (feature: calls advanceEncounterTurn SA). Catalog uses TurnControlsIslandCatalog which wires no-op advance with local pending state.',
+  propsSchema: {},
+  render: () => <TurnControlsIslandCatalog />,
+};
+
+const encuentrosListViewEntry: ComponentEntry = {
+  id: 'encuentros-list-view',
+  name: 'EncuentrosListView',
+  group: 'encuentros',
+  notes: 'Presentational list view. DM role: renders encounter cards (name, campaign, round, status Pills) + disabled DashedCTA. Non-DM role: V3Empty guard. Server component — uses next/link and Pill.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    // DM — 2 encounters
+    {
+      _label: 'DM — 2 encounters (1 active, 1 closed)',
+      _role: 'dm',
+      _rows: [
+        {
+          encounter: { id: 'enc1', campaignId: 'camp1', name: 'Asalto al Goblin Keep', round: 3, status: 'active' as const, currentCombatantId: 'c1', version: 1, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+          campaignName: 'Los Reinos Olvidados',
+          combatantsCount: 4,
+        },
+        {
+          encounter: { id: 'enc2', campaignId: 'camp1', name: 'Defensa del Puente', round: 7, status: 'completed' as const, currentCombatantId: 'c1', version: 2, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+          campaignName: 'Los Reinos Olvidados',
+          combatantsCount: 6,
+        },
+      ],
+    },
+    // DM — empty state
+    { _label: 'DM — empty (no encounters)', _role: 'dm',    _rows: [] },
+    // Non-DM role guard
+    { _label: 'Player role — access guard', _role: 'player', _rows: [] },
+  ],
+  render: (p) => (
+    <EncuentrosListView
+      role={p._role as string}
+      rows={p._rows as Parameters<typeof EncuentrosListView>[0]['rows']}
+    />
+  ),
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -1224,4 +1585,17 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   formInputEntry,
   formErrorAlertEntry,
   formSubmitButtonEntry,
+  // encuentros/
+  radialDialEntry,
+  rosterListEntry,
+  turnBannerEntry,
+  conditionBadgesEntry,
+  resourcePanelEntry,
+  attackSheetEntry,
+  playerActionPanelEntry,
+  rageControlsEntry,
+  passTurnButtonEntry,
+  refreshButtonEntry,
+  turnControlsEntry,
+  encuentrosListViewEntry,
 ];
