@@ -15,6 +15,98 @@ import type { EncounterActionResult } from '@/app/encuentros/actions';
 
 const IdSchema = z.string().uuid();
 
+// ─── activateRage ─────────────────────────────────────────────────────────────
+// POST /encounters/:id/actions/activate-rage  { ragerId, version }
+// REQ-WCR-WEB-ACT-01 — player activates own Barbarian rage (PHB p.48 — Rage)
+
+export async function activateRage(
+  encounterId: string,
+  combatantId: string,
+  version: number,
+): Promise<EncounterActionResult> {
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
+  if (!IdSchema.safeParse(combatantId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid combatant ID' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { ok: false, code: 'UNAUTHORIZED' };
+
+  try {
+    await api.post(
+      `/encounters/${encounterId}/actions/activate-rage`,
+      { ragerId: combatantId, version },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    if (err instanceof ApiError && err.status === 409) {
+      return { ok: false, code: 'VERSION_CONFLICT' };
+    }
+    const msg =
+      err instanceof ApiError
+        ? (err.body as { error?: string } | null)?.error
+        : undefined;
+    return { ok: false, code: 'API_ERROR', message: msg };
+  }
+
+  revalidatePath(`/encuentros/${encounterId}`);
+  return { ok: true };
+}
+
+// ─── deactivateRage ───────────────────────────────────────────────────────────
+// POST /encounters/:id/actions/deactivate-rage  { ragerId, version }
+// REQ-WCR-WEB-ACT-01 — player ends own Barbarian rage (PHB p.48 — Rage: bonus action on own turn)
+
+export async function deactivateRage(
+  encounterId: string,
+  combatantId: string,
+  version: number,
+): Promise<EncounterActionResult> {
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
+  if (!IdSchema.safeParse(combatantId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid combatant ID' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { ok: false, code: 'UNAUTHORIZED' };
+
+  try {
+    await api.post(
+      `/encounters/${encounterId}/actions/deactivate-rage`,
+      { ragerId: combatantId, version },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    if (err instanceof ApiError && err.status === 409) {
+      return { ok: false, code: 'VERSION_CONFLICT' };
+    }
+    const msg =
+      err instanceof ApiError
+        ? (err.body as { error?: string } | null)?.error
+        : undefined;
+    return { ok: false, code: 'API_ERROR', message: msg };
+  }
+
+  revalidatePath(`/encuentros/${encounterId}`);
+  return { ok: true };
+}
+
 // ─── useResource ─────────────────────────────────────────────────────────────
 // POST /characters/:id/resources/use  { slug, amount? }
 

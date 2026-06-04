@@ -11,7 +11,7 @@ export type EncounterActionResult =
   | { ok: true }
   | {
       ok: false;
-      code: 'VALIDATION_FAILED' | 'UNAUTHORIZED' | 'VERSION_CONFLICT' | 'API_ERROR';
+      code: 'VALIDATION_FAILED' | 'UNAUTHORIZED' | 'VERSION_CONFLICT' | 'API_ERROR' | 'FORBIDDEN';
       message?: string;
     };
 
