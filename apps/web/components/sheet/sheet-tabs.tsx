@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ScrollNav } from '@/components/ui/scroll-nav';
 
 export type SheetTab = 'resumen' | 'habilidades' | 'hechizos' | 'recursos' | 'inventario' | 'notas';
 
@@ -18,7 +19,7 @@ const TABS: { slug: SheetTab; label: string }[] = [
 
 export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
   return (
-    <nav className="flex gap-1.5 overflow-x-auto py-1 scrollbar-none" aria-label="Pestañas de ficha">
+    <ScrollNav as="nav" className="py-1" aria-label="Pestañas de ficha">
       {TABS.map(({ slug, label }) => {
         const isActive = activeTab === slug;
         return (
@@ -45,6 +46,6 @@ export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
           </div>
         );
       })}
-    </nav>
+    </ScrollNav>
   );
 }

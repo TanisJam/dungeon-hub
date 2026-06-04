@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { parseChip } from '@/lib/personajes-filter';
+import { ScrollNav } from '@/components/ui/scroll-nav';
 import type { ChipCounts, StatusChip } from './types';
 
 const CHIPS: ReadonlyArray<{ key: StatusChip; label: string; showCount: boolean }> = [
@@ -18,7 +19,7 @@ export function StatusFilterChips({ counts }: { counts: ChipCounts }) {
   const active = parseChip(rawStatus ?? undefined);
 
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <ScrollNav className="pb-0.5">
       {CHIPS.map(({ key, label, showCount }) => {
         const on = key === active;
         return (
@@ -35,6 +36,6 @@ export function StatusFilterChips({ counts }: { counts: ChipCounts }) {
           </Link>
         );
       })}
-    </div>
+    </ScrollNav>
   );
 }

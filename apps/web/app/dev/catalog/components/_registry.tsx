@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 // ui/ primitives
 import { Button } from '@/components/ui/button';
 import { CharacterCard } from '@/components/ui/character-card';
+import { ScrollNav } from '@/components/ui/scroll-nav';
 import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { DashedCTA } from '@/components/ui/dashed-cta';
 import { ListRow } from '@/components/ui/list-row';
@@ -310,6 +311,61 @@ const characterCardEntry: ComponentEntry = {
     >
       {p.children as ReactNode}
     </CharacterCard>
+  ),
+};
+
+const scrollNavEntry: ComponentEntry = {
+  id: 'scroll-nav',
+  name: 'ScrollNav',
+  group: 'ui',
+  notes: 'Horizontal-scroll container primitive. as="nav"|"div" (default div). gap (default gap-1.5). Scrollbar hidden cross-browser ([scrollbar-width:none] + [&::-webkit-scrollbar]:hidden). Adopted by SheetTabs (py-1, as=nav) and StatusFilterChips (pb-0.5). Sub-nav is NOT a scroll strip — it is a segmented control and is intentionally excluded.',
+  propsSchema: {
+    as:        { kind: 'enum',    options: ['div', 'nav'] as const, default: 'div',      label: 'Element' },
+    gap:       { kind: 'string',  default: 'gap-1.5',                                    label: 'Gap class' },
+    className: { kind: 'string',  label: 'Extra classes (optional)' },
+    children:  { kind: 'node',    label: 'Items' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    // SheetTabs strip simulation (as=nav, py-1)
+    {
+      as: 'nav',
+      gap: 'gap-1.5',
+      className: 'py-1',
+      children: (
+        <>
+          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold ficha-tab-active">Resumen</a>
+          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Habilidades</a>
+          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Hechizos</a>
+          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Recursos</a>
+          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Inventario</a>
+        </>
+      ),
+    },
+    // StatusFilterChips strip simulation (div, pb-0.5)
+    {
+      as: 'div',
+      gap: 'gap-1.5',
+      className: 'pb-0.5',
+      children: (
+        <>
+          <a className="shrink-0 rounded-full border border-accent-deep personajes-chip-on px-2.5 py-1 text-[11px] font-semibold">Activos · 3</a>
+          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Pendientes · 1</a>
+          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Retirados</a>
+          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Borradores · 2</a>
+          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Todos</a>
+        </>
+      ),
+    },
+  ],
+  render: (p) => (
+    <ScrollNav
+      as={p.as as 'div' | 'nav'}
+      gap={p.gap as string | undefined}
+      className={p.className as string | undefined}
+    >
+      {p.children as ReactNode}
+    </ScrollNav>
   ),
 };
 
@@ -673,6 +729,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   dashedCtaEntry,
   characterPortraitEntry,
   characterCardEntry,
+  scrollNavEntry,
   listRowEntry,
   questRowEntry,
   sectionHeadEntry,
