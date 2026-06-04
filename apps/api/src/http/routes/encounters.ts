@@ -28,6 +28,7 @@ import { performCastSpellApply } from '../../use-cases/encounters/perform-cast-s
 import { resolveCastReaction } from '../../use-cases/encounters/resolve-cast-reaction.js';
 import { activateRage } from '../../use-cases/encounters/activate-rage.js';
 import { deactivateRage } from '../../use-cases/encounters/deactivate-rage.js';
+import { passEncounterTurn } from '../../use-cases/encounters/pass-encounter-turn.js';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -1344,6 +1345,63 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       return reply.code(200).send({ ok: true });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/pass-turn ------------------------------
+  // web-combat-pass-turn C1: player passes own turn. Owner-OR-GM.
+  // Body: { version } only — no combatantId (authz targets server-derived currentCombatantId).
+  // PHB p.189 — a creature may take fewer actions and declare its turn complete.
+  // REQ-WCPT-API-01, REQ-WCPT-API-03. ADR-2 (thin route, mirrors rage threading).
+
+  const PassTurnBody = z.object({
+    version: z.number().int().nonnegative(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/pass-turn',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      const bodyResult = PassTurnBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { version } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const role = await memberRole(encRow.campaignId, userId);
+      // Non-members (role === null) are rejected at route level (membership gate only).
+      // Owner-OR-GM resolution is delegated to use-case via assertCombatantOwnerOrGm.
+      if (role === null) return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await passEncounterTurn({ encounterId: id, version, callerId: userId, callerRole: role });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND' });
+          case 'FORBIDDEN':
+            return reply.code(403).send({ error: 'FORBIDDEN' });
+          case 'ENCOUNTER_NOT_ACTIVE':
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: result.code });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      return reply.code(200).send(result.encounter);
     },
   );
 
