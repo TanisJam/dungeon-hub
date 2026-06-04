@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 import type { ClassResourceView } from '@/lib/sheet-types';
 import { useResource, restoreResource, shortRest, longRest } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
+import { Toast } from '@/components/ui/toast';
+import { useToast } from '@/lib/use-toast';
 
 // Display name map — mirrors the subset shown in RecursosTab (recursos.tsx).
 // PHB references: Ki Points PHB p.76, Second Wind PHB p.72, etc.
@@ -34,14 +36,9 @@ type Props = {
 
 export function ResourcePanel({ characterId, encounterId, resources }: Props) {
   const router = useRouter();
-  const [toast, setToast] = useState<string | null>(null);
+  const { message: toast, showToast } = useToast();
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  }
 
   async function handleUse(slug: string) {
     startTransition(async () => {
@@ -97,15 +94,7 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {/* REQ-WCO-WEB-07: VERSION_CONFLICT toast */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="text-xs text-center px-3 py-2 bg-warning-soft text-warning-deep rounded"
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
 
       {actionError && (
         <p className="text-xs text-red-600" role="alert">{actionError}</p>

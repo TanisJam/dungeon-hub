@@ -12,6 +12,8 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { activateRage, deactivateRage } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
+import { Toast } from '@/components/ui/toast';
+import { useToast } from '@/lib/use-toast';
 
 type Props = {
   combatantId: string;
@@ -53,7 +55,7 @@ export function RageControls({
   version,
 }: Props) {
   const router = useRouter();
-  const [toast, setToast] = useState<string | null>(null);
+  const { message: toast, showToast } = useToast();
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -66,11 +68,6 @@ export function RageControls({
     !isOwnTurn ||
     bonusActionUsed ||
     (!isRaging && !rageUnlimited && rageUsesRemaining <= 0);
-
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  }
 
   function handleClick() {
     startTransition(async () => {
@@ -96,15 +93,7 @@ export function RageControls({
   return (
     <div className="flex flex-col gap-2">
       {/* VERSION_CONFLICT toast */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="text-xs text-center px-3 py-2 bg-warning-soft text-warning-deep rounded"
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
 
       {actionError && (
         <p className="text-xs text-red-600" role="alert">{actionError}</p>

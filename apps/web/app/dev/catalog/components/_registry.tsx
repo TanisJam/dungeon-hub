@@ -31,6 +31,7 @@ import { TabBarIsland } from './_islands/tabbar-island';
 import { RoleSwitcherIsland } from './_islands/role-switcher-island';
 import { V3SheetIsland } from './_islands/v3-sheet-island';
 import { FormInputIsland } from './_islands/form-input-island';
+import { ToastIsland } from './_islands/toast-island';
 
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
@@ -366,6 +367,28 @@ const scrollNavEntry: ComponentEntry = {
     >
       {p.children as ReactNode}
     </ScrollNav>
+  ),
+};
+
+const toastEntry: ComponentEntry = {
+  id: 'toast',
+  name: 'Toast',
+  group: 'ui',
+  notes: 'Transient notice banner (warning-soft style). role="status" aria-live="polite". Renders null when message is null. Pair with useToast hook (lib/use-toast) for auto-clear after 3500ms. Adopted by resource-panel + rage-controls.',
+  propsSchema: {
+    message: { kind: 'string', default: 'El estado cambió, actualizando...', label: 'Message' },
+    durationMs: { kind: 'number', default: 3500, label: 'Auto-clear ms' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { message: 'El estado cambió, actualizando...', durationMs: 3500 },
+    { message: null, durationMs: 3500 },
+  ],
+  render: (p) => (
+    <ToastIsland
+      message={(p.message as string) ?? 'El estado cambió, actualizando...'}
+      durationMs={p.durationMs as number | undefined}
+    />
   ),
 };
 
@@ -730,6 +753,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   characterPortraitEntry,
   characterCardEntry,
   scrollNavEntry,
+  toastEntry,
   listRowEntry,
   questRowEntry,
   sectionHeadEntry,
