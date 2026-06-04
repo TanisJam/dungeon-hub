@@ -284,6 +284,95 @@ export async function shortRest(
   return { ok: true };
 }
 
+// ─── attackApplyAction ────────────────────────────────────────────────────────
+// POST /encounters/:id/actions/attack/apply  { attackerId, targetId, weaponInstanceId, version }
+// REQ-WCA-WEB-SA-01 — player fires a one-shot weapon attack vs NPC target.
+// PHB p.194-195: attack roll (d20 + bonus vs AC) → if hit, roll damage; server-authoritative.
+// Returns the full attack result (hit/miss, d20, total, damage, newHp) so the sheet
+// can display the outcome in the 'result' step.
+// Error codes: FORBIDDEN(403), VERSION_CONFLICT(409→router.refresh), NOT_FOUND(404),
+//              TARGET_NOT_NPC(400 VALIDATION_FAILED issues[0].code).
+
+/** Success: full 200 body from the attack/apply route. */
+export type AttackApplyResponse = {
+  hit: boolean;
+  d20?: number;
+  total?: number;
+  targetAc?: number;
+  rolledDamage?: number;
+  damageType?: string;
+  newHp?: number;
+  crit?: boolean;
+};
+
+export type AttackApplyActionResult =
+  | { ok: true; result: AttackApplyResponse }
+  | { ok: false; code: 'VERSION_CONFLICT' | 'FORBIDDEN' | 'NOT_FOUND' | 'TARGET_NOT_NPC' | 'API_ERROR' | 'VALIDATION_FAILED'; message?: string };
+
+export async function attackApplyAction(
+  encounterId: string,
+  attackerId: string,
+  targetId: string,
+  weaponInstanceId: string,
+  version: number,
+): Promise<AttackApplyActionResult> {
+  if (!IdSchema.safeParse(encounterId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid encounter ID' };
+  }
+  if (!IdSchema.safeParse(attackerId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid attacker ID' };
+  }
+  if (!IdSchema.safeParse(targetId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid target ID' };
+  }
+  if (!IdSchema.safeParse(weaponInstanceId).success) {
+    return { ok: false, code: 'VALIDATION_FAILED', message: 'Invalid weapon instance ID' };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { ok: false, code: 'FORBIDDEN', message: 'Not authenticated' };
+
+  let result: AttackApplyResponse;
+  try {
+    result = await api.post<AttackApplyResponse>(
+      `/encounters/${encounterId}/actions/attack/apply`,
+      { attackerId, targetId, weaponInstanceId, version },
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403) {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+    if (err instanceof ApiError && err.status === 409) {
+      return { ok: false, code: 'VERSION_CONFLICT' };
+    }
+    if (err instanceof ApiError && err.status === 404) {
+      return { ok: false, code: 'NOT_FOUND' };
+    }
+    if (err instanceof ApiError && err.status === 400) {
+      // Inspect issues[0].code for TARGET_NOT_NPC
+      const body = err.body as { issues?: Array<{ code: string }> } | null;
+      const issueCode = body?.issues?.[0]?.code;
+      if (issueCode === 'TARGET_NOT_NPC') {
+        return { ok: false, code: 'TARGET_NOT_NPC' };
+      }
+      const msg = body?.issues?.[0]?.code;
+      return { ok: false, code: 'API_ERROR', message: msg };
+    }
+    const msg =
+      err instanceof ApiError
+        ? (err.body as { error?: string } | null)?.error
+        : undefined;
+    return { ok: false, code: 'API_ERROR', message: msg };
+  }
+
+  revalidatePath(`/encuentros/${encounterId}`);
+  return { ok: true, result };
+}
+
 // ─── longRest ────────────────────────────────────────────────────────────────
 // POST /characters/:id/rest/long  (PHB p.186 — Long Rest: 8+ hours, full restore)
 

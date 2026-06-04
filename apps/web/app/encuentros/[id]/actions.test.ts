@@ -191,6 +191,109 @@ describe('activateRage — REQ-WCR-WEB-ACT-01', () => {
   });
 });
 
+// ── attackApplyAction — REQ-WCA-WEB-SA-01 ────────────────────────────────────
+
+const VALID_TARGET_ID  = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+const VALID_WEAPON_ID  = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
+describe('attackApplyAction — REQ-WCA-WEB-SA-01', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // UUID guard
+  it('invalid encounterId → VALIDATION_FAILED, no api call', async () => {
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction('bad-id', VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('invalid attackerId → VALIDATION_FAILED, no api call', async () => {
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, 'bad-id', VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('invalid targetId → VALIDATION_FAILED, no api call', async () => {
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, 'bad-id', VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('invalid weaponInstanceId → VALIDATION_FAILED, no api call', async () => {
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, 'bad-id', 1);
+    expect(result).toEqual({ ok: false, code: 'VALIDATION_FAILED', message: expect.any(String) });
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  // Body shape — must match AttackApplyBody exactly (no extra fields, correct keys)
+  it('POSTs correct body: { attackerId, targetId, weaponInstanceId, version }', async () => {
+    const hitBody = { hit: true, d20: 15, total: 18, targetAc: 13, rolledDamage: 6, damageType: 'piercing', newHp: 1 };
+    vi.mocked(api.post).mockResolvedValue(hitBody);
+    const { attackApplyAction } = await import('./actions');
+    await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 3);
+    expect(api.post).toHaveBeenCalledWith(
+      `/encounters/${VALID_ENC_ID}/actions/attack/apply`,
+      { attackerId: VALID_COMBATANT_ID, targetId: VALID_TARGET_ID, weaponInstanceId: VALID_WEAPON_ID, version: 3 },
+      'test-token',
+    );
+  });
+
+  // Success path
+  it('200 HIT → ok:true with result body, revalidatePath called', async () => {
+    const hitBody = { hit: true, d20: 15, total: 18, targetAc: 13, rolledDamage: 6, damageType: 'piercing', newHp: 1 };
+    vi.mocked(api.post).mockResolvedValue(hitBody);
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: true, result: hitBody });
+    expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
+  });
+
+  it('200 MISS → ok:true with miss result body', async () => {
+    const missBody = { hit: false, d20: 4, total: 7, targetAc: 13 };
+    vi.mocked(api.post).mockResolvedValue(missBody);
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: true, result: missBody });
+    expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
+  });
+
+  // Error mapping
+  it('403 → FORBIDDEN (no revalidatePath)', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new ApiError(403, { error: 'FORBIDDEN' }, 'FORBIDDEN'));
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'FORBIDDEN' });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('409 → VERSION_CONFLICT (no revalidatePath)', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new ApiError(409, { error: 'VERSION_CONFLICT' }, 'VERSION_CONFLICT'));
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'VERSION_CONFLICT' });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('404 → NOT_FOUND', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new ApiError(404, { error: 'NOT_FOUND' }, 'NOT_FOUND'));
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'NOT_FOUND' });
+  });
+
+  it('400 TARGET_NOT_NPC → TARGET_NOT_NPC', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new ApiError(400, { error: 'VALIDATION_FAILED', issues: [{ code: 'TARGET_NOT_NPC' }] }, '400'),
+    );
+    const { attackApplyAction } = await import('./actions');
+    const result = await attackApplyAction(VALID_ENC_ID, VALID_COMBATANT_ID, VALID_TARGET_ID, VALID_WEAPON_ID, 1);
+    expect(result).toEqual({ ok: false, code: 'TARGET_NOT_NPC' });
+  });
+});
+
 describe('deactivateRage — REQ-WCR-WEB-ACT-01', () => {
   beforeEach(() => vi.clearAllMocks());
 

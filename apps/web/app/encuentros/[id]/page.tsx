@@ -25,8 +25,9 @@ import { ResourcePanel } from '@/components/encuentros/resource-panel';
 import { RageControls } from '@/components/encuentros/rage-controls';
 import { PlayerActionPanel } from '@/components/encuentros/player-action-panel';
 import { PassTurnButton } from '@/components/encuentros/pass-turn-button';
+import { AttackSheet } from '@/components/encuentros/attack-sheet';
 import type { EncounterDetail } from '@/components/encuentros/types';
-import type { ClassResourceView, SheetResponse } from '@/lib/sheet-types';
+import type { ClassResourceView, SheetResponse, EnrichedInventoryItem } from '@/lib/sheet-types';
 
 type RouteParams = Promise<{ id: string }>;
 
@@ -76,8 +77,10 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
 
   // If there's an own combatant, fetch their class resources for ResourcePanel + RageControls.
   // Design D3 — this fetch is NOT on page.tsx today; added here per Risk #2 in tasks.
+  // ADR-4 (C2): also retain inventoryEnriched for AttackSheet island — no new API call.
   let ownResources: ClassResourceView[] = [];
   let ownClassResources: Record<string, ClassResourceView> = {};
+  let ownInventoryEnriched: EnrichedInventoryItem[] = [];
   if (ownCombatant?.characterId) {
     try {
       const sheet = await api.get<SheetResponse>(
@@ -86,10 +89,14 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
       );
       ownClassResources = sheet.sheet.classResources ?? {};
       ownResources = Object.values(ownClassResources);
+      // ADR-4: retain inventoryEnriched from same fetch (additive field, optional).
+      // This avoids a second API call — the weapon list for AttackSheet comes from here.
+      ownInventoryEnriched = sheet.inventoryEnriched ?? [];
     } catch {
       // Resource panel degrades gracefully on failure
       ownResources = [];
       ownClassResources = {};
+      ownInventoryEnriched = [];
     }
   }
 
@@ -107,6 +114,18 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
   const isOwnTurn = ownCombatant != null && detail.currentCombatantId === ownCombatant.id;
   // bonusActionUsed: from action economy on own combatant.
   const bonusActionUsed = ownCombatant?.bonusActionUsed ?? false;
+  // actionUsed: from action economy on own combatant.
+  const actionUsed = ownCombatant?.actionUsed ?? false;
+
+  // ADR-4 (C2): derive weapon + target lists for AttackSheet island.
+  // equippedWeapons: v3Type==='weapon' && equipped (from same sheet fetch — no new call).
+  const equippedWeapons = ownInventoryEnriched.filter(
+    (i) => i.v3Type === 'weapon' && i.equipped,
+  );
+  // npcTargets: characterId===null (NPC), alive (hpCurrent>0), not the attacker.
+  const npcTargets = detail.combatants.filter(
+    (c) => c.characterId === null && c.hpCurrent > 0 && c.id !== ownCombatant?.id,
+  );
 
   // REQ-WCO-WEB-08: find the current combatant name for TurnBanner
   const currentCombatant = detail.combatants.find((c) => c.id === detail.currentCombatantId);
@@ -177,7 +196,9 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
         )}
 
         {/* REQ-WCPT-WEB-UI-01: PlayerActionPanel — only on own turn in active encounter.
-            Placed BELOW Rage section, ABOVE Recursos — turn-level actions (ADR-5). */}
+            Placed BELOW Rage section, ABOVE Recursos — turn-level actions (ADR-5).
+            REQ-WCA-WEB-UI-01 (C2): AttackSheet rendered as sibling to PassTurnButton —
+            zero edits to PlayerActionPanel (ADR-3). Gated on own turn + active + weapons exist. */}
         {ownCombatant != null && isOwnTurn && detail.status === 'active' && (
           <PlayerActionPanel>
             <PassTurnButton
@@ -186,6 +207,17 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
               version={detail.version}
               isOwnTurn={isOwnTurn}
             />
+            {equippedWeapons.length > 0 && npcTargets.length > 0 && (
+              <AttackSheet
+                encounterId={detail.id}
+                attackerCombatantId={ownCombatant.id}
+                equippedWeapons={equippedWeapons}
+                npcTargets={npcTargets}
+                version={detail.version}
+                isOwnTurn={isOwnTurn}
+                actionUsed={actionUsed}
+              />
+            )}
           </PlayerActionPanel>
         )}
 
