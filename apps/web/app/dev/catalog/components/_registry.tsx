@@ -16,6 +16,12 @@ import { TopBar } from '@/components/layout/topbar';
 import { NavProgress } from '@/components/layout/nav-progress';
 import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
+// form/ primitives
+import { FormLabel } from '@/components/ui/form-label';
+import { FormInput } from '@/components/ui/form-input';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { FormSubmitButton } from '@/components/ui/form-submit-button';
+
 // Client islands (thin 'use client' wrappers for server-module compatibility)
 import { TabBarIsland } from './_islands/tabbar-island';
 import { RoleSwitcherIsland } from './_islands/role-switcher-island';
@@ -400,6 +406,99 @@ const v3SheetEntry: ComponentEntry = {
   render: () => <V3SheetIsland />,
 };
 
+// ── form/ group ───────────────────────────────────────────────────────────────
+
+const formLabelEntry: ComponentEntry = {
+  id: 'form-label',
+  name: 'FormLabel',
+  group: 'form',
+  notes: 'Canonical label style: mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft. Required asterisk via aria-hidden span.',
+  propsSchema: {
+    htmlFor:  { kind: 'string',  default: 'demo-field', label: 'htmlFor' },
+    children: { kind: 'node',    default: 'Field label',  label: 'Label text' },
+    required: { kind: 'boolean', default: false,           label: 'Required' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { htmlFor: 'demo-field', children: 'Nombre', required: false },
+    { htmlFor: 'demo-field', children: 'Nombre', required: true },
+  ],
+  render: (p) => (
+    <FormLabel htmlFor={p.htmlFor as string} required={p.required as boolean}>
+      {p.children as ReactNode}
+    </FormLabel>
+  ),
+};
+
+const formInputEntry: ComponentEntry = {
+  id: 'form-input',
+  name: 'FormInput',
+  group: 'form',
+  notes: 'input: min-h-[44px] (REQ-B1-05). multiline=true → textarea without min-h. Spreads all HTML attrs.',
+  propsSchema: {
+    id:        { kind: 'string',  default: 'demo-input', label: 'id' },
+    multiline: { kind: 'boolean', default: false,          label: 'Multiline (textarea)' },
+    value:     { kind: 'string',  default: '',             label: 'Value' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { id: 'demo-input',        multiline: false, value: '',         placeholder: 'Nombre del NPC' },
+    { id: 'demo-input-multi',  multiline: true,  value: '',         placeholder: 'Descripción…', rows: 3 },
+    { id: 'demo-input-filled', multiline: false, value: 'Aragorn', placeholder: 'Nombre del NPC' },
+  ],
+  render: (p) => (
+    <FormInput
+      id={p.id as string}
+      multiline={p.multiline as boolean}
+      value={p.value as string}
+      placeholder={p.placeholder as string | undefined}
+      rows={p.rows as number | undefined}
+      onChange={() => {}}
+    />
+  ),
+};
+
+const formErrorAlertEntry: ComponentEntry = {
+  id: 'form-error-alert',
+  name: 'FormErrorAlert',
+  group: 'form',
+  notes: 'Renders null when message is null/falsy. role="alert" with bg-danger-soft / text-danger tokens (REQ-B1-04).',
+  propsSchema: {
+    message: { kind: 'string', default: null as unknown as string, label: 'Message (null = renders nothing)' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { message: 'El nombre es obligatorio.' },
+    { message: 'Error al guardar. Intenta de nuevo.' },
+  ],
+  render: (p) => <FormErrorAlert message={p.message as string | null} />,
+};
+
+const formSubmitButtonEntry: ComponentEntry = {
+  id: 'form-submit-button',
+  name: 'FormSubmitButton',
+  group: 'form',
+  notes: 'bg-ink submit treatment (distinct from gradient CTA Button). min-h-[44px]. pending=true → disabled + pendingLabel.',
+  propsSchema: {
+    pending:      { kind: 'boolean', default: false,        label: 'Pending' },
+    idleLabel:    { kind: 'string',  default: 'Crear NPC',  label: 'Idle label' },
+    pendingLabel: { kind: 'string',  default: 'Guardando…', label: 'Pending label' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { pending: false, idleLabel: 'Crear NPC',      pendingLabel: 'Guardando…' },
+    { pending: true,  idleLabel: 'Guardar cambios', pendingLabel: 'Guardando…' },
+    { pending: false, idleLabel: 'Guardar cambios', pendingLabel: 'Guardando…' },
+  ],
+  render: (p) => (
+    <FormSubmitButton
+      pending={p.pending as boolean}
+      idleLabel={p.idleLabel as string}
+      pendingLabel={p.pendingLabel as string}
+    />
+  ),
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -422,4 +521,9 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   numberedSectionHeadEntry,
   // sheet/
   v3SheetEntry,
+  // form/
+  formLabelEntry,
+  formInputEntry,
+  formErrorAlertEntry,
+  formSubmitButtonEntry,
 ];
