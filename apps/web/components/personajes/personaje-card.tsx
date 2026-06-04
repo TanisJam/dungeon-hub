@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Pill } from '@/components/ui/pill';
 import type { PillTone } from '@/components/ui/pill';
+import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { SetActiveCharacterButton } from './set-active-character-button';
 import type { RosterCharacter } from './types';
 
@@ -31,7 +32,6 @@ export function PersonajeCard({
   highlight?: boolean;
   activeCharacterId?: string;
 }) {
-  const initial = char.name.trim().charAt(0).toUpperCase() || '?';
   const tone: PillTone = STATUS_TONES[char.status] ?? 'stone';
   const label = STATUS_LABELS[char.status] ?? char.status;
   const href =
@@ -53,9 +53,7 @@ export function PersonajeCard({
         href={href}
         className="flex flex-1 transition-colors hover:border-ink-mute"
       >
-        <div className="personajes-portrait grid w-[72px] shrink-0 place-items-center border-r border-line font-display text-[26px] font-bold text-accent">
-          {initial}
-        </div>
+        <CharacterPortrait name={char.name} className="border-r border-line" />
         <div className="flex min-w-0 flex-1 flex-col gap-1 px-3 py-2.5">
           <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
             {char.name}

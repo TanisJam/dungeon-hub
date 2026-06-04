@@ -1,3 +1,5 @@
+import { characterInitials } from '@/lib/character-initials';
+
 const XP_TABLE = [
   0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
   85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000,
@@ -19,12 +21,6 @@ interface SheetHeroProps {
   xpNextThreshold: number;
 }
 
-function getInitials(name: string): string {
-  const words = name.trim().split(/\s+/);
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
-}
-
 export function SheetHero({
   name,
   raceLabel,
@@ -34,7 +30,7 @@ export function SheetHero({
   xpCurrent,
   xpNextThreshold,
 }: SheetHeroProps) {
-  const initials = getInitials(name);
+  const initials = characterInitials(name, { maxChars: 2 });
   const isMaxLevel = level >= 20;
   const xpFill = isMaxLevel
     ? 100
@@ -57,8 +53,7 @@ export function SheetHero({
           aria-label={`Iniciales de ${name}`}
         >
           <div
-            className="flex h-full w-full items-center justify-center rounded-sm"
-            style={{ background: 'linear-gradient(135deg, #2A2240, #1B1428)' }}
+            className="ficha-portrait-inner flex h-full w-full items-center justify-center rounded-sm"
           >
             <span className="font-display text-2xl font-bold text-white">
               {initials}

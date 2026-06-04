@@ -1,4 +1,5 @@
 import { Pill } from '@/components/ui/pill';
+import { CharacterPortrait } from '@/components/ui/character-portrait';
 import type { PendingFichaSummary } from '../types';
 import { PendientesActionButtons } from './pendientes-action-buttons';
 
@@ -17,9 +18,7 @@ export function PendientesFichaCard({ ficha }: Props) {
   return (
     <article className={rootClass}>
       <div className="flex items-start gap-3">
-        <div className="pendientes-portrait text-lg font-display text-white">
-          {ficha.pj.charAt(0)}
-        </div>
+        <CharacterPortrait name={ficha.pj} size="sm" />
         <div className="flex flex-col gap-0.5 flex-1 min-w-0">
           <h3 className="font-display text-base text-ink leading-tight">{ficha.pj}</h3>
           <p className="italic text-sm text-ink-mute leading-tight">{ficha.lineage}</p>
