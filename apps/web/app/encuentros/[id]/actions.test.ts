@@ -98,6 +98,13 @@ describe('route-local [id]/actions — encounterId UUID validation (FIX 4)', () 
     const { shortRest } = await import('./actions');
     const result = await shortRest(VALID_CHAR_ID, VALID_ENC_ID);
     expect(result).toEqual({ ok: true });
+    // Body MUST be an object ({}), not undefined — ShortRestBody is z.object() and
+    // rejects undefined ("expected object, received undefined" 400). Regression guard.
+    expect(api.post).toHaveBeenCalledWith(
+      `/characters/${VALID_CHAR_ID}/rest/short`,
+      {},
+      expect.any(String),
+    );
     expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
   });
 
@@ -114,6 +121,11 @@ describe('route-local [id]/actions — encounterId UUID validation (FIX 4)', () 
     const { longRest } = await import('./actions');
     const result = await longRest(VALID_CHAR_ID, VALID_ENC_ID);
     expect(result).toEqual({ ok: true });
+    expect(api.post).toHaveBeenCalledWith(
+      `/characters/${VALID_CHAR_ID}/rest/long`,
+      {},
+      expect.any(String),
+    );
     expect(revalidatePath).toHaveBeenCalledWith(`/encuentros/${VALID_ENC_ID}`);
   });
 });

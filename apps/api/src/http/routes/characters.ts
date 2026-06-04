@@ -3411,7 +3411,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
   // Recupera Warlock pact slots (data.warlockSlotsUsed = 0).
   app.post('/characters/:id/rest/short', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
-    const body = ShortRestBody.parse(request.body);
+    // Tolerate an empty/absent body (short rest spending no hit dice), mirroring
+    // /rest/long. ShortRestBody fields are all optional; without `?? {}` a missing
+    // body fails Zod with "expected object, received undefined".
+    const body = ShortRestBody.parse(request.body ?? {});
     const userId = request.user!.sub;
 
     const character = await loadCharacter(id);

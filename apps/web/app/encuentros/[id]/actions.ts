@@ -265,7 +265,10 @@ export async function shortRest(
   if (!session) return { ok: false, code: 'UNAUTHORIZED' };
 
   try {
-    await api.post(`/characters/${characterId}/rest/short`, undefined, session.access_token);
+    // Empty object — not undefined: ShortRestBody is z.object({...}) and rejects
+    // an undefined body ("expected object, received undefined"). Both fields are
+    // optional, so {} means "short rest, spend no hit dice".
+    await api.post(`/characters/${characterId}/rest/short`, {}, session.access_token);
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) {
       return { ok: false, code: 'VERSION_CONFLICT' };
@@ -303,7 +306,7 @@ export async function longRest(
   if (!session) return { ok: false, code: 'UNAUTHORIZED' };
 
   try {
-    await api.post(`/characters/${characterId}/rest/long`, undefined, session.access_token);
+    await api.post(`/characters/${characterId}/rest/long`, {}, session.access_token);
   } catch (err) {
     if (err instanceof ApiError && err.status === 409) {
       return { ok: false, code: 'VERSION_CONFLICT' };
