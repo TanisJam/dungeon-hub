@@ -71,6 +71,22 @@ import { PassTurnButtonIsland } from './_islands/pass-turn-button-island';
 import { RefreshButtonIsland } from './_islands/refresh-button-island';
 import { TurnControlsIslandCatalog } from './_islands/turn-controls-island-catalog';
 
+// ficha/ interactive islands
+import { AtributosEditorIsland } from './_islands/atributos-editor-island';
+import { AtributosSectionEditorIsland } from './_islands/atributos-section-editor-island';
+import { HPEditorIsland } from './_islands/hp-editor-island';
+import { HPSectionEditorIsland } from './_islands/hp-section-editor-island';
+import { SpellKnownEditorIsland } from './_islands/spell-known-editor-island';
+import { SpellKnownSectionEditorIsland } from './_islands/spell-known-section-editor-island';
+import { SpellPrepEditorIsland } from './_islands/spell-prep-editor-island';
+import { SpellPrepSectionEditorIsland } from './_islands/spell-prep-section-editor-island';
+import { ViewOnlySectionSheetIsland } from './_islands/view-only-section-sheet-island';
+import {
+  BackgroundSectionIsland,
+  ClassSectionIsland,
+  RaceSectionIsland,
+} from './_islands/ficha-sections-island';
+
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
 import type { ComponentEntry } from './_registry-types';
@@ -1538,6 +1554,381 @@ const encuentrosListViewEntry: ComponentEntry = {
   ),
 };
 
+// ── ficha/ group ──────────────────────────────────────────────────────────────
+//
+// PAIR ANALYSIS SUMMARY (D2 batch 3)
+// ─────────────────────────────────────────────────────────────────────────────
+// Pattern: *-editor = form body (owns state + SA call)
+//          *-section-editor = pencil/wand button + V3Sheet + *-editor
+//
+// PAIR 1: AtributosEditor ↔ AtributosSectionEditor
+//   Relationship: THIN WRAPPER (clean). SectionEditor adds only open/close state +
+//   pencil button affordance + V3Sheet host. No logic duplication.
+//   Note: pencil button is 32×32px (below 44px touch target) — minor UX debt.
+//
+// PAIR 2: HPEditor ↔ HPSectionEditor
+//   Relationship: THIN WRAPPER (clean). Same pattern as Pair 1.
+//   Note: HPSectionEditor pencil button IS min-h/w 44px (touch-safe) — inconsistency
+//   vs AtributosSectionEditor which is only 32×32px.
+//
+// PAIR 3: SpellKnownEditor ↔ SpellKnownSectionEditor
+//   Relationship: WRAPPER WITH EXTRA COMPLEXITY. SectionEditor adds lazy fetch
+//   (useEffect + GET /options) + loading/error states + amber wand icon affordance.
+//   NOT a thin wrapper — the fetch logic adds real behaviour.
+//
+// PAIR 4: SpellPrepEditor ↔ SpellPrepSectionEditor
+//   Relationship: WRAPPER WITH EXTRA COMPLEXITY. Same pattern as Pair 3 (lazy fetch).
+//   SpellPrepSectionEditor vs SpellKnownSectionEditor share the SAME fetch URL and
+//   SAME FetchState union — strongest homogenization candidate: extract
+//   useSpellOptions(characterId, classSlug) shared hook.
+//
+// CROSS-PAIR DUPLICATION:
+//   BackgroundSection + ClassSection + RaceSection are TRIPLICATE of the same pattern:
+//   identical pencil button, identical ViewOnlySectionSheet usage, only display JSX differs.
+//   → Extract SectionAffordance<T extends ReactNode>(title, displayContent, ...) component.
+//
+// RECOMMENDATIONS (priority order):
+//   1. useSpellOptions hook (Pair 3 + Pair 4 share the same lazy-fetch pattern)
+//   2. SectionAffordance generic (Background/Class/Race triplicate → single component)
+//   3. Homogenize pencil button touch target (32×32 vs 44×44 inconsistency)
+
+// Shared fixture ability scores
+const _fixtureScoresFull = { str: 16, dex: 14, con: 15, int: 10, wis: 8, cha: 18 };
+const _fixtureScoresLocked = { str: 12, dex: 10, con: 14, int: 13, wis: 11, cha: 9 };
+
+const atributosEditorEntry: ComponentEntry = {
+  id: 'atributos-editor',
+  name: 'AtributosEditor',
+  group: 'ficha',
+  notes: 'Form body for editing the 6 ability scores. Player mode: editable. Locked mode (statusLocked=true + isDm=false): read-only grid + lock banner. DM overrides lock (isDm=true). Calls saveAtributos server action on submit. PAIR: see AtributosSectionEditor for the pencil+V3Sheet wrapper.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Editable — player mode (statusLocked=false)' },
+    { _label: 'DM mode — locked but isDm=true' },
+    { _label: 'Locked — statusLocked=true, player (read-only)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('isDm=true');
+    const statusLocked = label.includes('statusLocked=true') || label.includes('isDm=true');
+    const scores = statusLocked ? _fixtureScoresLocked : _fixtureScoresFull;
+    return (
+      <AtributosEditorIsland
+        currentStats={scores}
+        statusLocked={statusLocked}
+        isDm={isDm}
+      />
+    );
+  },
+};
+
+const atributosSectionEditorEntry: ComponentEntry = {
+  id: 'atributos-section-editor',
+  name: 'AtributosSectionEditor',
+  group: 'ficha',
+  notes: 'Pencil affordance (h-8 w-8 — 32px, NOTE: below 44px touch-safe threshold) + V3Sheet host + AtributosEditor. PAIR with AtributosEditor: this is a thin wrapper that adds open/close state + button affordance. Tap the pencil to open the sheet.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Player — unlocked (tap pencil to edit)' },
+    { _label: 'DM — locked override (tap pencil to edit)' },
+    { _label: 'Player — locked (tap pencil to see read-only form)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('DM');
+    const statusLocked = label.includes('locked');
+    const scores = statusLocked ? _fixtureScoresLocked : _fixtureScoresFull;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ink-mute">Sección Atributos →</span>
+        <AtributosSectionEditorIsland
+          currentStats={scores}
+          statusLocked={statusLocked}
+          isDm={isDm}
+        />
+      </div>
+    );
+  },
+};
+
+const hpEditorEntry: ComponentEntry = {
+  id: 'hp-editor',
+  name: 'HPEditor',
+  group: 'ficha',
+  notes: 'Dual-mode HP form. Player mode: current + temp editable, max read-only. DM mode: all 3 editable + "DM Override" amber badge. Uses FormErrorAlert for error display. Calls saveHp server action on submit. PAIR: see HPSectionEditor for the pencil+V3Sheet wrapper.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Player mode — current+temp editable, max read-only' },
+    { _label: 'DM mode — all 3 editable + DM Override badge' },
+    { _label: 'Player mode — low HP (7/36)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDmHere = label.includes('DM mode');
+    const isLow = label.includes('low HP');
+    return (
+      <HPEditorIsland
+        currentHp={{ current: isLow ? 7 : 28, max: 36, temp: 0 }}
+        isDmHere={isDmHere}
+      />
+    );
+  },
+};
+
+const hpSectionEditorEntry: ComponentEntry = {
+  id: 'hp-section-editor',
+  name: 'HPSectionEditor',
+  group: 'ficha',
+  notes: 'Pencil affordance (min-h/w-[44px] — touch-safe, NOTE: larger than AtributosSectionEditor) + V3Sheet host + HPEditor. PAIR with HPEditor: thin wrapper that adds open/close state + button affordance. Inconsistency: 44px here vs 32px in AtributosSectionEditor — homogenization needed.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Player mode (tap pencil)' },
+    { _label: 'DM mode (tap pencil)' },
+  ],
+  render: (p) => {
+    const isDmHere = (p._label as string).includes('DM');
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ink-mute">HP 28/36 →</span>
+        <HPSectionEditorIsland
+          currentHp={{ current: 28, max: 36, temp: 0 }}
+          isDmHere={isDmHere}
+        />
+      </div>
+    );
+  },
+};
+
+// Fixture spell lists for spell editors
+const _fixtureKnownSpells = [
+  { slug: 'magic-missile', name: 'Magic Missile', level: 1 },
+  { slug: 'shield', name: 'Shield', level: 1 },
+  { slug: 'thunderwave', name: 'Thunderwave', level: 1 },
+  { slug: 'misty-step', name: 'Misty Step', level: 2 },
+  { slug: 'mirror-image', name: 'Mirror Image', level: 2 },
+  { slug: 'fireball', name: 'Fireball', level: 3 },
+  { slug: 'counterspell', name: 'Counterspell', level: 3 },
+];
+
+const spellKnownEditorEntry: ComponentEntry = {
+  id: 'spell-known-editor',
+  name: 'SpellKnownEditor',
+  group: 'ficha',
+  notes: 'DM-only toggle list for setting known spells. Checkbox list (max-h-64 scroll). Cantrips filtered defensively. Counter shows selected count in amber. No RAW cap enforcement. Calls saveSpellKnown server action. PAIR: see SpellKnownSectionEditor for the wand+fetch+V3Sheet wrapper.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Wizard Lvl 5 — 2 known pre-selected' },
+    { _label: 'Wizard Lvl 5 — all selected' },
+    { _label: 'Wizard Lvl 5 — none selected' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const known = label.includes('all')
+      ? _fixtureKnownSpells.map((s) => s.slug)
+      : label.includes('none')
+        ? []
+        : ['magic-missile', 'shield'];
+    return (
+      <SpellKnownEditorIsland
+        availableSpells={_fixtureKnownSpells}
+        currentKnownSlugs={known}
+      />
+    );
+  },
+};
+
+const spellKnownSectionEditorEntry: ComponentEntry = {
+  id: 'spell-known-section-editor',
+  name: 'SpellKnownSectionEditor',
+  group: 'ficha',
+  notes: 'Amber wand affordance (h-8 w-8, DM visual signal) + lazy GET /options fetch + V3Sheet + SpellKnownEditor. PAIR with SpellKnownEditor. Wrapper adds: (1) amber wand icon vs pencil — DM-distinct styling, (2) lazy fetch (useEffect, loading/error states), (3) same V3Sheet pattern. Catalog bypasses fetch — fixtures injected.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Wizard — 2 known (tap wand to open)' },
+    { _label: 'Bard — none known (tap wand to open)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const classSlug = label.includes('Bard') ? 'bard' : 'wizard';
+    const known = label.includes('none') ? [] : ['magic-missile', 'shield'];
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ink-mute">Hechizos conocidos ({classSlug}) →</span>
+        <SpellKnownSectionEditorIsland classSlug={classSlug} currentKnownSlugs={known} />
+      </div>
+    );
+  },
+};
+
+const _fixturePrepSpells = [
+  { slug: 'cure-wounds', source: 'PHB', name: 'Cure Wounds', level: 1 },
+  { slug: 'bless', source: 'PHB', name: 'Bless', level: 1 },
+  { slug: 'guiding-bolt', source: 'PHB', name: 'Guiding Bolt', level: 1 },
+  { slug: 'hold-person', source: 'PHB', name: 'Hold Person', level: 2 },
+  { slug: 'spiritual-weapon', source: 'PHB', name: 'Spiritual Weapon', level: 2 },
+  { slug: 'dispel-magic', source: 'PHB', name: 'Dispel Magic', level: 3 },
+];
+const _fixtureGrantedSlugs = ['cure-wounds', 'bless'];
+
+const spellPrepEditorEntry: ComponentEntry = {
+  id: 'spell-prep-editor',
+  name: 'SpellPrepEditor',
+  group: 'ficha',
+  notes: 'Toggle list for preparing spells per class. Counter pill (green/amber/danger tones). Subclass domain grants shown always-prepared+disabled. At-limit: disables un-selected. Over-limit: danger tone. More complex than SpellKnownEditor (prepLimit enforcement + domain grants). PAIR: see SpellPrepSectionEditor.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Cleric 5 — 2 domain grants + 1 prepared (prepLimit=8)' },
+    { _label: 'Cleric 5 — at limit (8/8)' },
+    { _label: 'Cleric 5 — none prepared yet (prepLimit=8)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const initial = label.includes('at limit')
+      ? ['guiding-bolt', 'hold-person', 'spiritual-weapon', 'dispel-magic']
+      : label.includes('none')
+        ? []
+        : ['guiding-bolt'];
+    const prepLimit = label.includes('at limit') ? 4 : 8;
+    return (
+      <SpellPrepEditorIsland
+        availableSpells={_fixturePrepSpells}
+        subclassGrantedSlugs={_fixtureGrantedSlugs}
+        initialPreparedSlugs={initial}
+        prepLimit={prepLimit}
+      />
+    );
+  },
+};
+
+const spellPrepSectionEditorEntry: ComponentEntry = {
+  id: 'spell-prep-section-editor',
+  name: 'SpellPrepSectionEditor',
+  group: 'ficha',
+  notes: 'Pencil affordance (h-8 w-8, edit icon, border-line) + lazy GET /options fetch + V3Sheet + SpellPrepEditor. PAIR with SpellPrepEditor. STRONG DUPLICATION with SpellKnownSectionEditor: same fetch URL + same FetchState union. → useSpellOptions(characterId, classSlug) hook would eliminate both. Catalog bypasses fetch.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Cleric — 1 prepared (tap pencil)' },
+    { _label: 'Cleric — at limit (tap pencil)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const initial = label.includes('at limit') ? ['guiding-bolt', 'hold-person', 'spiritual-weapon', 'dispel-magic'] : ['guiding-bolt'];
+    const prepLimit = label.includes('at limit') ? 4 : 8;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ink-mute">Preparar hechizos (cleric) →</span>
+        <SpellPrepSectionEditorIsland
+          classSlug="cleric"
+          initialPreparedSlugs={initial}
+          prepLimit={prepLimit}
+        />
+      </div>
+    );
+  },
+};
+
+const viewOnlySectionSheetEntry: ComponentEntry = {
+  id: 'view-only-section-sheet',
+  name: 'ViewOnlySectionSheet',
+  group: 'ficha',
+  notes: 'Read-only display sheet for Race/Class/Background sections. Status-conditional CTA: draft/pending → "Editar" link; active/retired/dead + isDm → "Editar (DM)"; active/retired/dead + player → locked banner. Pure presentation — controlled externally (open/onClose). Shared by Background/Class/Race section components.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Draft — "Editar" link shown' },
+    { _label: 'Active + DM — "Editar (DM)" link shown' },
+    { _label: 'Active + player — locked banner' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('DM');
+    const status = label.includes('Active') ? 'active' : 'draft';
+    const displayContent = (
+      <div className="space-y-1">
+        <p className="text-sm text-ink">Semielfo</p>
+        <p className="text-xs text-ink-mute">Herencia feérica</p>
+      </div>
+    );
+    return (
+      <ViewOnlySectionSheetIsland
+        title="Linaje"
+        characterStatus={status}
+        isDm={isDm}
+        displayContent={displayContent}
+        wizardStepHref="#"
+      />
+    );
+  },
+};
+
+const backgroundSectionEntry: ComponentEntry = {
+  id: 'background-section',
+  name: 'BackgroundSection',
+  group: 'ficha',
+  notes: 'Pencil affordance + ViewOnlySectionSheet for the Trasfondo section. TRIPLICATE pattern with ClassSection + RaceSection: identical pencil button, identical ViewOnlySectionSheet usage — only display JSX differs. → Homogenization candidate: generic SectionAffordance component.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Draft — can edit (tap pencil)' },
+    { _label: 'Active + player — locked (tap pencil to see)' },
+    { _label: 'Active + DM — can edit (tap pencil)' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('DM');
+    const status = label.includes('Active') ? ('active' as const) : ('draft' as const);
+    return <BackgroundSectionIsland characterStatus={status} isDm={isDm} />;
+  },
+};
+
+const classSectionEntry: ComponentEntry = {
+  id: 'class-section',
+  name: 'ClassSection',
+  group: 'ficha',
+  notes: 'Pencil affordance + ViewOnlySectionSheet for the Clase section. TRIPLICATE pattern with BackgroundSection + RaceSection. Displays class list (slug + level + optional subclass). → Homogenization candidate: generic SectionAffordance component.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Draft — Fighter 6 (Champion)' },
+    { _label: 'Active + player — locked' },
+    { _label: 'Active + DM — can edit' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('DM');
+    const status = label.includes('Active') ? ('active' as const) : ('draft' as const);
+    return <ClassSectionIsland characterStatus={status} isDm={isDm} />;
+  },
+};
+
+const raceSectionEntry: ComponentEntry = {
+  id: 'race-section',
+  name: 'RaceSection',
+  group: 'ficha',
+  notes: 'Pencil affordance + ViewOnlySectionSheet for the Linaje section. TRIPLICATE pattern with BackgroundSection + ClassSection. Displays race + optional subrace. → Homogenization candidate: generic SectionAffordance component.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Draft — Semielfo + subrace' },
+    { _label: 'Active + player — locked' },
+    { _label: 'Active + DM — can edit' },
+  ],
+  render: (p) => {
+    const label = p._label as string;
+    const isDm = label.includes('DM');
+    const status = label.includes('Active') ? ('active' as const) : ('draft' as const);
+    return <RaceSectionIsland characterStatus={status} isDm={isDm} />;
+  },
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -1598,4 +1989,17 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   refreshButtonEntry,
   turnControlsEntry,
   encuentrosListViewEntry,
+  // ficha/
+  atributosEditorEntry,
+  atributosSectionEditorEntry,
+  hpEditorEntry,
+  hpSectionEditorEntry,
+  spellKnownEditorEntry,
+  spellKnownSectionEditorEntry,
+  spellPrepEditorEntry,
+  spellPrepSectionEditorEntry,
+  viewOnlySectionSheetEntry,
+  backgroundSectionEntry,
+  classSectionEntry,
+  raceSectionEntry,
 ];
