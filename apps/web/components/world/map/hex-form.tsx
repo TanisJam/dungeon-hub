@@ -4,9 +4,23 @@
 // Required fields: q, r (coordinates) — REQ-MAP-01 API constraint.
 // Optional: name, terrain, status, dmNotes, playerNotes.
 // REQ-MAP-01, REQ-GATE-03 (44px tap targets).
+//
+// B1 NORMALIZATION (VISUAL CHANGE — requires Mauricio 375px sign-off before merging):
+//   - Labels now use canonical FormLabel (mb-1 block text-xs font-semibold uppercase tracking-wide
+//     text-ink-soft). Previous hex-only style: block text-xs font-medium text-ink-soft (no mb-1,
+//     no uppercase, no tracking-wide, font-medium not font-semibold). This is intentional
+//     consolidation of drift, NOT a pure refactor. See discovery #1816, decision #1820.
+//   - Inputs no longer use inline mt-1 spacing (replaced by FormLabel's mb-1).
+//   - Error block now appears at TOP (before fields, after <form>) not at bottom.
+//   - hover:bg-ink/90 → hover:bg-ink/80 (canonical hover matches other 4 forms).
+//   - select stays inline (FormSelect deferred per B1 scope decision).
 
 import { useState } from 'react';
 import type { HexRow, HexBody, HexStatus } from '@/app/mapa/actions';
+import { FormLabel } from '@/components/ui/form-label';
+import { FormInput } from '@/components/ui/form-input';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { FormSubmitButton } from '@/components/ui/form-submit-button';
 
 const HEX_STATUSES: { value: HexStatus; label: string }[] = [
   { value: 'unexplored', label: 'Sin explorar' },
@@ -14,6 +28,9 @@ const HEX_STATUSES: { value: HexStatus; label: string }[] = [
   { value: 'explored', label: 'Explorada' },
   { value: 'cleared', label: 'Despejada' },
 ];
+
+const selectClass =
+  'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20';
 
 interface HexFormProps {
   mode: 'create' | 'edit';
@@ -62,76 +79,68 @@ export function HexForm({ mode, initial, onSubmit, onDone }: HexFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <FormErrorAlert message={error} />
+
       {/* Coordinates — required */}
       <div className="flex gap-3">
         <div className="flex-1">
-          <label htmlFor="hex-q" className="block text-xs font-medium text-ink-soft">
-            Coordenada Q *
-          </label>
-          <input
+          <FormLabel htmlFor="hex-q" required>
+            Coordenada Q
+          </FormLabel>
+          <FormInput
             id="hex-q"
             type="number"
             required
             value={q}
             onChange={(e) => setQ(Number(e.target.value))}
-            className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
           />
         </div>
         <div className="flex-1">
-          <label htmlFor="hex-r" className="block text-xs font-medium text-ink-soft">
-            Coordenada R *
-          </label>
-          <input
+          <FormLabel htmlFor="hex-r" required>
+            Coordenada R
+          </FormLabel>
+          <FormInput
             id="hex-r"
             type="number"
             required
             value={r}
             onChange={(e) => setR(Number(e.target.value))}
-            className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
           />
         </div>
       </div>
 
       {/* Name */}
       <div>
-        <label htmlFor="hex-name" className="block text-xs font-medium text-ink-soft">
-          Nombre
-        </label>
-        <input
+        <FormLabel htmlFor="hex-name">Nombre</FormLabel>
+        <FormInput
           id="hex-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ej: Valle de las Sombras"
-          className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
       {/* Terrain */}
       <div>
-        <label htmlFor="hex-terrain" className="block text-xs font-medium text-ink-soft">
-          Terreno
-        </label>
-        <input
+        <FormLabel htmlFor="hex-terrain">Terreno</FormLabel>
+        <FormInput
           id="hex-terrain"
           type="text"
           value={terrain}
           onChange={(e) => setTerrain(e.target.value)}
           placeholder="Ej: Bosque, Montaña, Llanura…"
-          className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
-      {/* Status */}
+      {/* Status — select stays inline (FormSelect deferred per B1 scope decision) */}
       <div>
-        <label htmlFor="hex-status" className="block text-xs font-medium text-ink-soft">
-          Estado
-        </label>
+        <FormLabel htmlFor="hex-status">Estado</FormLabel>
         <select
           id="hex-status"
           value={status}
           onChange={(e) => setStatus(e.target.value as HexStatus)}
-          className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+          className={selectClass}
         >
           {HEX_STATUSES.map(({ value, label }) => (
             <option key={value} value={value}>
@@ -143,47 +152,33 @@ export function HexForm({ mode, initial, onSubmit, onDone }: HexFormProps) {
 
       {/* Player notes */}
       <div>
-        <label htmlFor="hex-player-notes" className="block text-xs font-medium text-ink-soft">
-          Notas para jugadores
-        </label>
-        <textarea
+        <FormLabel htmlFor="hex-player-notes">Notas para jugadores</FormLabel>
+        <FormInput
           id="hex-player-notes"
+          multiline
           value={playerNotes}
           onChange={(e) => setPlayerNotes(e.target.value)}
           rows={3}
-          className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
       {/* DM notes */}
       <div>
-        <label htmlFor="hex-dm-notes" className="block text-xs font-medium text-ink-soft">
-          Notas del DM (privadas)
-        </label>
-        <textarea
+        <FormLabel htmlFor="hex-dm-notes">Notas del DM (privadas)</FormLabel>
+        <FormInput
           id="hex-dm-notes"
+          multiline
           value={dmNotes}
           onChange={(e) => setDmNotes(e.target.value)}
           rows={3}
-          className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
-      {/* Error */}
-      {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      )}
-
       {/* Submit */}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="min-h-[44px] w-full rounded-md bg-ink px-4 py-2 text-sm font-medium text-surface transition-colors hover:bg-ink/90 disabled:opacity-50"
-      >
-        {submitting ? 'Guardando…' : mode === 'create' ? 'Crear hex' : 'Guardar cambios'}
-      </button>
+      <FormSubmitButton
+        pending={submitting}
+        idleLabel={mode === 'create' ? 'Crear hex' : 'Guardar cambios'}
+      />
     </form>
   );
 }

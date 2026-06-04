@@ -5,9 +5,14 @@
 //             tags (comma-separated input).
 // ADR-3: body is plain text — textarea write, whitespace-pre-wrap read. No markdown.
 // REQ-GATE-03: mobile-first, ≥44px inputs.
+// B1 refactor: replaced inline inputClass/labelClass/error/submit with ui/ primitives.
 
 import { useState } from 'react';
 import type { JournalRow, JournalBody, JournalVisibility } from '@/app/cronica/actions';
+import { FormLabel } from '@/components/ui/form-label';
+import { FormInput } from '@/components/ui/form-input';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { FormSubmitButton } from '@/components/ui/form-submit-button';
 
 interface JournalFormProps {
   mode: 'create' | 'edit';
@@ -20,6 +25,9 @@ const VISIBILITY_OPTIONS: { value: JournalVisibility; label: string }[] = [
   { value: 'public', label: 'Público' },
   { value: 'dm-only', label: 'Solo DM' },
 ];
+
+const selectClass =
+  'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20';
 
 export function JournalForm({ mode, initial, onSubmit, onDone }: JournalFormProps) {
   const [title, setTitle] = useState(initial?.title ?? '');
@@ -62,44 +70,33 @@ export function JournalForm({ mode, initial, onSubmit, onDone }: JournalFormProp
     }
   }
 
-  const inputClass =
-    'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20';
-  const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft';
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FormErrorAlert message={error} />
 
       {/* Title (required) */}
       <div>
-        <label htmlFor="journal-title" className={labelClass}>
-          Título <span aria-hidden="true">*</span>
-        </label>
-        <input
+        <FormLabel htmlFor="journal-title" required>
+          Título
+        </FormLabel>
+        <FormInput
           id="journal-title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Título de la nota"
           required
-          className={inputClass}
         />
       </div>
 
-      {/* Visibility */}
+      {/* Visibility — select stays inline (FormSelect deferred per B1 scope decision) */}
       <div>
-        <label htmlFor="journal-visibility" className={labelClass}>
-          Visibilidad
-        </label>
+        <FormLabel htmlFor="journal-visibility">Visibilidad</FormLabel>
         <select
           id="journal-visibility"
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as JournalVisibility)}
-          className={inputClass}
+          className={selectClass}
         >
           {VISIBILITY_OPTIONS.map((v) => (
             <option key={v.value} value={v.value}>
@@ -111,42 +108,34 @@ export function JournalForm({ mode, initial, onSubmit, onDone }: JournalFormProp
 
       {/* Body — plain text only (ADR-3) */}
       <div>
-        <label htmlFor="journal-body" className={labelClass}>
-          Contenido
-        </label>
-        <textarea
+        <FormLabel htmlFor="journal-body">Contenido</FormLabel>
+        <FormInput
           id="journal-body"
+          multiline
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Escribe el contenido de la nota…"
           rows={6}
-          className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
       {/* Tags (comma-separated) */}
       <div>
-        <label htmlFor="journal-tags" className={labelClass}>
-          Etiquetas (separadas por comas)
-        </label>
-        <input
+        <FormLabel htmlFor="journal-tags">Etiquetas (separadas por comas)</FormLabel>
+        <FormInput
           id="journal-tags"
           type="text"
           value={tagsInput}
           onChange={(e) => setTagsInput(e.target.value)}
           placeholder="session-1, trama, secreto…"
-          className={inputClass}
         />
       </div>
 
       {/* Submit */}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="min-h-[44px] w-full rounded-md bg-ink px-4 py-2 text-sm font-medium text-surface transition-colors hover:bg-ink/80 disabled:opacity-50"
-      >
-        {submitting ? 'Guardando…' : mode === 'create' ? 'Crear nota' : 'Guardar cambios'}
-      </button>
+      <FormSubmitButton
+        pending={submitting}
+        idleLabel={mode === 'create' ? 'Crear nota' : 'Guardar cambios'}
+      />
     </form>
   );
 }

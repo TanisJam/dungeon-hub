@@ -3,9 +3,14 @@
 // FactionForm — DM-only create/edit form rendered inside V3Sheet.
 // REQ-FAC-03: fields: name (required), description, state select, dmNotes.
 // REQ-GATE-03: mobile-first, ≥44px inputs.
+// B1 refactor: replaced inline inputClass/labelClass/error/submit with ui/ primitives.
 
 import { useState } from 'react';
 import type { FactionRow, FactionBody, FactionState } from '@/app/codex/actions';
+import { FormLabel } from '@/components/ui/form-label';
+import { FormInput } from '@/components/ui/form-input';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { FormSubmitButton } from '@/components/ui/form-submit-button';
 
 interface FactionFormProps {
   mode: 'create' | 'edit';
@@ -20,6 +25,9 @@ const STATES: { value: FactionState; label: string }[] = [
   { value: 'destroyed', label: 'Destruida' },
   { value: 'disbanded', label: 'Disuelta' },
 ];
+
+const selectClass =
+  'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20';
 
 export function FactionForm({ mode, initial, onSubmit, onDone }: FactionFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
@@ -55,44 +63,33 @@ export function FactionForm({ mode, initial, onSubmit, onDone }: FactionFormProp
     }
   }
 
-  const inputClass =
-    'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20';
-  const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-soft';
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-          {error}
-        </p>
-      )}
+      <FormErrorAlert message={error} />
 
       {/* Name (required) */}
       <div>
-        <label htmlFor="faction-name" className={labelClass}>
-          Nombre <span aria-hidden="true">*</span>
-        </label>
-        <input
+        <FormLabel htmlFor="faction-name" required>
+          Nombre
+        </FormLabel>
+        <FormInput
           id="faction-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Nombre de la facción"
           required
-          className={inputClass}
         />
       </div>
 
-      {/* State */}
+      {/* State — select stays inline (FormSelect deferred per B1 scope decision) */}
       <div>
-        <label htmlFor="faction-state" className={labelClass}>
-          Estado
-        </label>
+        <FormLabel htmlFor="faction-state">Estado</FormLabel>
         <select
           id="faction-state"
           value={state}
           onChange={(e) => setState(e.target.value as FactionState)}
-          className={inputClass}
+          className={selectClass}
         >
           {STATES.map((s) => (
             <option key={s.value} value={s.value}>
@@ -104,42 +101,35 @@ export function FactionForm({ mode, initial, onSubmit, onDone }: FactionFormProp
 
       {/* Description */}
       <div>
-        <label htmlFor="faction-description" className={labelClass}>
-          Descripción
-        </label>
-        <textarea
+        <FormLabel htmlFor="faction-description">Descripción</FormLabel>
+        <FormInput
           id="faction-description"
+          multiline
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Descripción de la facción…"
           rows={3}
-          className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
       {/* dmNotes (DM-only form field) */}
       <div>
-        <label htmlFor="faction-dm-notes" className={labelClass}>
-          Notas del DM
-        </label>
-        <textarea
+        <FormLabel htmlFor="faction-dm-notes">Notas del DM</FormLabel>
+        <FormInput
           id="faction-dm-notes"
+          multiline
           value={dmNotes}
           onChange={(e) => setDmNotes(e.target.value)}
           placeholder="Notas privadas del DM…"
           rows={3}
-          className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
       </div>
 
       {/* Submit */}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="min-h-[44px] w-full rounded-md bg-ink px-4 py-2 text-sm font-medium text-surface transition-colors hover:bg-ink/80 disabled:opacity-50"
-      >
-        {submitting ? 'Guardando…' : mode === 'create' ? 'Crear facción' : 'Guardar cambios'}
-      </button>
+      <FormSubmitButton
+        pending={submitting}
+        idleLabel={mode === 'create' ? 'Crear facción' : 'Guardar cambios'}
+      />
     </form>
   );
 }
