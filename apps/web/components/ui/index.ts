@@ -36,3 +36,6 @@ export type { ListRowProps } from './list-row';
 
 export { QuestRow } from './quest-row';
 export type { QuestRowProps } from './quest-row';
+
+export { CharacterCard } from './character-card';
+export type { CharacterCardProps } from './character-card';
