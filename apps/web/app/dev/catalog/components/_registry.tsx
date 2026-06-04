@@ -18,7 +18,6 @@ import { NumberedSectionHead } from '@/components/layout/numbered-section-head';
 
 // form/ primitives
 import { FormLabel } from '@/components/ui/form-label';
-import { FormInput } from '@/components/ui/form-input';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { FormSubmitButton } from '@/components/ui/form-submit-button';
 
@@ -26,6 +25,7 @@ import { FormSubmitButton } from '@/components/ui/form-submit-button';
 import { TabBarIsland } from './_islands/tabbar-island';
 import { RoleSwitcherIsland } from './_islands/role-switcher-island';
 import { V3SheetIsland } from './_islands/v3-sheet-island';
+import { FormInputIsland } from './_islands/form-input-island';
 
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
@@ -447,13 +447,12 @@ const formInputEntry: ComponentEntry = {
     { id: 'demo-input-filled', multiline: false, value: 'Aragorn', placeholder: 'Nombre del NPC' },
   ],
   render: (p) => (
-    <FormInput
+    <FormInputIsland
       id={p.id as string}
       multiline={p.multiline as boolean}
       value={p.value as string}
       placeholder={p.placeholder as string | undefined}
       rows={p.rows as number | undefined}
-      onChange={() => {}}
     />
   ),
 };
