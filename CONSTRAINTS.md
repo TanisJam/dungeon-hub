@@ -1,5 +1,7 @@
 # CONSTRAINTS.md — Decisiones abiertas de reglas D&D 5e
 
+> ⚠️ SUPERSEDED for implementation (2026-06-04). Records early 5e rules decisions (note: Rules Profile scope is now per-WORLD, not per-campaign). Current enforcement lives in code + `packages/domain` tests; scope in `docs/mvp/definition.md`. Preserved for the reasoning trail.
+
 > **Propósito:** Catálogo de constraints del reglamento que el PRD no resuelve. Cada sección lista las opciones que dan las reglas oficiales y un campo **Decisión** que el equipo completa. Este documento se convierte en la spec del motor de validación del Character Builder.
 >
 > **Regla de oro:** No inventamos data de D&D. Cada opción referencia la fuente oficial (PHB, XGE, TCE, etc.).

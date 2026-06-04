@@ -1,4 +1,7 @@
 # PRD — Dungeon Hub
+
+> ⚠️ SUPERSEDED (2026-06-04). This is the original pre-implementation product vision (1 DM / 5 players framing). Current MVP scope and product truth live in `docs/mvp/definition.md`. Preserved for historical context only.
+
 ### Sistema privado de gestión de personajes D&D 5e y campaña West Marches
 
 **Versión:** 1.0  

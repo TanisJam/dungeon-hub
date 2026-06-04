@@ -1,5 +1,7 @@
 # IMPLEMENTATION_PLAN.md — Character Builder + Persistencia + Inventario
 
+> ⚠️ SUPERSEDED (2026-06-04). The Phase 1 plan here is frozen at 2026-05-20; its schema/API shapes are ~2 migrations out of date (rules_profile moved to worlds, campaign_members → worldMembers, characters.worldId). Current state: `docs/STATUS.md`; scope: `docs/mvp/definition.md`. Historical only.
+
 > **Scope:** Fase 1 del PRD (Character Builder con constraints + persistencia + inventario Fase A).
 > **Fuente de constraints:** [`CONSTRAINTS.md`](./CONSTRAINTS.md) (decisiones cerradas).
 > **Fuera de scope acá:** West Marches Manager, Discord Bot, Web frontend (Next.js). Se planifican aparte cuando lleguemos.
