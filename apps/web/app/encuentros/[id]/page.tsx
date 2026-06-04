@@ -22,6 +22,7 @@ import { TurnControlsIsland } from '@/components/encuentros/turn-controls-island
 import { TurnBanner } from '@/components/encuentros/turn-banner';
 import { RefreshButton } from '@/components/encuentros/refresh-button';
 import { ResourcePanel } from '@/components/encuentros/resource-panel';
+import { RageControls } from '@/components/encuentros/rage-controls';
 import type { EncounterDetail } from '@/components/encuentros/types';
 import type { ClassResourceView, SheetResponse } from '@/lib/sheet-types';
 
@@ -71,21 +72,39 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
     (c) => c.characterId !== null && ownCharacterIds.has(c.characterId),
   ) ?? null;
 
-  // If there's an own combatant, fetch their class resources for ResourcePanel.
+  // If there's an own combatant, fetch their class resources for ResourcePanel + RageControls.
   // Design D3 — this fetch is NOT on page.tsx today; added here per Risk #2 in tasks.
   let ownResources: ClassResourceView[] = [];
+  let ownClassResources: Record<string, ClassResourceView> = {};
   if (ownCombatant?.characterId) {
     try {
       const sheet = await api.get<SheetResponse>(
         `/characters/${ownCombatant.characterId}/sheet`,
         token,
       );
-      ownResources = Object.values(sheet.sheet.classResources ?? {});
+      ownClassResources = sheet.sheet.classResources ?? {};
+      ownResources = Object.values(ownClassResources);
     } catch {
       // Resource panel degrades gracefully on failure
       ownResources = [];
+      ownClassResources = {};
     }
   }
+
+  // REQ-WCR-WEB-PAGE-01 — Derive Barbarian/Rage state from already-fetched data.
+  // isBarbarian: slug 'barbarian:rage-uses' present in classResources (PHB p.48).
+  const rageResource = ownClassResources['barbarian:rage-uses'] ?? null;
+  const isBarbarian = rageResource !== null;
+  // rageUnlimited: sentinel max=999 means Unlimited at L20 (PHB p.48 rage uses table).
+  const rageUnlimited = isBarbarian && rageResource!.max === 999;
+  const rageUsesRemaining = isBarbarian ? rageResource!.max - rageResource!.used : 0;
+  const rageMax = isBarbarian ? rageResource!.max : 0;
+  // isRaging: 'Raging' condition on own combatant (PHB p.48 — Rage condition).
+  const isRaging = ownCombatant?.conditions.some((c) => c.name === 'Raging') ?? false;
+  // isOwnTurn: current combatant matches own combatant.
+  const isOwnTurn = ownCombatant != null && detail.currentCombatantId === ownCombatant.id;
+  // bonusActionUsed: from action economy on own combatant.
+  const bonusActionUsed = ownCombatant?.bonusActionUsed ?? false;
 
   // REQ-WCO-WEB-08: find the current combatant name for TurnBanner
   const currentCombatant = detail.combatants.find((c) => c.id === detail.currentCombatantId);
@@ -133,6 +152,27 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
           currentCombatantId={detail.currentCombatantId}
           ownCombatantId={ownCombatant?.id ?? null}
         />
+
+        {/* REQ-WCR-WEB-PAGE-01: RageControls — only for own Barbarian combatant.
+            Placed ABOVE Recursos per ADR-4 (mobile-first 375px: Rage is the headline action). */}
+        {ownCombatant && isBarbarian && (
+          <section aria-label="Furia" className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
+              Furia
+            </h2>
+            <RageControls
+              combatantId={ownCombatant.id}
+              encounterId={detail.id}
+              isRaging={isRaging}
+              isOwnTurn={isOwnTurn}
+              bonusActionUsed={bonusActionUsed}
+              rageUsesRemaining={rageUsesRemaining}
+              rageMax={rageMax}
+              rageUnlimited={rageUnlimited}
+              version={detail.version}
+            />
+          </section>
+        )}
 
         {/* REQ-WCO-WEB-05: ResourcePanel — only when player has an own combatant */}
         {ownCombatant && (
