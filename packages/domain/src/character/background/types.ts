@@ -139,6 +139,14 @@ export type BackgroundValidationIssue =
     }
   | { code: 'BACKGROUND_LANGUAGE_DUPLICATE'; language: string }
   | {
+      /**
+       * Idioma elegido no pertenece al pool habilitado del mundo (standard ∪ exotic).
+       * PHB p.123 — Standard + Exotic Languages tables; worlds may disable some via rulesProfile.
+       */
+      code: 'BACKGROUND_LANGUAGE_NOT_IN_POOL';
+      language: string;
+    }
+  | {
       code: 'BACKGROUND_TOOL_COUNT_MISMATCH';
       kind: string;
       expectedCount: number;

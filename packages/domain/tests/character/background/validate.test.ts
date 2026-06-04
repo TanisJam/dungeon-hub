@@ -8,6 +8,7 @@ import {
 import type { BackgroundCompendiumData } from '../../../src/character/background/types.js';
 import { DEFAULT_RULES_PROFILE } from '../../../src/rules-profile/default.js';
 import { ARTISANS_TOOLS, GAMING_SETS, MUSICAL_INSTRUMENTS } from '../../../src/character/tool/pools.js';
+import { phbDefaultPools } from '../../../src/world/phb-defaults.js';
 
 // Algunos tests usan backgrounds de VRGR (Haunted One). Default profile no la trae,
 // así que armamos un profile con VRGR habilitada para esos casos.
@@ -1033,5 +1034,100 @@ describe('validateBackgroundSelection — Custom Background: BACKGROUND_FEATURE_
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.issues.some((i) => i.code === 'BACKGROUND_FEATURE_UNKNOWN')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Language pool membership gate (language-pool-validation)
+// PHB p.123 — characters may only learn languages from the Standard + Exotic
+// tables; worlds can further restrict via rulesProfile (disabledEntities).
+// ---------------------------------------------------------------------------
+
+// Sage: skillProficiencies fixed, languageProficiencies: [{anyStandard:2}]
+const SAGE_BG: BackgroundCompendiumData = {
+  slug: 'sage',
+  source: 'PHB',
+  name: 'Sage',
+  skillProficiencies: [{ arcana: true, history: true }],
+  languageProficiencies: [{ anyStandard: 2 }],
+};
+
+describe('validateBackgroundSelection — language pool membership (PHB p.123)', () => {
+  it('LP-B-1: language not in PHB pool (klingon) → BACKGROUND_LANGUAGE_NOT_IN_POOL', () => {
+    // PHB p.123 — only Standard and Exotic language table members are valid choices;
+    // 'klingon' is not in either table.
+    const res = validateBackgroundSelection({
+      backgroundData: SAGE_BG,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      languageChoices: ['elvish', 'klingon'],
+      worldRefData: phbDefaultPools(),
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'BACKGROUND_LANGUAGE_NOT_IN_POOL',
+      language: 'klingon',
+    });
+  });
+
+  it('LP-B-2: both languages in PHB pool (elvish, draconic) → ok:true', () => {
+    // PHB p.123 — 'elvish' is Standard, 'draconic' is Exotic; both valid.
+    const res = validateBackgroundSelection({
+      backgroundData: SAGE_BG,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      languageChoices: ['elvish', 'draconic'],
+      worldRefData: phbDefaultPools(),
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('LP-B-3: world-disabled language → BACKGROUND_LANGUAGE_NOT_IN_POOL', () => {
+    // PHB p.123 — if a world disables a language (here: 'goblin' removed from standard pool),
+    // submitting it must be rejected on the write path.
+    const worldRefData = phbDefaultPools();
+    const restrictedPool = {
+      ...worldRefData,
+      languagePool: {
+        standard: worldRefData.languagePool.standard.filter((l) => l !== 'goblin'),
+        exotic: worldRefData.languagePool.exotic,
+      },
+    };
+    const res = validateBackgroundSelection({
+      backgroundData: SAGE_BG,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      languageChoices: ['elvish', 'goblin'],
+      worldRefData: restrictedPool,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'BACKGROUND_LANGUAGE_NOT_IN_POOL',
+      language: 'goblin',
+    });
+  });
+
+  it('LP-B-4: no worldRefData passed → falls back to PHB defaults, valid language ok:true', () => {
+    // Regression: callers without worldRefData should get PHB defaults, not crash.
+    const res = validateBackgroundSelection({
+      backgroundData: SAGE_BG,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      languageChoices: ['elvish', 'draconic'],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('LP-B-5: no worldRefData passed, invalid language → BACKGROUND_LANGUAGE_NOT_IN_POOL', () => {
+    // Regression: fallback path must still reject non-PHB languages.
+    const res = validateBackgroundSelection({
+      backgroundData: SAGE_BG,
+      rulesProfile: DEFAULT_RULES_PROFILE,
+      languageChoices: ['elvish', 'klingon'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'BACKGROUND_LANGUAGE_NOT_IN_POOL',
+      language: 'klingon',
+    });
   });
 });

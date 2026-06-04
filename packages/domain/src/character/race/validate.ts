@@ -238,11 +238,16 @@ interface ValidateRaceInput {
 /**
  * Valida los idiomas elegidos contra los slots `any*` combinados de race + subrace.
  * Devuelve issues (vacío si OK) y la lista normalizada (lowercase) a persistir.
+ *
+ * @param pool - The world's enabled language pool (standard ∪ exotic). Used for
+ *   membership validation per PHB p.123. Passes through from validateRaceSelection
+ *   so world-disabled languages are properly rejected on the write path.
  */
 function validateLanguageChoices(input: {
   race: RaceCompendiumData;
   subrace?: SubraceCompendiumData | null;
   choices: string[];
+  pool: { standard: readonly string[]; exotic: readonly string[] };
 }): { issues: RaceValidationIssue[]; applied: string[] } {
   const raceLangs = splitLanguageBlocks(input.race.languageProficiencies);
   const subraceLangs = splitLanguageBlocks(input.subrace?.languageProficiencies);
@@ -261,10 +266,19 @@ function validateLanguageChoices(input: {
     return { issues, applied: normalized };
   }
 
+  // Build the full pool set once for O(1) membership checks.
+  const poolSet = new Set([...input.pool.standard, ...input.pool.exotic]);
+
   const seen = new Set<string>();
   for (const lang of normalized) {
     if (seen.has(lang) || fixedSet.has(lang)) {
       issues.push({ code: 'RACE_LANGUAGE_DUPLICATE', language: lang });
+      continue;
+    }
+    // PHB p.123 — only Standard and Exotic language table members are valid choices;
+    // worlds may further restrict via rulesProfile (disabledEntities removes entries from pool).
+    if (!poolSet.has(lang)) {
+      issues.push({ code: 'RACE_LANGUAGE_NOT_IN_POOL', language: lang });
       continue;
     }
     seen.add(lang);
@@ -331,6 +345,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
     race: raceData,
     subrace: subraceData ?? null,
     choices: input.languageChoices ?? [],
+    pool: worldRefData.languagePool,
   });
   if (langResult.issues.length > 0) {
     return { ok: false, issues: langResult.issues };

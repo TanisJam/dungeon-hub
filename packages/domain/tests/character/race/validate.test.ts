@@ -1280,3 +1280,80 @@ describe('validateRaceSelection — injected worldRefData (DI contract)', () => 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Language pool membership gate (language-pool-validation)
+// PHB p.123 — characters may only learn languages from the Standard + Exotic
+// tables; worlds can further restrict via rulesProfile (disabledEntities).
+// ---------------------------------------------------------------------------
+describe('validateRaceSelection — language pool membership (PHB p.123)', () => {
+  /** Half-Elf: CHA+2, choose 2 stats +1 each, anyStandard:1 */
+  const HALF_ELF_WITH_LANG: RaceCompendiumData = {
+    slug: 'half-elf',
+    source: 'PHB',
+    ability: [{ cha: 2, choose: { from: ['str', 'dex', 'con', 'int', 'wis'], count: 2 } }],
+    languageProficiencies: [{ anyStandard: 1 }],
+  };
+
+  const appliedAsis = [
+    { ability: 'cha' as const, bonus: 2, source: 'race' as const },
+    { ability: 'str' as const, bonus: 1, source: 'race' as const },
+    { ability: 'dex' as const, bonus: 1, source: 'race' as const },
+  ];
+
+  // PHB pool uses standard: ['common','dwarvish','elvish','giant','gnomish','goblin','halfling','orc']
+  // and exotic: ['abyssal','celestial','deep-speech','draconic','infernal','primordial','sylvan','undercommon']
+
+  it('LP-R-1: language not in PHB pool (klingon) → RACE_LANGUAGE_NOT_IN_POOL', () => {
+    // PHB p.123 — only Standard and Exotic language tables are valid choices;
+    // 'klingon' is not in either table.
+    const res = validateRaceSelection({
+      raceData: HALF_ELF_WITH_LANG,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis,
+      languageChoices: ['klingon'],
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'RACE_LANGUAGE_NOT_IN_POOL',
+      language: 'klingon',
+    });
+  });
+
+  it('LP-R-2: valid PHB language (draconic) → ok:true', () => {
+    // PHB p.123 — 'draconic' is in the Exotic Languages table.
+    const res = validateRaceSelection({
+      raceData: HALF_ELF_WITH_LANG,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis,
+      languageChoices: ['draconic'],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it('LP-R-3: world-disabled language → RACE_LANGUAGE_NOT_IN_POOL', () => {
+    // PHB p.123 — if a world disables a language via its pool, it is no longer valid.
+    // Using an empty standard pool to simulate 'goblin' being removed.
+    const res = validateRaceSelection({
+      raceData: HALF_ELF_WITH_LANG,
+      rulesProfile: PROFILE_TASHAS_OFF,
+      appliedAsis,
+      languageChoices: ['goblin'],
+      worldRefData: {
+        languagePool: {
+          standard: ['common', 'dwarvish', 'elvish', 'giant', 'gnomish', 'halfling', 'orc'],
+          exotic: ['abyssal', 'celestial', 'deep-speech', 'draconic', 'infernal', 'primordial', 'sylvan', 'undercommon'],
+        },
+        subraceRequiredSet: new Set(),
+        subraceReplacingAbilitySet: new Set(),
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.issues).toContainEqual({
+      code: 'RACE_LANGUAGE_NOT_IN_POOL',
+      language: 'goblin',
+    });
+  });
+});

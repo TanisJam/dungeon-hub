@@ -1,5 +1,7 @@
 import { ALL_SKILLS } from '../sheet/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
+import { phbDefaultPools } from '../../world/phb-defaults.js';
+import type { WorldRefData } from '../../world/ref-data.js';
 import { expandToolFrom, patchAnyToolCount } from '../tool/pools.js';
 import type {
   AppliedBackground,
@@ -317,6 +319,15 @@ interface ValidateBackgroundInput {
   backgroundData: BackgroundCompendiumData;
   rulesProfile: RulesProfile;
   /**
+   * Resolved reference-data pools for the world. When omitted, `phbDefaultPools()`
+   * is used — keeps PHB-only callers and existing tests working without threading
+   * the pool everywhere. New callers (api routes loading worlds from DB) SHOULD pass
+   * the resolved data so homebrew/disabledEntities apply.
+   *
+   * Used for language pool membership validation (PHB p.123 — write path only).
+   */
+  worldRefData?: WorldRefData;
+  /**
    * Skills elegidos por el jugador para llenar los choose blocks del background.
    * Solo necesario si el background tiene `choose`.
    */
@@ -334,6 +345,7 @@ interface ValidateBackgroundInput {
 export function validateBackgroundSelection(input: ValidateBackgroundInput): BackgroundValidationResult {
   const issues: BackgroundValidationIssue[] = [];
   const { backgroundData, rulesProfile } = input;
+  const worldRefData = input.worldRefData ?? phbDefaultPools();
   const skillChoices = (input.skillChoices ?? []).map((s) => s.toLowerCase());
   const languageChoices = (input.languageChoices ?? []).map((s) => s.toLowerCase());
   const toolChoices = input.toolChoices ?? {};
@@ -429,10 +441,21 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
           gotCount: languageChoices.length,
         });
       }
+      // Build the full pool set once for O(1) membership checks.
+      const poolSet = new Set([
+        ...worldRefData.languagePool.standard,
+        ...worldRefData.languagePool.exotic,
+      ]);
       const seen = new Set<string>();
       for (const lang of languageChoices) {
         if (seen.has(lang) || allLanguagesFixed.includes(lang)) {
           issues.push({ code: 'BACKGROUND_LANGUAGE_DUPLICATE', language: lang });
+          continue;
+        }
+        // PHB p.123 — only Standard and Exotic language table members are valid choices;
+        // worlds may further restrict via rulesProfile (disabledEntities removes entries from pool).
+        if (!poolSet.has(lang)) {
+          issues.push({ code: 'BACKGROUND_LANGUAGE_NOT_IN_POOL', language: lang });
           continue;
         }
         seen.add(lang);

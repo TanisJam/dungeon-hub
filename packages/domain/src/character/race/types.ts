@@ -291,6 +291,14 @@ export type RaceValidationIssue =
       language: string;
     }
   | {
+      /**
+       * Idioma elegido no pertenece al pool habilitado del mundo (standard ∪ exotic).
+       * PHB p.123 — Standard + Exotic Languages tables; worlds may disable some via rulesProfile.
+       */
+      code: 'RACE_LANGUAGE_NOT_IN_POOL';
+      language: string;
+    }
+  | {
       /** La raza/subrace requiere elegir un feat (`feats: [{any:1}]`) y no se proveyó. */
       code: 'RACE_FEAT_REQUIRED';
       race: { slug: string; source: string };
