@@ -39,3 +39,6 @@ export type { QuestRowProps } from './quest-row';
 
 export { CharacterCard } from './character-card';
 export type { CharacterCardProps } from './character-card';
+
+export { ScrollNav } from './scroll-nav';
+export type { ScrollNavProps } from './scroll-nav';
