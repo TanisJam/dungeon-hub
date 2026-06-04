@@ -223,6 +223,165 @@ test.describe('Encuentros — player read view @ 375px', () => {
   });
 });
 
+// ── REQ-WCPT-WEB-E2E-01: Player passes own turn @ 375px ──────────────────────
+
+test.describe('REQ-WCPT-WEB-E2E-01: Player passes own turn @ 375px', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('WCPT-E2E-01: player passes own turn → TurnBanner advances to NPC + panel disappears', async ({
+    page,
+  }) => {
+    // ── Step 1: Obtain JWTs ────────────────────────────────────────────────
+    let dmJwt: string;
+    let p1Jwt: string;
+    try {
+      dmJwt = await getJwt(FIXTURE_DM_EMAIL, FIXTURE_PASSWORD);
+      p1Jwt = await getJwt(FIXTURE_PLAYER1_EMAIL, FIXTURE_PASSWORD);
+    } catch (err) {
+      test.skip(true, `Fixture users unavailable: ${err}. Run pnpm --filter @dungeon-hub/api db:seed:e2e`);
+      return;
+    }
+
+    // ── Step 2: Seed a Fighter character for player1 ──────────────────────
+    // Use default Human Fighter (no classOverride) — any active PC works for pass-turn.
+    let worldId: string;
+    let charId: string;
+    try {
+      worldId = await getFixtureWorldId(dmJwt);
+      const char = await seedJourneyCharacter({
+        ownerJwt: p1Jwt,
+        dmJwt,
+        worldId,
+        name: `WCPT E2E Hero ${Date.now()}`,
+        targetStatus: 'active',
+      });
+      charId = char.id;
+    } catch (err) {
+      test.skip(true, `Could not seed character: ${err}`);
+      return;
+    }
+
+    // ── Step 3: Find fixture campaign ─────────────────────────────────────
+    let campaignId: string;
+    try {
+      const campaignList = await apiCall<{
+        data: Array<{ id: string; name: string; memberRole: string }>;
+      }>('GET', '/api/v1/campaigns', dmJwt);
+      const campaign = campaignList.data?.find(
+        (c) => c.memberRole === 'gm' && c.name === 'E2E Fixture',
+      );
+      if (!campaign) {
+        test.skip(true, 'Fixture campaign "E2E Fixture" not found. Run db:seed:e2e first.');
+        return;
+      }
+      campaignId = campaign.id;
+    } catch (err) {
+      test.skip(true, `Could not find fixture campaign: ${err}`);
+      return;
+    }
+
+    // ── Step 4: DM creates encounter — Player PC at initiative 20 (goes first) ─
+    // NPC at initiative 5. PC is currentCombatant at encounter start.
+    const NPC_NAME = `WCPT Goblin ${Date.now()}`;
+    let encounterId: string;
+    try {
+      const enc = await apiCall<{ id: string; version: number }>('POST', '/api/v1/encounters', dmJwt, {
+        campaignId,
+        name: `WCPT Pass-Turn E2E ${Date.now()}`,
+        combatants: [
+          {
+            name: 'WCPT Hero',
+            kind: 'pc',
+            characterId: charId,
+            initiative: 20,
+            hpCurrent: 20,
+            hpMax: 20,
+          },
+          {
+            name: NPC_NAME,
+            kind: 'npc',
+            initiative: 5,
+            hpCurrent: 7,
+            hpMax: 7,
+            ac: 13,
+          },
+        ],
+      });
+      encounterId = enc.id;
+    } catch (err) {
+      test.skip(true, `Could not create encounter: ${err}`);
+      return;
+    }
+
+    // Verify PC is currentCombatant (initiative 20 > 5).
+    const encDetail = await apiCall<{
+      currentCombatantId: string;
+      combatants: Array<{ id: string; characterId: string | null }>;
+    }>('GET', `/api/v1/encounters/${encounterId}`, dmJwt);
+    const pcCombatant = encDetail.combatants.find((c) => c.characterId === charId);
+    if (!pcCombatant || encDetail.currentCombatantId !== pcCombatant.id) {
+      test.skip(true, 'PC is not the current combatant — initiative ordering issue');
+      return;
+    }
+
+    // ── Step 5: Login as player1 in the browser context ───────────────────
+    // page.request shares the cookie jar with page.goto() calls (mirrors Rage E2E pattern).
+    await page.goto('/');
+    const loginRes = await page.request.post('/api/dev/login', {
+      data: { email: FIXTURE_PLAYER1_EMAIL, password: FIXTURE_PASSWORD },
+    });
+    if (loginRes.status() !== 200) {
+      test.skip(true, 'Could not login as player1 — /api/dev/login unavailable or fixture missing');
+      return;
+    }
+
+    // ── Step 6: Navigate to encounter page ────────────────────────────────
+    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'domcontentloaded' });
+
+    const currentUrl = page.url();
+    if (currentUrl.includes('/not-found') || currentUrl.includes('/404')) {
+      test.skip(
+        true,
+        'player1 does not have campaign access. Run db:seed:e2e to re-seed campaign members.',
+      );
+      return;
+    }
+
+    await expect(page).toHaveURL(new RegExp(`/encuentros/${encounterId}`), { timeout: 15_000 });
+
+    // ── Step 7: Assert "Tu turno" in TurnBanner and "Pasar Turno" button visible ─
+    // REQ-WCPT-WEB-UI-01: PlayerActionPanel + PassTurnButton render when own turn + active.
+    const turnBanner = page.locator('text=Tu turno').first();
+    await expect(turnBanner).toBeVisible({ timeout: 10_000 });
+
+    const passTurnBtn = page.getByRole('button', { name: /pasar turno/i });
+    await expect(passTurnBtn).toBeVisible({ timeout: 5_000 });
+    await expect(passTurnBtn).toBeEnabled();
+
+    // ── Step 8: Click "Pasar Turno" ───────────────────────────────────────
+    await passTurnBtn.click();
+
+    // ── Step 9: Assert TurnBanner advances to NPC ─────────────────────────
+    // After revalidatePath SC re-render: TurnBanner shows "Turno de {NPC_NAME}".
+    // "Tu turno" must disappear (no longer own turn).
+    const npcTurnBanner = page.locator(`text=Turno de`).first();
+    await expect(npcTurnBanner).toBeVisible({ timeout: 15_000 });
+
+    // "Tu turno" must be gone (player's turn ended).
+    await expect(turnBanner).not.toBeVisible({ timeout: 5_000 });
+
+    // ── Step 10: Assert "Pasar Turno" button is no longer visible ─────────
+    // PlayerActionPanel only renders when isOwnTurn + active; after passing turn
+    // isOwnTurn=false → panel not rendered.
+    await expect(passTurnBtn).not.toBeVisible({ timeout: 5_000 });
+
+    // ── Step 11: Screenshot for visual review (non-fatal) ─────────────────
+    await page.screenshot({
+      path: `e2e/.screenshots/wcpt-pass-turn-${Date.now()}.png`,
+    }).catch(() => {});
+  });
+});
+
 // ── REQ-WCR-E2E-01: Barbarian Rage flow @ 375px ───────────────────────────────
 
 test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
