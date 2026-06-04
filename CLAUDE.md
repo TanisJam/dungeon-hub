@@ -170,8 +170,8 @@ Do NOT batch test + impl in one edit. Do NOT write production code without a fai
   - `403 FORBIDDEN`
   - `404 NOT_FOUND`
   - `410 EXPIRED` / `CONSUMED` (one-shot resources)
-- **JWT user typing**: use `declare module '@fastify/jwt' { interface FastifyJWT { user: SupabaseJwtPayload } }`, NOT `declare module 'fastify' { interface FastifyRequest { user?: ... } }`. The `@fastify/jwt` plugin does its own augmentation that wins over `FastifyRequest.user`. See [engram #525].
-- **Issue field naming**: count-mismatch codes use `expectedCount` / `gotCount`; single-value-mismatch codes use `expected` / `got`. See [engram #556].
+- **JWT user typing**: use `declare module '@fastify/jwt' { interface FastifyJWT { user: SupabaseJwtPayload } }`, NOT `declare module 'fastify' { interface FastifyRequest { user?: ... } }`. The `@fastify/jwt` plugin already augments `FastifyRequest.user` with `string | object | Buffer` by default, and any conflicting `FastifyRequest.user` augmentation loses to it — switching to `FastifyJWT.user` is what makes `request.user.sub` type-check correctly. See [engram #525].
+- **Issue field naming**: count-mismatch codes use `expectedCount` / `gotCount`; single-value-mismatch codes use `expected` / `got`. Specifically: codes with the `_COUNT_MISMATCH` suffix (e.g. `RACE_SKILL_COUNT_MISMATCH`) carry `expectedCount: number` + `gotCount: number`; codes that compare a single value or array (e.g. `ASI_MISMATCH`) carry plain `expected` / `got`. 12+ existing emit sites in `race/validate.ts` and `background/validate.ts` follow this — align new specs to match them. See [engram #556].
 
 ---
 
@@ -246,7 +246,7 @@ If you trip on any of these, save a `discovery` to engram and link from your SDD
 - **Playwright `selectOption({ label: regex })` does not exist.** Use `selectOption('exact-string')` or `selectOption({ value: '...' })`.
 - **Sub-agent skips RED step silently.** When delegating `sdd-apply`, the prompt must say `NEVER write production code without a failing test` AND must ask the agent to paste `Tests N passed` deltas as proof. Without that, agents can ship Phase X with 0 new tests and report "complete".
 - **Read-path tolerance for new gates.** When adding a new write-time validation gate (e.g. `RACE_SUBRACE_REQUIRED`), legacy DB rows that predate the gate must still load via GET without erroring. Validate write-only; tolerate read.
-- **Migrations: never apply via raw psql.** Always `pnpm --filter @dungeon-hub/api db:migrate` (it records the row in `drizzle.__drizzle_migrations`). Applying DDL manually desyncs the tracking table → `db:migrate` then re-runs every migration and fails on "already exists". If a migration ever *was* applied manually, backfill `__drizzle_migrations` with `sha256(<file>.sql)` as the `hash` + the journal `when` as `created_at`. See engram #1314 (root cause of the recurring #1284/#1293 failures).
+- **Migrations: never apply via raw psql.** Always `pnpm --filter @dungeon-hub/api db:migrate` (it records the row in `drizzle.__drizzle_migrations`). Applying DDL manually desyncs the tracking table → `db:migrate` then re-runs every migration and fails on "already exists". Root cause: drizzle-kit matches each migration by `sha256(file_content)`; a missing or malformed hash row causes it to re-apply the SQL (which then fails with "column already exists"). If a migration ever *was* applied manually, backfill the row: `hash` = plain `sha256sum` of the `.sql` file content, `created_at` = the journal `when` (folderMillis) value for that index. See engram #1314 (root cause of the recurring #1284/#1293 failures).
 
 ---
 
@@ -259,3 +259,8 @@ If you trip on any of these, save a `discovery` to engram and link from your SDD
 - **E2E setup**: `apps/web/e2e/README.md` (pre-requisites, env vars, commands).
 - **Manual system**: `docs/manuals/dsl.md` (DSL reference) + `docs/manuals/conflict-resolution.md` (per-world overrides).
 - **Roadmaps**: `audit/rules-audit-*/proposal` topics in engram (one per audited domain).
+- **DM onboarding**: `docs/onboarding/dm-onboarding.md` — create a world, invite players, approve characters, run a session.
+- **Operator checklist**: `docs/onboarding/operator-checklist.md` — local stack bringup, pg_dump backup/restore.
+- **MVP scope**: `docs/mvp/definition.md` — current MVP scope; source of truth for scope decisions.
+- **Live system state**: `docs/STATUS.md` — current system state (being created in parallel; link by path once committed).
+- **Arc index**: `docs/ROADMAP.md` — high-level arc and upcoming work (being created in parallel; link by path once committed).

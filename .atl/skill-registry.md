@@ -5,9 +5,9 @@ Resolved automatically by the SDD orchestrator and injected as compact rules int
 
 ## Project Conventions (auto-resolved)
 
-No project-level `agents.md` / `CLAUDE.md` / `.cursorrules` detected.
+Project-level `CLAUDE.md` IS present at the repo root — it is the authoritative conventions doc (Two Sources of Truth, mobile-first, architecture/layering, testing, API/web conventions, git, SDD workflow, 5etools handling, pitfalls). Read it first for any code work. Current MVP scope: `docs/mvp/definition.md`; live state: `docs/STATUS.md`; arc index: `docs/ROADMAP.md`.
 
-User-global `~/.claude/CLAUDE.md` applies as the operator's working agreement:
+User-global `~/.claude/CLAUDE.md` also applies as the operator's working agreement:
 - Never add Co-Authored-By or AI attribution to commits — conventional commits only.
 - Never build after changes (no `pnpm build` for verification — `pnpm typecheck` is the gate).
 - Use bat/rg/fd/sd/eza (not cat/grep/find/sed/ls).
@@ -43,7 +43,7 @@ User-global `~/.claude/CLAUDE.md` applies as the operator's working agreement:
 - Test runner: vitest (api, domain). Playwright (web E2E).
 - Strict TDD enabled for domain package: write failing test first, then implementation.
 - Domain tests are pure unit tests (no fixtures, no I/O). Fast feedback loop.
-- API tests via vitest can do route-level integration but no DB fixtures yet — keep targeted.
+- API tests via vitest do real integration against Supabase + Postgres (sequential fork pool, 30s timeout). Not fixture-mocked.
 - Web is verified via Playwright E2E happy paths, NOT via component tests (RSC + jsdom is painful, low ROI).
 - E2E project naming: `*.setup.ts` (setup project), `*.public.spec.ts` (no auth), `*.auth.spec.ts` (uses storageState).
 
