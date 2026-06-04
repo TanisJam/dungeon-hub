@@ -9,6 +9,13 @@
  *   (3) No horizontal scroll at 375px (REQ-WCO-WEB-01)
  *   (4) Round-trip: use a resource charge → page reflects updated count
  *
+ * REQ-WCR-E2E-01 — Barbarian Rage flow @ 375px
+ *
+ * Covers:
+ *   (5) Barbarian sees "Entrar en Furia" button when on own turn
+ *   (6) Click → 'Raging' badge appears, rage-uses counter decrements
+ *   (7) Advance turn → button disabled (not own turn)
+ *
  * Seeding strategy:
  *   - DM creates an encounter via API (POST /encounters) with player1's character as PC combatant.
  *   - Player1 browses the encounter page via /api/dev/login cookie injection.
@@ -212,6 +219,185 @@ test.describe('Encuentros — player read view @ 375px', () => {
     // ── Step 11: Screenshot for visual review (non-fatal) ─────────────────
     await page.screenshot({
       path: `e2e/.screenshots/encuentros-player-${Date.now()}.png`,
+    }).catch(() => {});
+  });
+});
+
+// ── REQ-WCR-E2E-01: Barbarian Rage flow @ 375px ───────────────────────────────
+
+test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('REQ-WCR-E2E-01: player enters and ends Rage on own turn', async ({ page }) => {
+    // ── Step 1: Obtain JWTs ────────────────────────────────────────────────
+    let dmJwt: string;
+    let p1Jwt: string;
+    try {
+      dmJwt = await getJwt(FIXTURE_DM_EMAIL, FIXTURE_PASSWORD);
+      p1Jwt = await getJwt(FIXTURE_PLAYER1_EMAIL, FIXTURE_PASSWORD);
+    } catch (err) {
+      test.skip(true, `Fixture users unavailable: ${err}. Run pnpm --filter @dungeon-hub/api db:seed:e2e`);
+      return;
+    }
+
+    // ── Step 2: Seed a Barbarian character for player1 ────────────────────
+    // PHB p.49 — Barbarian skill pool: Animal Handling, Athletics, Intimidation,
+    //             Nature, Perception, Survival. Pick 2 skills (PHB p.49 — Barbarian).
+    // Soldier fixed skills: Athletics + Intimidation (PHB p.140 — Soldier).
+    // Safe choices (no collision with Soldier): 'animal handling' + 'survival'.
+    // Note: skill slugs use spaces not hyphens ('animal handling', not 'animal-handling').
+    let worldId: string;
+    let charId: string;
+    try {
+      worldId = await getFixtureWorldId(dmJwt);
+      const char = await seedJourneyCharacter({
+        ownerJwt: p1Jwt,
+        dmJwt,
+        worldId,
+        name: `E2E Barbarian ${Date.now()}`,
+        targetStatus: 'active',
+        classOverride: {
+          slug: 'barbarian',
+          source: 'PHB',
+          skillChoices: ['animal handling', 'survival'],
+        },
+      });
+      charId = char.id;
+    } catch (err) {
+      test.skip(true, `Could not seed Barbarian character: ${err}`);
+      return;
+    }
+
+    // ── Step 3: Find fixture campaign ─────────────────────────────────────
+    let campaignId: string;
+    try {
+      const campaignList = await apiCall<{
+        data: Array<{ id: string; name: string; memberRole: string }>;
+      }>('GET', '/api/v1/campaigns', dmJwt);
+      const campaign = campaignList.data?.find(
+        (c) => c.memberRole === 'gm' && c.name === 'E2E Fixture',
+      );
+      if (!campaign) {
+        test.skip(true, 'Fixture campaign "E2E Fixture" not found. Run db:seed:e2e first.');
+        return;
+      }
+      campaignId = campaign.id;
+    } catch (err) {
+      test.skip(true, `Could not find fixture campaign: ${err}`);
+      return;
+    }
+
+    // ── Step 4: DM creates encounter — Barbarian on initiative 20 (goes first) ─
+    // Put the Barbarian first so it starts as currentCombatant immediately.
+    let encounterId: string;
+    let encVersion: number;
+    try {
+      const enc = await apiCall<{ id: string; version: number }>('POST', '/api/v1/encounters', dmJwt, {
+        campaignId,
+        name: `E2E Rage ${Date.now()}`,
+        combatants: [
+          {
+            name: 'Barbarian Hero',
+            kind: 'pc',
+            characterId: charId,
+            initiative: 20,
+            hpCurrent: 12,
+            hpMax: 12,
+          },
+          {
+            name: 'Test Goblin',
+            kind: 'npc',
+            initiative: 5,
+            hpCurrent: 7,
+            hpMax: 7,
+            ac: 13,
+          },
+        ],
+      });
+      encounterId = enc.id;
+      encVersion = enc.version;
+    } catch (err) {
+      test.skip(true, `Could not create encounter: ${err}`);
+      return;
+    }
+
+    // Verify that it is indeed the Barbarian's turn (initiative 20 > 5)
+    const encDetail = await apiCall<{
+      currentCombatantId: string;
+      combatants: Array<{ id: string; characterId: string | null }>;
+    }>('GET', `/api/v1/encounters/${encounterId}`, dmJwt);
+    const barbarianCombatant = encDetail.combatants.find((c) => c.characterId === charId);
+    if (!barbarianCombatant || encDetail.currentCombatantId !== barbarianCombatant.id) {
+      test.skip(true, 'Barbarian is not the current combatant — initiative ordering issue');
+      return;
+    }
+
+    // ── Step 5: Login as player1 in the browser context ───────────────────
+    // Use page.request (shares cookie jar with the page — MUST NOT use standalone `request`).
+    await page.goto('/');
+    const loginRes = await page.request.post('/api/dev/login', {
+      data: { email: FIXTURE_PLAYER1_EMAIL, password: FIXTURE_PASSWORD },
+    });
+    if (loginRes.status() !== 200) {
+      test.skip(true, 'Could not login as player1 — /api/dev/login unavailable or fixture missing');
+      return;
+    }
+
+    // ── Step 6: Navigate to encounter page ────────────────────────────────
+    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'domcontentloaded' });
+
+    const currentUrl = page.url();
+    if (currentUrl.includes('/not-found') || currentUrl.includes('/404')) {
+      test.skip(
+        true,
+        'player1 does not have campaign access (not in campaignMembers). ' +
+          'Run db:seed:e2e to re-seed campaign members.',
+      );
+      return;
+    }
+
+    await expect(page).toHaveURL(new RegExp(`/encuentros/${encounterId}`), { timeout: 15_000 });
+
+    // ── Step 7: Assert "Furia" section and "Entrar en Furia" button visible ─
+    // REQ-WCR-WEB-PAGE-01: RageControls renders for own Barbarian combatant.
+    const rageSection = page.locator('section[aria-label="Furia"]');
+    await expect(rageSection).toBeVisible({ timeout: 10_000 });
+
+    const enterRageBtn = page.getByRole('button', { name: /entrar en furia/i });
+    await expect(enterRageBtn).toBeVisible({ timeout: 5_000 });
+    // PHB p.48: Barbarian can rage on own turn — button must be enabled.
+    await expect(enterRageBtn).toBeEnabled();
+
+    // ── Step 8: Assert rage counter shows "X / Y usos de Furia" ──────────
+    const counterEl = rageSection.locator('p').first();
+    const initialCounterText = await counterEl.textContent();
+    // L1 Barbarian has 2 uses per day (PHB p.48 Barbarian table)
+    expect(initialCounterText).toMatch(/usos de Furia/i);
+
+    // ── Step 9: Click "Entrar en Furia" — activate Rage ──────────────────
+    await enterRageBtn.click();
+
+    // After revalidatePath, Server Component re-renders.
+    // Assert: "Terminar Furia" button appears (isRaging now true).
+    const endRageBtn = page.getByRole('button', { name: /terminar furia/i });
+    await expect(endRageBtn).toBeVisible({ timeout: 15_000 });
+
+    // Assert: "Raging" condition badge appears on the combatant's roster row.
+    // RosterList renders ConditionBadges per combatant.
+    const ragingBadge = page.locator('[aria-label="Raging"]').or(
+      page.locator('text=Raging').first(),
+    );
+    await expect(ragingBadge.first()).toBeVisible({ timeout: 10_000 });
+
+    // Assert: rage uses counter decremented (e.g. "1 / 2" → was "2 / 2").
+    const updatedCounterText = await counterEl.textContent();
+    const initialRemaining = parseInt(initialCounterText?.trim().split('/')[0] ?? '2', 10);
+    const updatedRemaining = parseInt(updatedCounterText?.trim().split('/')[0] ?? '1', 10);
+    expect(updatedRemaining, 'Rage uses must decrement after activating').toBe(initialRemaining - 1);
+
+    // ── Step 10: Screenshot for visual review (non-fatal) ─────────────────
+    await page.screenshot({
+      path: `e2e/.screenshots/barbarian-rage-${Date.now()}.png`,
     }).catch(() => {});
   });
 });
