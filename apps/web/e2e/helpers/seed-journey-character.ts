@@ -93,6 +93,16 @@ export interface ClassOverride {
   skillChoices: string[];
 }
 
+/**
+ * Optional weapon to grant and equip after character approval.
+ * ADR-5 (C2): additive opt-in — absent → default journey path unchanged.
+ * The DM grants the item via grant/item; the owner equips it via PATCH inventory.
+ */
+export interface EquipWeaponOption {
+  slug: string;
+  source: string;
+}
+
 export interface SeedCharacterOptions {
   /** JWT of the character owner. */
   ownerJwt: string;
@@ -113,6 +123,12 @@ export interface SeedCharacterOptions {
    * do not conflict with Soldier's fixed Athletics+Intimidation.
    */
   classOverride?: ClassOverride;
+  /**
+   * Optional weapon to grant and equip after character approval.
+   * ADR-5 (C2): absent → existing behavior unchanged (backward-compatible).
+   * Example: { slug: 'shortsword', source: 'PHB' }
+   */
+  equipWeapon?: EquipWeaponOption;
 }
 
 export interface SeededCharacter {
@@ -138,6 +154,7 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
     targetStatus = 'active',
     xpGrant = 0,
     classOverride,
+    equipWeapon,
   } = opts;
 
   // Default class is Human Fighter / Soldier (backward-compatible with all existing callers).
@@ -208,6 +225,18 @@ export async function seedJourneyCharacter(opts: SeedCharacterOptions): Promise<
     await apiCall('POST', `/api/v1/characters/${charId}/xp`, dmJwt, { award: xpGrant });
   }
 
+  // 9. Optional weapon equip (ADR-5 C2 — opt-in, backward-compatible).
+  // DM grants the item; owner equips it via PATCH /inventory/:instanceId.
+  if (equipWeapon) {
+    const { addedInstanceId } = await grantItemApi(charId, equipWeapon.slug, equipWeapon.source, dmJwt);
+    await apiCall(
+      'PATCH',
+      `/api/v1/characters/${charId}/inventory/${addedInstanceId}`,
+      ownerJwt,
+      { state: 'equipped' },
+    );
+  }
+
   return { id: charId, name, status: 'active' };
 }
 
@@ -238,14 +267,18 @@ export async function grantGoldApi(charId: string, gp: number, dmJwt: string): P
 
 /**
  * Grant an item to a character via the DM token.
+ * Returns the instanceId of the newly added inventory row.
+ * The API route already returns addedInstanceId (characters.ts L1588) —
+ * this change is additive and backward-compatible (callers that discard the
+ * return value are unaffected; see grantItemApi audit in apply-progress #1792).
  */
 export async function grantItemApi(
   charId: string,
   slug: string,
   source: string,
   dmJwt: string,
-): Promise<void> {
-  await apiCall('POST', `/api/v1/characters/${charId}/grant/item`, dmJwt, {
+): Promise<{ addedInstanceId: string }> {
+  return apiCall<{ addedInstanceId: string }>('POST', `/api/v1/characters/${charId}/grant/item`, dmJwt, {
     item: { slug, source },
   });
 }

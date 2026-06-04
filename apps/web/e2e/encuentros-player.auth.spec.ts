@@ -37,6 +37,9 @@ import {
   FIXTURE_PASSWORD,
 } from './helpers/seed-journey-character';
 
+// ── Shared apiCall helper for this file ──────────────────────────────────────
+// Used by every test in this file (read view, pass-turn, rage, weapon-attack).
+
 const FIXTURE_PLAYER1_EMAIL = 'player1@dh.test';
 const FIXTURE_DM_EMAIL = 'dm@dh.test';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -594,6 +597,235 @@ test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
     // ── Step 13: Screenshot for visual review (non-fatal) ─────────────────
     await page.screenshot({
       path: `e2e/.screenshots/barbarian-rage-${Date.now()}.png`,
+    }).catch(() => {});
+  });
+});
+
+// ── REQ-WCA-E2E-01: Player weapon attack vs NPC @ 375px ───────────────────────
+
+test.describe('REQ-WCA-E2E-01: player weapon attack vs NPC @ 375px', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('REQ-WCA-E2E-01: player attacks NPC → NPC HP drops', async ({ page }) => {
+    // ── Step 1: Obtain JWTs ────────────────────────────────────────────────
+    // PHB p.194-195: attack roll (d20 + attack bonus vs AC) → hit/miss → damage.
+    let dmJwt: string;
+    let p1Jwt: string;
+    try {
+      dmJwt = await getJwt(FIXTURE_DM_EMAIL, FIXTURE_PASSWORD);
+      p1Jwt = await getJwt(FIXTURE_PLAYER1_EMAIL, FIXTURE_PASSWORD);
+    } catch (err) {
+      test.skip(true, `Fixture users unavailable: ${err}. Run pnpm --filter @dungeon-hub/api db:seed:e2e`);
+      return;
+    }
+
+    // ── Step 2: Seed a Fighter character with an equipped Shortsword ───────
+    // ADR-5: equipWeapon opt-in — DM grants shortsword PHB; owner equips it.
+    // PHB p.149 — Shortsword: finesse, light, 1d6 piercing.
+    let worldId: string;
+    let charId: string;
+    try {
+      worldId = await getFixtureWorldId(dmJwt);
+      const char = await seedJourneyCharacter({
+        ownerJwt: p1Jwt,
+        dmJwt,
+        worldId,
+        name: `WCA E2E Hero ${Date.now()}`,
+        targetStatus: 'active',
+        equipWeapon: { slug: 'shortsword', source: 'PHB' },
+      });
+      charId = char.id;
+    } catch (err) {
+      test.skip(true, `Could not seed character with weapon: ${err}`);
+      return;
+    }
+
+    // ── Step 3: Find fixture campaign ─────────────────────────────────────
+    let campaignId: string;
+    try {
+      const campaignList = await apiCall<{
+        data: Array<{ id: string; name: string; memberRole: string }>;
+      }>('GET', '/api/v1/campaigns', dmJwt);
+      const campaign = campaignList.data?.find(
+        (c) => c.memberRole === 'gm' && c.name === 'E2E Fixture',
+      );
+      if (!campaign) {
+        test.skip(true, 'Fixture campaign "E2E Fixture" not found. Run db:seed:e2e first.');
+        return;
+      }
+      campaignId = campaign.id;
+    } catch (err) {
+      test.skip(true, `Could not find fixture campaign: ${err}`);
+      return;
+    }
+
+    // ── Helper to create a fresh encounter ───────────────────────────────
+    const NPC_HP = 30; // High HP — ensures NPC survives even a crit
+    async function createFreshEncounter(suffix: string) {
+      const npcName = `WCA Goblin ${suffix}`;
+      const enc = await apiCall<{ id: string; version: number }>('POST', '/api/v1/encounters', dmJwt, {
+        campaignId,
+        name: `WCA E2E ${Date.now()}`,
+        combatants: [
+          { name: 'WCA Fighter', kind: 'pc', characterId: charId, initiative: 20, hpCurrent: 20, hpMax: 20 },
+          { name: npcName, kind: 'npc', initiative: 5, hpCurrent: NPC_HP, hpMax: NPC_HP, ac: 13 },
+        ],
+      });
+      const detail = await apiCall<{
+        currentCombatantId: string;
+        combatants: Array<{ id: string; characterId: string | null; name: string; hpCurrent: number }>;
+      }>('GET', `/api/v1/encounters/${enc.id}`, dmJwt);
+      const pc = detail.combatants.find((c) => c.characterId === charId);
+      const npc = detail.combatants.find((c) => c.name === npcName);
+      return { encounterId: enc.id, pc, npc, npcName };
+    }
+
+    // ── Step 4: DM creates first encounter for preflight ──────────────────
+    let preflight: Awaited<ReturnType<typeof createFreshEncounter>>;
+    try {
+      preflight = await createFreshEncounter('preflight');
+    } catch (err) {
+      test.skip(true, `Could not create preflight encounter: ${err}`);
+      return;
+    }
+    if (!preflight.pc || !preflight.npc) {
+      test.skip(true, 'PC or NPC combatant not found in preflight encounter');
+      return;
+    }
+    if (preflight.pc.id !== (await apiCall<{ currentCombatantId: string }>('GET', `/api/v1/encounters/${preflight.encounterId}`, dmJwt)).currentCombatantId) {
+      test.skip(true, 'PC is not currentCombatant in preflight encounter');
+      return;
+    }
+
+    // ── Step 4b: Preflight — validate ownership via API with p1Jwt ───────
+    // Confirms assertCombatantOwnerOrGm works for this character BEFORE the browser test.
+    // If 403 here → ownership mismatch (charRow.userId vs JWT sub), NOT a web session issue.
+    const sheetRes = await apiCall<{
+      inventoryEnriched?: Array<{ instanceId: string; v3Type: string; equipped: boolean }>;
+    }>('GET', `/api/v1/characters/${charId}/sheet`, p1Jwt);
+    const equippedWeapon = sheetRes.inventoryEnriched?.find((i) => i.v3Type === 'weapon' && i.equipped);
+    if (!equippedWeapon) {
+      test.skip(
+        true,
+        `Preflight: weapon not in inventoryEnriched (equip step failed). ` +
+          `inventoryEnriched=${JSON.stringify(sheetRes.inventoryEnriched?.slice(0, 3))}`,
+      );
+      return;
+    }
+
+    const preflightVersion = (await apiCall<{ version: number }>('GET', `/api/v1/encounters/${preflight.encounterId}`, p1Jwt)).version;
+    const preflightAttack = await fetch(`${API_BASE}/api/v1/encounters/${preflight.encounterId}/actions/attack/apply`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${p1Jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        attackerId: preflight.pc.id,
+        targetId: preflight.npc.id,
+        weaponInstanceId: equippedWeapon.instanceId,
+        version: preflightVersion,
+      }),
+    });
+    if (preflightAttack.status === 403) {
+      const errBody = await preflightAttack.json() as { error: string };
+      throw new Error(
+        `Preflight API attack → 403 FORBIDDEN. Ownership check failed — charRow.userId !== callerId. ` +
+        `charId=${charId}, attackerId=${preflight.pc.id}. API: ${JSON.stringify(errBody)}`,
+      );
+    }
+    if (preflightAttack.status === 401) {
+      test.skip(true, `Preflight attack → 401 UNAUTHORIZED: JWT expired or fixture broken. Re-run db:seed:e2e.`);
+      return;
+    }
+    // Preflight attack succeeded (or 200/400/409). The action is consumed on this encounter.
+    // Create a FRESH encounter for the browser test so actionUsed=false.
+
+    // ── Step 4c: Create fresh encounter for browser test ─────────────────
+    let browserEnc: Awaited<ReturnType<typeof createFreshEncounter>>;
+    try {
+      browserEnc = await createFreshEncounter('browser');
+    } catch (err) {
+      test.skip(true, `Could not create browser encounter: ${err}`);
+      return;
+    }
+    if (!browserEnc.pc || !browserEnc.npc) {
+      test.skip(true, 'PC or NPC combatant not found in browser encounter');
+      return;
+    }
+
+    const browserEncounterId = browserEnc.encounterId;
+    const browserNpcCombatant = browserEnc.npc;
+
+    // ── Step 5: Login as player1 in the browser context ───────────────────
+    await page.goto('/');
+    const loginRes = await page.request.post('/api/dev/login', {
+      data: { email: FIXTURE_PLAYER1_EMAIL, password: FIXTURE_PASSWORD },
+    });
+    if (loginRes.status() !== 200) {
+      test.skip(true, 'Could not login as player1 — /api/dev/login unavailable or fixture missing');
+      return;
+    }
+
+    // ── Step 6: Navigate to encounter page ────────────────────────────────
+    await page.goto(`/encuentros/${browserEncounterId}`, { waitUntil: 'domcontentloaded' });
+
+    const currentUrl = page.url();
+    if (currentUrl.includes('/not-found') || currentUrl.includes('/404')) {
+      test.skip(
+        true,
+        'player1 does not have campaign access. Run db:seed:e2e to re-seed campaign members.',
+      );
+      return;
+    }
+
+    await expect(page).toHaveURL(new RegExp(`/encuentros/${browserEncounterId}`), { timeout: 15_000 });
+
+    // ── Step 7: Assert "Tu turno" and "Atacar" button visible ────────────
+    const turnBanner = page.locator('text=Tu turno').first();
+    await expect(turnBanner).toBeVisible({ timeout: 10_000 });
+
+    const atacarBtn = page.getByRole('button', { name: /^atacar$/i });
+    await expect(atacarBtn).toBeVisible({ timeout: 10_000 });
+    await expect(atacarBtn).toBeEnabled();
+
+    // ── Step 8: Open AttackSheet, pick weapon, pick NPC target ──────────
+    await atacarBtn.click();
+
+    const shortswordBtn = page.getByRole('button', { name: /shortsword/i });
+    await expect(shortswordBtn).toBeVisible({ timeout: 5_000 });
+    await shortswordBtn.click();
+
+    // NPC name contains timestamp — use partial match
+    const npcTargetBtn = page.getByRole('button', { name: /WCA Goblin/i }).first();
+    await expect(npcTargetBtn).toBeVisible({ timeout: 5_000 });
+    await npcTargetBtn.click();
+
+    // ── Step 9: Assert result shown — hit or miss ───────────────────────
+    await expect(
+      page.locator('text=/¡Impacto!|Fallo/i').first()
+    ).toBeVisible({ timeout: 15_000 });
+
+    // ── Step 10: Assert NPC HP changed correctly ─────────────────────────
+    const resultText = await page.locator('text=/¡Impacto!|Fallo/i').first().textContent().catch(() => '');
+    const wasHit = /impacto/i.test(resultText ?? '');
+
+    const encAfter = await apiCall<{
+      combatants: Array<{ id: string; hpCurrent: number }>;
+    }>('GET', `/api/v1/encounters/${browserEncounterId}`, dmJwt);
+    const npcAfter = encAfter.combatants.find((c) => c.id === browserNpcCombatant.id);
+    expect(npcAfter, 'NPC combatant must still be in encounter after attack').toBeTruthy();
+
+    if (wasHit) {
+      expect(
+        npcAfter!.hpCurrent,
+        'NPC HP must have decreased after a hit (server applied damage — PHB p.194-195)',
+      ).toBeLessThan(NPC_HP);
+    } else {
+      // On a miss: no damage (PHB p.194)
+      expect(npcAfter!.hpCurrent).toBe(NPC_HP);
+    }
+
+    // ── Step 11: Screenshot for visual review (non-fatal) ────────────────
+    await page.screenshot({
+      path: `e2e/.screenshots/weapon-attack-${Date.now()}.png`,
     }).catch(() => {});
   });
 });
