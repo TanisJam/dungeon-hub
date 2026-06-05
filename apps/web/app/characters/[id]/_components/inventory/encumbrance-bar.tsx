@@ -3,10 +3,10 @@
  *
  * REQ-INV-ENCUMBRANCE-DISPLAY (spec #843 — inventory-foundation). Renders a
  * weight/capacity bar with PHB p.176 variant thresholds:
- *   0    – STR×5  → 'ok'        (green)
- *   STR×5  – STR×10 → 'encumbered' (yellow, speed -10)
- *   STR×10 – STR×15 → 'heavily'    (orange, speed -20)
- *   > STR×15           → 'over'       (red, no carry)
+ *   0    – STR×5  → 'ok'        (token: success)
+ *   STR×5  – STR×10 → 'encumbered' (token: warning, speed -10)
+ *   STR×10 – STR×15 → 'heavily'    (token: warning-deep, speed -20)
+ *   > STR×15           → 'over'       (token: danger, no carry)
  *
  * When the rules-variant is OFF the domain only reports 'ok' or 'over';
  * the intermediate thresholds are still rendered so the user has a sense of
@@ -25,17 +25,20 @@ const STATUS_COPY: Record<EncumbranceStatus, string> = {
   over: 'Capacidad máxima superada: no podés cargar más.',
 };
 
+// Design-system tokens (NOT raw Tailwind palette). The PHB 4-tier scale maps to
+// the 3 semantic token families with warning-deep covering the "heavily" tier:
+//   ok → success · encumbered → warning · heavily → warning-deep · over → danger
 const BAR_COLOR: Record<EncumbranceStatus, string> = {
-  ok: 'bg-emerald-500',
-  encumbered: 'bg-amber-400',
-  'heavily-encumbered': 'bg-orange-500',
-  over: 'bg-red-600',
+  ok: 'bg-success',
+  encumbered: 'bg-warning',
+  'heavily-encumbered': 'bg-warning-deep',
+  over: 'bg-danger',
 };
 
 const BANNER_COLOR: Record<Exclude<EncumbranceStatus, 'ok'>, string> = {
-  encumbered: 'border-amber-300 bg-amber-50 text-amber-800',
-  'heavily-encumbered': 'border-orange-300 bg-orange-50 text-orange-800',
-  over: 'border-red-300 bg-red-50 text-red-800',
+  encumbered: 'border-warning-deep/20 bg-warning-soft text-warning-deep',
+  'heavily-encumbered': 'border-warning-deep/40 bg-warning-soft text-warning-deep',
+  over: 'border-danger-soft-border bg-danger-soft text-danger',
 };
 
 export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
