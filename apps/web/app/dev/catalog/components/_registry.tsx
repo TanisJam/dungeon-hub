@@ -117,6 +117,22 @@ import type {
   QuoteNode,
 } from '@/components/compendium/types';
 
+// world/ components (presentational)
+import { SubNav } from '@/components/world/_shell/sub-nav';
+import { EventRowView } from '@/components/world/events/event-row';
+import { EventDetailView } from '@/components/world/events/event-detail';
+import { FactionRowView } from '@/components/world/factions/faction-row';
+import { FactionDetailView } from '@/components/world/factions/faction-detail';
+import { JournalRowView } from '@/components/world/journal/journal-row';
+import { JournalDetailView } from '@/components/world/journal/journal-detail';
+import { HexRowView } from '@/components/world/map/hex-row';
+import { NpcRowView } from '@/components/world/npcs/npc-row';
+import type { EventRow, EventVisibility } from '@/app/cronica/actions';
+import type { JournalRow, JournalVisibility } from '@/app/cronica/actions';
+import type { FactionRow, FactionState } from '@/app/codex/actions';
+import type { NpcRow, NpcStatus } from '@/app/codex/actions';
+import type { HexRow, HexStatus } from '@/app/mapa/actions';
+
 // inicio/ organisms (presentational)
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
@@ -2810,6 +2826,335 @@ const quoteNodeViewEntry: ComponentEntry = {
   },
 };
 
+// ── world/ group ──────────────────────────────────────────────────────────────
+
+const subNavEntry: ComponentEntry = {
+  id: 'world-sub-nav',
+  name: 'SubNav',
+  group: 'world',
+  notes: 'Horizontal pill strip for world sub-routes. Each pill is a Next.js Link, ≥44px tall, fills 375px width. Active pill: bg-ink + text-surface. REQ-FAC-04, REQ-GATE-03.',
+  propsSchema: {
+    activePath: { kind: 'string', default: '/world/npcs', label: 'Current pathname' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { activePath: '/world/npcs' },
+    { activePath: '/world/factions' },
+  ],
+  render: (p) => (
+    <SubNav
+      items={[
+        { label: 'PNJs', href: '/world/npcs' },
+        { label: 'Facciones', href: '/world/factions' },
+        { label: 'Diario', href: '/world/journal' },
+        { label: 'Mapa', href: '/world/map' },
+        { label: 'Eventos', href: '/world/events' },
+      ]}
+      activePath={p.activePath as string}
+    />
+  ),
+};
+
+const _eventRowFixture: EventRow = {
+  id: 'evt-01',
+  worldId: 'world-01',
+  title: 'La Caída del Puente de Vallaki',
+  description: 'El puente principal de Vallaki colapsó durante una tormenta, cortando el acceso al norte.',
+  dmNotes: 'Strahd lo hizo colapsar intencionalmente para aislar al grupo.',
+  occurredAt: '2024-10-15T00:00:00.000Z',
+  sourceSessionId: null,
+  visibility: 'public' as EventVisibility,
+  tags: ['Vallaki', 'infraestructura'],
+  createdAt: '2024-10-16T12:00:00.000Z',
+  updatedAt: '2024-10-16T12:00:00.000Z',
+};
+
+const _eventRowDmOnlyFixture: EventRow = {
+  id: 'evt-02',
+  worldId: 'world-01',
+  title: 'Reunión secreta en el Castillo Ravenloft',
+  description: null,
+  dmNotes: 'Strahd está preparando el ritual de vinculación. Los jugadores no deben saber aún.',
+  occurredAt: '2024-11-01T00:00:00.000Z',
+  sourceSessionId: 'session-07',
+  visibility: 'dm-only' as EventVisibility,
+  tags: ['Ravenloft', 'ritual'],
+  createdAt: '2024-11-02T09:00:00.000Z',
+  updatedAt: '2024-11-02T09:00:00.000Z',
+};
+
+const eventRowViewEntry: ComponentEntry = {
+  id: 'world-event-row',
+  name: 'EventRowView',
+  group: 'world',
+  notes: 'Single world-event list row. Renders title + occurredAt formatted date + visibility Pill (public → primary, dm-only → amber). ≥44px via ListRow. REQ-CRO-02.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _event: _eventRowFixture },
+    { _event: _eventRowDmOnlyFixture },
+  ],
+  render: (p) => <EventRowView row={p._event as EventRow} />,
+};
+
+const eventDetailViewDmEntry: ComponentEntry = {
+  id: 'world-event-detail-dm',
+  name: 'EventDetailView (dm)',
+  group: 'world',
+  notes: 'Event detail — DM view. Shows title, visibility pill, occurredAt, description, tags, dmNotes, and sourceSessionId. REQ-CRO-02, REQ-GATE-01.',
+  propsSchema: {},
+  render: () => (
+    <EventDetailView detail={_eventRowDmOnlyFixture} effectiveView="dm" />
+  ),
+};
+
+const eventDetailViewPlayerEntry: ComponentEntry = {
+  id: 'world-event-detail-player',
+  name: 'EventDetailView (player)',
+  group: 'world',
+  notes: 'Event detail — player view. dm-only events render a "no disponible" fallback. Public events omit dmNotes + sourceSessionId entirely. REQ-CRO-02, REQ-GATE-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'public event — player' },
+    { _label: 'dm-only event — player (fallback)' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const detail = label.includes('dm-only') ? _eventRowDmOnlyFixture : _eventRowFixture;
+    return <EventDetailView detail={detail} effectiveView="player" />;
+  },
+};
+
+const _factionRowFixture: FactionRow = {
+  id: 'fac-01',
+  worldId: 'world-01',
+  name: 'Los Vistani',
+  state: 'active' as FactionState,
+  description: 'Pueblo nómade con lazos misteriosos con Strahd von Zarovich. Controlan las rutas comerciales de Barovia.',
+  dmNotes: 'En realidad sirven a Strahd como espías voluntarios.',
+  createdAt: '2024-09-01T00:00:00.000Z',
+  updatedAt: '2024-10-20T00:00:00.000Z',
+};
+
+const _factionRowDormantFixture: FactionRow = {
+  id: 'fac-02',
+  worldId: 'world-01',
+  name: 'La Orden del Dragón de Plata',
+  state: 'dormant' as FactionState,
+  description: 'Antigua orden paladínica que alguna vez protegió Barovia. Sus miembros restantes se esconden en las montañas.',
+  dmNotes: null,
+  createdAt: '2024-09-05T00:00:00.000Z',
+  updatedAt: '2024-10-10T00:00:00.000Z',
+};
+
+const factionRowViewEntry: ComponentEntry = {
+  id: 'world-faction-row',
+  name: 'FactionRowView',
+  group: 'world',
+  notes: 'Single faction list row. Renders name + state Pill (active → primary, dormant → stone, destroyed → ink, disbanded → amber). ≥44px via ListRow. REQ-FAC-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _faction: _factionRowFixture },
+    { _faction: _factionRowDormantFixture },
+  ],
+  render: (p) => <FactionRowView row={p._faction as FactionRow} />,
+};
+
+const factionDetailViewDmEntry: ComponentEntry = {
+  id: 'world-faction-detail-dm',
+  name: 'FactionDetailView (dm)',
+  group: 'world',
+  notes: 'Faction detail — DM view. Shows name, state pill, description, and dmNotes. REQ-FAC-01, REQ-GATE-01.',
+  propsSchema: {},
+  render: () => (
+    <FactionDetailView detail={_factionRowFixture} effectiveView="dm" />
+  ),
+};
+
+const factionDetailViewPlayerEntry: ComponentEntry = {
+  id: 'world-faction-detail-player',
+  name: 'FactionDetailView (player)',
+  group: 'world',
+  notes: 'Faction detail — player view. dmNotes section is absent from DOM entirely. REQ-FAC-01, REQ-GATE-01.',
+  propsSchema: {},
+  render: () => (
+    <FactionDetailView detail={_factionRowFixture} effectiveView="player" />
+  ),
+};
+
+const _journalRowFixture: JournalRow = {
+  id: 'jrn-01',
+  worldId: 'world-01',
+  title: 'Primera noche en Barovia',
+  body: 'Llegamos al pueblo de Barovia al anochecer. Las calles estaban vacías excepto por una niña llorando en el umbral de una puerta...',
+  visibility: 'public' as JournalVisibility,
+  tags: ['Barovia', 'llegada'],
+  authorUserId: 'user-dm-01',
+  createdAt: '2024-09-10T20:00:00.000Z',
+  updatedAt: '2024-09-10T20:00:00.000Z',
+};
+
+const _journalRowDmOnlyFixture: JournalRow = {
+  id: 'jrn-02',
+  worldId: 'world-01',
+  title: 'Notas del DM — Sesión 3',
+  body: 'El grupo no sabe aún que Ireena es la reencarnación de Tatyana. Strahd los observó desde la niebla durante toda la noche.',
+  visibility: 'dm-only' as JournalVisibility,
+  tags: ['DM', 'secreto', 'Ireena'],
+  authorUserId: 'user-dm-01',
+  createdAt: '2024-09-20T22:00:00.000Z',
+  updatedAt: '2024-09-20T22:00:00.000Z',
+};
+
+const journalRowViewEntry: ComponentEntry = {
+  id: 'world-journal-row',
+  name: 'JournalRowView',
+  group: 'world',
+  notes: 'Single journal entry list row. Renders title + visibility Pill (public → primary, dm-only → amber). ≥44px via ListRow. REQ-CRO-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _entry: _journalRowFixture },
+    { _entry: _journalRowDmOnlyFixture },
+  ],
+  render: (p) => <JournalRowView row={p._entry as JournalRow} />,
+};
+
+const journalDetailViewDmEntry: ComponentEntry = {
+  id: 'world-journal-detail-dm',
+  name: 'JournalDetailView (dm)',
+  group: 'world',
+  notes: 'Journal detail — DM view. Shows title, visibility pill, body (plain text / whitespace-pre-wrap per ADR-3), and tags. REQ-CRO-03, REQ-GATE-01.',
+  propsSchema: {},
+  render: () => (
+    <JournalDetailView detail={_journalRowDmOnlyFixture} effectiveView="dm" />
+  ),
+};
+
+const journalDetailViewPlayerEntry: ComponentEntry = {
+  id: 'world-journal-detail-player',
+  name: 'JournalDetailView (player)',
+  group: 'world',
+  notes: 'Journal detail — player view. dm-only entries render "Nota no disponible" fallback. Public entries render normally. REQ-CRO-03, REQ-GATE-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'public entry — player' },
+    { _label: 'dm-only entry — player (fallback)' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const detail = label.includes('dm-only') ? _journalRowDmOnlyFixture : _journalRowFixture;
+    return <JournalDetailView detail={detail} effectiveView="player" />;
+  },
+};
+
+const _hexRowFixture: HexRow = {
+  id: 'hex-01',
+  worldId: 'world-01',
+  parentHexId: null,
+  scale: 'region',
+  q: 3,
+  r: -2,
+  worldX: 320,
+  worldY: 180,
+  name: 'Bosque de Svalich',
+  terrain: 'forest',
+  status: 'explored' as HexStatus,
+  dmNotes: 'Un lobo fantasmal patrulla estos bosques de noche.',
+  playerNotes: 'Vimos huellas de lobo enormes cerca del río.',
+  createdAt: '2024-09-12T00:00:00.000Z',
+  updatedAt: '2024-10-05T00:00:00.000Z',
+};
+
+const _hexRowUnexploredFixture: HexRow = {
+  id: 'hex-02',
+  worldId: 'world-01',
+  parentHexId: null,
+  scale: 'region',
+  q: 5,
+  r: -1,
+  worldX: null,
+  worldY: null,
+  name: null,
+  terrain: null,
+  status: 'unexplored' as HexStatus,
+  dmNotes: null,
+  playerNotes: null,
+  createdAt: '2024-09-12T00:00:00.000Z',
+  updatedAt: '2024-09-12T00:00:00.000Z',
+};
+
+const hexRowViewEntry: ComponentEntry = {
+  id: 'world-hex-row',
+  name: 'HexRowView',
+  group: 'world',
+  notes: 'Single hex list row. Renders name (or "Hex (q,r)" fallback), terrain subtitle, and status Pill (unexplored→stone, rumored→amber, explored→primary, cleared→success). REQ-MAP-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _hex: _hexRowFixture },
+    { _hex: _hexRowUnexploredFixture },
+  ],
+  render: (p) => <HexRowView row={p._hex as HexRow} />,
+};
+
+const _npcRowFixture: NpcRow = {
+  id: 'npc-01',
+  worldId: 'world-01',
+  name: 'Strahd von Zarovich',
+  race: 'Vampiro',
+  description: 'El Señor Oscuro de Barovia. Un vampiro antiguo de poder incalculable que gobierna desde el Castillo Ravenloft.',
+  dmNotes: 'Strahd está enamorado de Ireena Kolyana. Manipulará al grupo para acercarse a ella.',
+  hexId: 'hex-ravenloft',
+  status: 'alive' as NpcStatus,
+  worldX: 512,
+  worldY: 256,
+  factions: [
+    {
+      id: 'fac-strahd',
+      worldId: 'world-01',
+      name: 'Corte de Ravenloft',
+      state: 'active' as FactionState,
+      description: null,
+    },
+  ],
+  createdAt: '2024-09-01T00:00:00.000Z',
+  updatedAt: '2024-11-01T00:00:00.000Z',
+};
+
+const _npcRowDeadFixture: NpcRow = {
+  id: 'npc-02',
+  worldId: 'world-01',
+  name: 'Kolyan Indirovich',
+  race: 'Humano',
+  description: 'Burgomaestre de Barovia. Murió a causa de la maldición de Strahd que afecta al pueblo.',
+  dmNotes: null,
+  hexId: 'hex-barovia-village',
+  status: 'dead' as NpcStatus,
+  worldX: null,
+  worldY: null,
+  factions: [],
+  createdAt: '2024-09-02T00:00:00.000Z',
+  updatedAt: '2024-09-15T00:00:00.000Z',
+};
+
+const npcRowViewEntry: ComponentEntry = {
+  id: 'world-npc-row',
+  name: 'NpcRowView',
+  group: 'world',
+  notes: 'Single NPC list row. Renders name + status Pill (alive→primary, dead→ink, missing→amber, unknown→stone). ≥44px via ListRow. REQ-NPC-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _npc: _npcRowFixture },
+    { _npc: _npcRowDeadFixture },
+  ],
+  render: (p) => <NpcRowView row={p._npc as NpcRow} />,
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -2910,4 +3255,17 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   imageNodeViewEntry,
   galleryNodeViewEntry,
   quoteNodeViewEntry,
+  // world/
+  subNavEntry,
+  eventRowViewEntry,
+  eventDetailViewDmEntry,
+  eventDetailViewPlayerEntry,
+  factionRowViewEntry,
+  factionDetailViewDmEntry,
+  factionDetailViewPlayerEntry,
+  journalRowViewEntry,
+  journalDetailViewDmEntry,
+  journalDetailViewPlayerEntry,
+  hexRowViewEntry,
+  npcRowViewEntry,
 ];
