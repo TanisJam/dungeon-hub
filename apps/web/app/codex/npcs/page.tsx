@@ -91,11 +91,7 @@ export default async function NpcsPage() {
       callerRole={callerRole}
     >
       <SubNav
-        items={[
-          { label: 'Facciones', href: '/codex/facciones' },
-          { label: 'NPCs', href: '/codex/npcs' },
-          { label: 'Quests', href: '/codex/quests' },
-        ]}
+        items={CODEX_DM_SUBNAV_ITEMS}
         activePath="/codex/npcs"
       />
       <NpcClientWrapper

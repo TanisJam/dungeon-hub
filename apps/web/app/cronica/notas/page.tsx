@@ -92,7 +92,7 @@ export default async function NotasPage({
 
   return (
     <AppShell
-      title="Crónica"
+      title="Bitácora"
       subtitle="NOTAS"
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
