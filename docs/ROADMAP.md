@@ -11,14 +11,15 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 
 | Priority | Arc / Work | 1-line scope | Closes definition.md item |
 |---|---|---|---|
-| 1 | **Campaign invite flow** (gap #782) | Add `POST /campaigns/:id/members` + invite-link UI + atomic dual-write to `worldMembers` + `campaignMembers`. No invite mechanism exists today. | #3.6 DM campaigns |
-| 2 | **JSON export** | Character export endpoint + download UI (start here, highest value). Then config/NPC export. Then full content round-trip (referential integrity is the hard part). Zero export code exists today. | #3.9 Import/export |
-| 3 | **West Marches write-path** (`wm-knowledge-layer`, paused at #1808) | Player contribution to Bitácora: sightings, rumors, waypoints, session recaps. Sealing/debunking by DM. Bitácora→codex link. `NovedadesFeed` backend hookup. | #3.10 WM knowledge |
-| 4 | **Custom content via JSON upload** (DEC-1, locked 2026-06-04) | DM-accessible import surface: upload a JSON pack, enable per-world via `rulesProfile`. Reuses existing `compendium-import` pipeline. Visual authoring is post-MVP. | #3.8 Custom content |
-| 5 | **Quests** | DB table + API CRUD + wire existing `QuestsSinTocarList` UI shell. Currently zero backend. | #3.7 World content |
-| 6 | **Feats + Conditions codex browser** | Add entries to `CATEGORY_CONFIG` (`apps/web/app/compendium/[category]/_config/registry.ts`) and cards to `V3_COMPENDIUM_CATS`. API+DB already done. Low effort. | #3.3 Codex coverage |
-| 7 | **Codex cross-category search + item type filter** | Landing-page search across all categories; items `?type=` filter in browser UI (API param already exists). | #3.4 Codex nav/search |
-| 8 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
+| 1 | **JSON export** | Character export endpoint + download UI (start here, highest value). Then config/NPC export. Then full content round-trip (referential integrity is the hard part). Zero export code exists today. | #3.9 Import/export |
+| 2 | **West Marches write-path** (`wm-knowledge-layer`, paused at #1808) | Player contribution to Bitácora: sightings, rumors, waypoints, session recaps. Sealing/debunking by DM. Bitácora→codex link. `NovedadesFeed` backend hookup. | #3.10 WM knowledge |
+| 3 | **Custom content via JSON upload** (DEC-1, locked 2026-06-04) | DM-accessible import surface: upload a JSON pack, enable per-world via `rulesProfile`. Reuses existing `compendium-import` pipeline. Visual authoring is post-MVP. | #3.8 Custom content |
+| 4 | **Quests** | DB table + API CRUD + wire existing `QuestsSinTocarList` UI shell. Currently zero backend. | #3.7 World content |
+| 5 | **Feats + Conditions codex browser** | Add entries to `CATEGORY_CONFIG` (`apps/web/app/compendium/[category]/_config/registry.ts`) and cards to `V3_COMPENDIUM_CATS`. API+DB already done. Low effort. | #3.3 Codex coverage |
+| 6 | **Codex cross-category search + item type filter** | Landing-page search across all categories; items `?type=` filter in browser UI (API param already exists). | #3.4 Codex nav/search |
+| 7 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
+
+> ✅ **Campaign invite flow** (gap #782, was P1) — SHIPPED 2026-06-05 via SDD `campaign-invite-flow` (engram archive #1877). Invite-link mechanism (`campaign_invite_tokens` + `POST /campaigns/:id/invite` + `/invites/status|confirm` + `/invite/[token]` accept screen, atomic `worldMembers`+`campaignMembers` dual-write). Closes #3.6 DM campaigns.
 
 ---
 
