@@ -1,4 +1,5 @@
 import type { AbilityKey } from '@/lib/sheet-types';
+import { StatCell } from '@/components/ui/stat-cell';
 
 export interface AbilityScoreEntry {
   score: number;
@@ -31,18 +32,13 @@ export function AbilityScoreGrid({ scores }: AbilityScoreGridProps) {
         const entry = scores[key];
         if (!entry) return null;
         return (
-          <div
+          <StatCell
             key={key}
-            className="flex flex-col items-center rounded-md bg-paper-soft p-2.5 text-center"
-          >
-            <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
-              {ABILITY_ES[key]}
-            </span>
-            <span className="font-display text-2xl font-bold text-ink leading-tight">
-              {entry.score}
-            </span>
-            <span className="text-xs text-ink-soft">{fmtMod(entry.modifier)}</span>
-          </div>
+            surface="paper"
+            label={ABILITY_ES[key]}
+            value={entry.score}
+            sub={fmtMod(entry.modifier)}
+          />
         );
       })}
     </div>

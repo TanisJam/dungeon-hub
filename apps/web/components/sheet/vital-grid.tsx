@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { StatCell } from '@/components/ui/stat-cell';
 
 interface VitalGridProps {
   hp: { current: number | null; max: number | null; temp?: number };
@@ -42,63 +43,55 @@ export function VitalGrid({
       ? Math.min(100, Math.round((effectiveCurrent / hp.max) * 100))
       : 0;
 
+  const hpBar =
+    hp.max !== null && hp.max > 0 ? (
+      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-accent/20">
+        <div
+          className="h-full rounded-full bg-accent"
+          style={{ width: `${hpFill}%` }}
+        />
+      </div>
+    ) : null;
+
+  const hpTempEl =
+    hp.temp !== undefined && hp.temp > 0 ? (
+      <span className="text-[10px] font-bold text-amber-400 leading-tight" data-testid="hp-temp">
+        +{hp.temp} temporal
+      </span>
+    ) : null;
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {/* HP — peach gradient (ficha-vital-hp replaces inline style) */}
-      <div className="ficha-vital-hp flex flex-col items-center rounded-md px-3 py-4 text-center relative">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
-          Puntos de Golpe
-        </span>
-        <span className="font-display text-lg font-bold text-ink leading-tight mt-0.5">
-          {hpDisplay}
-        </span>
-        {hp.temp !== undefined && hp.temp > 0 && (
-          <span className="text-[10px] font-bold text-amber-400 leading-tight" data-testid="hp-temp">
-            +{hp.temp} temporal
-          </span>
-        )}
-        {hp.max !== null && hp.max > 0 && (
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-accent/20">
-            <div
-              className="h-full rounded-full bg-accent"
-              style={{ width: `${hpFill}%` }}
-            />
-          </div>
-        )}
-        {/* HP editor slot — injected by parent (DmAwareAffordances for character sheet).
-            Uses absolute positioning inside this relative container. */}
-        {hpEditorSlot}
-      </div>
+      <StatCell
+        label="Puntos de Golpe"
+        value={hpDisplay}
+        size="compact"
+        accent="peach"
+        footer={
+          <>
+            {hpTempEl}
+            {hpBar}
+            {hpEditorSlot}
+          </>
+        }
+      />
 
       {/* AC — ficha-vital-ac adds cyan glow ring */}
-      <div className="ficha-vital-ac flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
-          Clase Armadura
-        </span>
-        <span className="font-display text-2xl font-bold text-ink leading-tight mt-0.5">
-          {dash(ac)}
-        </span>
-        {armorFormula && (
-          <span className="mt-1 text-[9px] text-ink-mute leading-tight break-words w-full">
-            {armorFormula}
-          </span>
-        )}
-      </div>
+      <StatCell
+        label="Clase Armadura"
+        value={dash(ac)}
+        accent="teal"
+        sub={armorFormula}
+      />
 
       {/* Initiative — ficha-vital-init adds copper glow ring */}
-      <div className="ficha-vital-init flex flex-col items-center rounded-md bg-surface border border-line px-3 py-4 text-center">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
-          Iniciativa
-        </span>
-        <span className="font-display text-2xl font-bold text-ink leading-tight mt-0.5">
-          {formatInitiative(initiative)}
-        </span>
-        {walkSpeed !== undefined && (
-          <span className="mt-1 text-[9px] text-ink-mute leading-tight">
-            {walkSpeed} ft vel.
-          </span>
-        )}
-      </div>
+      <StatCell
+        label="Iniciativa"
+        value={formatInitiative(initiative)}
+        accent="magenta"
+        sub={walkSpeed !== undefined ? `${walkSpeed} ft vel.` : undefined}
+      />
     </div>
   );
 }
