@@ -3,12 +3,13 @@
  *
  * WT-DPPM-A-03: callerRole='player' → RoleSwitcher NOT rendered.
  * WT-DPPM-A-04: callerRole absent/undefined → canBeDM defaults false → toggle NOT rendered.
+ *   ADR-C2 (Slice C): canBeDMProp default is now FALSE (flipped from true). When callerRole
+ *   is undefined AND canBeDM is omitted, the pill is hidden by default (safe default-deny).
  * WT-DPPM-A-05: callerRole='gm' → RoleSwitcher IS rendered (regression guard).
  *
- * ADR-A5: gate at call site (pass callerRole), do NOT flip AppShell canBeDMProp default.
- * The default of canBeDMProp=true remains UNCHANGED for un-migrated pages (Slice C handles the audit).
- *
- * SDD: dm-player-play-model Slice A, REQ-DPPM-A-RS-01..03, SC-RS-01..03.
+ * ADR-A5 / ADR-C2: default flipped to false in Slice C (REQ-DPPMC-SHELL-02).
+ * SDD: dm-player-play-model Slice A (REQ-DPPM-A-RS-01..03, SC-RS-01..03) +
+ *      Slice C (WT-DPPMC-C2, REQ-DPPMC-SHELL-02).
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -45,10 +46,8 @@ describe('AppShell callerRole → RoleSwitcher gating (ADR-A5)', () => {
   });
 
   // WT-DPPM-A-04: callerRole absent/undefined → canBeDM defaults false (REQ-DPPM-A-RS-02)
-  // Note: when callerRole is undefined the ADR-5 derivation falls back to canBeDMProp which defaults true.
-  // This test documents the CORRECT behavior after the two core-flow pages pass callerRole.
-  // The AppShell itself DOES NOT change its default — the fix is that the pages now pass callerRole.
-  // So this test asserts that passing callerRole=null gates correctly.
+  // ADR-C2 (Slice C): canBeDMProp default is now FALSE. Passing callerRole=null or omitting
+  // both callerRole and canBeDM results in no pill (safe default-deny).
   it('WT-DPPM-A-04: callerRole=null → RoleSwitcher NOT rendered', () => {
     render(
       <AppShell title="Campaña" callerRole={null}>
@@ -96,5 +95,16 @@ describe('AppShell callerRole → RoleSwitcher gating (ADR-A5)', () => {
       </AppShell>,
     );
     expect(screen.getByTestId('role-switcher')).toBeTruthy();
+  });
+
+  // WT-DPPMC-C2 (Slice C — ADR-C2 lock): <AppShell> with NO callerRole and NO canBeDM
+  // must NOT render RoleSwitcher. This test locks the default-deny flip (REQ-DPPMC-SHELL-02).
+  it('WT-DPPMC-C2: no callerRole, no canBeDM → RoleSwitcher NOT rendered (default-deny)', () => {
+    render(
+      <AppShell title="Página sin mundo">
+        <div>content</div>
+      </AppShell>,
+    );
+    expect(screen.queryByTestId('role-switcher')).toBeNull();
   });
 });

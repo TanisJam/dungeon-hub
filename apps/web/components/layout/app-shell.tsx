@@ -11,7 +11,7 @@ type AppShellProps = {
   rightAction?: ReactNode;
   /** @deprecated v3 tabs are declarative; constructor is reachable via Personajes. Accepted for backwards compat. */
   constructorHref?: string;
-  /** Show the role switcher pill in the topbar. Defaults true. */
+  /** Show the role switcher pill in the topbar. Defaults false (ADR-C2, default-deny). */
   canBeDM?: boolean;
   /** Render the unread dot on the notif bell. Defaults false. */
   hasNotif?: boolean;
@@ -40,7 +40,7 @@ type AppShellProps = {
   /**
    * Caller's role in the active world ('gm' | 'player' | null).
    * When provided, auto-derives canBeDM = callerRole === 'gm' (ADR-5).
-   * Falls back to the explicit canBeDM prop (or its default true) for un-migrated pages.
+   * Falls back to the explicit canBeDM prop (or its default false) for un-migrated pages (ADR-C2).
    */
   callerRole?: CallerRole;
   children: ReactNode;
@@ -58,7 +58,7 @@ export function AppShell({
   title,
   subtitle,
   rightAction,
-  canBeDM: canBeDMProp = true,
+  canBeDM: canBeDMProp = false,
   hasNotif = false,
   showTabBar = true,
   backHref,
@@ -67,8 +67,8 @@ export function AppShell({
   callerRole,
   children,
 }: AppShellProps) {
-  // ADR-5: auto-derive canBeDM from callerRole when world context is present.
-  // Falls back to canBeDMProp (default true) for un-migrated/account-level pages.
+  // ADR-5 / ADR-C2: auto-derive canBeDM from callerRole when world context is present.
+  // Falls back to canBeDMProp (now default false — Slice C default-deny) for un-migrated/account-level pages.
   const canBeDM = callerRole !== undefined ? callerRole === 'gm' : canBeDMProp;
 
   return (
