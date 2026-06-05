@@ -105,6 +105,21 @@ import { TableNodeView } from '@/components/compendium/nodes/table';
 import { InsetNodeView, InsetReadaloudNodeView } from '@/components/compendium/nodes/inset';
 import { ImageNodeView, GalleryNodeView } from '@/components/compendium/nodes/image';
 import { QuoteNodeView } from '@/components/compendium/nodes/quote';
+// inicio/ interactive islands (batch 7) — DM pending-fichas approval flow.
+// All wrap the REAL production components with injected stub actions so the
+// catalog never fires the real approve/reject server actions.
+import { PendingFichasCardIsland } from './_islands/pending-fichas-card-island';
+import { PendingFichasCardTriggerIsland } from './_islands/pending-fichas-card-trigger-island';
+import { PendientesActionButtonsIsland } from './_islands/pendientes-action-buttons-island';
+import { PendientesFichaCardIsland } from './_islands/pendientes-ficha-card-island';
+import { PendientesSheetContentIsland } from './_islands/pendientes-sheet-content-island';
+
+// personajes/ interactive islands (batch 7)
+import { SetActiveCharacterButtonIsland } from './_islands/set-active-character-button-island';
+import { StatusFilterChipsIsland } from './_islands/status-filter-chips-island';
+import { PersonajeCardIsland } from './_islands/personaje-card-island';
+import { SubclassPickerIsland, SubclassPickerEmptyIsland } from './_islands/subclass-picker-island';
+
 // compendium/ term-hover system + domain content islands (client)
 import { DomainContentIsland } from './_islands/domain-content-island';
 import { TermHoverIsland } from './_islands/term-hover-island';
@@ -143,8 +158,6 @@ import { NovedadesFeed } from '@/components/inicio/novedades-feed';
 import { QuickActions } from '@/components/inicio/quick-actions';
 import { DMNextSessionCard } from '@/components/inicio/dm/dm-next-session-card';
 import { DMQuickActions } from '@/components/inicio/dm/dm-quick-actions';
-import { PendientesFichaCard } from '@/components/inicio/dm/pendientes-ficha-card';
-import { PendientesSheetContent } from '@/components/inicio/dm/pendientes-sheet-content';
 import { QuestsSinTocarList } from '@/components/inicio/dm/quests-sin-tocar-list';
 import type {
   ActiveCharacter,
@@ -2424,7 +2437,7 @@ const pendientesFichaCardEntry: ComponentEntry = {
   id: 'pendientes-ficha-card',
   name: 'PendientesFichaCard',
   group: 'inicio',
-  notes: 'DM ficha-approval card. Portrait, PJ name, lineage, player pill, sent-date pill. Renders PendientesActionButtons (client child — approve/reject actions no-op in catalog). fresh=true → accent border highlight. Props: ficha.',
+  notes: 'DM ficha-approval card. Portrait, PJ name, lineage, player pill, sent-date pill. Renders the real PendientesActionButtons via an island that injects stub actions — approve/reject do NOT fire the real server actions in the catalog. fresh=true → accent border highlight. Props: ficha.',
   propsSchema: {},
   matrixMode: 'list',
   explicitCombos: [
@@ -2435,8 +2448,8 @@ const pendientesFichaCardEntry: ComponentEntry = {
     const label = (p._label as string) ?? '';
     const ficha = _fixturePendingFichas.find((f) =>
       label.includes('Korrak') ? f.id === 'ficha-korrak' : f.id === 'ficha-lyra',
-    ) ?? _fixturePendingFichas[0];
-    return <PendientesFichaCard ficha={ficha} />;
+    ) ?? _fixturePendingFichas[0]!;
+    return <PendientesFichaCardIsland ficha={ficha} />;
   },
 };
 
@@ -2444,7 +2457,7 @@ const pendientesSheetContentEntry: ComponentEntry = {
   id: 'pendientes-sheet-content',
   name: 'PendientesSheetContent',
   group: 'inicio',
-  notes: 'DM bottom-sheet body — lists pending fichas (via PendientesFichaCard) and quests sin tocar (via QuestRow). Props: fichas, quests.',
+  notes: 'DM bottom-sheet body — lists pending fichas (via PendientesFichaCard) and quests sin tocar (via QuestRow). Rendered via an island that injects stub actions — embedded approve/reject do NOT fire the real server actions in the catalog. Props: fichas, quests.',
   propsSchema: {},
   matrixMode: 'list',
   explicitCombos: [
@@ -2454,9 +2467,9 @@ const pendientesSheetContentEntry: ComponentEntry = {
   render: (p) => {
     const label = (p._label as string) ?? '';
     if (label.includes('Empty')) {
-      return <PendientesSheetContent fichas={[]} quests={[]} />;
+      return <PendientesSheetContentIsland fichas={[]} quests={[]} />;
     }
-    return <PendientesSheetContent fichas={_fixturePendingFichas} quests={_fixtureQuests} />;
+    return <PendientesSheetContentIsland fichas={_fixturePendingFichas} quests={_fixtureQuests} />;
   },
 };
 
@@ -2477,6 +2490,117 @@ const questsSinTocarListEntry: ComponentEntry = {
       return <QuestsSinTocarList quests={[]} />;
     }
     return <QuestsSinTocarList quests={_fixtureQuests} />;
+  },
+};
+
+// ── inicio/ batch 7 additions ─────────────────────────────────────────────────
+
+const pendingFichasCardEntry: ComponentEntry = {
+  id: 'pending-fichas-card',
+  name: 'PendingFichasCard',
+  group: 'inicio',
+  notes: 'DM hero card showing pending character approvals. Displays avatar stack (portraitInitial letters), count headline, oldestAge sub-line, and a "Revisar" CTA pill. Rendered as <button> — onClick is supplied by PendingFichasCardTrigger. INTERACTIVE — click stub no-ops in this entry; see PendingFichasCardTrigger for the full trigger+sheet flow.',
+  propsSchema: {},
+  render: () => <PendingFichasCardIsland />,
+};
+
+const pendingFichasCardTriggerEntry: ComponentEntry = {
+  id: 'pending-fichas-card-trigger',
+  name: 'PendingFichasCardTrigger',
+  group: 'inicio',
+  notes: 'Client island that wraps PendingFichasCard + V3Sheet (PendientesSheetContent). Tap the card to open the sheet; × or backdrop tap to close. Sheet body lists pending fichas (PendientesFichaCard) and quests (QuestRow). Approve/reject buttons are stubbed — no server action, no router. INTERACTIVE — full open/close flow in catalog.',
+  propsSchema: {},
+  render: () => <PendingFichasCardTriggerIsland />,
+};
+
+const pendientesActionButtonsEntry: ComponentEntry = {
+  id: 'pendientes-action-buttons',
+  name: 'PendientesActionButtons',
+  group: 'inicio',
+  notes: 'DM approve/reject/view row for a pending ficha. Buttons: "Aprobar" (magenta), "Ver ficha" (link), "Devolver" (muted). The real component now accepts injectable `actions` (PendientesActions, default = the real server actions); the catalog island injects stubs (~400ms latency + confirmation label) so no real server action fires. INTERACTIVE — client island wrapping the real component.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'ficha-lyra' },
+    { _label: 'ficha-korrak' },
+  ],
+  render: (p) => (
+    <PendientesActionButtonsIsland fichaId={(p._label as string) ?? 'ficha-lyra'} />
+  ),
+};
+
+// ── personajes/ group ─────────────────────────────────────────────────────────
+
+const setActiveCharacterButtonEntry: ComponentEntry = {
+  id: 'set-active-character-button',
+  name: 'SetActiveCharacterButton',
+  group: 'personajes',
+  notes: 'Star button (☆/★) that sets the active character lens. ≥44×44px touch target. active=true → filled ★ + text-accent. Production calls setActiveCharacter server action + router.refresh(); catalog toggles local state only — no network, no router. INTERACTIVE — client island with stubbed server action.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'inactive (☆ unfilled)' },
+    { _label: 'active (★ filled)' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    return <SetActiveCharacterButtonIsland initialIsActive={label.includes('active (★')} />;
+  },
+};
+
+const statusFilterChipsEntry: ComponentEntry = {
+  id: 'status-filter-chips',
+  name: 'StatusFilterChips',
+  group: 'personajes',
+  notes: 'Horizontal scrollable filter strip for the personajes roster. Chips: Activos, Pendientes, Retirados, Borradores, Todos. Active chip gets personajes-chip-on style. Production uses useSearchParams + Next.js Links; catalog uses local useState + <button> to avoid URL dependency. INTERACTIVE — tap chip to activate.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'active chip selected' },
+    { _label: 'pending chip selected' },
+    { _label: 'all chip selected' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const initial = label.includes('pending') ? 'pending' : label.includes('all') ? 'all' : 'active';
+    return <StatusFilterChipsIsland initialActive={initial as 'active' | 'pending' | 'all'} />;
+  },
+};
+
+const personajeCardEntry: ComponentEntry = {
+  id: 'personaje-card',
+  name: 'PersonajeCard',
+  group: 'personajes',
+  notes: 'Roster character card. CharacterCard + portrait + name/lineage + status Pill + HP Pill (active chars only) + "Jugando" Pill when highlighted. active status rows include a SetActiveCharacterButton star toggle (stubbed in catalog). Production SetActiveCharacterButton calls server action + router.refresh(); catalog uses local toggle. INTERACTIVE — client island; tap star to toggle active state.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'active — star toggle + HP pill + Jugando' },
+    { _label: 'pending_approval — no star, no HP' },
+    { _label: 'draft — links to wizard' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const variant = label.includes('pending') ? 'pending' : label.includes('draft') ? 'draft' : 'active';
+    return <PersonajeCardIsland variant={variant as 'active' | 'pending' | 'draft'} />;
+  },
+};
+
+const subclassPickerEntry: ComponentEntry = {
+  id: 'subclass-picker',
+  name: 'SubclassPicker',
+  group: 'personajes',
+  notes: 'Shared subclass radio-card picker used in wizard class step and level-up flow. ≥80px card height (mobile-first, REQ-CLU-SUB-UI-MOBILE). Selected card: border-accent + bg-accent-soft. Empty options branch renders warning fallback. Fixture: PHB Wizard Arcane Traditions (PHB p.112). INTERACTIVE — tap a card to select/deselect.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Populated — 4 Wizard subclasses' },
+    { _label: 'Empty — warning fallback' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Empty')) return <SubclassPickerEmptyIsland />;
+    return <SubclassPickerIsland />;
   },
 };
 
@@ -3267,6 +3391,14 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   pendientesFichaCardEntry,
   pendientesSheetContentEntry,
   questsSinTocarListEntry,
+  pendingFichasCardEntry,
+  pendingFichasCardTriggerEntry,
+  pendientesActionButtonsEntry,
+  // personajes/
+  setActiveCharacterButtonEntry,
+  statusFilterChipsEntry,
+  personajeCardEntry,
+  subclassPickerEntry,
   // compendium/
   compendiumEntriesEntry,
   entryNodeRendererEntry,
