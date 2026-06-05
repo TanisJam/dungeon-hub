@@ -23,4 +23,5 @@ export type CampaignMember = {
 export type CampaignDetail = CampaignSummary & {
   tagline?: string | null;
   members: CampaignMember[];
+  callerRole: CampaignMemberRole;
 };
