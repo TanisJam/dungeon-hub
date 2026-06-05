@@ -4,12 +4,14 @@ import { api, ApiError } from '@/lib/api';
 import { Card } from '@/components/ui';
 import { SignInButton } from '@/app/_components/sign-in-button';
 import { ConfirmInviteButton } from './_confirm-button';
+import { AlreadyMemberCard } from './_already-member-card';
 
 type InviteStatus = {
   campaignName: string;
   worldName: string;
   campaignId: string;
   alreadyMember: boolean;
+  worldRole: 'gm' | 'player' | null;
 };
 
 type Props = { params: Promise<{ token: string }> };
@@ -45,17 +47,12 @@ export default async function InviteTokenPage({ params }: Props) {
   if (status.alreadyMember) {
     return (
       <Shell title="Ya sos parte de esta campaña">
-        <p className="text-ink-soft">
-          Ya sos miembro de <strong>{status.campaignName}</strong> ({status.worldName}).
-        </p>
-        <div className="mt-6">
-          <Link
-            href={`/campanas/${status.campaignId}`}
-            className="inline-flex items-center justify-center w-full min-h-[44px] rounded-[12px] border bg-gradient-to-br from-primary to-primary-deep px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(111,134,201,0.35),0_1px_2px_rgba(39,30,51,0.08)] transition-all hover:brightness-105 border-transparent"
-          >
-            Ir a la campaña
-          </Link>
-        </div>
+        <AlreadyMemberCard
+          worldRole={status.worldRole}
+          campaignId={status.campaignId}
+          campaignName={status.campaignName}
+          worldName={status.worldName}
+        />
       </Shell>
     );
   }

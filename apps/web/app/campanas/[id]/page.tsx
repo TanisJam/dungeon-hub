@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getActiveWorld } from '@/lib/active-world';
 import { AppShell } from '@/components/layout/app-shell';
 import { CampanaDetailView, type CampanaSessionRow } from '@/components/campanas/campana-detail-view';
 import type { CampaignDetail } from '@/components/campanas/types';
@@ -29,12 +30,21 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
     throw err;
   }
 
-  const sessionsResult = await api
-    .get<{ data: CampanaSessionRow[] }>(`/sessions?campaignId=${id}`, token)
-    .catch(() => ({ data: [] as CampanaSessionRow[] }));
+  // Parallelize sessions fetch + active world resolution (ADR-A5: gate at call site).
+  const [sessionsResult, activeWorld] = await Promise.all([
+    api
+      .get<{ data: CampanaSessionRow[] }>(`/sessions?campaignId=${id}`, token)
+      .catch(() => ({ data: [] as CampanaSessionRow[] })),
+    getActiveWorld(token),
+  ]);
 
   return (
-    <AppShell title={detail.name} subtitle="CAMPAÑA" backHref="/campanas">
+    <AppShell
+      title={detail.name}
+      subtitle="CAMPAÑA"
+      backHref="/campanas"
+      callerRole={activeWorld?.callerRole ?? undefined}
+    >
       <CampanaDetailView detail={detail} sessions={sessionsResult.data} />
     </AppShell>
   );

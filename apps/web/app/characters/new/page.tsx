@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getMyWorlds } from '@/lib/api';
+import { getActiveWorld } from '@/lib/active-world';
 import { AppShell } from '@/components/layout/app-shell';
 import { Card } from '@/components/ui';
 import { NewCharacterForm } from './_form';
@@ -11,7 +12,12 @@ export default async function NewCharacterPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/');
   const { data: { session } } = await supabase.auth.getSession();
-  const worlds = await getMyWorlds(session!.access_token);
+
+  // Parallelize worlds fetch + active world resolution (ADR-A5: gate at call site).
+  const [worlds, activeWorld] = await Promise.all([
+    getMyWorlds(session!.access_token),
+    getActiveWorld(session!.access_token),
+  ]);
 
   const exitLink = (
     <Link
@@ -28,6 +34,7 @@ export default async function NewCharacterPage() {
       subtitle="NUEVO PERSONAJE"
       rightAction={exitLink}
       constructorHref="/characters/new"
+      callerRole={activeWorld?.callerRole ?? undefined}
     >
       <p className="text-sm text-ink-mute">
         Elegí un mundo y un nombre. Después configuramos atributos, linaje, clase y trasfondo.
