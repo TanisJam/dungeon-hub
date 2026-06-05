@@ -10,6 +10,7 @@
 
 import { activateRage, deactivateRage } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { Toast } from '@/components/ui/toast';
 import { useToast } from '@/lib/use-toast';
 import { useEncounterAction } from './use-encounter-action';
@@ -79,9 +80,7 @@ export function RageControls({
       {/* VERSION_CONFLICT toast */}
       <Toast message={toast} />
 
-      {actionError && (
-        <p className="text-xs text-red-600" role="alert">{actionError}</p>
-      )}
+      <FormErrorAlert message={actionError} />
 
       {/* Counter — PHB p.48 Rage uses; "Ilimitado" when L20 (sentinel 999) */}
       <p className="text-sm text-ink-soft">

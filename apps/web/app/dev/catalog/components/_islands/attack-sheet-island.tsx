@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 
 type Step = 'weapon' | 'target' | 'result';
 
@@ -103,9 +104,7 @@ export function AttackSheetIsland({ isOwnTurn = true, actionUsed = false }: Prop
       </Button>
 
       <V3Sheet open={open} onClose={handleClose} title="Atacar">
-        {attackError && (
-          <p className="text-xs text-red-600 mb-3" role="alert">{attackError}</p>
-        )}
+        <FormErrorAlert message={attackError} className="mb-3" />
 
         {step === 'weapon' && (
           <div className="flex flex-col gap-2">

@@ -9,6 +9,7 @@
 
 import { passTurn } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { useEncounterAction } from './use-encounter-action';
 
 type Props = {
@@ -31,9 +32,7 @@ export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }:
 
   return (
     <div className="flex flex-col gap-2">
-      {actionError && (
-        <p className="text-xs text-red-600" role="alert">{actionError}</p>
-      )}
+      <FormErrorAlert message={actionError} />
 
       {/* Full-width ≥44px button (mobile-first 375px — CLAUDE.md §2) */}
       <Button

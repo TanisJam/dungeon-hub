@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { attackApplyAction } from '@/app/encuentros/[id]/actions';
 import { useEncounterAction } from './use-encounter-action';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
@@ -151,9 +152,7 @@ export function AttackSheet({
 
       <V3Sheet open={open} onClose={handleClose} title="Atacar">
         {/* ── Error banner (persists across steps) ─────────────────────────── */}
-        {attackError && (
-          <p className="text-xs text-red-600 mb-3" role="alert">{attackError}</p>
-        )}
+        <FormErrorAlert message={attackError} className="mb-3" />
 
         {/* ── Step 1: weapon pick ──────────────────────────────────────────── */}
         {step === 'weapon' && (
