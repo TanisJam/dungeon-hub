@@ -377,4 +377,32 @@ describe('characters CRUD', () => {
     expect(body.sheet.armorClass.value).toBe(10);
     expect(body.sheet.identity.totalLevel).toBe(0);
   });
+
+  // REQ-DPPM-A-WZ-01..04 (SDD dm-player-play-model, Slice A):
+  // A world-GM must be able to create a character in their own world.
+  // POST /characters gates on world membership, NOT on role — regression lock.
+  it('world-GM can create a character in their own world (ADR-A6 regression lock)', async () => {
+    const app = await getTestApp();
+    const { createWorldWithGm } = await import('../helpers/create-world-with-gm.js');
+    const { createTestUser: createUser, deleteTestUser: deleteUser } = await import('../helpers/test-user.js');
+
+    const gmUser = await createUser();
+    const { worldId: gmWorldId } = await createWorldWithGm(gmUser.id, { name: 'GM Character World' });
+
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gmUser.accessToken}` },
+        payload: { worldId: gmWorldId, name: 'GM Character' },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const c = res.json() as { worldId: string; userId: string };
+      expect(c.worldId).toBe(gmWorldId);
+      expect(c.userId).toBe(gmUser.id);
+    } finally {
+      await deleteUser(gmUser.id);
+    }
+  });
 });

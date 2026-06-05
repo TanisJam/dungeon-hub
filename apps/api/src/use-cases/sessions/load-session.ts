@@ -38,16 +38,24 @@ export async function loadSession(id: string): Promise<LoadedSession | null> {
 }
 
 /**
+ * Resolves the worldId that owns a campaign.
+ * Returns null if the campaign no longer exists.
+ */
+export async function loadCampaignWorldId(campaignId: string): Promise<string | null> {
+  const rows = await db
+    .select({ worldId: campaigns.worldId })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+  return rows[0]?.worldId ?? null;
+}
+
+/**
  * Resolves the worldId for a session by loading its campaign.
  * Returns null if the campaign no longer exists.
  */
 export async function loadSessionWorldId(session: LoadedSession): Promise<string | null> {
-  const rows = await db
-    .select({ worldId: campaigns.worldId })
-    .from(campaigns)
-    .where(eq(campaigns.id, session.campaignId))
-    .limit(1);
-  return rows[0]?.worldId ?? null;
+  return loadCampaignWorldId(session.campaignId);
 }
 
 export type SessionAccess = 'gm' | 'participant' | 'campaign-member' | 'none';

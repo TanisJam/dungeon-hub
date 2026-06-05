@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { campaignInviteTokens, campaignMembers, campaigns, worlds } from '../../infra/db/schema.js';
+import { campaignInviteTokens, campaignMembers, campaigns, worldMembers, worlds } from '../../infra/db/schema.js';
 import { evaluateInviteToken } from '../../use-cases/campaigns/evaluate-invite-token.js';
 import { acceptCampaignInvite } from '../../use-cases/campaigns/accept-campaign-invite.js';
 
@@ -42,6 +42,7 @@ export const invitesRoute: FastifyPluginAsync = async (app) => {
         .select({
           token: campaignInviteTokens.token,
           campaignId: campaignInviteTokens.campaignId,
+          worldId: campaignInviteTokens.worldId,
           expiresAt: campaignInviteTokens.expiresAt,
           revokedAt: campaignInviteTokens.revokedAt,
           maxUses: campaignInviteTokens.maxUses,
@@ -81,12 +82,22 @@ export const invitesRoute: FastifyPluginAsync = async (app) => {
 
       const alreadyMember = memberRows.length > 0;
 
+      // Resolve caller's world-level role so the invite page can branch on GM vs player.
+      // ADR-A4: natural to do here since worldId is already in scope from the join.
+      const wmRows = await db
+        .select({ role: worldMembers.role })
+        .from(worldMembers)
+        .where(and(eq(worldMembers.worldId, row.worldId), eq(worldMembers.userId, userId)))
+        .limit(1);
+      const worldRole: 'gm' | 'player' | null = wmRows[0]?.role ?? null;
+
       // NEVER echo the raw token in the response.
       return {
         campaignName: row.campaignName,
         worldName: row.worldName,
         campaignId: row.campaignId,
         alreadyMember,
+        worldRole,
       };
     },
   );

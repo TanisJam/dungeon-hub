@@ -19,6 +19,7 @@ import {
   findCharacterActiveSession,
   getSessionAccess,
   listSessionParticipants,
+  loadCampaignWorldId,
   loadCharacterForSession,
   loadSession,
   loadSessionWorldId,
@@ -142,10 +143,25 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
         ),
       )
       .limit(1);
-    if (member.length === 0) {
-      return reply.code(403).send({ error: 'FORBIDDEN', message: 'No sos miembro de la campaña' });
+
+    const isCampaignGm = member.length > 0 && member[0]!.role === 'gm';
+
+    let allowed = isCampaignGm;
+    if (!allowed) {
+      // OR-accept a world-GM of THIS campaign's world (multi-DM, ADR-A1).
+      // Scoped by loadCampaignWorldId so a GM of a different world is denied (INV-5).
+      const worldId = await loadCampaignWorldId(body.campaignId);
+      if (worldId) {
+        const gm = await assertWorldGm(worldId, userId);
+        allowed = gm.ok;
+      }
     }
-    if (member[0]!.role !== 'gm') {
+
+    if (!allowed) {
+      // Distinguish: known campaign member but not a GM vs total outsider.
+      if (member.length === 0) {
+        return reply.code(403).send({ error: 'FORBIDDEN', message: 'No sos miembro de la campaña' });
+      }
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo un GM puede crear sesiones' });
     }
 
@@ -195,10 +211,22 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
         ),
       )
       .limit(1);
-    if (member.length === 0) {
+
+    const campaignRole = member.length > 0 ? member[0]!.role : null;
+
+    // World-GM of this campaign's world gets GM-level listing even without a campaign_members row.
+    // Scoped by loadCampaignWorldId to prevent cross-world privilege (INV-5, INV-7).
+    let isWorldGm = false;
+    if (campaignRole !== 'gm') {
+      const worldId = await loadCampaignWorldId(query.campaignId);
+      if (worldId) isWorldGm = (await assertWorldGm(worldId, userId)).ok;
+    }
+
+    if (member.length === 0 && !isWorldGm) {
       return reply.code(403).send({ error: 'FORBIDDEN', message: 'No sos miembro de la campaña' });
     }
-    const role = member[0]!.role;
+
+    const role = campaignRole; // may be null for pure world-GM
 
     const conditions = [eq(sessions.campaignId, query.campaignId)];
     if (query.status) conditions.push(eq(sessions.status, query.status));
@@ -211,8 +239,9 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
 
     // Visibility: solo el GM de cada sesión ve dmNotes. El campaign GM también
     // ve dmNotes de TODAS las sesiones de su campaña (admin del mundo).
+    // World-GM also sees dmNotes (parallel authority to campaign GM).
     const cleaned = rows.map((s) => {
-      if (s.gmUserId === userId || role === 'gm') return s;
+      if (s.gmUserId === userId || role === 'gm' || isWorldGm) return s;
       const { dmNotes: _omit, ...rest } = s;
       return rest;
     });

@@ -166,6 +166,60 @@ describe('campaign-invite-flow', () => {
       expect(JSON.stringify(body)).not.toContain(validToken);
     });
 
+    // IT-DPPM-A-09 (invites variant, REQ-DPPM-A-INV-05):
+    // worldRole is returned in the status response so the invite page can branch GM vs player.
+    // Uses fresh tokens to avoid consuming the shared validToken used by test (e).
+    it('(a2) alreadyMember GM → worldRole: gm (IT-DPPM-A-09)', async () => {
+      // gm is the world-GM — use a fresh token to avoid consuming validToken
+      const app = await getTestApp();
+      const freshTokenRes = await createInvite(gm.accessToken, campaignId);
+      const freshToken = extractToken(freshTokenRes.json().url);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/invites/status/${freshToken}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { alreadyMember: boolean; worldRole: string | null };
+      expect(body.alreadyMember).toBe(true);
+      expect(body.worldRole).toBe('gm');
+    });
+
+    it('(a3) alreadyMember player → worldRole: player', async () => {
+      const app = await getTestApp();
+
+      // Create a fresh multi-use token so we don't consume validToken
+      const joinTokenRes = await createInvite(gm.accessToken, campaignId, { multiUse: true });
+      const joinToken = extractToken(joinTokenRes.json().url);
+
+      // Have player accept the invite to become a member
+      const confirmRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/invites/confirm',
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: { token: joinToken },
+      });
+      // 200 or 201 = joined fresh, 410 CONSUMED/EXPIRED = already joined or token edge case
+      if (![200, 201, 410].includes(confirmRes.statusCode)) {
+        throw new Error(`Unexpected confirm status: ${confirmRes.statusCode} ${confirmRes.body}`);
+      }
+
+      // Create yet another token for the status check (player is now a member)
+      const checkTokenRes = await createInvite(gm.accessToken, campaignId);
+      const checkToken = extractToken(checkTokenRes.json().url);
+
+      const statusRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/invites/status/${checkToken}`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      });
+      expect(statusRes.statusCode).toBe(200);
+      const body = statusRes.json() as { alreadyMember: boolean; worldRole: string | null };
+      // player is now a world member with role 'player'
+      expect(body.worldRole).toBe('player');
+    });
+
     it('(b) expired token → 410 EXPIRED', async () => {
       // Insert an already-expired token directly
       const { db } = await import('../../src/infra/db/client.js');
