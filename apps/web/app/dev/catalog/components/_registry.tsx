@@ -151,6 +151,21 @@ import type { FactionRow, FactionState } from '@/app/codex/actions';
 import type { NpcRow, NpcStatus } from '@/app/codex/actions';
 import type { HexRow, HexStatus } from '@/app/mapa/actions';
 
+// world/ interactive islands (batch 9a)
+import { WorldEntityShellIsland } from './_islands/world-entity-shell-island';
+import { EventFormIsland } from './_islands/event-form-island';
+import { FactionFormIsland } from './_islands/faction-form-island';
+import { JournalFormIsland } from './_islands/journal-form-island';
+import { NpcFormIsland } from './_islands/npc-form-island';
+import { HexFormIsland } from './_islands/hex-form-island';
+import { PoiFormIsland } from './_islands/poi-form-island';
+import { HexDetailViewIsland } from './_islands/hex-detail-view-island';
+import { PoiAccordionIsland } from './_islands/poi-accordion-island';
+import { PoiDetailIsland } from './_islands/poi-detail-island';
+import { PoiMapDrawerIsland } from './_islands/poi-map-drawer-island';
+import { FactionChipSectionIsland } from './_islands/faction-chip-section-island';
+import { WorldMapPlaceholderIsland } from './_islands/world-map-placeholder-island';
+
 // inicio/ organisms (presentational)
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
@@ -3302,6 +3317,144 @@ const npcRowViewEntry: ComponentEntry = {
   render: (p) => <NpcRowView row={p._npc as NpcRow} />,
 };
 
+// ── world/ interactive islands (batch 9a) ────────────────────────────────────
+
+const worldEntityShellEntry: ComponentEntry = {
+  id: 'world-entity-shell',
+  name: 'WorldEntityShell',
+  group: 'world',
+  notes: 'Generic world-entity client island: debounced search, list rows, detail V3Sheet, DM FAB (create), edit/delete buttons. Slot functions (renderRow, renderDetail, renderForm) supplied by per-entity client wrappers — NOT serializable from RSC. Fixture: Barovia NPCs, DM view. INTERACTIVE — search, tap row → detail sheet, FAB → create form. All mutations are stubs. REQ-FAC-01, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <WorldEntityShellIsland />,
+};
+
+const eventFormEntry: ComponentEntry = {
+  id: 'world-event-form',
+  name: 'EventForm',
+  group: 'world',
+  notes: 'DM-only event create/edit form inside V3Sheet. Props: mode ("create"|"edit"), initial (EventRow|null), onSubmit((EventBody)→Promise<{ok,error?}>), onDone(). Fields: title (required), occurredAt (date), visibility select (public|dm-only), description, tags (comma-separated), dmNotes. Uses canonical FormLabel/FormInput/FormErrorAlert/FormSubmitButton. INTERACTIVE — submit runs stub (~400ms). REQ-CRO-02, REQ-GATE-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <EventFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const factionFormEntry: ComponentEntry = {
+  id: 'world-faction-form',
+  name: 'FactionForm',
+  group: 'world',
+  notes: 'DM-only faction create/edit form inside V3Sheet. Props: mode ("create"|"edit"), initial (FactionRow|null), onSubmit((FactionBody)→Promise<{ok,error?}>), onDone(). Fields: name (required), state select (active|dormant|destroyed|disbanded), description, dmNotes. Uses canonical ui/ form primitives. INTERACTIVE — submit runs stub (~400ms). REQ-FAC-03, REQ-GATE-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <FactionFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const journalFormEntry: ComponentEntry = {
+  id: 'world-journal-form',
+  name: 'JournalForm',
+  group: 'world',
+  notes: 'DM-only journal create/edit form inside V3Sheet. Props: mode ("create"|"edit"), initial (JournalRow|null), onSubmit((JournalBody)→Promise<{ok,error?}>), onDone(). Fields: title (required), visibility select (public|dm-only), body (plain text — ADR-3, no markdown), tags (comma-separated). Uses canonical ui/ form primitives. INTERACTIVE — submit runs stub (~400ms). REQ-CRO-03, REQ-GATE-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <JournalFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const npcFormEntry: ComponentEntry = {
+  id: 'world-npc-form',
+  name: 'NpcForm',
+  group: 'world',
+  notes: 'DM-only NPC create/edit form inside V3Sheet. Props: mode ("create"|"edit"), initial (NpcRow|null), onSubmit((NpcBody)→Promise<{ok,error?}>), onDone(). Fields: name (required), race (text), status select (alive|dead|missing|unknown), description, dmNotes. Uses canonical ui/ form primitives. INTERACTIVE — submit runs stub (~400ms). REQ-NPC-01, REQ-GATE-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <NpcFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const hexFormEntry: ComponentEntry = {
+  id: 'world-hex-form',
+  name: 'HexForm',
+  group: 'world',
+  notes: 'DM-only hex create/edit form inside V3Sheet. Props: mode ("create"|"edit"), initial (HexRow|null), onSubmit((HexBody)→Promise<{ok,error?}>), onDone(). Fields: q/r coordinates (required integers), name, terrain, status select (unexplored|rumored|explored|cleared), playerNotes, dmNotes. Uses canonical ui/ form primitives. INTERACTIVE — submit runs stub (~400ms). REQ-MAP-01, REQ-GATE-03.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <HexFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const poiFormEntry: ComponentEntry = {
+  id: 'world-poi-form',
+  name: 'PoiForm',
+  group: 'world',
+  notes: 'Shared POI create/edit form (REQ-PWC-FORM-01). Props: mode, initial (PoiRow|null), initialCoords ({worldX,worldY}|null), onSubmit((PoiBody)→Promise<{ok,error?}>), onDone(), idPrefix (string, default "poi"). Fields: name (required), description, dmNotes, status select (unknown|discovered|cleared), worldX/worldY coords (optional numbers, 0..IMAGE_W/H range). Uses inline labels/inputs (not canonical ui/ primitives — intentional). INTERACTIVE — submit runs stub (~400ms). REQ-MAP-01, REQ-PLACE-FIELDS-01.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [{ _mode: 'create' }, { _mode: 'edit' }],
+  render: (p) => <PoiFormIsland mode={(p._mode as 'create' | 'edit') ?? 'create'} />,
+};
+
+const hexDetailViewEntry: ComponentEntry = {
+  id: 'world-hex-detail-view',
+  name: 'HexDetailView',
+  group: 'world',
+  notes: 'Hex detail sheet body. Props: detail (HexRow), effectiveView, onLoadPois((hexId)→Promise<PoiRow[]>), onCreatePoi, onUpdatePoi, onDeletePoi. DM: name, status pill, terrain, q/r coords, dmNotes (amber block), playerNotes, + PoiAccordion (lazy). Player: same minus coords/dmNotes. Accordion calls onLoadPois ONLY on first user expand (no N+1). INTERACTIVE — expand accordion to load fixture POIs (~300ms). CRUD stubs. REQ-MAP-01, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <HexDetailViewIsland />,
+};
+
+const poiAccordionEntry: ComponentEntry = {
+  id: 'world-poi-accordion',
+  name: 'PoiAccordion',
+  group: 'world',
+  notes: 'Lazy inline POI accordion for a single hex. Props: hexId, effectiveView, onLoadPois, onCreatePoi, onUpdatePoi, onDeletePoi. Loads POIs only on first expand (no N+1 at page load). DM: full list + PoiDetail + CRUD controls (edit/delete/+ add). Player: filtered list (status != "unknown"), read-only. "Colocar en mapa" button on null-coord POIs uses router.push — catalog shows it. INTERACTIVE — expand, CRUD stubs. REQ-MAP-01, REQ-GATE-01, REQ-PLACE-TAP-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <PoiAccordionIsland />,
+};
+
+const poiDetailEntry: ComponentEntry = {
+  id: 'world-poi-detail',
+  name: 'PoiDetail',
+  group: 'world',
+  notes: 'Presentational POI body. Props: poi (PoiRow), isDM (boolean). Renders: name + status Pill (via POI_STATUS_TONE), optional description, DM-gated dmNotes (amber italic). Used by PoiAccordion and Leaflet popups. Three combos: isDM=true with notes, isDM=false (notes absent), cleared status no notes. REQ-POI-DETAIL-01, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <PoiDetailIsland />,
+};
+
+const poiMapDrawerEntry: ComponentEntry = {
+  id: 'world-poi-map-drawer',
+  name: 'PoiMapDrawer',
+  group: 'world',
+  notes: 'Collapsible POI list overlay for the Mapa view. Props: pois (PoiRow[]), effectiveView, open (boolean), onClose, onFlyTo((PoiRow)→void). Mobile: bottom-sheet ~55vh. Desktop: left panel 320px. NOT a portal — does NOT lock body scroll. Placed POIs (worldX/Y != null): tappable fly-to row. Null-coord POIs: non-interactive "sin ubicación". Rendered inline in catalog (not fixed) so it stays in frame. INTERACTIVE — open/close, tap placed POIs → onFlyTo stub. REQ-PML-DRAWER-01, REQ-PML-FLYTO-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <PoiMapDrawerIsland />,
+};
+
+const factionChipSectionEntry: ComponentEntry = {
+  id: 'world-faction-chip-section',
+  name: 'FactionChipSection',
+  group: 'world',
+  notes: 'NPC faction membership chip list. Props: factions (NpcFaction[]), worldFactions (FactionRow[]), effectiveView, onAttach((factionId)→Promise<{ok,error?}>), onDetach((factionId)→Promise<{ok,error?}>). DM view: chips with × detach + "+" picker for unattached factions. Player view: read-only chips. Local state reflects attach/detach stubs immediately. INTERACTIVE — detach/attach run stubs (~300ms). REQ-NPC-02, REQ-GATE-01, REQ-GATE-03.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <FactionChipSectionIsland />,
+};
+
+const worldMapPlaceholderEntry: ComponentEntry = {
+  id: 'world-map-placeholder',
+  name: 'WorldMap (Leaflet — catalog placeholder)',
+  group: 'world',
+  notes: 'Static catalog stand-in for WorldMapLeaflet / MapClientWrapper. Leaflet cannot run in the catalog (requires window/tile fetches/server actions on mount). Renders: disabled controls bar (Capas / zoom+/−), canvas placeholder with grid + map glyph + explanatory text, real PoiMapDrawer (safe — no window deps) shown open/closed below. The live map lives in apps/web/components/world/map/map-client-wrapper.tsx. INTERACTIVE — drawer open/close + onFlyTo stub. REQ-PML-DRAWER-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <WorldMapPlaceholderIsland />,
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -3425,4 +3578,18 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   journalDetailViewPlayerEntry,
   hexRowViewEntry,
   npcRowViewEntry,
+  // world/ interactive islands (batch 9a)
+  worldEntityShellEntry,
+  eventFormEntry,
+  factionFormEntry,
+  journalFormEntry,
+  npcFormEntry,
+  hexFormEntry,
+  poiFormEntry,
+  hexDetailViewEntry,
+  poiAccordionEntry,
+  poiDetailEntry,
+  poiMapDrawerEntry,
+  factionChipSectionEntry,
+  worldMapPlaceholderEntry,
 ];
