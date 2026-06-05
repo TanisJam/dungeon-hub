@@ -6,18 +6,14 @@
 // Fulfils the "promised but unimplemented" refresh requirement from the verify report.
 
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 export function RefreshButton() {
   const router = useRouter();
 
   return (
-    <button
-      type="button"
-      onClick={() => router.refresh()}
-      className="min-h-[44px] px-4 text-sm font-semibold rounded border border-line"
-      aria-label="Actualizar estado del encuentro"
-    >
+    <Button tone="ghost" fullWidth onClick={() => router.refresh()} aria-label="Actualizar estado del encuentro">
       Actualizar
-    </button>
+    </Button>
   );
 }

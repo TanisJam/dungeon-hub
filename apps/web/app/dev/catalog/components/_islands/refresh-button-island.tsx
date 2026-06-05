@@ -5,6 +5,7 @@
 // page doesn't actually navigate away during visual inspection.
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 export function RefreshButtonIsland() {
   const [refreshed, setRefreshed] = useState(false);
@@ -16,14 +17,9 @@ export function RefreshButtonIsland() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <button
-        type="button"
-        onClick={handleClick}
-        className="min-h-[44px] px-4 text-sm font-semibold rounded border border-line"
-        aria-label="Actualizar estado del encuentro"
-      >
+      <Button tone="ghost" fullWidth onClick={handleClick} aria-label="Actualizar estado del encuentro">
         Actualizar
-      </button>
+      </Button>
       {refreshed && (
         <p className="text-[10px] text-ink-soft text-center">
           (Catálogo) router.refresh() → stub en el catálogo
