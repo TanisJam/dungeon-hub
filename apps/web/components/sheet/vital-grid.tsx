@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { StatCell } from '@/components/ui/stat-cell';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 interface VitalGridProps {
   hp: { current: number | null; max: number | null; temp?: number };
@@ -38,19 +39,17 @@ export function VitalGrid({
       ? '—'
       : `${dash(effectiveCurrent)} / ${dash(hp.max)}`;
 
-  const hpFill =
-    hp.max !== null && hp.max > 0 && effectiveCurrent !== null
-      ? Math.min(100, Math.round((effectiveCurrent / hp.max) * 100))
-      : 0;
-
   const hpBar =
     hp.max !== null && hp.max > 0 ? (
-      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-accent/20">
-        <div
-          className="h-full rounded-full bg-accent"
-          style={{ width: `${hpFill}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={effectiveCurrent ?? 0}
+        max={hp.max}
+        tone="accent"
+        height="sm"
+        trackClassName="bg-accent/20"
+        className="mt-2"
+        ariaLabel="Puntos de vida"
+      />
     ) : null;
 
   const hpTempEl =

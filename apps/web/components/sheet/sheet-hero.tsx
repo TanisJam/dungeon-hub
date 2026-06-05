@@ -1,5 +1,6 @@
 import { Pill } from '@/components/ui/pill';
 import { CharacterPortrait } from '@/components/ui/character-portrait';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 const XP_TABLE = [
   0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
@@ -32,9 +33,6 @@ export function SheetHero({
   xpNextThreshold,
 }: SheetHeroProps) {
   const isMaxLevel = level >= 20;
-  const xpFill = isMaxLevel
-    ? 100
-    : Math.min(100, Math.round((xpCurrent / xpNextThreshold) * 100));
 
   const subtitle = [raceLabel, classLabel].filter(Boolean).join(' · ') || null;
 
@@ -87,12 +85,14 @@ export function SheetHero({
           </span>
         </div>
         {!isMaxLevel && (
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-arcane to-arcane-deep"
-              style={{ width: `${xpFill}%` }}
-            />
-          </div>
+          <ProgressBar
+            value={xpCurrent}
+            max={xpNextThreshold}
+            tone="arcane"
+            trackClassName="bg-white/10"
+            className="mt-1.5"
+            ariaLabel="Experiencia"
+          />
         )}
       </div>
     </div>

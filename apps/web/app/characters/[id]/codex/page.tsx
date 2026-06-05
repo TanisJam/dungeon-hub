@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,14 +92,13 @@ export default async function CharacterCodexPage({ params }: Props) {
                 {monsters.known} de {monsters.total} descubiertos
               </p>
               {/* Progress bar */}
-              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-paper-muted">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{
-                    width: `${monsters.total > 0 ? Math.round((monsters.known / monsters.total) * 100) : 0}%`,
-                  }}
-                />
-              </div>
+              <ProgressBar
+                value={monsters.known}
+                max={monsters.total}
+                tone="primary"
+                className="mt-1"
+                ariaLabel="Monstruos descubiertos"
+              />
             </div>
           </Link>
         </div>
