@@ -61,7 +61,7 @@ export default async function NotasPage({
   if (!aw) {
     return (
       <AppShell
-        title="Crónica"
+        title="Bitácora"
         subtitle="NOTAS"
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}

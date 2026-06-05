@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
  * organisms compose into a full mobile screen.
  */
 
-const TABS = ['Inicio', 'Mapa', 'Codex', 'Crónica', 'Mesa'] as const;
+const TABS = ['Inicio', 'Mapa', 'Codex', 'Bitácora', 'Mesa'] as const;
 
 interface ScreenFrameProps {
   /** TopBar title. */

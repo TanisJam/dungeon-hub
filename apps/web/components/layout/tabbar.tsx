@@ -9,13 +9,13 @@ type Tab = { key: string; label: string; icon: IconName; href: string };
 /**
  * World-scoped 5-tab navigation (Slice 2, ADR-6).
  * Static tabs — not role-split. Role still affects content per-page (Slice 3).
- * @375px layout: 75px/column. text-[9px] + tracking-[0.06em] fits "Crónica" (7 chars).
+ * @375px layout: 75px/column. text-[9px] + tracking-[0.06em] fits "Bitácora" (8 chars).
  */
 const WORLD_TABS: Tab[] = [
   { key: 'inicio',  label: 'Inicio',  icon: 'home',    href: '/inicio' },
   { key: 'mapa',    label: 'Mapa',    icon: 'feather', href: '/mapa' },
   { key: 'codex',   label: 'Codex',   icon: 'book',    href: '/codex' },
-  { key: 'cronica', label: 'Crónica', icon: 'scroll',  href: '/cronica' },
+  { key: 'cronica', label: 'Bitácora', icon: 'scroll',  href: '/cronica' },
   { key: 'mesa',    label: 'Mesa',    icon: 'compass',  href: '/campanas' },
 ];
 

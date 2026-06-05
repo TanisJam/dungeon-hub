@@ -61,7 +61,7 @@ export default async function EventosPage({
   if (!aw) {
     return (
       <AppShell
-        title="Crónica"
+        title="Bitácora"
         subtitle="EVENTOS"
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}

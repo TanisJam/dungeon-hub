@@ -81,12 +81,12 @@ test('SubNav pills are visible: Eventos and Notas', async ({ page }) => {
   await expect(page.getByRole('link', { name: /notas/i })).toBeVisible({ timeout: 10_000 });
 });
 
-test('Crónica tab remains active when on /cronica/eventos', async ({ page }) => {
+test('Bitácora tab remains active when on /cronica/eventos', async ({ page }) => {
   await page.goto('/inicio', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
   const nav = page.locator('nav[aria-label="Navegación principal"]');
-  const cronicaTab = nav.getByText('Crónica', { exact: true });
+  const cronicaTab = nav.getByText('Bitácora', { exact: true });
   await cronicaTab.click();
 
   // Should redirect to /cronica/eventos

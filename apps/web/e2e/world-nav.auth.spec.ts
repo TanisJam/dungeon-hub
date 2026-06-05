@@ -43,7 +43,7 @@ test('each tab label is visible and non-empty', async ({ page }) => {
   const nav = page.locator('nav[aria-label="Navegación principal"]');
   await expect(nav).toBeVisible({ timeout: 10_000 });
 
-  const expectedLabels = ['Inicio', 'Mapa', 'Codex', 'Crónica', 'Mesa'];
+  const expectedLabels = ['Inicio', 'Mapa', 'Codex', 'Bitácora', 'Mesa'];
   for (const label of expectedLabels) {
     await expect(nav.getByText(label, { exact: true })).toBeVisible({ timeout: 5_000 });
   }
@@ -125,7 +125,7 @@ test('Codex (player account) — no facciones redirect, grid or empty state rend
   }
 });
 
-test('Crónica redirects to /cronica/eventos and renders content', async ({ page }) => {
+test('Bitácora tab redirects to /cronica/eventos and renders content', async ({ page }) => {
   await page.goto('/cronica', { waitUntil: 'domcontentloaded' });
   // /cronica redirects to /cronica/eventos (ADR-1, REQ-CRO-01)
   await expect(page).toHaveURL(/\/cronica\/eventos/, { timeout: 10_000 });

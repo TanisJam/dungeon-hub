@@ -57,10 +57,29 @@ describe('TabBar — 5-tab world nav (REQ-WIS-05)', () => {
 
   it('(c) each label text is non-empty', () => {
     render(<TabBar />);
-    const expectedLabels = ['Inicio', 'Mapa', 'Codex', 'Crónica', 'Mesa'];
+    const expectedLabels = ['Inicio', 'Mapa', 'Codex', 'Bitácora', 'Mesa'];
     for (const label of expectedLabels) {
       expect(screen.getByText(label)).toBeTruthy();
     }
+  });
+
+  // SCENARIO RENAME-S1: tabbar renders 'Bitácora' label with '/cronica' href
+  it('RENAME-S1: renders Bitácora tab link with href /cronica', () => {
+    render(<TabBar />);
+    const link = screen.getByRole('link', { name: /bitácora/i });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/cronica');
+    expect(screen.queryByText('Crónica')).toBeNull();
+  });
+
+  // SCENARIO RENAME-S2: when pathname='/cronica', tab with href '/cronica' has aria-current="page" and text 'Bitácora'
+  it('RENAME-S2: Bitácora tab has aria-current="page" when pathname is /cronica', () => {
+    mockUsePathname.mockReturnValue('/cronica');
+    const { container } = render(<TabBar />);
+    const activeLink = container.querySelector('[aria-current="page"]');
+    expect(activeLink).toBeTruthy();
+    expect(activeLink?.getAttribute('href')).toBe('/cronica');
+    expect(activeLink?.textContent).toContain('Bitácora');
   });
 
   it('(c) Mesa tab href points to /campanas', () => {
