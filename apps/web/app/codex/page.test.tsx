@@ -121,8 +121,8 @@ describe('CodexPage — role-dispatch', () => {
     expect(vi.mocked(redirect)).toHaveBeenCalledWith('/codex/facciones');
   });
 
-  // Scenario: DM toggled to player → 6 cards (REQ-DISPATCH-01 scenario "DM toggled to player view")
-  it('DM toggled to player (viewPref=player) + activeChar → 6 card links render', async () => {
+  // Scenario: DM toggled to player → 8 cards (REQ-DISPATCH-01 scenario "DM toggled to player view")
+  it('DM toggled to player (viewPref=player) + activeChar → 8 card links render', async () => {
     mockGetActiveWorld.mockResolvedValue({ id: 'world-1', callerRole: 'gm' });
     mockGetViewPreference.mockResolvedValue('player');
     mockGetActiveCharacter.mockResolvedValue({ id: 'char-1', worldId: 'world-1', name: 'Aranea' });
@@ -133,16 +133,16 @@ describe('CodexPage — role-dispatch', () => {
     // Should render grid, NOT redirect
     expect(vi.mocked(redirect)).not.toHaveBeenCalled();
     const links = screen.getAllByRole('link');
-    expect(links.length).toBe(6);
+    expect(links.length).toBe(8);
   });
 
-  // Scenario: Player + activeChar → 6 cards (REQ-GRID-01)
-  it('Player + activeChar → 6 category card links with correct hrefs', async () => {
+  // Scenario: Player + activeChar → 8 cards (REQ-GRID-01)
+  it('Player + activeChar → 8 category card links with correct hrefs', async () => {
     const element = await CodexPage();
     render(element as React.ReactElement);
 
     const links = screen.getAllByRole('link') as HTMLAnchorElement[];
-    expect(links.length).toBe(6);
+    expect(links.length).toBe(8);
 
     // getAttribute('href') returns the raw attribute value (no origin prefix in jsdom)
     const hrefs = links.map((l) => l.getAttribute('href'));

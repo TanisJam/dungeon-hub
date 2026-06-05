@@ -24,12 +24,15 @@ const PLAYER_CODEX_CATEGORIES: CategoryCard[] = [
   { label: 'Razas',      href: '/codex/races',         emoji: '🧝' },
   { label: 'Clases',     href: '/codex/classes',       emoji: '🛡️' },
   { label: 'Trasfondos', href: '/codex/backgrounds',   emoji: '📜' },
+  { label: 'Dotes',      href: '/codex/feats',         emoji: '⭐' },
+  { label: 'Estados',    href: '/codex/conditions',    emoji: '⚡' },
 ];
 
 /**
- * PlayerCodexGrid — 6 nav-link cards for the player Codex landing page.
+ * PlayerCodexGrid — 8 nav-link cards for the player Codex landing page.
  * Server Component (no state — pure links).
- * REQ-GRID-01: exactly 6 category cards; all always visible (no gating).
+ * REQ-GRID-01: category cards always visible (no gating). Feats/Conditions
+ * added (#3.3) — they reuse CATEGORY_CONFIG so /codex/{feats,conditions} work.
  * REQ-GRID-02: grid-cols-1 at 375px, min-h-[80px] per card.
  */
 export function PlayerCodexGrid() {

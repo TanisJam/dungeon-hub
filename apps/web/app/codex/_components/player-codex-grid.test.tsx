@@ -17,13 +17,13 @@ vi.mock('next/link', () => ({
 import { PlayerCodexGrid } from './player-codex-grid';
 
 describe('PlayerCodexGrid', () => {
-  it('REQ-GRID-01: renders exactly 6 category link cards', () => {
+  it('REQ-GRID-01: renders exactly 8 category link cards', () => {
     render(<PlayerCodexGrid />);
     const links = screen.getAllByRole('link');
-    expect(links.length).toBe(6);
+    expect(links.length).toBe(8);
   });
 
-  it('REQ-GRID-01: all 6 category labels are present', () => {
+  it('REQ-GRID-01: all 8 category labels are present', () => {
     render(<PlayerCodexGrid />);
     expect(screen.getByText('Monstruos')).toBeTruthy();
     expect(screen.getByText('Items')).toBeTruthy();
@@ -31,6 +31,8 @@ describe('PlayerCodexGrid', () => {
     expect(screen.getByText('Razas')).toBeTruthy();
     expect(screen.getByText('Clases')).toBeTruthy();
     expect(screen.getByText('Trasfondos')).toBeTruthy();
+    expect(screen.getByText('Dotes')).toBeTruthy();
+    expect(screen.getByText('Estados')).toBeTruthy();
   });
 
   it('REQ-GRID-01: each card links to the correct /codex/:kind href', () => {
@@ -43,6 +45,8 @@ describe('PlayerCodexGrid', () => {
     expect(hrefs).toContain('/codex/races');
     expect(hrefs).toContain('/codex/classes');
     expect(hrefs).toContain('/codex/backgrounds');
+    expect(hrefs).toContain('/codex/feats');
+    expect(hrefs).toContain('/codex/conditions');
   });
 
   it('REQ-GRID-02: grid container has grid-cols-1 class (single column at base/375px breakpoint)', () => {
