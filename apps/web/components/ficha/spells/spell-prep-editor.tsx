@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { filterPrepUniverse } from './spell-prep-helpers';
 import { saveSpellPrepForClass } from './save-spell-prep-action';
+import { Pill } from '@/components/ui/pill';
 
 /** Minimal spell reference (slug + source). */
 export interface SpellRef {
@@ -83,12 +84,7 @@ export function SpellPrepEditor({
   const atLimit = count >= prepLimit;
   const overLimit = count > prepLimit;
 
-  const counterTone = overLimit ? 'danger' : atLimit ? 'amber' : 'green';
-  const counterColors: Record<string, string> = {
-    green: 'text-green-700 bg-green-50 border-green-200',
-    amber: 'text-amber-700 bg-amber-50 border-amber-200',
-    danger: 'text-red-700 bg-red-50 border-red-200',
-  };
+  const counterTone = overLimit ? 'danger' : atLimit ? 'amber' : 'success';
 
   function handleToggle(slug: string, source: string) {
     setPreparedSlugs((prev) => {
@@ -134,9 +130,9 @@ export function SpellPrepEditor({
   return (
     <div className="space-y-4">
       {/* Counter pill */}
-      <div className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${counterColors[counterTone]}`}>
-        <span>{count}/{prepLimit} preparados</span>
-      </div>
+      <Pill tone={counterTone} fill="tint" size="md">
+        {count}/{prepLimit} preparados
+      </Pill>
 
       {/* At/over-limit hint */}
       {atLimit && !overLimit && (
