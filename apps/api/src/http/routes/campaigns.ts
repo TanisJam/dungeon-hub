@@ -241,7 +241,13 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
   // Returns 201 { url, expiresAt }. NEVER logs the raw token.
   app.post('/campaigns/:id/invite', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
-    const body = CreateInviteBody.parse(request.body);
+    const bodyParsed = CreateInviteBody.safeParse(request.body);
+    if (!bodyParsed.success) {
+      return reply
+        .code(400)
+        .send({ error: 'VALIDATION_FAILED', issues: bodyParsed.error.issues });
+    }
+    const body = bodyParsed.data;
     const userId = request.user!.sub;
 
     const campaign = await loadCampaign(id);
