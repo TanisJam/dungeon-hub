@@ -49,6 +49,8 @@ export async function acceptCampaignInvite(
 
     // Step 3: Insert world membership — DO NOTHING preserves existing role
     // (never downgrades an existing GM). Handles multi-campaign-in-same-world.
+    // NOTE: role is hardcoded 'player'; row.role is intentionally ignored until
+    // the co-GM invite SDD lands (this change only issues 'player' invites).
     await tx
       .insert(worldMembers)
       .values({ worldId: row.worldId, userId, role: 'player' })

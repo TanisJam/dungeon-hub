@@ -101,6 +101,10 @@ describe('InviteAffordance', () => {
       );
       expect(mockShare).toHaveBeenCalledWith({ url: 'https://app.local/invite/abc123' });
     });
+    // W2 fix: expiry confirmation must render on the share path too (REQ-WEB-GM-AFFORD-01)
+    await waitFor(() => {
+      expect(screen.getByText(/Enlace compartido · vence el/)).toBeTruthy();
+    });
   });
 
   it('WIA-CLIPBOARD-03: calls navigator.clipboard.writeText when share API is unavailable', async () => {
