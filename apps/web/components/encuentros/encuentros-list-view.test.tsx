@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EncuentrosListView, type EncuentroRow } from './encuentros-list-view';
+
+// Mock next/link — the new player state renders a link CTA
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string; [key: string]: unknown }) => (
+    <a href={href} {...rest}>{children}</a>
+  ),
+}));
 
 const baseRow: EncuentroRow = {
   encounter: {
@@ -29,9 +36,11 @@ describe('EncuentrosListView (WEL-*)', () => {
     expect(screen.getByText('Pacto Roto')).toBeTruthy();
   });
 
-  it('T2 WEL-DM-ONLY-01 player: empty-state copy', () => {
+  // T2: updated to match new useful player state (REQ-DPPMC-ENCUENTROS-04, Slice C)
+  it('T2 WEL-DM-ONLY-01 player: useful state — not a dead-end (REQ-DPPMC-ENCUENTROS-04)', () => {
     render(<EncuentrosListView role="player" rows={[]} />);
-    expect(screen.getByText(/Esta sección es para DMs/)).toBeTruthy();
+    // New copy — informational, not a dead-end
+    expect(screen.getByText(/Los combates los maneja tu DM/)).toBeTruthy();
   });
 
   it('T3 WEL-ROW-CONTENT-02 + WEL-CREATE-CTA-03: name + campaign + Ronda + combatientes + CTA', () => {
@@ -41,5 +50,30 @@ describe('EncuentrosListView (WEL-*)', () => {
     expect(screen.getByText('Ronda 2')).toBeTruthy();
     expect(screen.getByText('5 combatientes')).toBeTruthy();
     expect(screen.getByText(/Iniciar encuentro nuevo/)).toBeTruthy();
+  });
+
+  // REQ-DPPMC-ENCUENTROS-04: player state renders a CTA linking to /inicio
+  it('T4 player: CTA links to /inicio (REQ-DPPMC-ENCUENTROS-04)', () => {
+    render(<EncuentrosListView role="player" rows={[]} />);
+    const ctaLink = screen.getByRole('link', { name: /Ir a mis sesiones/i });
+    expect(ctaLink).toBeTruthy();
+    expect(ctaLink.getAttribute('href')).toBe('/inicio');
+  });
+
+  // REQ-DPPMC-ENCUENTROS-04: no combat UI in player state (combat is FROZEN)
+  it('T5 player: no combat UI visible (FROZEN — REQ-DPPMC-ENCUENTROS-04)', () => {
+    render(<EncuentrosListView role="player" rows={[]} />);
+    // Should NOT find any reference to iniciar/combat UI
+    expect(screen.queryByText(/Iniciar encuentro/i)).toBeNull();
+    expect(screen.queryByText(/iniciar/i)).toBeNull();
+  });
+
+  // DM branch stays unchanged — regression guard
+  it('T6 DM branch: unchanged — DashedCTA + rows (DM branch regression guard)', () => {
+    render(<EncuentrosListView role="dm" rows={[]} />);
+    // DM with no encounters: empty state + DashedCTA
+    expect(screen.getByText(/Iniciar encuentro nuevo/)).toBeTruthy();
+    // Should NOT render the player informational state
+    expect(screen.queryByText(/Los combates los maneja tu DM/)).toBeNull();
   });
 });

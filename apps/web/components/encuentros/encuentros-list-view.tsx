@@ -17,11 +17,14 @@ type Props = {
 
 export function EncuentrosListView({ role, rows }: Props) {
   if (role !== 'dm') {
+    // REQ-DPPMC-ENCUENTROS-04: useful player state (not a dead-end).
+    // Combat is FROZEN — no combat UI. Point the player to their active sessions.
     return (
       <V3Empty
-        glyph="sword"
-        title="Esta sección es para DMs"
-        sub="Cambiá a modo DM con el switcher de arriba para gestionar encuentros."
+        glyph="scroll"
+        title="Los combates los maneja tu DM"
+        sub="Cuando estés en una sesión activa vas a ver acá lo que pase en la mesa."
+        cta={{ label: 'Ir a mis sesiones', href: '/inicio' }}
       />
     );
   }
