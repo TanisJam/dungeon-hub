@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 const tabs = [
   { href: '/dev/catalog/tokens',      label: 'Tokens' },
   { href: '/dev/catalog/components',  label: 'Components' },
+  { href: '/dev/catalog/screens',     label: 'Screens' },
   { href: '/dev/catalog/diagnostics', label: 'Diagnostics' },
 ];
 
