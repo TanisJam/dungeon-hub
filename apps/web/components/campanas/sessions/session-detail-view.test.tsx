@@ -80,7 +80,7 @@ const baseEvents: SessionEvent[] = [
   {
     id: 'evt-1',
     sessionId: 'sess-1',
-    type: 'session_started',
+    eventType: 'session_started',
     visibility: 'public',
     actorUserId: 'gm-user-1',
     payload: null,

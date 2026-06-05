@@ -21,7 +21,8 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
   world_change_recorded: 'Cambio en el mundo registrado',
 };
 
-function labelForType(type: string): string {
+function labelForType(type: string | undefined | null): string {
+  if (!type) return 'Evento';
   return EVENT_TYPE_LABEL[type] ?? type.replace(/_/g, ' ');
 }
 
@@ -74,7 +75,7 @@ export function EventTimeline({ events }: EventTimelineProps) {
       {sorted.map((event) => (
         <li
           key={event.id}
-          data-event-type={event.type}
+          data-event-type={event.eventType}
           className="relative flex flex-col gap-0.5 py-2"
         >
           {/* Left-border accent dot (REQ-DPPMB-DETAIL-06: left-border accent) */}
@@ -85,7 +86,7 @@ export function EventTimeline({ events }: EventTimelineProps) {
 
           {/* Event type label */}
           <span className="font-sans text-sm font-semibold text-ink">
-            {labelForType(event.type)}
+            {labelForType(event.eventType)}
           </span>
 
           {/* Relative timestamp */}

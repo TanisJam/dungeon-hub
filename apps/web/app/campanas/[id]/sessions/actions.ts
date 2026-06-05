@@ -89,7 +89,9 @@ export interface SessionDetail extends SessionRow {
 export interface SessionEvent {
   id: string;
   sessionId: string;
-  type: string;
+  // API column is `event_type` → returned as `eventType` by the raw-row select
+  // in listSessionEvents (use-cases/sessions/events.ts). NOT `type`.
+  eventType: string;
   visibility: 'public' | 'dm-only';
   actorUserId: string | null;
   payload: Record<string, unknown> | null;
