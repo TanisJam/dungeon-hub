@@ -1,4 +1,5 @@
 import { characterInitials } from '@/lib/character-initials';
+import { Pill } from '@/components/ui/pill';
 
 const XP_TABLE = [
   0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
@@ -72,23 +73,17 @@ export function SheetHero({
 
           {/* Pills row */}
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {/* Level */}
-            <span className="inline-flex items-center rounded-pill border border-white/40 px-2.5 py-0.5 text-xs font-semibold text-white/90">
-              ✦ Nivel {level}
-            </span>
+            {/* Level — NORM: font-semibold→font-medium (atom base) */}
+            <Pill tone="neutral" fill="outline" size="md">✦ Nivel {level}</Pill>
 
-            {/* Class */}
+            {/* Class — FLAG: text-white→text-on-accent (dark ink on copper). Human sign-off needed. */}
             {classLabel && (
-              <span className="inline-flex items-center rounded-pill bg-accent px-2.5 py-0.5 text-xs font-semibold text-white">
-                {classLabel}
-              </span>
+              <Pill tone="accent" fill="solid" size="md">{classLabel}</Pill>
             )}
 
-            {/* Subclass */}
+            {/* Subclass — NORM: border-white/30→/40, text-white/70→/90 (atom outline neutral) */}
             {subclassLabel && (
-              <span className="inline-flex items-center rounded-pill border border-white/30 px-2.5 py-0.5 text-xs font-medium text-white/70">
-                {subclassLabel}
-              </span>
+              <Pill tone="neutral" fill="outline" size="md">{subclassLabel}</Pill>
             )}
           </div>
         </div>
