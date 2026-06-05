@@ -260,6 +260,13 @@
       "when": 1780560000000,
       "tag": "0037_campaign_invite_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1780620000000,
+      "tag": "0038_quests",
+      "breakpoints": true
     }
   ]
 }

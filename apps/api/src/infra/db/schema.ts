@@ -686,6 +686,42 @@ export const journalEntries = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// quests — world-scoped DM quest tracking (MVP gap #3.7 — world content).
+//
+// NOT a PHB/5e rules concept — app-level DM content tooling, like journal_entries.
+// visibility: 'public' visible a todos los miembros; 'dm-only' solo GMs.
+// status: available | active | completed | abandoned (sin RAW; convención del modelo).
+// dmNotes: prep secreto del GM — SIEMPRE se omite en respuestas a players,
+//   incluso en quests 'public' (strip per-field en el use-case/route, NO en cliente).
+// 'sin tocar' widget = status IN ('available','active') ORDER BY updated_at ASC.
+// quests SDD spec #1890, design #1891.
+// ---------------------------------------------------------------------------
+export const quests = pgTable(
+  'quests',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    description: text('description'),
+    dmNotes: text('dm_notes'),
+    status: text('status', { enum: ['available', 'active', 'completed', 'abandoned'] })
+      .notNull()
+      .default('available'),
+    visibility: text('visibility', { enum: ['public', 'dm-only'] })
+      .notNull()
+      .default('public'),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_quests_world_updated').on(t.worldId, t.updatedAt)],
+);
+
 // ===========================================================================
 // COMPENDIUM — data importada desde 5etools.
 //
