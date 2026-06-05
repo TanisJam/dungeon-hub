@@ -33,4 +33,17 @@ describe('FormErrorAlert', () => {
     expect(alert.className).toContain('bg-danger-soft');
     expect(alert.className).toContain('text-danger');
   });
+
+  it('T5: merges caller className after base classes', () => {
+    render(<FormErrorAlert message="Error con margen." className="mb-3" />);
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toContain('mb-3');
+    expect(alert.className).toContain('text-danger');
+    expect(alert.className).toContain('bg-danger-soft');
+  });
+
+  it('T6: renders nothing when message is undefined', () => {
+    const { container } = render(<FormErrorAlert message={undefined} />);
+    expect(container.firstChild).toBeNull();
+  });
 });

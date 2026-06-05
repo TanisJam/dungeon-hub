@@ -4,13 +4,17 @@
 // SCENARIO-B1-02.
 
 interface FormErrorAlertProps {
-  message: string | null;
+  message: string | null | undefined;
+  className?: string;
 }
 
-export function FormErrorAlert({ message }: FormErrorAlertProps) {
+export function FormErrorAlert({ message, className }: FormErrorAlertProps) {
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+    <p
+      role="alert"
+      className={`rounded-md bg-danger-soft px-3 py-2 text-sm text-danger${className ? ` ${className}` : ''}`}
+    >
       {message}
     </p>
   );
