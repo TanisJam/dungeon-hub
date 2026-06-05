@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import {
   campaignMembers,
@@ -221,4 +221,124 @@ export async function listSessionParticipants(sessionId: string): Promise<
     .from(sessionParticipants)
     .where(eq(sessionParticipants.sessionId, sessionId));
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// B0 Enrichment helpers (REQ-DPPMB-DETAIL-04, REQ-DPPMB-LIST-01)
+// ---------------------------------------------------------------------------
+
+export interface EnrichedParticipant {
+  characterId: string;
+  userId: string;
+  joinedAt: Date;
+  leftAt: Date | null;
+  /** Character display name. */
+  name: string;
+  /**
+   * Raw lineage string extracted from character.data->>'lineage' or
+   * data->>'race'. Null when the character has no race/lineage set yet.
+   */
+  lineage: string | null;
+  /** Sum of class levels from character.data.classes[]. 0 when no class. */
+  level: number;
+}
+
+interface RawCharacterClass {
+  classSlug?: string;
+  level?: number;
+}
+
+function projectClassesLevel(data: unknown): number {
+  if (!data || typeof data !== 'object') return 0;
+  const raw = (data as { classes?: unknown }).classes;
+  if (!Array.isArray(raw)) return 0;
+  let total = 0;
+  for (const entry of raw as RawCharacterClass[]) {
+    if (!entry || typeof entry !== 'object') continue;
+    const lvl = typeof entry.level === 'number' && Number.isFinite(entry.level) ? entry.level : 0;
+    total += lvl;
+  }
+  return total;
+}
+
+/**
+ * Enriches a session's participant list with character name, lineage, and
+ * level via a single LEFT JOIN on `characters`. Mirrors the `projectClasses`
+ * pattern from `list-world-characters.ts`.
+ *
+ * REQ-DPPMB-DETAIL-04: name + lineage + level for all participants,
+ * including cross-user characters.
+ */
+export async function enrichParticipants(
+  sessionId: string,
+): Promise<EnrichedParticipant[]> {
+  const rows = await db
+    .select({
+      characterId: sessionParticipants.characterId,
+      userId: sessionParticipants.userId,
+      joinedAt: sessionParticipants.joinedAt,
+      leftAt: sessionParticipants.leftAt,
+      characterName: characters.name,
+      characterData: characters.data,
+    })
+    .from(sessionParticipants)
+    .leftJoin(characters, eq(characters.id, sessionParticipants.characterId))
+    .where(eq(sessionParticipants.sessionId, sessionId));
+
+  return rows.map((r) => {
+    const data = r.characterData as unknown;
+    // Extract lineage: try data.lineage (string) then data.race (string).
+    // When race is stored as {slug,source} object, text extraction yields null.
+    let lineage: string | null = null;
+    if (data && typeof data === 'object') {
+      const d = data as Record<string, unknown>;
+      if (typeof d['lineage'] === 'string') lineage = d['lineage'];
+      else if (typeof d['race'] === 'string') lineage = d['race'];
+    }
+
+    return {
+      characterId: r.characterId,
+      userId: r.userId,
+      joinedAt: r.joinedAt,
+      leftAt: r.leftAt,
+      name: r.characterName ?? r.characterId,
+      lineage,
+      level: projectClassesLevel(data),
+    };
+  });
+}
+
+/**
+ * Attaches a `currentPlayers` count (participants with leftAt IS NULL) to
+ * each session row via a SINGLE grouped-join query (no N+1).
+ *
+ * REQ-DPPMB-LIST-01: session list includes current active player count.
+ */
+export async function attachCurrentPlayers<T extends { id: string }>(
+  rows: T[],
+): Promise<(T & { currentPlayers: number })[]> {
+  if (rows.length === 0) return [];
+
+  const sessionIds = rows.map((r) => r.id);
+
+  const counts = await db
+    .select({
+      sessionId: sessionParticipants.sessionId,
+      currentPlayers: count(sessionParticipants.characterId),
+    })
+    .from(sessionParticipants)
+    .where(
+      and(
+        inArray(sessionParticipants.sessionId, sessionIds),
+        isNull(sessionParticipants.leftAt),
+      ),
+    )
+    .groupBy(sessionParticipants.sessionId);
+
+  const countMap = new Map(counts.map((c) => [c.sessionId, Number(c.currentPlayers)]));
+
+  return rows.map((r) => ({
+    ...r,
+    currentPlayers: countMap.get(r.id) ?? 0,
+  }));
 }

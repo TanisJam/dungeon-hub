@@ -16,6 +16,8 @@ import {
 } from '@dungeon-hub/domain/character/inventory';
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import {
+  attachCurrentPlayers,
+  enrichParticipants,
   findCharacterActiveSession,
   getSessionAccess,
   listSessionParticipants,
@@ -246,7 +248,9 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
       return rest;
     });
 
-    return { data: cleaned };
+    // REQ-DPPMB-LIST-01: attach currentPlayers count via a single grouped query (no N+1).
+    const enriched = await attachCurrentPlayers(cleaned);
+    return { data: enriched };
   });
 
   // ---- GET /sessions/:id ---------------------------------------------------
@@ -260,7 +264,8 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
     const access = await getSessionAccess(session, userId);
     if (access === 'none') return reply.code(403).send({ error: 'FORBIDDEN' });
 
-    const participants = await listSessionParticipants(id);
+    // REQ-DPPMB-DETAIL-04: enrich participants with name, lineage, level.
+    const participants = await enrichParticipants(id);
     return { ...sanitizeSessionForRole(session, access), participants };
   });
 
