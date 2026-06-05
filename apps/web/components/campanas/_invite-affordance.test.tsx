@@ -8,6 +8,11 @@ import type { CampaignDetail } from './types';
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Stub SessionList so CampanaDetailView tests don't pull in supabase/server
+vi.mock('@/components/campanas/sessions/session-list', () => ({
+  SessionList: () => <div data-testid="session-list" />,
+}));
+
 const mockPost = vi.fn();
 vi.mock('@/lib/api', () => ({
   api: { post: (...args: unknown[]) => mockPost(...args) },
@@ -128,12 +133,12 @@ describe('InviteAffordance', () => {
   });
 
   it('WIA-GM-VISIBILITY-04: affordance renders in CampanaDetailView when callerRole=gm', () => {
-    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'gm' }} sessions={[]} />);
+    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'gm' }} sessions={[]} callerUserId="u-gm" worldId="w-1" />);
     expect(screen.getByRole('button', { name: /Invitar jugador/ })).toBeTruthy();
   });
 
   it('WIA-PLAYER-HIDDEN-05: affordance NOT rendered in CampanaDetailView when callerRole=player', () => {
-    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'player' }} sessions={[]} />);
+    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'player' }} sessions={[]} callerUserId="u-p1" worldId="w-1" />);
     expect(screen.queryByRole('button', { name: /Invitar jugador/ })).toBeNull();
   });
 });

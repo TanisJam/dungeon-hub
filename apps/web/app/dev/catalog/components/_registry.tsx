@@ -2249,10 +2249,10 @@ const _fixtureCampaignDetail: CampaignDetail = {
 };
 
 const _fixtureSessions: CampanaSessionRow[] = [
-  { id: 'ses-01', title: 'El camino a Phandalin',      status: 'completed',  scheduledAt: '2024-03-10T20:00:00Z' },
-  { id: 'ses-02', title: 'La guarida de los Trozos',   status: 'completed',  scheduledAt: '2024-03-24T20:00:00Z' },
-  { id: 'ses-03', title: 'Sildar Rescatado',            status: 'completed',  scheduledAt: '2024-04-07T20:00:00Z' },
-  { id: 'ses-04', title: 'El Castillo Cragmaw',         status: 'scheduled',  scheduledAt: '2026-06-14T20:00:00Z' },
+  { id: 'ses-01', title: 'El camino a Phandalin',    status: 'completed',  scheduledAt: '2024-03-10T20:00:00Z', levelMin: null, levelMax: null, maxPlayers: null, currentPlayers: 3, participants: [] },
+  { id: 'ses-02', title: 'La guarida de los Trozos', status: 'completed',  scheduledAt: '2024-03-24T20:00:00Z', levelMin: null, levelMax: null, maxPlayers: null, currentPlayers: 3, participants: [] },
+  { id: 'ses-03', title: 'Sildar Rescatado',          status: 'completed',  scheduledAt: '2024-04-07T20:00:00Z', levelMin: null, levelMax: null, maxPlayers: null, currentPlayers: 3, participants: [] },
+  { id: 'ses-04', title: 'El Castillo Cragmaw',       status: 'scheduled',  scheduledAt: '2026-06-14T20:00:00Z', levelMin: 1,    levelMax: 4,    maxPlayers: 4,    currentPlayers: 2, participants: [] },
 ];
 
 const campanasViewEntry: ComponentEntry = {
@@ -2324,9 +2324,9 @@ const campanaDetailViewEntry: ComponentEntry = {
   render: (p) => {
     const label = (p._label as string) ?? '';
     if (label.includes('empty sessions')) {
-      return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={[]} />;
+      return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={[]} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} />;
     }
-    return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={_fixtureSessions} />;
+    return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={_fixtureSessions} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} />;
   },
 };
 

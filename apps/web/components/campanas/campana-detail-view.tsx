@@ -2,17 +2,34 @@ import { SectionHead } from '@/components/ui/section-head';
 import { Pill } from '@/components/ui/pill';
 import type { CampaignDetail, CampaignMemberRole } from './types';
 import { InviteAffordance } from './_invite-affordance';
+import { SessionList } from '@/components/campanas/sessions/session-list';
+
+// REQ-DPPMB-LIST-01: CampanaSessionRow extended with session fields for the play-loop UI.
+export type SessionParticipantRef = {
+  characterId: string;
+  userId: string;
+  joinedAt: string;
+  leftAt: string | null;
+};
 
 export type CampanaSessionRow = {
   id: string;
   title: string;
   status: 'scheduled' | 'active' | 'paused' | 'completed' | 'cancelled';
   scheduledAt: string | null;
+  // REQ-DPPMB-LIST-01: added in Slice B
+  levelMin: number | null;
+  levelMax: number | null;
+  maxPlayers: number | null;
+  currentPlayers: number;
+  participants: SessionParticipantRef[];
 };
 
 type Props = {
   detail: CampaignDetail;
   sessions: CampanaSessionRow[];
+  callerUserId: string;
+  worldId: string;
 };
 
 const ROLE_LABEL: Record<CampaignMemberRole, string> = {
@@ -24,29 +41,17 @@ const ROLE_TONE: Record<CampaignMemberRole, 'accent' | 'stone'> = {
   player: 'stone',
 };
 
-const STATUS_LABEL: Record<CampanaSessionRow['status'], string> = {
-  scheduled: 'Programada',
-  active: 'En curso',
-  paused: 'Pausada',
-  completed: 'Jugada',
-  cancelled: 'Cancelada',
-};
-const STATUS_TONE: Record<CampanaSessionRow['status'], 'primary' | 'secondary' | 'stone' | 'amber'> = {
-  scheduled: 'amber',
-  active: 'primary',
-  paused: 'stone',
-  completed: 'primary',
-  cancelled: 'stone',
-};
+export function CampanaDetailView({ detail, sessions, callerUserId, worldId }: Props) {
+  // Derive the set of character IDs that the caller is an ACTIVE participant in
+  // (leftAt IS NULL, userId matches the caller). Passed into SessionList so each
+  // SessionCard can render the correct affordance without additional fetches.
+  // REQ-DPPMB-LIST-08.
+  const activeParticipantCharIds = sessions.flatMap((s) =>
+    s.participants
+      .filter((p) => p.userId === callerUserId && p.leftAt === null)
+      .map((p) => p.characterId),
+  );
 
-const SHORT_DATE = new Intl.DateTimeFormat('es-AR', {
-  day: '2-digit',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-export function CampanaDetailView({ detail, sessions }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
@@ -76,35 +81,13 @@ export function CampanaDetailView({ detail, sessions }: Props) {
         {detail.callerRole === 'gm' && <InviteAffordance campaignId={detail.id} />}
       </section>
 
-      <section>
-        <SectionHead title="Sesiones" meta={sessions.length} />
-        {sessions.length === 0 ? (
-          <p className="mt-2 font-sans text-sm text-ink-mute">No hay sesiones aún</p>
-        ) : (
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {sessions.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between gap-2 rounded-md bg-surface-raised px-3 py-2"
-              >
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-sans text-sm font-semibold text-ink">
-                    {s.title}
-                  </span>
-                  {s.scheduledAt ? (
-                    <span className="font-sans text-xs text-ink-mute">
-                      {SHORT_DATE.format(new Date(s.scheduledAt))}
-                    </span>
-                  ) : null}
-                </div>
-                <Pill size="sm" tone={STATUS_TONE[s.status]}>
-                  {STATUS_LABEL[s.status]}
-                </Pill>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <SessionList
+        campaignId={detail.id}
+        worldId={worldId}
+        sessions={sessions}
+        callerRole={detail.callerRole ?? 'player'}
+        activeParticipantCharIds={activeParticipantCharIds}
+      />
     </div>
   );
 }

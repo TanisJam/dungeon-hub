@@ -31,12 +31,15 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
   }
 
   // Parallelize sessions fetch + active world resolution (ADR-A5: gate at call site).
+  // REQ-DPPMB-LIST-08: include participants so callerRole active-char derivation works.
   const [sessionsResult, activeWorld] = await Promise.all([
     api
       .get<{ data: CampanaSessionRow[] }>(`/sessions?campaignId=${id}`, token)
       .catch(() => ({ data: [] as CampanaSessionRow[] })),
     getActiveWorld(token),
   ]);
+
+  const worldId = activeWorld?.id ?? detail.worldId;
 
   return (
     <AppShell
@@ -45,7 +48,12 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
       backHref="/campanas"
       callerRole={activeWorld?.callerRole ?? undefined}
     >
-      <CampanaDetailView detail={detail} sessions={sessionsResult.data} />
+      <CampanaDetailView
+        detail={detail}
+        sessions={sessionsResult.data}
+        callerUserId={user.id}
+        worldId={worldId}
+      />
     </AppShell>
   );
 }
