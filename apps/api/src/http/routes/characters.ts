@@ -115,6 +115,26 @@ import {
   type Breakdown,
   type AbilityScoreModifierInput,
 } from '@dungeon-hub/domain/engine';
+import { slugifyForFilename } from './_slug.js';
+
+/**
+ * Envelope returned by GET /characters/:id/export.
+ * schemaVersion is a literal 1 (number, not string). userId deliberately excluded.
+ * REQ-EXP-TYPE-01, REQ-EXP-ENV-01–05.
+ */
+interface CharacterExportEnvelope {
+  schemaVersion: 1;
+  exportedAt: string; // ISO 8601 UTC
+  character: {
+    id: string;
+    name: string;
+    worldId: string;
+    status: 'draft' | 'active' | 'retired' | 'dead' | 'pending_approval';
+    xp: number;
+    data: unknown;
+    inventory: unknown;
+  };
+}
 
 /**
  * Enriched inventory item for the v3 list view.
@@ -1132,6 +1152,44 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       // REQ-AS-CONTRACT-02: engineAbilityScores top-level field removed.
       // Engine-sourced scores now flow through sheet.abilityScores (injected into computeCharacterSheet).
     };
+  });
+
+  // ---- GET /characters/:id/export -----------------------------------------
+  // Raw-passthrough character export. Owner-only. Returns the portable envelope
+  // (schemaVersion + raw data + inventory) as a downloadable JSON attachment.
+  // No fastify response schema — a schema would strip the passthrough unknown blobs.
+  // REQ-EXP-ROUTE-01–06, REQ-EXP-ENV-01–05, REQ-EXP-INV-01–03, REQ-EXP-RAW-01–03,
+  // REQ-EXP-HDR-01–02, REQ-EXP-SLUG-01–04.
+  app.get('/characters/:id/export', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede exportar' });
+    }
+
+    const envelope: CharacterExportEnvelope = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      character: {
+        id: character.id,
+        name: character.name,
+        worldId: character.worldId,
+        status: character.status,
+        xp: character.xp,
+        data: character.data,
+        inventory: character.inventory,
+      },
+    };
+
+    const slug = slugifyForFilename(character.name) || `character-${character.id}`;
+    reply.header('Content-Type', 'application/json');
+    reply.header('Content-Disposition', `attachment; filename="${slug}.json"`);
+    return reply.send(envelope);
   });
 
   // ---- POST /characters/:id/cast-bless ------------------------------------
