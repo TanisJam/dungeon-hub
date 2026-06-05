@@ -2,7 +2,7 @@
  * Unit tests for SetActiveCharacterButton — REQ-AC-SEL-01 + REQ-AC-SEL-02.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mock: server action
@@ -84,5 +84,41 @@ describe('SetActiveCharacterButton', () => {
 
     expect(mockSetActiveCharacter).toHaveBeenCalledOnce();
     expect(mockSetActiveCharacter).toHaveBeenCalledWith('char-2', 'world-2');
+  });
+
+  it('injected actions.setActive + onActivated run instead of the real server action / router.refresh', async () => {
+    const setActive = vi.fn().mockResolvedValue(undefined);
+    const onActivated = vi.fn();
+    render(
+      <SetActiveCharacterButton
+        characterId="char-3"
+        worldId="world-3"
+        isActive={false}
+        actions={{ setActive, onActivated }}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'));
+    });
+    expect(setActive).toHaveBeenCalledWith('char-3', 'world-3');
+    expect(onActivated).toHaveBeenCalledOnce();
+    expect(mockSetActiveCharacter).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('injected actions are NOT invoked when isActive=true (no-op guard holds)', () => {
+    const setActive = vi.fn().mockResolvedValue(undefined);
+    const onActivated = vi.fn();
+    render(
+      <SetActiveCharacterButton
+        characterId="char-3"
+        worldId="world-3"
+        isActive={true}
+        actions={{ setActive, onActivated }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(setActive).not.toHaveBeenCalled();
+    expect(onActivated).not.toHaveBeenCalled();
   });
 });

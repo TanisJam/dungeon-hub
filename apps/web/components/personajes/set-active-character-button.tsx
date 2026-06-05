@@ -3,11 +3,24 @@
 import { useRouter } from 'next/navigation';
 import { setActiveCharacter } from '@/app/set-active-character';
 
+/**
+ * Side-effects of activating a character. Injectable so non-production surfaces
+ * (e.g. the dev catalog) can pass stubs instead of firing the real server action
+ * + router refresh. Defaults to the real `setActiveCharacter` + `router.refresh()`.
+ */
+export type SetActiveCharacterActions = {
+  setActive: (characterId: string, worldId: string) => Promise<unknown> | void;
+  /** Run after a successful activation (production: refresh the route). */
+  onActivated: () => void;
+};
+
 interface SetActiveCharacterButtonProps {
   characterId: string;
   worldId: string;
   /** True when this character is already the active lens — renders filled state, no-op on click. */
   isActive: boolean;
+  /** Injectable activation side-effects; omitted → real server action + router.refresh(). */
+  actions?: SetActiveCharacterActions;
 }
 
 /**
@@ -22,14 +35,17 @@ export function SetActiveCharacterButton({
   characterId,
   worldId,
   isActive,
+  actions,
 }: SetActiveCharacterButtonProps) {
   const router = useRouter();
+  const setActive = actions?.setActive ?? setActiveCharacter;
+  const onActivated = actions?.onActivated ?? (() => router.refresh());
 
   const handleClick = async () => {
     // No-op guard: if this card is already the active character, do nothing.
     if (isActive) return;
-    await setActiveCharacter(characterId, worldId);
-    router.refresh();
+    await setActive(characterId, worldId);
+    onActivated();
   };
 
   return (
