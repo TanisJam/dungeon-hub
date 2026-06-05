@@ -25,6 +25,7 @@ import { EncuentrosListView } from '@/components/encuentros/encuentros-list-view
 import type { EncounterCombatant } from '@/components/encuentros/types';
 
 // ui/ primitives
+import { StatCell } from '@/components/ui/stat-cell';
 import { Button } from '@/components/ui/button';
 import { CharacterCard } from '@/components/ui/character-card';
 import { ScrollNav } from '@/components/ui/scroll-nav';
@@ -58,6 +59,7 @@ import { FormInputIsland } from './_islands/form-input-island';
 import { ToastIsland } from './_islands/toast-island';
 // wizard/ interactive islands
 import { StatTileIsland } from './_islands/stat-tile-island';
+import { StatCellClickableIsland } from './_islands/stat-cell-island';
 import { ChoiceCardIsland } from './_islands/choice-card-island';
 import { ChoiceListIsland } from './_islands/choice-list-island';
 import { CharacterNameInputIsland } from './_islands/character-name-input-island';
@@ -92,6 +94,81 @@ export type { ComponentGroup, ComponentEntry, VariantCombination } from './_regi
 import type { ComponentEntry } from './_registry-types';
 
 // ── ui/ group ─────────────────────────────────────────────────────────────────
+
+const statCellEntry: ComponentEntry = {
+  id: 'stat-cell',
+  name: 'StatCell',
+  group: 'ui',
+  notes: [
+    'Unified stat tile atom. Surface: surface (default bg-surface+border-line) | paper (bg-paper-soft, no border).',
+    'Size: default (text-2xl) | compact (text-lg, e.g. "12 / 20").',
+    'Accent: teal (ficha-vital-ac glow) | magenta (ficha-vital-init glow) | peach (ficha-vital-hp gradient bg).',
+    'value={null} → dashed border + em-dash placeholder.',
+    'selected → 2px accent ring.',
+    'onClick → renders as <button> with hover+active transitions.',
+    'sub: string → ink-soft 10px span; ReactNode (Pill etc.) → rendered directly.',
+    'footer: slot below sub-line (HP bar, editor button, etc.).',
+  ].join(' '),
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Default surface — FUE 16' },
+    { _label: 'Compact size — HP 28 / 36' },
+    { _label: 'Paper surface — CON 14 +2' },
+    { _label: 'Accent teal — AC 15' },
+    { _label: 'Accent magenta — Initiative +2' },
+    { _label: 'Accent peach — HP tile' },
+    { _label: 'Selected state — FUE 16' },
+    { _label: 'Interactive (onClick) — DEX 14' },
+    { _label: 'Unassigned (value=null)' },
+    { _label: 'Sub as Pill — roll tile' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+
+    if (label.includes('Compact size')) {
+      return (
+        <StatCell label="Puntos de Golpe" value="28 / 36" size="compact" accent="peach" />
+      );
+    }
+    if (label.includes('Paper surface')) {
+      return <StatCell label="CON" value={14} sub="+2" surface="paper" />;
+    }
+    if (label.includes('Accent teal')) {
+      return <StatCell label="Clase Armadura" value={15} accent="teal" sub="Armadura de cuero" />;
+    }
+    if (label.includes('Accent magenta')) {
+      return <StatCell label="Iniciativa" value="+2" accent="magenta" sub="30 ft vel." />;
+    }
+    if (label.includes('Accent peach')) {
+      return <StatCell label="Puntos de Golpe" value="28 / 36" size="compact" accent="peach" />;
+    }
+    if (label.includes('Selected state')) {
+      return <StatCell label="FUE" value={16} sub="+3" selected />;
+    }
+    if (label.includes('Interactive')) {
+      return (
+        <div className="w-24">
+          <StatCellClickableIsland />
+        </div>
+      );
+    }
+    if (label.includes('Unassigned')) {
+      return <StatCell label="FUE" value={null} />;
+    }
+    if (label.includes('Sub as Pill')) {
+      return (
+        <StatCell
+          label="FUE"
+          value={15}
+          sub={<Pill tone="primary" size="sm">+2</Pill>}
+        />
+      );
+    }
+    // Default surface
+    return <StatCell label="FUE" value={16} sub="+3" />;
+  },
+};
 
 const buttonEntry: ComponentEntry = {
   id: 'button',
@@ -1933,6 +2010,7 @@ const raceSectionEntry: ComponentEntry = {
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
   // ui/
+  statCellEntry,
   buttonEntry,
   pillEntry,
   cardEntry,
