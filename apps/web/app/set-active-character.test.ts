@@ -1,8 +1,9 @@
 /**
- * Unit tests for setActiveCharacter() — REQ-AC-ACT-01.
+ * Unit tests for setActiveCharacter() — REQ-AC-ACT-01, REQ-DPPMC-LENS-01.
  *
  * Asserts that cookies().set is called twice — once for dh:character, once
  * for dh:world — with the correct values and options.
+ * Also asserts dh:role is cleared on character-select (per-world lens, Slice C).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -11,10 +12,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 const mockCookiesSet = vi.fn();
+const mockCookiesDelete = vi.fn();
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     set: mockCookiesSet,
+    delete: mockCookiesDelete,
   }),
 }));
 
@@ -24,6 +27,7 @@ import { setActiveCharacter } from './set-active-character';
 describe('setActiveCharacter()', () => {
   beforeEach(() => {
     mockCookiesSet.mockReset();
+    mockCookiesDelete.mockReset();
   });
 
   it('writes dh:character and dh:world cookies (REQ-AC-ACT-01 double-write)', async () => {
@@ -60,5 +64,23 @@ describe('setActiveCharacter()', () => {
 
     expect(charCall?.[1]).toBe('char-specific');
     expect(worldCall?.[1]).toBe('world-specific');
+  });
+
+  // REQ-DPPMC-LENS-01: clearing dh:role on character-select (per-world lens, Slice C)
+  it('LENS-01: clears dh:role cookie after writing dh:character + dh:world', async () => {
+    await setActiveCharacter('char-abc', 'world-xyz');
+
+    expect(mockCookiesDelete).toHaveBeenCalledWith('dh:role');
+  });
+
+  it('LENS-01: clears dh:role AFTER the two set calls (order check)', async () => {
+    const callOrder: string[] = [];
+    mockCookiesSet.mockImplementation(() => { callOrder.push('set'); });
+    mockCookiesDelete.mockImplementation(() => { callOrder.push('delete'); });
+
+    await setActiveCharacter('char-abc', 'world-xyz');
+
+    // Two sets (dh:character, dh:world), then one delete (dh:role)
+    expect(callOrder).toEqual(['set', 'set', 'delete']);
   });
 });

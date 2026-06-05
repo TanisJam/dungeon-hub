@@ -18,4 +18,7 @@ export async function setActiveWorld(worldId: string): Promise<void> {
     sameSite: 'lax',
     httpOnly: false,
   });
+  // REQ-DPPMC-LENS-01: clear the GM view-overlay cookie so the new world
+  // starts from its own callerRole default (not leaked from the previous world).
+  cookieStore.delete('dh:role');
 }

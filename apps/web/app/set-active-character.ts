@@ -23,4 +23,7 @@ export async function setActiveCharacter(
   const ATTRS = { path: '/', sameSite: 'lax' as const, httpOnly: false };
   cookieStore.set('dh:character', characterId, ATTRS);
   cookieStore.set('dh:world', worldId, ATTRS);
+  // REQ-DPPMC-LENS-01: clear GM view-overlay so the newly selected world
+  // starts from its own callerRole default (not a stale overlay from another world).
+  cookieStore.delete('dh:role');
 }
