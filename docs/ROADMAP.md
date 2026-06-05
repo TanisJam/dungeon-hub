@@ -11,7 +11,7 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 
 | Priority | Arc / Work | 1-line scope | Closes definition.md item |
 |---|---|---|---|
-| 1 | **JSON export** | Character export endpoint + download UI (start here, highest value). Then config/NPC export. Then full content round-trip (referential integrity is the hard part). Zero export code exists today. | #3.9 Import/export |
+| 1 | **JSON import/export (remaining)** | Character EXPORT ✅ shipped. Remaining: character RE-IMPORT (reuses the `schemaVersion:1` envelope; aligns slug algorithms first — see follow-up), then config/NPC/world export. Referential integrity on re-import is the hard part. | #3.9 Import/export |
 | 2 | **West Marches write-path** (`wm-knowledge-layer`, paused at #1808) | Player contribution to Bitácora: sightings, rumors, waypoints, session recaps. Sealing/debunking by DM. Bitácora→codex link. `NovedadesFeed` backend hookup. | #3.10 WM knowledge |
 | 3 | **Custom content via JSON upload** (DEC-1, locked 2026-06-04) | DM-accessible import surface: upload a JSON pack, enable per-world via `rulesProfile`. Reuses existing `compendium-import` pipeline. Visual authoring is post-MVP. | #3.8 Custom content |
 | 4 | **Quests** | DB table + API CRUD + wire existing `QuestsSinTocarList` UI shell. Currently zero backend. | #3.7 World content |
@@ -20,6 +20,8 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 | 7 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
 
 > ✅ **Campaign invite flow** (gap #782, was P1) — SHIPPED 2026-06-05 via SDD `campaign-invite-flow` (engram archive #1877). Invite-link mechanism (`campaign_invite_tokens` + `POST /campaigns/:id/invite` + `/invites/status|confirm` + `/invite/[token]` accept screen, atomic `worldMembers`+`campaignMembers` dual-write). Closes #3.6 DM campaigns.
+>
+> ✅ **Character JSON export** (MVP #3.9 first slice) — SHIPPED 2026-06-05 via SDD `character-json-export` (engram archive #1885). `GET /characters/:id/export` (owner-only) → versioned envelope `{schemaVersion:1, …, character:{…, data, inventory}}` (raw passthrough, no response schema) + sheet danger-zone download island. Follow-up before re-import: align the web (NFD) vs api (drop-non-ASCII) slug algorithms.
 
 ---
 
