@@ -1,5 +1,5 @@
-import { characterInitials } from '@/lib/character-initials';
 import { Pill } from '@/components/ui/pill';
+import { CharacterPortrait } from '@/components/ui/character-portrait';
 
 const XP_TABLE = [
   0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
@@ -31,7 +31,6 @@ export function SheetHero({
   xpCurrent,
   xpNextThreshold,
 }: SheetHeroProps) {
-  const initials = characterInitials(name, { maxChars: 2 });
   const isMaxLevel = level >= 20;
   const xpFill = isMaxLevel
     ? 100
@@ -47,20 +46,8 @@ export function SheetHero({
       <div className="pointer-events-none absolute inset-0" />
 
       <div className="relative z-10 flex items-center gap-4">
-        {/* Portrait — conic ring + initials */}
-        <div
-          className="ficha-portrait-ring flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-md"
-          style={{ padding: '2px' }}
-          aria-label={`Iniciales de ${name}`}
-        >
-          <div
-            className="ficha-portrait-inner flex h-full w-full items-center justify-center rounded-sm"
-          >
-            <span className="font-display text-2xl font-bold text-white">
-              {initials}
-            </span>
-          </div>
-        </div>
+        {/* Portrait — conic ring + initials (CharacterPortrait hero variant) */}
+        <CharacterPortrait name={name} size="hero" ariaLabel={`Iniciales de ${name}`} />
 
         {/* Name + subtitle + pills */}
         <div className="min-w-0 flex-1">

@@ -90,4 +90,43 @@ describe('CharacterPortrait', () => {
     const { container: c2 } = render(<CharacterPortrait name="X" size="sm" />);
     expect((c2.firstElementChild as HTMLElement).dataset.portraitSize).toBe('sm');
   });
+
+  // ── hero variant — sheet-hero conic ring (REQ from D2 batch-1 finding #1840 f3) ──
+
+  it('T9: size="hero" root has the ficha-portrait-ring class + data-portrait-size="hero"', () => {
+    const { container } = render(<CharacterPortrait name="Brann" size="hero" />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).toContain('ficha-portrait-ring');
+    expect(root.dataset.portraitSize).toBe('hero');
+  });
+
+  it('T10: size="hero" renders the ficha-portrait-inner wrapper', () => {
+    const { container } = render(<CharacterPortrait name="Brann" size="hero" />);
+    expect(container.querySelector('.ficha-portrait-inner')).toBeTruthy();
+  });
+
+  it('T11: size="hero" uses 2-char initials (single word → first two letters)', () => {
+    render(<CharacterPortrait name="Brann" size="hero" />);
+    expect(screen.getByText('BR')).toBeTruthy();
+  });
+
+  it('T11b: size="hero" 2-char initials (multi-word → first letter of first two words)', () => {
+    render(<CharacterPortrait name="Arken Drûm" size="hero" />);
+    expect(screen.getByText('AD')).toBeTruthy();
+  });
+
+  it('T12: size="hero" applies the provided ariaLabel to the root', () => {
+    const { container } = render(
+      <CharacterPortrait name="Brann" size="hero" ariaLabel="Iniciales de Brann" />,
+    );
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.getAttribute('aria-label')).toBe('Iniciales de Brann');
+  });
+
+  it('T13: size="hero" does NOT apply personajes-portrait/pendientes-portrait classes', () => {
+    const { container } = render(<CharacterPortrait name="Brann" size="hero" />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).not.toContain('personajes-portrait');
+    expect(root.className).not.toContain('pendientes-portrait');
+  });
 });
