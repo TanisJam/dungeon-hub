@@ -1,6 +1,7 @@
 import { SectionHead } from '@/components/ui/section-head';
 import { Pill } from '@/components/ui/pill';
 import type { CampaignDetail, CampaignMemberRole } from './types';
+import { InviteAffordance } from './_invite-affordance';
 
 export type CampanaSessionRow = {
   id: string;
@@ -72,6 +73,7 @@ export function CampanaDetailView({ detail, sessions }: Props) {
             </li>
           ))}
         </ul>
+        {detail.callerRole === 'gm' && <InviteAffordance campaignId={detail.id} />}
       </section>
 
       <section>

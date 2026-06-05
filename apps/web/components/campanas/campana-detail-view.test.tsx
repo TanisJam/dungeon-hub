@@ -1,7 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CampanaDetailView } from './campana-detail-view';
 import type { CampaignDetail } from './types';
+
+// CampanaDetailView now conditionally renders InviteAffordance ('use client'),
+// which transitively imports @/lib/supabase/client → @/lib/env → throws without
+// env vars. Mock the client module so these render tests stay env-agnostic.
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({ auth: { getSession: vi.fn() } }),
+}));
+vi.mock('@/lib/api', () => ({
+  api: { post: vi.fn() },
+  ApiError: class ApiError extends Error {},
+}));
 
 const baseDetail: CampaignDetail = {
   id: 'camp-1',
@@ -10,6 +21,7 @@ const baseDetail: CampaignDetail = {
   worldId: 'w-1',
   createdAt: '2026-01-01T00:00:00Z',
   memberRole: 'gm',
+  callerRole: 'gm',
   playersCount: 3,
   sessionsCount: 7,
   nextSession: null,

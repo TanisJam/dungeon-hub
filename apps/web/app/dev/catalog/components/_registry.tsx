@@ -2238,6 +2238,7 @@ const _fixtureCampaignDm: CampaignSummary = {
 
 const _fixtureCampaignDetail: CampaignDetail = {
   ..._fixtureCampaignDm,
+  callerRole: 'gm',
   tagline: 'Aventuras en el Filo del Mundo',
   members: [
     { userId: 'user-dm-01', username: 'Aurelion', role: 'gm', joinedAt: '2024-03-01T09:00:00Z' },
