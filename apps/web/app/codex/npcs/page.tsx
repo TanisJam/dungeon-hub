@@ -58,6 +58,7 @@ export default async function NpcsPage() {
           items={[
             { label: 'Facciones', href: '/codex/facciones' },
             { label: 'NPCs', href: '/codex/npcs' },
+            { label: 'Quests', href: '/codex/quests' },
           ]}
           activePath="/codex/npcs"
         />
@@ -96,6 +97,7 @@ export default async function NpcsPage() {
         items={[
           { label: 'Facciones', href: '/codex/facciones' },
           { label: 'NPCs', href: '/codex/npcs' },
+          { label: 'Quests', href: '/codex/quests' },
         ]}
         activePath="/codex/npcs"
       />

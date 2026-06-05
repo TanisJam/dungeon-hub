@@ -22,6 +22,7 @@ import type {
   ActiveCharacter,
   DMCampaignNextSession,
   PendingFichaSummary,
+  QuestSinTocar,
 } from '@/components/inicio/types';
 
 // ---------------------------------------------------------------------------
@@ -276,6 +277,27 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
     oldestAge = fichasData[fichasData.length - 1]?.sent;
   }
 
+  // Fetch quests for the 'sin tocar' widget and pendingQuests count (REQ-QUEST-INICIO-01)
+  // ADR-4: single unfiltered fetch; derive pendingQuests + sin-tocar client-side (small N).
+  let questsSinTocar: QuestSinTocar[] = [];
+  let pendingQuests = 0;
+  if (gmCampaign && token) {
+    const questsRes = await api
+      .get<{ data: { id: string; title: string; status: string; updatedAt: string }[] }>(
+        `/worlds/${gmCampaign.worldId}/quests?limit=50`,
+        token,
+      )
+      .catch(() => null);
+    const allQuests = questsRes?.data ?? [];
+    // REQ-QUEST-INICIO-03: count active quests (D1 — no extra round-trip)
+    pendingQuests = allQuests.filter((q) => q.status === 'active').length;
+    // REQ-QUEST-INICIO-02: sort ASC by updatedAt (oldest = sin tocar), slice top 10, map to display type
+    questsSinTocar = [...allQuests]
+      .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
+      .slice(0, 10)
+      .map((q) => ({ id: q.id, title: q.title, lastChange: relativeAge(q.updatedAt) }));
+  }
+
   // Build DM campaign display data
   let dmCampaignData: DMCampaignNextSession | null = null;
   if (gmCampaign) {
@@ -285,6 +307,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
       nextSession: gmCampaign.nextSession ? formatNextSession(gmCampaign.nextSession) : '—',
       players: gmCampaign.playersCount,
       sessions: gmCampaign.sessionsCount,
+      pendingQuests: pendingQuests > 0 ? pendingQuests : undefined,
     };
   }
 
@@ -296,7 +319,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
         <PendingFichasCardTrigger
           fichas={fichasData}
           oldestAge={oldestAge ?? '—'}
-          quests={[]}
+          quests={questsSinTocar}
         />
         {dmCampaignData ? (
           <>
@@ -327,7 +350,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
           </div>
         )}
         <DMQuickActions />
-        <QuestsSinTocarList quests={[]} />
+        <QuestsSinTocarList quests={questsSinTocar} />
       </div>
     </AppShell>
   );
