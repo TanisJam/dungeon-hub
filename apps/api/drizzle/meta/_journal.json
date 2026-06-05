@@ -253,6 +253,13 @@
       "when": 1780500000000,
       "tag": "0036_poi_world_level",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1780560000000,
+      "tag": "0037_campaign_invite_tokens",
+      "breakpoints": true
     }
   ]
 }

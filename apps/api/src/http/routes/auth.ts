@@ -1,10 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq, isNull, gt } from 'drizzle-orm';
-import { randomBytes } from 'node:crypto';
 import { db } from '../../infra/db/client.js';
 import { discordLinkTokens, users } from '../../infra/db/schema.js';
-import { env } from '../../env.js';
+import { generateToken, buildAppUrl } from '../../infra/tokens.js';
 
 /**
  * Endpoints para vincular accounts de Discord ↔ users del backend.
@@ -26,7 +25,6 @@ import { env } from '../../env.js';
  */
 
 const TOKEN_TTL_MINUTES = 10;
-const TOKEN_BYTES = 24; // 192 bits → 48 hex chars
 
 const RequestLinkBody = z.object({
   discord_id: z.string().min(1).max(64),
@@ -40,14 +38,6 @@ const ConfirmLinkBody = z.object({
 const StatusParams = z.object({
   token: z.string().min(1),
 });
-
-function generateToken(): string {
-  return randomBytes(TOKEN_BYTES).toString('hex');
-}
-
-function buildLinkUrl(token: string): string {
-  return `${env.WEB_APP_URL.replace(/\/$/, '')}/link/${token}`;
-}
 
 export const authRoute: FastifyPluginAsync = async (app) => {
   // ---- GET /auth/me --------------------------------------------------------
@@ -128,7 +118,7 @@ export const authRoute: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send({
       token,
-      url: buildLinkUrl(token),
+      url: buildAppUrl('link', token),
       expiresAt: expiresAt.toISOString(),
       ttlSeconds: TOKEN_TTL_MINUTES * 60,
     });

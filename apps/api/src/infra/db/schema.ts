@@ -155,6 +155,40 @@ export const campaignMembers = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// campaign_invite_tokens — shareable invite links for campaigns.
+//
+// Flow: GM calls POST /campaigns/:id/invite → backend generates a 48-hex token,
+// stores it here, returns the URL. A player opens the URL, authenticates, and
+// calls POST /invites/confirm → atomic dual-write to worldMembers + campaignMembers.
+//
+// Single-use default (maxUses=1, set by use-case); multi-use opt-in via maxUses=null.
+// revokedAt is schema-ready; no revoke UI in this change.
+// ---------------------------------------------------------------------------
+export const campaignInviteTokens = pgTable(
+  'campaign_invite_tokens',
+  {
+    token: text('token').primaryKey(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    createdByUserId: uuid('created_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    role: text('role', { enum: ['gm', 'player'] }).notNull().default('player'),
+    // NULL = unlimited (multi-use). Use-case sets 1 for single-use, null for multi-use.
+    maxUses: integer('max_uses'),
+    useCount: integer('use_count').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_campaign_invite_tokens_campaign').on(t.campaignId)],
+);
+
+// ---------------------------------------------------------------------------
 // characters — snapshot completo en data JSONB; inventory aparte para queries.
 //
 // campaign_id DROPPED (locked decision #774); world_id added.
