@@ -13,6 +13,7 @@ import { mapRoute } from './http/routes/map.js';
 import { worldRoute } from './http/routes/world.js';
 import { worldsRoute } from './http/routes/worlds.js';
 import { journalRoute } from './http/routes/journal.js';
+import { questsRoute } from './http/routes/quests.js';
 import { encountersRoute } from './http/routes/encounters.js';
 import { invitesRoute } from './http/routes/invites.js';
 
@@ -50,6 +51,7 @@ export async function buildServer() {
       await api.register(worldRoute);
       await api.register(worldsRoute);
       await api.register(journalRoute);
+      await api.register(questsRoute);
       await api.register(encountersRoute);
       await api.register(invitesRoute);
     },
