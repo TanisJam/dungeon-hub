@@ -22,9 +22,9 @@ interface SectionAffordanceProps {
  * SectionAffordance — pencil button + ViewOnlySectionSheet.
  *
  * Extracts the triplicate pattern from BackgroundSection, ClassSection, and
- * RaceSection: all three have the same pencil affordance (h-8 w-8, border-line,
- * hover:accent) and the same ViewOnlySectionSheet. They differ only in title,
- * display content (children), and wizardStepHref.
+ * RaceSection: all three have the same pencil affordance (44px touch-target,
+ * border-line, hover:accent) and the same ViewOnlySectionSheet. They differ only
+ * in title, display content (children), and wizardStepHref.
  *
  * Dedup: web-component-catalog/homogenization-tier1 — Dedup 2.
  */
@@ -44,7 +44,7 @@ export function SectionAffordance({
         type="button"
         aria-label={ariaLabel}
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
       >
         <Icon name="edit" size={14} />
       </button>

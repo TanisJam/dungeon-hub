@@ -8,7 +8,8 @@
  * T2: Pencil button click opens the ViewOnlySectionSheet (dialog visible).
  * T3: Sheet title matches the provided title prop.
  * T4: display children are rendered inside the sheet.
- * T5: The pencil button has the correct styling classes (h-8 w-8 affordance).
+ * T5: The pencil button meets the 44px touch-target (min-h/min-w-[44px]),
+ *     consistent with the atributos/hp section-editor pencils.
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -79,14 +80,14 @@ describe('SectionAffordance', () => {
     expect(screen.getByText('My section display')).toBeTruthy();
   });
 
-  it('T5: pencil button has correct styling classes', () => {
+  it('T5: pencil button meets the 44px touch-target', () => {
     render(
       <SectionAffordance {...baseProps}>
         <p>Display content</p>
       </SectionAffordance>,
     );
     const btn = screen.getByRole('button', { name: 'Editar trasfondo' });
-    expect(btn.className).toContain('h-8');
-    expect(btn.className).toContain('w-8');
+    expect(btn.className).toContain('min-h-[44px]');
+    expect(btn.className).toContain('min-w-[44px]');
   });
 });
