@@ -1,19 +1,25 @@
 'use client';
 
-// SessionList — vertical stack of SessionCards with DM FAB and empty state.
-// REQ-DPPMB-LIST-04, REQ-DPPMB-CT-01.
+// SessionList — vertical stack of SessionCards with DM FAB, create sheet,
+//               join bottom-sheet, and leave confirmation.
+// REQ-DPPMB-LIST-04, REQ-DPPMB-JOIN-01, REQ-DPPMB-LEAVE-02, REQ-DPPMB-CT-01.
 // ADR-B3: SessionList is 'use client'; receives serializable props from the
 //         Server Component page (ADR-B3: RSC boundary).
 // B2.2: DM FAB wired to SessionCreateForm inside V3Sheet.
+// B3.2: join sheet + leave confirm wired here.
 
 import { useState } from 'react';
 import { SectionHead } from '@/components/ui/section-head';
 import { V3Empty } from '@/components/ui/empty';
 import { V3Sheet } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { SessionCard } from './session-card';
 import { SessionCreateForm } from './session-create-form';
+import { JoinSheet } from './join-sheet';
+import { leaveSession } from '@/app/campanas/[id]/sessions/actions';
 import type { CampanaSessionRow } from '@/components/campanas/campana-detail-view';
+import type { RosterCharacter } from './join-sheet';
 
 export interface SessionListProps {
   campaignId: string;
@@ -22,6 +28,8 @@ export interface SessionListProps {
   /** callerRole='gm' shows DM FAB; 'player' shows join affordances */
   callerRole: 'gm' | 'player';
   activeParticipantCharIds: string[];
+  /** Active characters the caller owns in this world — fed into the join sheet. */
+  callerCharacters: RosterCharacter[];
   /** Called when the DM taps the FAB. Wired to the create sheet in B2. */
   onCreateRequest?: () => void;
   /** Called when a player taps "Unirme". Wired to the join sheet in B3. */
@@ -32,17 +40,63 @@ export interface SessionListProps {
 
 export function SessionList({
   campaignId,
+  worldId: _worldId,
   sessions,
   callerRole,
   activeParticipantCharIds,
+  callerCharacters,
   onCreateRequest,
   onJoinRequest,
   onLeaveRequest,
 }: SessionListProps) {
   const isDm = callerRole === 'gm';
 
-  // B2.2 — create sheet state; controlled here (not via onCreateRequest prop from parent)
+  // B2.2 — create sheet state
   const [showCreate, setShowCreate] = useState(false);
+
+  // B3.2 — join sheet state
+  const [joinSessionId, setJoinSessionId] = useState<string | null>(null);
+
+  // B3.2 — leave confirmation state: holds { sessionId, characterId } while confirm is shown
+  const [leaveTarget, setLeaveTarget] = useState<{
+    sessionId: string;
+    characterId: string;
+  } | null>(null);
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  // B3.2 — join handler wired from SessionCard.onJoinRequest
+  function handleJoinRequest(sessionId: string) {
+    setJoinSessionId(sessionId);
+    onJoinRequest?.(sessionId);
+  }
+
+  // B3.2 — leave handler wired from SessionCard.onLeaveRequest
+  function handleLeaveRequest(sessionId: string, characterId: string) {
+    setLeaveTarget({ sessionId, characterId });
+    setLeaveError(null);
+    onLeaveRequest?.(sessionId, characterId);
+  }
+
+  async function handleLeaveConfirm() {
+    if (!leaveTarget) return;
+    setLeaveSubmitting(true);
+    setLeaveError(null);
+
+    const result = await leaveSession(leaveTarget.sessionId, leaveTarget.characterId, campaignId);
+    setLeaveSubmitting(false);
+
+    if (result.ok) {
+      setLeaveTarget(null);
+    } else {
+      // REQ-DPPMB-LEAVE-04: 403 = no permission
+      if (result.status === 403) {
+        setLeaveError('No tenés permiso para salir de esta sesión.');
+      } else {
+        setLeaveError(result.error ?? 'No se pudo salir de la sesión. Intentá de nuevo.');
+      }
+    }
+  }
 
   return (
     <section className="relative">
@@ -59,6 +113,56 @@ export function SessionList({
           />
         </V3Sheet>
       )}
+
+      {/* B3.2 — Join bottom-sheet (player and DM-as-player) */}
+      <JoinSheet
+        open={joinSessionId !== null}
+        onClose={() => setJoinSessionId(null)}
+        sessionId={joinSessionId ?? ''}
+        campaignId={campaignId}
+        characters={callerCharacters}
+      />
+
+      {/* B3.2 — Leave confirmation sheet (REQ-DPPMB-LEAVE-02: explicit confirmation) */}
+      <V3Sheet
+        open={leaveTarget !== null}
+        onClose={() => {
+          setLeaveTarget(null);
+          setLeaveError(null);
+        }}
+        title="Salir de la sesión"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="font-sans text-sm text-ink">
+            ¿Salir de la sesión? Tu personaje será removido.
+          </p>
+          {leaveError && (
+            <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+              {leaveError}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <Button
+              tone="ghost"
+              fullWidth
+              onClick={() => {
+                setLeaveTarget(null);
+                setLeaveError(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              tone="cta"
+              fullWidth
+              disabled={leaveSubmitting}
+              onClick={handleLeaveConfirm}
+            >
+              {leaveSubmitting ? 'Saliendo…' : 'Confirmar'}
+            </Button>
+          </div>
+        </div>
+      </V3Sheet>
 
       <SectionHead title="Sesiones" meta={sessions.length} />
 
@@ -83,8 +187,8 @@ export function SessionList({
               campaignId={campaignId}
               session={s}
               activeParticipantCharIds={activeParticipantCharIds}
-              onJoinRequest={onJoinRequest}
-              onLeaveRequest={onLeaveRequest}
+              onJoinRequest={handleJoinRequest}
+              onLeaveRequest={handleLeaveRequest}
             />
           ))}
         </ul>

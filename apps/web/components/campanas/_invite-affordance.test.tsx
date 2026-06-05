@@ -133,12 +133,12 @@ describe('InviteAffordance', () => {
   });
 
   it('WIA-GM-VISIBILITY-04: affordance renders in CampanaDetailView when callerRole=gm', () => {
-    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'gm' }} sessions={[]} callerUserId="u-gm" worldId="w-1" />);
+    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'gm' }} sessions={[]} callerUserId="u-gm" worldId="w-1" callerCharacters={[]} />);
     expect(screen.getByRole('button', { name: /Invitar jugador/ })).toBeTruthy();
   });
 
   it('WIA-PLAYER-HIDDEN-05: affordance NOT rendered in CampanaDetailView when callerRole=player', () => {
-    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'player' }} sessions={[]} callerUserId="u-p1" worldId="w-1" />);
+    render(<CampanaDetailView detail={{ ...baseDetail, callerRole: 'player' }} sessions={[]} callerUserId="u-p1" worldId="w-1" callerCharacters={[]} />);
     expect(screen.queryByRole('button', { name: /Invitar jugador/ })).toBeNull();
   });
 });

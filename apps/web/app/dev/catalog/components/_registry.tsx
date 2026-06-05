@@ -2324,9 +2324,9 @@ const campanaDetailViewEntry: ComponentEntry = {
   render: (p) => {
     const label = (p._label as string) ?? '';
     if (label.includes('empty sessions')) {
-      return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={[]} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} />;
+      return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={[]} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} callerCharacters={[]} />;
     }
-    return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={_fixtureSessions} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} />;
+    return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={_fixtureSessions} callerUserId="user-gm-1" worldId={_fixtureCampaignDetail.worldId} callerCharacters={[]} />;
   },
 };
 

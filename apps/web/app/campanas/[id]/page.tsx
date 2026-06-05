@@ -30,16 +30,28 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
     throw err;
   }
 
-  // Parallelize sessions fetch + active world resolution (ADR-A5: gate at call site).
+  // Parallelize sessions + roster + active world (ADR-A5: gate at call site).
   // REQ-DPPMB-LIST-08: include participants so callerRole active-char derivation works.
-  const [sessionsResult, activeWorld] = await Promise.all([
+  // ADR-B4: roster fetched here (GET /characters?status=active); world-filtered in JoinSheet.
+  const [sessionsResult, activeWorld, rosterResult] = await Promise.all([
     api
       .get<{ data: CampanaSessionRow[] }>(`/sessions?campaignId=${id}`, token)
       .catch(() => ({ data: [] as CampanaSessionRow[] })),
     getActiveWorld(token),
+    api
+      .get<{ data: Array<{ id: string; name: string; lineage: string; worldId: string }> }>(
+        '/characters?status=active',
+        token,
+      )
+      .catch(() => ({ data: [] as Array<{ id: string; name: string; lineage: string; worldId: string }> })),
   ]);
 
   const worldId = activeWorld?.id ?? detail.worldId;
+
+  // Filter roster to this world (ADR-B4: client-side world filter).
+  const callerCharacters = (rosterResult.data ?? [])
+    .filter((c) => c.worldId === worldId)
+    .map((c) => ({ id: c.id, name: c.name, lineage: c.lineage, worldId: c.worldId }));
 
   return (
     <AppShell
@@ -53,6 +65,7 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
         sessions={sessionsResult.data}
         callerUserId={user.id}
         worldId={worldId}
+        callerCharacters={callerCharacters}
       />
     </AppShell>
   );

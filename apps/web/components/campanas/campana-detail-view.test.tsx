@@ -71,19 +71,19 @@ const scheduledSession = {
 describe('CampanaDetailView', () => {
   it('WCD-METADATA-01: renders name; renders tagline when present; omits tagline when empty', () => {
     const { rerender } = render(
-      <CampanaDetailView detail={{ ...baseDetail, tagline: 'Bajo el cielo del lago' }} sessions={[]} callerUserId="u-gm" worldId="w-1" />,
+      <CampanaDetailView detail={{ ...baseDetail, tagline: 'Bajo el cielo del lago' }} sessions={[]} callerUserId="u-gm" worldId="w-1" callerCharacters={[]} />,
     );
     expect(screen.getByText('Tres Lunas')).toBeTruthy();
     expect(screen.getByText('Bajo el cielo del lago')).toBeTruthy();
 
-    rerender(<CampanaDetailView detail={{ ...baseDetail, tagline: '' }} sessions={[]} callerUserId="u-gm" worldId="w-1" />);
+    rerender(<CampanaDetailView detail={{ ...baseDetail, tagline: '' }} sessions={[]} callerUserId="u-gm" worldId="w-1" callerCharacters={[]} />);
     // Re-find name (still rendered); tagline element absent
     expect(screen.getByText('Tres Lunas')).toBeTruthy();
     expect(screen.queryByTestId('campana-tagline')).toBeNull();
   });
 
   it('WCD-MEMBERS-LIST-02: renders one row per member with username + role label', () => {
-    render(<CampanaDetailView detail={baseDetail} sessions={[]} callerUserId="u-gm" worldId="w-1" />);
+    render(<CampanaDetailView detail={baseDetail} sessions={[]} callerUserId="u-gm" worldId="w-1" callerCharacters={[]} />);
     expect(screen.getByText('mau')).toBeTruthy();
     expect(screen.getByText('flor')).toBeTruthy();
     expect(screen.getByText('DM')).toBeTruthy();
@@ -91,7 +91,7 @@ describe('CampanaDetailView', () => {
   });
 
   it('WCD-SESSIONS-LIST-03: empty sessions renders "No hay sesiones aún"', () => {
-    render(<CampanaDetailView detail={baseDetail} sessions={[]} callerUserId="u-gm" worldId="w-1" />);
+    render(<CampanaDetailView detail={baseDetail} sessions={[]} callerUserId="u-gm" worldId="w-1" callerCharacters={[]} />);
     expect(screen.getByText('No hay sesiones aún')).toBeTruthy();
   });
 
@@ -102,6 +102,7 @@ describe('CampanaDetailView', () => {
         sessions={[scheduledSession]}
         callerUserId="u-gm"
         worldId="w-1"
+        callerCharacters={[]}
       />,
     );
     // The mock SessionList renders a data-testid="session-list" — it received sessions
@@ -116,6 +117,7 @@ describe('CampanaDetailView', () => {
         sessions={[scheduledSession]}
         callerUserId="u-gm"
         worldId="w-1"
+        callerCharacters={[]}
       />,
     );
     const list = screen.getByTestId('session-list');
@@ -131,6 +133,7 @@ describe('CampanaDetailView', () => {
         sessions={[scheduledSession]}
         callerUserId="u-p1"
         worldId="w-1"
+        callerCharacters={[]}
       />,
     );
     const list = screen.getByTestId('session-list');
@@ -154,6 +157,7 @@ describe('CampanaDetailView', () => {
         ]}
         callerUserId="u-p1"
         worldId="w-1"
+        callerCharacters={[]}
       />,
     );
     // mock renders data-testid="active-char" for each activeParticipantCharId

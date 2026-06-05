@@ -3,6 +3,7 @@ import { Pill } from '@/components/ui/pill';
 import type { CampaignDetail, CampaignMemberRole } from './types';
 import { InviteAffordance } from './_invite-affordance';
 import { SessionList } from '@/components/campanas/sessions/session-list';
+import type { RosterCharacter } from '@/components/campanas/sessions/join-sheet';
 
 // REQ-DPPMB-LIST-01: CampanaSessionRow extended with session fields for the play-loop UI.
 export type SessionParticipantRef = {
@@ -30,6 +31,8 @@ type Props = {
   sessions: CampanaSessionRow[];
   callerUserId: string;
   worldId: string;
+  /** Active characters the caller owns in this world — passed to SessionList → JoinSheet. */
+  callerCharacters: RosterCharacter[];
 };
 
 const ROLE_LABEL: Record<CampaignMemberRole, string> = {
@@ -41,7 +44,7 @@ const ROLE_TONE: Record<CampaignMemberRole, 'accent' | 'stone'> = {
   player: 'stone',
 };
 
-export function CampanaDetailView({ detail, sessions, callerUserId, worldId }: Props) {
+export function CampanaDetailView({ detail, sessions, callerUserId, worldId, callerCharacters }: Props) {
   // Derive the set of character IDs that the caller is an ACTIVE participant in
   // (leftAt IS NULL, userId matches the caller). Passed into SessionList so each
   // SessionCard can render the correct affordance without additional fetches.
@@ -87,6 +90,7 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId }: P
         sessions={sessions}
         callerRole={detail.callerRole ?? 'player'}
         activeParticipantCharIds={activeParticipantCharIds}
+        callerCharacters={callerCharacters}
       />
     </div>
   );
