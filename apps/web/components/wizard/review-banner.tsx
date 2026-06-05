@@ -52,10 +52,9 @@ export function ReviewBanner({
           {raceClassSummary}
         </p>
         <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap">
+          {/* Level — NORM: border-paper-soft/40 text-paper-soft → outline neutral (white/90, white/40). font-semibold→font-medium. */}
           {levelPill && (
-            <span className="inline-flex items-center rounded-pill border border-paper-soft/40 px-2.5 py-0.5 text-[10px] font-semibold text-paper-soft">
-              {levelPill.label}
-            </span>
+            <Pill tone="neutral" fill="outline" size="sm">{levelPill.label}</Pill>
           )}
           {classPill && (
             <Pill tone={classPill.tone ?? 'secondary'} size="sm">
