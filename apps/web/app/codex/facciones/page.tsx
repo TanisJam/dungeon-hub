@@ -8,6 +8,7 @@ import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { SubNav } from '@/components/world/_shell/sub-nav';
 import { FactionClientWrapper } from '@/components/world/factions/faction-client-wrapper';
 import { V3Empty } from '@/components/ui';
+import { CODEX_DM_SUBNAV_ITEMS } from '../_components/codex-subnav-items';
 import type { FactionRow } from '../actions';
 
 /**
@@ -56,11 +57,7 @@ export default async function FaccionesPage() {
         callerRole={callerRole}
       >
         <SubNav
-          items={[
-            { label: 'Facciones', href: '/codex/facciones' },
-            { label: 'NPCs', href: '/codex/npcs' },
-            { label: 'Quests', href: '/codex/quests' },
-          ]}
+          items={CODEX_DM_SUBNAV_ITEMS}
           activePath="/codex/facciones"
         />
         <V3Empty
@@ -92,11 +89,7 @@ export default async function FaccionesPage() {
       callerRole={callerRole}
     >
       <SubNav
-        items={[
-          { label: 'Facciones', href: '/codex/facciones' },
-          { label: 'NPCs', href: '/codex/npcs' },
-          { label: 'Quests', href: '/codex/quests' },
-        ]}
+        items={CODEX_DM_SUBNAV_ITEMS}
         activePath="/codex/facciones"
       />
       <FactionClientWrapper

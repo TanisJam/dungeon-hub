@@ -8,6 +8,7 @@ import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { SubNav } from '@/components/world/_shell/sub-nav';
 import { QuestClientWrapper } from '@/components/world/quests/quest-client-wrapper';
 import { V3Empty } from '@/components/ui';
+import { CODEX_DM_SUBNAV_ITEMS } from '../_components/codex-subnav-items';
 import type { QuestRow } from './actions';
 
 /**
@@ -46,11 +47,6 @@ export default async function QuestsPage() {
     />
   ) : undefined;
 
-  const subNavItems = [
-    { label: 'Facciones', href: '/codex/facciones' },
-    { label: 'NPCs', href: '/codex/npcs' },
-    { label: 'Quests', href: '/codex/quests' },
-  ];
 
   // REQ-QUEST-WEB-PAGE-01 Scenario: No active world — render empty state (no 500)
   if (!aw) {
@@ -61,7 +57,7 @@ export default async function QuestsPage() {
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
-        <SubNav items={subNavItems} activePath="/codex/quests" />
+        <SubNav items={CODEX_DM_SUBNAV_ITEMS} activePath="/codex/quests" />
         <V3Empty
           glyph="book"
           title="Sin mundo activo"
@@ -90,7 +86,7 @@ export default async function QuestsPage() {
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >
-      <SubNav items={subNavItems} activePath="/codex/quests" />
+      <SubNav items={CODEX_DM_SUBNAV_ITEMS} activePath="/codex/quests" />
       <QuestClientWrapper
         worldId={aw.id}
         effectiveView={effectiveView}
