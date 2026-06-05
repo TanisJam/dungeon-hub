@@ -4,6 +4,7 @@ import { api, ApiError } from '@/lib/api';
 import { getActiveWorld } from '@/lib/active-world';
 import { AppShell } from '@/components/layout/app-shell';
 import { SessionDetailView } from '@/components/campanas/sessions/session-detail-view';
+import { DmControls } from '@/components/campanas/sessions/dm-controls';
 import type { CampaignDetail } from '@/components/campanas/types';
 import type { SessionDetail, SessionEvent } from '@/app/campanas/[id]/sessions/actions';
 
@@ -103,30 +104,22 @@ export default async function SessionDetailPage({ params }: { params: RouteParam
       backHref={`/campanas/${id}`}
       callerRole={accessLevel === 'gm' ? 'gm' : 'player'}
     >
-      {/*
-        B5 will pass <DmControls> here via dmControlsSlot.
-        The slot accepts a ReactNode so the RSC boundary stays clean:
-        the page renders the slot, B5's client component is imported and
-        rendered server-side (or as a client island), passed down as a node.
-
-        DmControls slot contract for B5:
-          - Import DmControls from '@/components/campanas/sessions/dm-controls'
-          - Render: <DmControls
-              sessionId={sid}
-              campaignId={id}
-              status={sessionDetail.status}
-              accessLevel={accessLevel}
-            />
-          - Pass it as dmControlsSlot to SessionDetailView.
-          - DmControls is 'use client'; receives status as a serializable prop.
-      */}
+      {/* B5: DmControls wired into the dmControlsSlot (REQ-DPPMB-CTRL-01, contract from B4). */}
       <SessionDetailView
         detail={sessionDetail}
         events={events}
         accessLevel={accessLevel}
         campaignId={id}
         gmName={gmName}
-        dmControlsSlot={undefined}
+        dmControlsSlot={
+          <DmControls
+            sessionId={sid}
+            campaignId={id}
+            status={sessionDetail.status}
+            accessLevel={accessLevel}
+            participants={sessionDetail.participants}
+          />
+        }
       />
     </AppShell>
   );
