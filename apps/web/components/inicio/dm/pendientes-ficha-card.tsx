@@ -2,12 +2,15 @@ import { Pill } from '@/components/ui/pill';
 import { CharacterPortrait } from '@/components/ui/character-portrait';
 import type { PendingFichaSummary } from '../types';
 import { PendientesActionButtons } from './pendientes-action-buttons';
+import type { PendientesActions } from './pendientes-action-buttons';
 
 type Props = {
   ficha: PendingFichaSummary;
+  /** Injectable approve/reject handlers; omitted → real server actions. */
+  actions?: PendientesActions;
 };
 
-export function PendientesFichaCard({ ficha }: Props) {
+export function PendientesFichaCard({ ficha, actions }: Props) {
   const rootClass = [
     'rounded-xl bg-surface-raised p-3 flex flex-col gap-3',
     ficha.fresh ? 'pendientes-card-fresh' : '',
@@ -30,7 +33,7 @@ export function PendientesFichaCard({ ficha }: Props) {
           </div>
         </div>
       </div>
-      <PendientesActionButtons fichaId={ficha.id} />
+      <PendientesActionButtons fichaId={ficha.id} actions={actions} />
     </article>
   );
 }

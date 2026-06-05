@@ -53,4 +53,26 @@ describe('PendientesActionButtons', () => {
     expect(devolver.disabled).toBe(true);
     expect(verFicha.getAttribute('aria-disabled')).toBeNull();
   });
+
+  it('T5: injected actions.onApprove is called instead of the default server action', async () => {
+    const onApprove = vi.fn().mockResolvedValue(undefined);
+    const onReject = vi.fn().mockResolvedValue(undefined);
+    render(<PendientesActionButtons fichaId={FICHA_ID} actions={{ onApprove, onReject }} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /aprobar/i }));
+    });
+    expect(onApprove).toHaveBeenCalledWith(FICHA_ID);
+    expect(approveFichaFromInicio).not.toHaveBeenCalled();
+  });
+
+  it('T6: injected actions.onReject is called instead of the default server action', async () => {
+    const onApprove = vi.fn().mockResolvedValue(undefined);
+    const onReject = vi.fn().mockResolvedValue(undefined);
+    render(<PendientesActionButtons fichaId={FICHA_ID} actions={{ onApprove, onReject }} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /devolver/i }));
+    });
+    expect(onReject).toHaveBeenCalledWith(FICHA_ID);
+    expect(rejectFichaFromInicio).not.toHaveBeenCalled();
+  });
 });
