@@ -130,6 +130,51 @@ describe('EventClientWrapper — DM view (effectiveView="dm")', () => {
   });
 });
 
+// ─── Injected actions path ───────────────────────────────────────────────────
+
+describe('EventClientWrapper — injected actions (DI path)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with stub actions bundle: getEventDetail stub is called on row tap, real module action is NOT called', async () => {
+    const stubListEvents = vi.fn().mockResolvedValue({ rows: [mockEvent], total: 1 });
+    const stubGetEventDetail = vi.fn().mockResolvedValue(mockEvent);
+    const stubCreateEvent = vi.fn().mockResolvedValue({ ok: true, data: mockEvent });
+    const stubUpdateEvent = vi.fn().mockResolvedValue({ ok: true, data: mockEvent });
+    const stubDeleteEvent = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+
+    // Note: vi.clearAllMocks() called in beforeEach — module mock call counts are reset
+    render(
+      <EventClientWrapper
+        worldId="w-stub"
+        effectiveView="dm"
+        initialEvents={[mockEvent]}
+        actions={{
+          listEvents: stubListEvents,
+          getEventDetail: stubGetEventDetail,
+          createEvent: stubCreateEvent,
+          updateEvent: stubUpdateEvent,
+          deleteEvent: stubDeleteEvent,
+        }}
+      />,
+      { baseElement: document.body },
+    );
+
+    // Tap the row — triggers onLoadDetail which calls stubGetEventDetail
+    const rowButton = screen.getByRole('button', { name: /La Batalla de Piedra Negra/i });
+    fireEvent.click(rowButton);
+
+    await waitFor(() => {
+      expect(stubGetEventDetail).toHaveBeenCalledWith('ev-1');
+    });
+
+    // Real module actions must NOT have been called
+    expect(vi.mocked(actions.getEventDetail)).not.toHaveBeenCalled();
+    expect(vi.mocked(actions.listEvents)).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Player view tests ───────────────────────────────────────────────────────
 
 describe('EventClientWrapper — Player view (effectiveView="player")', () => {

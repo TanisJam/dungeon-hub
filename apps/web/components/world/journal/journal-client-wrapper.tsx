@@ -29,11 +29,35 @@ import {
 } from '@/app/cronica/actions';
 import type { JournalRow, JournalBody } from '@/app/cronica/actions';
 
+// ---------------------------------------------------------------------------
+// Dependency injection bundle
+// ---------------------------------------------------------------------------
+
+export type JournalWrapperActions = {
+  listJournalEntries: typeof listJournalEntries;
+  getJournalDetail: typeof getJournalDetail;
+  createJournalEntry: typeof createJournalEntry;
+  updateJournalEntry: typeof updateJournalEntry;
+  deleteJournalEntry: typeof deleteJournalEntry;
+};
+
+const DEFAULT_JOURNAL_ACTIONS: JournalWrapperActions = {
+  listJournalEntries,
+  getJournalDetail,
+  createJournalEntry,
+  updateJournalEntry,
+  deleteJournalEntry,
+};
+
+// ---------------------------------------------------------------------------
+
 interface JournalClientWrapperProps {
   worldId: string;
   effectiveView: EffectiveView;
   initialEntries: JournalRow[];
   initialTag?: string;
+  /** Optional action bundle for catalog/testing; defaults to real server actions. */
+  actions?: JournalWrapperActions;
 }
 
 /**
@@ -55,7 +79,9 @@ export function JournalClientWrapper({
   effectiveView,
   initialEntries,
   initialTag,
+  actions,
 }: JournalClientWrapperProps) {
+  const a = actions ?? DEFAULT_JOURNAL_ACTIONS;
   const router = useRouter();
   const [activeTag, setActiveTag] = useState<string | undefined>(initialTag);
   const [knownTags] = useState<string[]>(() => collectTags(initialEntries));
@@ -91,11 +117,11 @@ export function JournalClientWrapper({
   ): ReactNode {
     async function handleSubmit(body: JournalBody) {
       if (mode === 'create') {
-        const result = await createJournalEntry(worldId, body);
+        const result = await a.createJournalEntry(worldId, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       } else {
         if (!initial?.id) return { ok: false, error: 'ID de nota desconocido' };
-        const result = await updateJournalEntry(initial.id, body);
+        const result = await a.updateJournalEntry(initial.id, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       }
     }
@@ -112,17 +138,17 @@ export function JournalClientWrapper({
 
   // ─── onSearch ───────────────────────────────────────────────────────────────
   async function onSearch(q: string, offset: number) {
-    return listJournalEntries(worldId, q, offset, activeTag);
+    return a.listJournalEntries(worldId, q, offset, activeTag);
   }
 
   // ─── onLoadDetail ───────────────────────────────────────────────────────────
   async function onLoadDetail(row: JournalRow) {
-    return getJournalDetail(row.id);
+    return a.getJournalDetail(row.id);
   }
 
   // ─── onDelete (DM-only) ─────────────────────────────────────────────────────
   async function onDelete(row: JournalRow) {
-    await deleteJournalEntry(row.id);
+    await a.deleteJournalEntry(row.id);
   }
 
   return (

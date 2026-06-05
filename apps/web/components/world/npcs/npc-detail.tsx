@@ -15,11 +15,31 @@ import type { NpcRow, NpcFaction, NpcStatus, FactionRow } from '@/app/codex/acti
 import { getNpcDetail, attachNpcFaction, detachNpcFaction } from '@/app/codex/actions';
 import { FactionChipSection } from './faction-chip-section';
 
+// ---------------------------------------------------------------------------
+// Dependency injection bundle
+// ---------------------------------------------------------------------------
+
+export type NpcDetailActions = {
+  getNpcDetail: typeof getNpcDetail;
+  attachNpcFaction: typeof attachNpcFaction;
+  detachNpcFaction: typeof detachNpcFaction;
+};
+
+const DEFAULT_NPC_DETAIL_ACTIONS: NpcDetailActions = {
+  getNpcDetail,
+  attachNpcFaction,
+  detachNpcFaction,
+};
+
+// ---------------------------------------------------------------------------
+
 interface NpcDetailProps {
   detail: NpcRow;
   effectiveView: EffectiveView;
   worldId: string;
   worldFactions: FactionRow[];
+  /** Optional action bundle for catalog/testing; defaults to real server actions. */
+  actions?: NpcDetailActions;
 }
 
 const STATUS_LABELS: Record<NpcStatus, string> = {
@@ -36,15 +56,16 @@ const STATUS_TONES: Record<NpcStatus, PillTone> = {
   unknown: 'stone',
 };
 
-export function NpcDetailView({ detail, effectiveView, worldId, worldFactions }: NpcDetailProps) {
+export function NpcDetailView({ detail, effectiveView, worldId, worldFactions, actions }: NpcDetailProps) {
+  const a = actions ?? DEFAULT_NPC_DETAIL_ACTIONS;
   // REQ-NPC-02: manage faction chip list as local state; re-fetch after attach/detach (no stale chips).
   const [factions, setFactions] = useState<NpcFaction[]>(detail.factions);
 
   async function handleAttach(factionId: string): Promise<{ ok: boolean; error?: string }> {
-    const result = await attachNpcFaction(worldId, detail.id, factionId);
+    const result = await a.attachNpcFaction(worldId, detail.id, factionId);
     if (result.ok) {
       // Re-fetch full NPC detail to get fresh faction list
-      const refreshed = await getNpcDetail(detail.id);
+      const refreshed = await a.getNpcDetail(detail.id);
       if (refreshed) setFactions(refreshed.factions);
     }
     return result.ok
@@ -53,10 +74,10 @@ export function NpcDetailView({ detail, effectiveView, worldId, worldFactions }:
   }
 
   async function handleDetach(factionId: string): Promise<{ ok: boolean; error?: string }> {
-    const result = await detachNpcFaction(worldId, detail.id, factionId);
+    const result = await a.detachNpcFaction(worldId, detail.id, factionId);
     if (result.ok) {
       // Re-fetch full NPC detail to get fresh faction list
-      const refreshed = await getNpcDetail(detail.id);
+      const refreshed = await a.getNpcDetail(detail.id);
       if (refreshed) setFactions(refreshed.factions);
     }
     return result.ok

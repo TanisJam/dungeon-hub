@@ -130,6 +130,48 @@ describe('JournalClientWrapper — DM view (effectiveView="dm")', () => {
   });
 });
 
+// ─── Injected actions path ───────────────────────────────────────────────────
+
+describe('JournalClientWrapper — injected actions (DI path)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with stub actions bundle: getJournalDetail stub is called on row tap, real module action is NOT called', async () => {
+    const stubGetJournalDetail = vi.fn().mockResolvedValue(mockEntry);
+    const stubListJournalEntries = vi.fn().mockResolvedValue({ rows: [mockEntry], total: 1 });
+    const stubCreateJournalEntry = vi.fn().mockResolvedValue({ ok: true, data: mockEntry });
+    const stubUpdateJournalEntry = vi.fn().mockResolvedValue({ ok: true, data: mockEntry });
+    const stubDeleteJournalEntry = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+
+    render(
+      <JournalClientWrapper
+        worldId="w-stub"
+        effectiveView="dm"
+        initialEntries={[mockEntry]}
+        actions={{
+          listJournalEntries: stubListJournalEntries,
+          getJournalDetail: stubGetJournalDetail,
+          createJournalEntry: stubCreateJournalEntry,
+          updateJournalEntry: stubUpdateJournalEntry,
+          deleteJournalEntry: stubDeleteJournalEntry,
+        }}
+      />,
+      { baseElement: document.body },
+    );
+
+    const rowButton = screen.getByRole('button', { name: /Sesión 1 — Resumen/i });
+    fireEvent.click(rowButton);
+
+    await waitFor(() => {
+      expect(stubGetJournalDetail).toHaveBeenCalledWith('je-1');
+    });
+
+    // Real module action must NOT have been called — stub was used instead
+    expect(vi.mocked(actions.getJournalDetail)).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Player view tests ───────────────────────────────────────────────────────
 
 describe('JournalClientWrapper — Player view (effectiveView="player")', () => {

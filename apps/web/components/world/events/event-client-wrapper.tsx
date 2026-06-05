@@ -29,11 +29,35 @@ import {
 } from '@/app/cronica/actions';
 import type { EventRow, EventBody } from '@/app/cronica/actions';
 
+// ---------------------------------------------------------------------------
+// Dependency injection bundle
+// ---------------------------------------------------------------------------
+
+export type EventWrapperActions = {
+  listEvents: typeof listEvents;
+  getEventDetail: typeof getEventDetail;
+  createEvent: typeof createEvent;
+  updateEvent: typeof updateEvent;
+  deleteEvent: typeof deleteEvent;
+};
+
+const DEFAULT_EVENT_ACTIONS: EventWrapperActions = {
+  listEvents,
+  getEventDetail,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+};
+
+// ---------------------------------------------------------------------------
+
 interface EventClientWrapperProps {
   worldId: string;
   effectiveView: EffectiveView;
   initialEvents: EventRow[];
   initialTag?: string;
+  /** Optional action bundle for catalog/testing; defaults to real server actions. */
+  actions?: EventWrapperActions;
 }
 
 /**
@@ -55,7 +79,9 @@ export function EventClientWrapper({
   effectiveView,
   initialEvents,
   initialTag,
+  actions,
 }: EventClientWrapperProps) {
+  const a = actions ?? DEFAULT_EVENT_ACTIONS;
   const router = useRouter();
   const [activeTag, setActiveTag] = useState<string | undefined>(initialTag);
   // Collect tags from the initial list for the chip row (may grow as search results change)
@@ -93,11 +119,11 @@ export function EventClientWrapper({
   ): ReactNode {
     async function handleSubmit(body: EventBody) {
       if (mode === 'create') {
-        const result = await createEvent(worldId, body);
+        const result = await a.createEvent(worldId, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       } else {
         if (!initial?.id) return { ok: false, error: 'ID de evento desconocido' };
-        const result = await updateEvent(initial.id, body);
+        const result = await a.updateEvent(initial.id, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       }
     }
@@ -114,17 +140,17 @@ export function EventClientWrapper({
 
   // ─── onSearch ───────────────────────────────────────────────────────────────
   async function onSearch(q: string, offset: number) {
-    return listEvents(worldId, q, offset, activeTag);
+    return a.listEvents(worldId, q, offset, activeTag);
   }
 
   // ─── onLoadDetail ───────────────────────────────────────────────────────────
   async function onLoadDetail(row: EventRow) {
-    return getEventDetail(row.id);
+    return a.getEventDetail(row.id);
   }
 
   // ─── onDelete (DM-only) ─────────────────────────────────────────────────────
   async function onDelete(row: EventRow) {
-    await deleteEvent(row.id);
+    await a.deleteEvent(row.id);
   }
 
   return (

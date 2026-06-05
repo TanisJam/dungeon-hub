@@ -201,6 +201,61 @@ describe('HexClientWrapper — Player view (effectiveView="player")', () => {
   });
 });
 
+// ─── Injected actions path ───────────────────────────────────────────────────
+
+describe('HexClientWrapper — injected actions (DI path)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with stub actions bundle: getHexDetail stub is called on row tap, listPois stub not called on mount; real module actions are NOT called', async () => {
+    const stubGetHexDetail = vi.fn().mockResolvedValue(mockHex);
+    const stubListHexes = vi.fn().mockResolvedValue({ rows: [mockHex], total: 1 });
+    const stubCreateHex = vi.fn().mockResolvedValue({ ok: true, data: mockHex });
+    const stubUpdateHex = vi.fn().mockResolvedValue({ ok: true, data: mockHex });
+    const stubDeleteHex = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+    const stubListPois = vi.fn().mockResolvedValue([]);
+    const stubCreatePoi = vi.fn().mockResolvedValue({ ok: true, data: undefined as never });
+    const stubUpdatePoi = vi.fn().mockResolvedValue({ ok: true, data: undefined as never });
+    const stubDeletePoi = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+
+    render(
+      <HexClientWrapper
+        worldId="w-stub"
+        effectiveView="dm"
+        initialHexes={[mockHex]}
+        actions={{
+          listHexes: stubListHexes,
+          getHexDetail: stubGetHexDetail,
+          createHex: stubCreateHex,
+          updateHex: stubUpdateHex,
+          deleteHex: stubDeleteHex,
+          listPois: stubListPois,
+          createPoi: stubCreatePoi,
+          updatePoi: stubUpdatePoi,
+          deletePoi: stubDeletePoi,
+        }}
+      />,
+      { baseElement: document.body },
+    );
+
+    // listPois stub must NOT be called on initial mount (no N+1)
+    expect(stubListPois).not.toHaveBeenCalled();
+
+    // Tap hex row to open detail sheet
+    const rowButton = screen.getByRole('button', { name: /Valle de las Sombras/i });
+    fireEvent.click(rowButton);
+
+    await waitFor(() => {
+      expect(stubGetHexDetail).toHaveBeenCalledWith('hex-1');
+    });
+
+    // Real module actions must NOT have been called
+    expect(vi.mocked(actions.getHexDetail)).not.toHaveBeenCalled();
+    expect(vi.mocked(actions.listPois)).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Lazy POI tests (CRITICAL) ───────────────────────────────────────────────
 //
 // Architecture: PoiAccordion is rendered inside the hex detail sheet (V3Sheet),

@@ -40,17 +40,51 @@ import {
 } from '@/app/mapa/actions';
 import type { HexRow, HexBody, PoiRow, PoiBody } from '@/app/mapa/actions';
 
+// ---------------------------------------------------------------------------
+// Dependency injection bundle
+// ---------------------------------------------------------------------------
+
+export type HexWrapperActions = {
+  listHexes: typeof listHexes;
+  getHexDetail: typeof getHexDetail;
+  createHex: typeof createHex;
+  updateHex: typeof updateHex;
+  deleteHex: typeof deleteHex;
+  listPois: typeof listPois;
+  createPoi: typeof createPoi;
+  updatePoi: typeof updatePoi;
+  deletePoi: typeof deletePoi;
+};
+
+const DEFAULT_HEX_ACTIONS: HexWrapperActions = {
+  listHexes,
+  getHexDetail,
+  createHex,
+  updateHex,
+  deleteHex,
+  listPois,
+  createPoi,
+  updatePoi,
+  deletePoi,
+};
+
+// ---------------------------------------------------------------------------
+
 interface HexClientWrapperProps {
   worldId: string;
   effectiveView: EffectiveView;
   initialHexes: HexRow[];
+  /** Optional action bundle for catalog/testing; defaults to real server actions. */
+  actions?: HexWrapperActions;
 }
 
 export function HexClientWrapper({
   worldId,
   effectiveView,
   initialHexes,
+  actions,
 }: HexClientWrapperProps) {
+  const a = actions ?? DEFAULT_HEX_ACTIONS;
   const router = useRouter();
 
   // ─── Lazy POI cache ────────────────────────────────────────────────────────────
@@ -65,14 +99,14 @@ export function HexClientWrapper({
     // For mutations (create/update/delete), the cache is deliberately invalidated
     // by the mutation handlers before calling this — so we always get fresh data
     // after a mutation.
-    const loaded = await listPois(hexId);
+    const loaded = await a.listPois(hexId);
     setPoisCache((prev) => {
       const next = new Map(prev);
       next.set(hexId, loaded);
       return next;
     });
     return loaded;
-  }, []);
+  }, [a]);
 
   // Invalidate cache for a hex (called by mutation handlers before re-fetch)
   const invalidatePoiCache = useCallback((hexId: string) => {
@@ -86,7 +120,7 @@ export function HexClientWrapper({
   // ─── POI CRUD (DM-only) ────────────────────────────────────────────────────────
   const handleCreatePoi = useCallback(
     async (hexId: string, body: PoiBody) => {
-      const result = await createPoi(hexId, body);
+      const result = await a.createPoi(hexId, body);
       if (result.ok) {
         invalidatePoiCache(hexId);
       }
@@ -95,24 +129,24 @@ export function HexClientWrapper({
         error: result.ok ? undefined : (result as { error: string }).error,
       };
     },
-    [invalidatePoiCache],
+    [a, invalidatePoiCache],
   );
 
   const handleUpdatePoi = useCallback(
     async (poiId: string, body: Partial<PoiBody>) => {
-      const result = await updatePoi(poiId, body);
+      const result = await a.updatePoi(poiId, body);
       // The PoiAccordion will handle cache refresh after this
       return {
         ok: result.ok,
         error: result.ok ? undefined : (result as { error: string }).error,
       };
     },
-    [],
+    [a],
   );
 
   const handleDeletePoi = useCallback(async (poiId: string) => {
-    await deletePoi(poiId);
-  }, []);
+    await a.deletePoi(poiId);
+  }, [a]);
 
   // ─── Slot: renderRow ─────────────────────────────────────────────────────────
   // Note: PoiAccordion is NOT placed here because WorldEntityShell wraps each row
@@ -150,11 +184,11 @@ export function HexClientWrapper({
   ): ReactNode {
     async function handleSubmit(body: HexBody) {
       if (mode === 'create') {
-        const result = await createHex(worldId, body);
+        const result = await a.createHex(worldId, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       } else {
         if (!initial?.id) return { ok: false, error: 'ID de hex desconocido' };
-        const result = await updateHex(initial.id, body);
+        const result = await a.updateHex(initial.id, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       }
     }
@@ -171,17 +205,17 @@ export function HexClientWrapper({
 
   // ─── onSearch ──────────────────────────────────────────────────────────────────
   async function onSearch(q: string, offset: number) {
-    return listHexes(worldId, q, offset);
+    return a.listHexes(worldId, q, offset);
   }
 
   // ─── onLoadDetail ──────────────────────────────────────────────────────────────
   async function onLoadDetail(row: HexRow) {
-    return getHexDetail(row.id);
+    return a.getHexDetail(row.id);
   }
 
   // ─── onDelete (DM-only) ────────────────────────────────────────────────────────
   async function onDelete(row: HexRow) {
-    await deleteHex(row.id);
+    await a.deleteHex(row.id);
   }
 
   return (

@@ -181,6 +181,54 @@ describe('NpcClientWrapper — DM view (effectiveView="dm")', () => {
   });
 });
 
+// ─── Injected actions path ───────────────────────────────────────────────────
+
+describe('NpcClientWrapper — injected actions (DI path)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with stub actions bundle: getNpcDetail stub is called on row tap, real module action is NOT called', async () => {
+    const stubGetNpcDetail = vi.fn().mockResolvedValue(mockNpcRow);
+    const stubListNpcs = vi.fn().mockResolvedValue({ rows: [mockNpcRow], total: 1 });
+    const stubCreateNpc = vi.fn().mockResolvedValue({ ok: true, data: mockNpcRow });
+    const stubUpdateNpc = vi.fn().mockResolvedValue({ ok: true, data: mockNpcRow });
+    const stubDeleteNpc = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+    const stubAttachNpcFaction = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+    const stubDetachNpcFaction = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+
+    render(
+      <NpcClientWrapper
+        worldId="w-stub"
+        effectiveView="dm"
+        initialNpcs={[mockNpcRow]}
+        worldFactions={[mockWorldFaction]}
+        actions={{
+          listNpcs: stubListNpcs,
+          getNpcDetail: stubGetNpcDetail,
+          createNpc: stubCreateNpc,
+          updateNpc: stubUpdateNpc,
+          deleteNpc: stubDeleteNpc,
+          attachNpcFaction: stubAttachNpcFaction,
+          detachNpcFaction: stubDetachNpcFaction,
+        }}
+      />,
+      { baseElement: document.body },
+    );
+
+    const rowButton = screen.getByRole('button', { name: /Varis Sombraluz/i });
+    fireEvent.click(rowButton);
+
+    await waitFor(() => {
+      expect(stubGetNpcDetail).toHaveBeenCalledWith('npc-1');
+    });
+
+    // Real module actions must NOT have been called — stub was used instead
+    expect(vi.mocked(actions.getNpcDetail)).not.toHaveBeenCalled();
+    expect(vi.mocked(actions.listNpcs)).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Player view tests ───────────────────────────────────────────────────────
 
 describe('NpcClientWrapper — Player view (effectiveView="player")', () => {

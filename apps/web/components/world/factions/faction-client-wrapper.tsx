@@ -27,17 +27,44 @@ import {
 } from '@/app/codex/actions';
 import type { FactionRow, FactionBody } from '@/app/codex/actions';
 
+// ---------------------------------------------------------------------------
+// Dependency injection bundle
+// ---------------------------------------------------------------------------
+
+export type FactionWrapperActions = {
+  listFactions: typeof listFactions;
+  getFactionDetail: typeof getFactionDetail;
+  createFaction: typeof createFaction;
+  updateFaction: typeof updateFaction;
+  deleteFaction: typeof deleteFaction;
+};
+
+const DEFAULT_FACTION_ACTIONS: FactionWrapperActions = {
+  listFactions,
+  getFactionDetail,
+  createFaction,
+  updateFaction,
+  deleteFaction,
+};
+
+// ---------------------------------------------------------------------------
+
 interface FactionClientWrapperProps {
   worldId: string;
   effectiveView: EffectiveView;
   initialFactions: FactionRow[];
+  /** Optional action bundle for catalog/testing; defaults to real server actions. */
+  actions?: FactionWrapperActions;
 }
 
 export function FactionClientWrapper({
   worldId,
   effectiveView,
   initialFactions,
+  actions,
 }: FactionClientWrapperProps) {
+  const a = actions ?? DEFAULT_FACTION_ACTIONS;
+
   // ─── Slot: renderRow ────────────────────────────────────────────────────────
   function renderRow(row: FactionRow): ReactNode {
     return <FactionRowView row={row} />;
@@ -56,11 +83,11 @@ export function FactionClientWrapper({
   ): ReactNode {
     async function handleSubmit(body: FactionBody) {
       if (mode === 'create') {
-        const result = await createFaction(worldId, body);
+        const result = await a.createFaction(worldId, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       } else {
         if (!initial?.id) return { ok: false, error: 'ID de facción desconocido' };
-        const result = await updateFaction(initial.id, body);
+        const result = await a.updateFaction(initial.id, body);
         return { ok: result.ok, error: result.ok ? undefined : (result as { error: string }).error };
       }
     }
@@ -77,17 +104,17 @@ export function FactionClientWrapper({
 
   // ─── onSearch ───────────────────────────────────────────────────────────────
   async function onSearch(q: string, offset: number) {
-    return listFactions(worldId, q, offset);
+    return a.listFactions(worldId, q, offset);
   }
 
   // ─── onLoadDetail ───────────────────────────────────────────────────────────
   async function onLoadDetail(row: FactionRow) {
-    return getFactionDetail(row.id);
+    return a.getFactionDetail(row.id);
   }
 
   // ─── onDelete (DM-only) ─────────────────────────────────────────────────────
   async function onDelete(row: FactionRow) {
-    await deleteFaction(row.id);
+    await a.deleteFaction(row.id);
   }
 
   return (

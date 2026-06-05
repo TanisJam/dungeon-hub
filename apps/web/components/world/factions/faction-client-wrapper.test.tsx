@@ -123,6 +123,59 @@ describe('FactionClientWrapper — DM view (effectiveView="dm")', () => {
   });
 });
 
+// ─── Injected actions path ───────────────────────────────────────────────────
+
+describe('FactionClientWrapper — injected actions (DI path)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with stub actions bundle: getFactionDetail stub is called on row tap, real module is NOT called', async () => {
+    const stubFaction: FactionRow = {
+      id: 'f-stub',
+      worldId: 'w-stub',
+      name: 'Los Cazadores',
+      state: 'active',
+      description: 'Una facción de cazadores.',
+      dmNotes: null,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+
+    const stubListFactions = vi.fn().mockResolvedValue({ rows: [stubFaction], total: 1 });
+    const stubGetFactionDetail = vi.fn().mockResolvedValue(stubFaction);
+    const stubCreateFaction = vi.fn().mockResolvedValue({ ok: true, data: stubFaction });
+    const stubUpdateFaction = vi.fn().mockResolvedValue({ ok: true, data: stubFaction });
+    const stubDeleteFaction = vi.fn().mockResolvedValue({ ok: true, data: undefined });
+
+    render(
+      <FactionClientWrapper
+        worldId="w-stub"
+        effectiveView="dm"
+        initialFactions={[stubFaction]}
+        actions={{
+          listFactions: stubListFactions,
+          getFactionDetail: stubGetFactionDetail,
+          createFaction: stubCreateFaction,
+          updateFaction: stubUpdateFaction,
+          deleteFaction: stubDeleteFaction,
+        }}
+      />,
+      { baseElement: document.body },
+    );
+
+    const rowButton = screen.getByRole('button', { name: /Los Cazadores/i });
+    fireEvent.click(rowButton);
+
+    await waitFor(() => {
+      expect(stubGetFactionDetail).toHaveBeenCalledWith('f-stub');
+    });
+
+    // listFactions is not called on mount (only via onSearch debounce) — stub not invoked yet
+    expect(stubListFactions).not.toHaveBeenCalled();
+  });
+});
+
 describe('FactionClientWrapper — Player view (effectiveView="player")', () => {
   beforeEach(() => {
     vi.clearAllMocks();
