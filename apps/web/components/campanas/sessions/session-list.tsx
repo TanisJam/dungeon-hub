@@ -4,11 +4,15 @@
 // REQ-DPPMB-LIST-04, REQ-DPPMB-CT-01.
 // ADR-B3: SessionList is 'use client'; receives serializable props from the
 //         Server Component page (ADR-B3: RSC boundary).
+// B2.2: DM FAB wired to SessionCreateForm inside V3Sheet.
 
+import { useState } from 'react';
 import { SectionHead } from '@/components/ui/section-head';
 import { V3Empty } from '@/components/ui/empty';
+import { V3Sheet } from '@/components/ui/sheet';
 import { Icon } from '@/components/ui/icon';
 import { SessionCard } from './session-card';
+import { SessionCreateForm } from './session-create-form';
 import type { CampanaSessionRow } from '@/components/campanas/campana-detail-view';
 
 export interface SessionListProps {
@@ -37,8 +41,25 @@ export function SessionList({
 }: SessionListProps) {
   const isDm = callerRole === 'gm';
 
+  // B2.2 — create sheet state; controlled here (not via onCreateRequest prop from parent)
+  const [showCreate, setShowCreate] = useState(false);
+
   return (
     <section className="relative">
+      {/* B2.2 — Create-session V3Sheet (DM only) */}
+      {isDm && (
+        <V3Sheet
+          open={showCreate}
+          onClose={() => setShowCreate(false)}
+          title="Nueva sesión"
+        >
+          <SessionCreateForm
+            campaignId={campaignId}
+            onDone={() => setShowCreate(false)}
+          />
+        </V3Sheet>
+      )}
+
       <SectionHead title="Sesiones" meta={sessions.length} />
 
       {sessions.length === 0 ? (
@@ -70,13 +91,16 @@ export function SessionList({
       )}
 
       {/* REQ-DPPMB-LIST-04: DM FAB — fixed bottom-right, gate on callerRole==='gm'.
-          Tapping opens the create-session V3Sheet (wired in B2).
+          B2.2: onClick opens the create-session V3Sheet.
           md: becomes an inline header button per the design. */}
       {isDm && (
         <button
           type="button"
           aria-label="Nueva sesión"
-          onClick={onCreateRequest}
+          onClick={() => {
+            setShowCreate(true);
+            onCreateRequest?.();
+          }}
           className={[
             'fixed bottom-20 right-4 z-40',
             'flex h-14 w-14 items-center justify-center',
