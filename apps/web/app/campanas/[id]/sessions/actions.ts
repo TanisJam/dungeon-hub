@@ -28,7 +28,14 @@ export type ActionResult<T = void> =
 
 function handleApiError(err: unknown): ActionResult<never> {
   if (err instanceof ApiError) {
-    const body = err.body as { message?: string; error?: string } | null;
+    const body = err.body as { message?: string; error?: string; issues?: unknown[] } | null;
+    // When the API returns a domain validation error (400 with an issues[] array),
+    // serialize the issues so the calling component can map each code to a
+    // human-readable message (join-sheet resolveErrorMessage / complete-form
+    // resolveErrors both JSON.parse this). Without this they only saw "VALIDATION_FAILED".
+    if (Array.isArray(body?.issues) && body.issues.length > 0) {
+      return { ok: false, error: JSON.stringify(body.issues), status: err.status };
+    }
     return {
       ok: false,
       error: body?.message ?? body?.error ?? `API ${err.status}`,
