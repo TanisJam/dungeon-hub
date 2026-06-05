@@ -57,7 +57,8 @@ export function SessionCard({
   const isTerminal = TERMINAL_STATUSES.includes(session.status);
 
   // Derive whether this session has an active character belonging to the caller.
-  const participatingCharId = session.participants.find(
+  // Guard: participants may be absent on the list endpoint (only present on detail).
+  const participatingCharId = (session.participants ?? []).find(
     (p) => activeParticipantCharIds.includes(p.characterId) && p.leftAt === null,
   )?.characterId;
   const isParticipating = Boolean(participatingCharId);

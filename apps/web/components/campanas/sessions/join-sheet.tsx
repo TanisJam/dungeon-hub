@@ -31,6 +31,8 @@ interface JoinSheetProps {
   campaignId: string;
   /** Active characters in this world — world-filtered by the parent before passing in. */
   characters: RosterCharacter[];
+  /** Called with the characterId after a successful join — used for optimistic local state. */
+  onJoined?: (characterId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +83,7 @@ export function JoinSheet({
   sessionId,
   campaignId,
   characters,
+  onJoined,
 }: JoinSheetProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -97,6 +100,8 @@ export function JoinSheet({
     setSubmitting(false);
 
     if (result.ok) {
+      // Notify parent with the joined characterId for optimistic local state update.
+      onJoined?.(selectedId);
       onClose();
     } else {
       setError(resolveErrorMessage(result.error ?? ''));

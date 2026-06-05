@@ -309,6 +309,64 @@ export async function enrichParticipants(
 }
 
 /**
+ * Participant ref shape used in the session list response.
+ * Intentionally lightweight — the detail endpoint (GET /sessions/:id) returns
+ * enriched participants (name, lineage, level) via enrichParticipants().
+ */
+export interface SessionParticipantRef {
+  characterId: string;
+  userId: string;
+  joinedAt: Date;
+  leftAt: Date | null;
+}
+
+/**
+ * Attaches a `participants` array (all rows, including those who left) to each
+ * session row via a SINGLE query (no N+1).
+ *
+ * REQ-DPPMB-LIST-08: campaign-detail page needs the caller's participant set so
+ * session cards can render the correct "En sesión" / "Unirme" affordance.
+ * B6 cross-batch fix: the list endpoint was missing this, causing activeParticipantCharIds
+ * to always be [] on page load.
+ */
+export async function attachParticipants<T extends { id: string }>(
+  rows: T[],
+): Promise<(T & { participants: SessionParticipantRef[] })[]> {
+  if (rows.length === 0) return rows.map((r) => ({ ...r, participants: [] }));
+
+  const sessionIds = rows.map((r) => r.id);
+
+  const allParticipants = await db
+    .select({
+      sessionId: sessionParticipants.sessionId,
+      characterId: sessionParticipants.characterId,
+      userId: sessionParticipants.userId,
+      joinedAt: sessionParticipants.joinedAt,
+      leftAt: sessionParticipants.leftAt,
+    })
+    .from(sessionParticipants)
+    .where(inArray(sessionParticipants.sessionId, sessionIds));
+
+  // Group by sessionId.
+  const participantMap = new Map<string, SessionParticipantRef[]>();
+  for (const p of allParticipants) {
+    const list = participantMap.get(p.sessionId) ?? [];
+    list.push({
+      characterId: p.characterId,
+      userId: p.userId,
+      joinedAt: p.joinedAt,
+      leftAt: p.leftAt,
+    });
+    participantMap.set(p.sessionId, list);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    participants: participantMap.get(r.id) ?? [],
+  }));
+}
+
+/**
  * Attaches a `currentPlayers` count (participants with leftAt IS NULL) to
  * each session row via a SINGLE grouped-join query (no N+1).
  *

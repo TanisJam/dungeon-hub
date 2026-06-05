@@ -57,6 +57,15 @@ export function SessionList({
   // B3.2 — join sheet state
   const [joinSessionId, setJoinSessionId] = useState<string | null>(null);
 
+  // Local overlay for active participant character IDs.
+  // Starts from the server-derived prop but is updated optimistically on join/leave
+  // because the list endpoint does not return per-session participants (only currentPlayers).
+  // This ensures the "En sesión" / "Salir" affordance shows immediately without waiting
+  // for a full server re-render cycle. B6 cross-batch bug fix.
+  const [localParticipantCharIds, setLocalParticipantCharIds] = useState<string[]>(
+    activeParticipantCharIds,
+  );
+
   // B3.2 — leave confirmation state: holds { sessionId, characterId } while confirm is shown
   const [leaveTarget, setLeaveTarget] = useState<{
     sessionId: string;
@@ -87,6 +96,10 @@ export function SessionList({
     setLeaveSubmitting(false);
 
     if (result.ok) {
+      // Remove character from local participant set immediately (optimistic update).
+      setLocalParticipantCharIds((prev) =>
+        prev.filter((id) => id !== leaveTarget.characterId),
+      );
       setLeaveTarget(null);
     } else {
       // REQ-DPPMB-LEAVE-04: 403 = no permission
@@ -121,6 +134,15 @@ export function SessionList({
         sessionId={joinSessionId ?? ''}
         campaignId={campaignId}
         characters={callerCharacters}
+        onJoined={(characterId) => {
+          // Optimistic update: add characterId to local participant set immediately.
+          // The server revalidation catches up in the background; this ensures the
+          // "En sesión" chip shows without waiting for a full page re-render. B6 fix.
+          setLocalParticipantCharIds((prev) =>
+            prev.includes(characterId) ? prev : [...prev, characterId],
+          );
+          setJoinSessionId(null);
+        }}
       />
 
       {/* B3.2 — Leave confirmation sheet (REQ-DPPMB-LEAVE-02: explicit confirmation) */}
@@ -186,7 +208,7 @@ export function SessionList({
               key={s.id}
               campaignId={campaignId}
               session={s}
-              activeParticipantCharIds={activeParticipantCharIds}
+              activeParticipantCharIds={localParticipantCharIds}
               onJoinRequest={handleJoinRequest}
               onLeaveRequest={handleLeaveRequest}
             />

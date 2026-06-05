@@ -17,6 +17,7 @@ import {
 import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import {
   attachCurrentPlayers,
+  attachParticipants,
   enrichParticipants,
   findCharacterActiveSession,
   getSessionAccess,
@@ -249,7 +250,10 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
     });
 
     // REQ-DPPMB-LIST-01: attach currentPlayers count via a single grouped query (no N+1).
-    const enriched = await attachCurrentPlayers(cleaned);
+    // B6 fix: also attach lightweight participant refs so the web can derive
+    // per-user participation state (activeParticipantCharIds) without N+1 fetches.
+    const withPlayers = await attachCurrentPlayers(cleaned);
+    const enriched = await attachParticipants(withPlayers);
     return { data: enriched };
   });
 

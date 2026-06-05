@@ -23,7 +23,8 @@ export type CampanaSessionRow = {
   levelMax: number | null;
   maxPlayers: number | null;
   currentPlayers: number;
-  participants: SessionParticipantRef[];
+  /** Present only on GET /sessions/:id (detail). Absent on GET /sessions list. Default to []. */
+  participants?: SessionParticipantRef[];
 };
 
 type Props = {
@@ -49,8 +50,11 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId, cal
   // (leftAt IS NULL, userId matches the caller). Passed into SessionList so each
   // SessionCard can render the correct affordance without additional fetches.
   // REQ-DPPMB-LIST-08.
+  // Guard: the list endpoint (GET /sessions?campaignId=X) does not include a participants
+  // array — that field only exists on the session detail (GET /sessions/:id). Default to []
+  // so the flatMap doesn't crash on the list page. Cross-batch bug fix (B6).
   const activeParticipantCharIds = sessions.flatMap((s) =>
-    s.participants
+    (s.participants ?? [])
       .filter((p) => p.userId === callerUserId && p.leftAt === null)
       .map((p) => p.characterId),
   );
