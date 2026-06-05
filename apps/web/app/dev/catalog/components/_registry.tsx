@@ -33,6 +33,7 @@ import { CharacterPortrait } from '@/components/ui/character-portrait';
 import { DashedCTA } from '@/components/ui/dashed-cta';
 import { ListRow } from '@/components/ui/list-row';
 import { Pill } from '@/components/ui/pill';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { QuestRow } from '@/components/ui/quest-row';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -301,6 +302,37 @@ const buttonEntry: ComponentEntry = {
     >
       {p.children as ReactNode}
     </Button>
+  ),
+};
+
+const progressBarEntry: ComponentEntry = {
+  id: 'progress-bar',
+  name: 'ProgressBar',
+  group: 'ui',
+  notes: 'Thin track + width%-filled bar. Orthogonal axes: tone (accent | arcane | primary) = fill colour; height (sm h-1 | md h-1.5); optional trackClassName for on-dark/tinted tracks. Clamps 0–100%, max<=0 → 0%. Unifies sheet-hero XP (arcane, on-dark track), vital-grid HP (accent), and the codex discovery bar (primary). NOT for the encumbrance bar (status colours + tick marks).',
+  propsSchema: {
+    value:  { kind: 'number', default: 6,        label: 'Value' },
+    max:    { kind: 'number', default: 10,       label: 'Max' },
+    tone:   { kind: 'enum',   options: ['accent', 'arcane', 'primary'] as const, default: 'accent', label: 'Tone (fill)' },
+    height: { kind: 'enum',   options: ['sm', 'md'] as const,                     default: 'md',     label: 'Height' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'accent · md · 60%',  tone: 'accent',  height: 'md', value: 6,  max: 10 },
+    { _label: 'accent · sm · 60%',  tone: 'accent',  height: 'sm', value: 6,  max: 10 },
+    { _label: 'arcane · md · 35%',  tone: 'arcane',  height: 'md', value: 35, max: 100 },
+    { _label: 'primary · md · 80%', tone: 'primary', height: 'md', value: 8,  max: 10 },
+    { _label: 'clamp >100 → 100%',  tone: 'accent',  height: 'md', value: 15, max: 10 },
+    { _label: 'max 0 → 0%',         tone: 'accent',  height: 'md', value: 5,  max: 0  },
+  ],
+  render: (p) => (
+    <ProgressBar
+      value={p.value as number}
+      max={p.max as number}
+      tone={p.tone as 'accent' | 'arcane' | 'primary'}
+      height={p.height as 'sm' | 'md'}
+      ariaLabel={(p._label as string) ?? 'Progress'}
+    />
   ),
 };
 
@@ -3531,6 +3563,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   statCellEntry,
   buttonEntry,
   pillEntry,
+  progressBarEntry,
   toggleChipEntry,
   cardEntry,
   iconEntry,
