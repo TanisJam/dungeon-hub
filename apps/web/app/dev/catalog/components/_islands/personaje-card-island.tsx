@@ -4,18 +4,19 @@
  * PersonajeCardIsland — catalog demo of PersonajeCard with stubbed active-character button.
  *
  * PersonajeCard is a Server Component that renders SetActiveCharacterButton (a 'use client'
- * child) which calls setActiveCharacter (server action) + router.refresh(). In the catalog
- * we reproduce the full card layout using the real CharacterCard + Pill atoms and an inline
- * stub button — identical visual, no network or router dependency.
+ * child) which, in production, calls setActiveCharacter (server action) + router.refresh().
+ * In the catalog we reproduce the card layout with the real CharacterCard + Pill atoms and
+ * the real SetActiveCharacterButton driven by injected stub actions — no network, no router.
  *
  * Demonstrates three status variants: active (with star button), pending_approval, and draft.
- * INTERACTIVE — active card star button toggles fill state locally.
+ * INTERACTIVE — tapping the active card's star activates it locally (one-way, as in prod).
  */
 
 import { useState } from 'react';
 import { CharacterCard } from '@/components/ui/character-card';
 import { Pill } from '@/components/ui/pill';
 import type { PillTone } from '@/components/ui/pill';
+import { SetActiveCharacterButton } from '@/components/personajes/set-active-character-button';
 import type { RosterCharacter } from '@/components/personajes/types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -99,17 +100,12 @@ function PersonajeCardCatalog({
       className={isActive ? 'personajes-char-card-active' : 'border-line'}
       action={
         char.status === 'active' ? (
-          <button
-            type="button"
-            onClick={() => setIsActive((p) => !p)}
-            aria-label={isActive ? 'Personaje activo' : 'Seleccionar como personaje activo'}
-            aria-pressed={isActive}
-            className={`flex min-h-[44px] w-[44px] shrink-0 items-center justify-center rounded-r-md transition-colors ${
-              isActive ? 'text-accent' : 'text-ink-mute hover:text-accent'
-            }`}
-          >
-            {isActive ? '★' : '☆'}
-          </button>
+          <SetActiveCharacterButton
+            characterId={char.id}
+            worldId={char.worldId}
+            isActive={isActive}
+            actions={{ setActive: async () => {}, onActivated: () => setIsActive(true) }}
+          />
         ) : null
       }
     >
