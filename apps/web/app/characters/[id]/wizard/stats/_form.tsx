@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { saveStats } from './actions';
 import { WizardFooterNav } from '@/components/wizard/wizard-footer-nav';
 import { Pill } from '@/components/ui';
+import { StatCell } from '@/components/ui/stat-cell';
 import { nextValueForTile } from '@/lib/stat-tile-cycle';
 import type { NullableScores, AbilityKey } from '@/lib/stat-tile-cycle';
 
@@ -429,18 +430,12 @@ function RollEditor({
           const v = scores[a.key];
           const mod = modifier(v);
           return (
-            <div
+            <StatCell
               key={a.key}
-              className="flex flex-col items-center justify-center gap-1 rounded-md border border-line bg-surface py-3 px-2"
-            >
-              <span className="text-[10px] font-bold uppercase tracking-widest text-ink-mute">
-                {a.abbr}
-              </span>
-              <span className="font-display text-[28px] font-bold leading-none text-ink">
-                {v}
-              </span>
-              <Pill tone="primary" size="sm">{mod}</Pill>
-            </div>
+              label={a.abbr}
+              value={v}
+              sub={<Pill tone="primary" size="sm">{mod}</Pill>}
+            />
           );
         })}
       </div>
