@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Role } from '@/lib/use-role';
 import { useRole } from '@/lib/use-role';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 
 interface RoleSwitcherProps {
   /**
@@ -49,20 +50,15 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
   };
 
   const label = role === 'dm' ? 'DM' : 'PJ';
-  const tone =
-    role === 'dm'
-      ? 'border-secondary/45 text-secondary bg-secondary-soft/60'
-      : 'border-accent/45 text-accent bg-accent-soft/60';
 
   return (
-    <button
-      type="button"
-      data-value={role}
-      aria-pressed={role === 'dm'}
+    <ToggleChip
+      tone={role === 'dm' ? 'secondary' : 'accent'}
+      active
       onClick={toggle}
+      ariaPressed={role === 'dm'}
+      ariaLabel={`Vista actual: ${label}. Tocar para cambiar.`}
       title="Cambiar vista DM / Jugador"
-      aria-label={`Vista actual: ${label}. Tocar para cambiar.`}
-      className={`inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors hover:brightness-110 active:translate-y-px ${tone}`}
     >
       <svg
         aria-hidden="true"
@@ -79,6 +75,6 @@ export function RoleSwitcher({ defaultRole = 'player' }: RoleSwitcherProps) {
         <path d="M20 15H7M10 12l-3 3 3 3" />
       </svg>
       <span>{label}</span>
-    </button>
+    </ToggleChip>
   );
 }

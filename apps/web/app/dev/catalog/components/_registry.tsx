@@ -40,6 +40,7 @@ import { SectionHead } from '@/components/ui/section-head';
 import { CrowMark } from '@/components/ui/crow-mark';
 import { DiscordIcon } from '@/components/ui/discord-icon';
 import { V3Empty } from '@/components/ui/empty';
+import { ToggleChip } from '@/components/ui/toggle-chip';
 
 // layout/ components
 import { AppShell } from '@/components/layout/app-shell';
@@ -689,6 +690,39 @@ const emptyEntry: ComponentEntry = {
       title={p.title as string}
       sub={p.sub as string | undefined}
     />
+  ),
+};
+
+const toggleChipEntry: ComponentEntry = {
+  id: 'toggle-chip',
+  name: 'ToggleChip',
+  group: 'ui',
+  notes: [
+    'Pill-chip with active/inactive × tone. Extracted from RoleSwitcher.',
+    'Tone: accent (default) | secondary.',
+    'active=true → brand bg+border+text. active=false → border-line text-ink-mute bg-transparent.',
+    'Renders <button type="button"> with aria-pressed / aria-label / title slots.',
+    'className merged last.',
+  ].join(' '),
+  propsSchema: {
+    tone:   { kind: 'enum',    options: ['accent', 'secondary'] as const, default: 'accent', label: 'Tone' },
+    active: { kind: 'boolean', default: true,                                                 label: 'Active' },
+  },
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'accent active',    tone: 'accent',    active: true  },
+    { _label: 'accent inactive',  tone: 'accent',    active: false },
+    { _label: 'secondary active', tone: 'secondary', active: true  },
+    { _label: 'secondary inactive', tone: 'secondary', active: false },
+  ],
+  render: (p) => (
+    <ToggleChip
+      tone={p.tone as 'accent' | 'secondary'}
+      active={p.active as boolean}
+      ariaLabel={`Chip ${p.tone as string} ${(p.active as boolean) ? 'active' : 'inactive'}`}
+    >
+      {(p.tone as string) === 'secondary' ? 'DM' : 'PJ'}
+    </ToggleChip>
   ),
 };
 
@@ -2048,6 +2082,7 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   statCellEntry,
   buttonEntry,
   pillEntry,
+  toggleChipEntry,
   cardEntry,
   iconEntry,
   dashedCtaEntry,
