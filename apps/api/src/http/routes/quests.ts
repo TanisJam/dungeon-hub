@@ -157,7 +157,10 @@ export const questsRoute: FastifyPluginAsync = async (app) => {
         .set(updates)
         .where(eq(quests.id, questId))
         .returning();
-      return updated;
+      // PATCH is GM-only, so this projection is a no-op today — but keeping the
+      // dmNotes strip uniform with GET means a future access-model change can't
+      // silently leak dm-only fields through the update path. (verify W2)
+      return projectQuestForAccess(updated!, access);
     },
   );
 
