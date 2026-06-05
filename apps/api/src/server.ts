@@ -14,6 +14,7 @@ import { worldRoute } from './http/routes/world.js';
 import { worldsRoute } from './http/routes/worlds.js';
 import { journalRoute } from './http/routes/journal.js';
 import { encountersRoute } from './http/routes/encounters.js';
+import { invitesRoute } from './http/routes/invites.js';
 
 export async function buildServer() {
   const isDev = env.NODE_ENV === 'development';
@@ -50,6 +51,7 @@ export async function buildServer() {
       await api.register(worldsRoute);
       await api.register(journalRoute);
       await api.register(encountersRoute);
+      await api.register(invitesRoute);
     },
     { prefix: '/api/v1' },
   );

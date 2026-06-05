@@ -4,11 +4,19 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { DEFAULT_RULES_PROFILE, RulesProfileSchema } from '@dungeon-hub/domain/rules-profile';
 import { db } from '../../infra/db/client.js';
-import { campaigns, campaignMembers, users, worlds, worldMembers } from '../../infra/db/schema.js';
+import {
+  campaigns,
+  campaignMembers,
+  campaignInviteTokens,
+  users,
+  worlds,
+  worldMembers,
+} from '../../infra/db/schema.js';
 import { loadCampaign } from '../../use-cases/campaigns/load-campaign.js';
 import { listUserCampaigns } from '../../use-cases/campaigns/list-user-campaigns.js';
 import { loadCampaignMembers } from '../../use-cases/campaigns/load-campaign-members.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
+import { generateToken, buildAppUrl } from '../../infra/tokens.js';
 
 const CreateCampaignBody = z.object({
   name: z.string().min(1).max(120),
@@ -28,6 +36,13 @@ const UpdateCampaignBody = z.object({
    * Accepting it here for backward compat — updates the associated world.
    */
   rulesProfile: RulesProfileSchema.optional(),
+});
+
+const CreateInviteBody = z.object({
+  /** TTL in hours. Defaults to 168 (7 days). Clamped to [1, 720]. */
+  ttlHours: z.number().int().min(1).max(720).optional(),
+  /** When true, maxUses=null (unlimited). Default is single-use (maxUses=1). */
+  multiUse: z.boolean().optional(),
 });
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
@@ -178,7 +193,9 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
     if (member.length === 0) return reply.code(403).send({ error: 'FORBIDDEN' });
 
     const members = await loadCampaignMembers(id);
-    return { ...campaign, members };
+    // member[0] is guaranteed present — the member.length === 0 guard ran above.
+    const callerRole: 'gm' | 'player' = member[0]!.role;
+    return { ...campaign, members, callerRole };
   });
 
   // ---- PATCH /campaigns/:id ------------------------------------------------
@@ -217,5 +234,45 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
     }
 
     return { ...updated, rulesProfile: body.rulesProfile ?? campaign.rulesProfile };
+  });
+
+  // ---- POST /campaigns/:id/invite -----------------------------------------
+  // GM-only. Generates a shareable invite link for the campaign.
+  // Returns 201 { url, expiresAt }. NEVER logs the raw token.
+  app.post('/campaigns/:id/invite', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = CreateInviteBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const campaign = await loadCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const check = await assertWorldGm(campaign.worldId, userId);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: campaign.worldId, userId }],
+      });
+    }
+
+    const token = generateToken();
+    const ttlMs = (body.ttlHours ?? 168) * 3_600_000; // 168h = 7 days default
+    const expiresAt = new Date(Date.now() + ttlMs);
+    const maxUses = body.multiUse ? null : 1;
+
+    await db.insert(campaignInviteTokens).values({
+      token,
+      campaignId: id,
+      worldId: campaign.worldId,
+      createdByUserId: userId,
+      role: 'player',
+      maxUses,
+      expiresAt,
+    });
+
+    return reply.code(201).send({
+      url: buildAppUrl('invite', token),
+      expiresAt: expiresAt.toISOString(),
+    });
   });
 };
