@@ -235,10 +235,6 @@
     radial-gradient(ellipse 70% 55% at 90% 10%, rgba(168, 90, 142, 0.18), transparent 50%),
     var(--color-surface);
 }
-.inicio-camp-dm-role-pill {
-  background-color: var(--color-secondary);
-  color: var(--color-ink);
-}
 .inicio-quick-iniciativa-ic {
   background-color: rgba(168, 90, 142, 0.18);
   color: var(--color-secondary);
@@ -305,27 +301,6 @@
     var(--color-surface);
   border-color: rgba(168, 90, 142, 0.40);
 }
-.campanas-role-pill {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 3px 8px;
-  border-radius: 9999px;
-  font-family: var(--font-sans);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-  background: rgba(91, 179, 201, 0.10);
-  border: 1px solid rgba(91, 179, 201, 0.40);
-  color: var(--color-primary);
-}
-.campanas-role-pill-dm {
-  background: rgba(168, 90, 142, 0.14);
-  border-color: rgba(168, 90, 142, 0.45);
-  color: var(--color-secondary);
-}
-
 /* ── Encuentros (initiative tracker) — magenta/accent dial ── */
 .encuentros-init {
   position: relative;

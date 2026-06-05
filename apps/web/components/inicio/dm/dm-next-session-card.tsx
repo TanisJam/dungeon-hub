@@ -1,4 +1,5 @@
 import type { DMCampaignNextSession } from '../types';
+import { Pill } from '@/components/ui/pill';
 
 interface DMNextSessionCardProps {
   campaign: DMCampaignNextSession;
@@ -19,9 +20,17 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
   return (
     <div className="inicio-camp-dm-bg relative rounded-2xl p-4 overflow-hidden">
       {/* DM role pill — absolute positioned */}
-      <span className="inicio-camp-dm-role-pill absolute top-3 right-3 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest rounded-full">
+      {/* FLAG: original text-ink (#F4EAD5 light) on bg-secondary (magenta). Atom solid secondary uses
+           text-on-secondary (#1A1208 dark). DIFFERENT — dark ink vs light cream. Human sign-off needed. */}
+      {/* NORM: font-bold→font-medium (atom base); 11px→10px (sm); uppercase+tracking preserved via className */}
+      <Pill
+        tone="secondary"
+        fill="solid"
+        size="sm"
+        className="absolute top-3 right-3 uppercase tracking-widest"
+      >
         Dirigís
-      </span>
+      </Pill>
 
       {/* Campaign title */}
       <h2 className="font-display font-bold text-[19px] leading-tight tracking-tight text-ink pr-16 mt-1">

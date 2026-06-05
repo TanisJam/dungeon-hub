@@ -15,13 +15,18 @@ export function V3CampCard({ campaign }: Props) {
   const rootClass = ['campanas-camp-card', 'block rounded-md p-4', isDm ? 'campanas-camp-card-dm' : '']
     .filter(Boolean)
     .join(' ');
-  const rolePillClass = ['campanas-role-pill', isDm ? 'campanas-role-pill-dm' : '']
-    .filter(Boolean)
-    .join(' ');
 
   return (
     <Link href={`/campanas/${campaign.id}`} className={rootClass}>
-      <span className={rolePillClass}>{isDm ? 'Dirigís' : 'Jugás'}</span>
+      {/* Role pill — NORM: 9px→10px font size (atom sm); uppercase+tracking preserved via className */}
+      <Pill
+        tone={isDm ? 'secondary' : 'primary'}
+        fill="tint"
+        size="sm"
+        className="absolute top-3 right-3 uppercase tracking-widest"
+      >
+        {isDm ? 'Dirigís' : 'Jugás'}
+      </Pill>
       <div className="font-display text-[17px] font-bold leading-tight tracking-tight text-ink">
         {campaign.name}
       </div>

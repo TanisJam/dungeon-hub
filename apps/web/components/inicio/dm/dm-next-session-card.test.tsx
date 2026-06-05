@@ -45,9 +45,9 @@ describe('DMNextSessionCard', () => {
     expect(container.querySelector('.inicio-camp-dm-bg')).toBeTruthy();
   });
 
-  it('T3: Dirigís pill element has class inicio-camp-dm-role-pill containing "absolute"', () => {
+  it('T3: Dirigís pill is a <Pill> atom with data-tone="secondary" and class absolute', () => {
     const { container } = render(<DMNextSessionCard campaign={MOCK_DM_NEXT_CAMPAIGN} />);
-    const pill = container.querySelector('.inicio-camp-dm-role-pill');
+    const pill = container.querySelector('[data-tone="secondary"]');
     expect(pill).toBeTruthy();
     expect(pill!.className).toContain('absolute');
   });
