@@ -105,6 +105,9 @@ import { TableNodeView } from '@/components/compendium/nodes/table';
 import { InsetNodeView, InsetReadaloudNodeView } from '@/components/compendium/nodes/inset';
 import { ImageNodeView, GalleryNodeView } from '@/components/compendium/nodes/image';
 import { QuoteNodeView } from '@/components/compendium/nodes/quote';
+// compendium/ term-hover system + domain content islands (client)
+import { DomainContentIsland } from './_islands/domain-content-island';
+import { TermHoverIsland } from './_islands/term-hover-island';
 import type {
   Entry,
   EntryNode,
@@ -2826,6 +2829,26 @@ const quoteNodeViewEntry: ComponentEntry = {
   },
 };
 
+const termHoverEntry: ComponentEntry = {
+  id: 'term-hover',
+  name: 'Term hover (TermProvider · mockMode)',
+  group: 'compendium',
+  notes: 'INTERACTIVE — client island. Inline {@kind slug|source} tags become dotted-underline spans whose hover/focus opens a HoverCard (Term/TermCard) with the referenced entry. Production resolves over the API; catalog passes a populated mockMode resolver (Prone / Fireball / Goblin fixtures + one unresolved ref for the error state). Term/TermCard are internal — exercised via the public CompendiumEntriesWithTerms wrapper. Hover/tap a term; tap outside / Esc to dismiss.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <TermHoverIsland />,
+};
+
+const domainContentEntry: ComponentEntry = {
+  id: 'domain-content',
+  name: 'Compendium domain content',
+  group: 'compendium',
+  notes: 'Real /compendium domain renderers (SpellHeader, MonsterStatblockHeader, ItemHeader, RaceHeader, ClassHeader, BackgroundHeader) with representative PHB/MM fixture data — no live API or auth. Each of the 6 categories constrained to 375px (mobile-first). Spell body uses CompendiumEntriesWithTerms in mockMode.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <DomainContentIsland />,
+};
+
 // ── world/ group ──────────────────────────────────────────────────────────────
 
 const subNavEntry: ComponentEntry = {
@@ -3255,6 +3278,8 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   imageNodeViewEntry,
   galleryNodeViewEntry,
   quoteNodeViewEntry,
+  termHoverEntry,
+  domainContentEntry,
   // world/
   subNavEntry,
   eventRowViewEntry,

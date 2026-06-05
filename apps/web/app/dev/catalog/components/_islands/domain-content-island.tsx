@@ -215,15 +215,7 @@ export function DomainContentIsland() {
   const spellEntries = (FIREBALL.data.entries ?? []) as Entry[];
 
   return (
-    <section className="mt-6 space-y-4">
-      <h2 className="font-mono text-xs font-bold text-ink-mute uppercase tracking-widest border-b border-line pb-1">
-        compendium content — domain renderers
-      </h2>
-      <p className="text-[10px] text-ink-mute font-mono">
-        Real renderers from /compendium with representative fixture data (no live API or auth).
-        Each example constrained to 375px (mobile-first).
-      </p>
-
+    <div className="space-y-4">
       {/* ── Spell ── */}
       <div className="space-y-2">
         <div>
@@ -314,6 +306,6 @@ export function DomainContentIsland() {
           <BackgroundHeader data={ACOLYTE} />
         </ContentFrame>
       </div>
-    </section>
+    </div>
   );
 }

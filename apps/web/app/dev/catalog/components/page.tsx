@@ -2,7 +2,6 @@ import { COMPONENT_REGISTRY } from './_registry';
 import type { ComponentGroup } from './_registry-types';
 import { buildMatrix } from './_matrix';
 import { Frame375 } from './_frame-375';
-import { DomainContentIsland } from './_islands/domain-content-island';
 
 const GROUP_LABELS: Record<ComponentGroup, string> = {
   ui:          'ui/ primitives',
@@ -62,6 +61,24 @@ export default function ComponentsPage() {
               const combos = buildMatrix(entry);
               const schemaEntries = Object.entries(entry.propsSchema);
               const axisNames = entry.variantAxes ? Object.keys(entry.variantAxes) : [];
+
+              // 'bare' entries manage their own framing (e.g. islands that render
+              // their own 375px frames internally). Skip the Frame375 matrix wrap.
+              if (entry.preview === 'bare') {
+                return (
+                  <div key={entry.id} className="space-y-2">
+                    <div>
+                      <h3 className="font-display font-semibold text-sm text-ink">{entry.name}</h3>
+                      {entry.notes && (
+                        <p className="text-[10px] text-ink-mute font-mono mt-0.5">{entry.notes}</p>
+                      )}
+                    </div>
+                    {entry.render(
+                      (entry.fixedProps ?? {}) as Parameters<typeof entry.render>[0]
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <div key={entry.id} className="space-y-2">
@@ -129,9 +146,6 @@ export default function ComponentsPage() {
           </section>
         );
       })}
-
-      {/* Domain content — compendium renderers with fixture data */}
-      <DomainContentIsland />
     </div>
   );
 }
