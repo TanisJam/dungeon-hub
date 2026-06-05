@@ -1,13 +1,12 @@
 'use client';
 
-// NOTE: mirrors RageControls (apps/web/components/encuentros/rage-controls.tsx)
-// Dev-only catalog island — supplies fixture props + stub handlers (no server actions called).
-// Rage toggle is local state only; Toast feedback confirms the action visually.
+// Dev-only catalog island for RageControlsView.
+// Uses RageControlsView directly with fixture props + local React state
+// (no server actions called — catalog visualization only).
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Toast } from '@/components/ui/toast';
 import { useToast } from '@/lib/use-toast';
+import { RageControlsView } from '@/components/encuentros/rage-controls-view';
 
 type Props = {
   isOwnTurn?: boolean;
@@ -29,13 +28,14 @@ export function RageControlsIsland({
   const { message: toast, showToast } = useToast();
   const [isRaging, setIsRaging] = useState(initialRaging);
   const [localUsesRemaining, setLocalUsesRemaining] = useState(rageUsesRemaining);
+  const [pending] = useState(false);
 
   const isDisabled =
     !isOwnTurn ||
     bonusActionUsed ||
     (!isRaging && !rageUnlimited && localUsesRemaining <= 0);
 
-  function handleClick() {
+  function handleToggle() {
     if (isRaging) {
       setIsRaging(false);
       showToast('(Catálogo) Furia terminada — sin acción de servidor real.');
@@ -49,26 +49,16 @@ export function RageControlsIsland({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Toast message={toast} />
-
-      <p className="text-sm text-ink-soft">
-        {rageUnlimited ? (
-          <>Ilimitado usos de Furia</>
-        ) : (
-          <>{localUsesRemaining}&nbsp;/&nbsp;{rageMax}&nbsp;usos de Furia</>
-        )}
-      </p>
-
-      <Button
-        tone="ghost"
-        aria-label={isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
-        disabled={isDisabled}
-        onClick={handleClick}
-        fullWidth
-      >
-        {isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
-      </Button>
-    </div>
+    <RageControlsView
+      isRaging={isRaging}
+      isDisabled={isDisabled}
+      pending={pending}
+      actionError={null}
+      toastMessage={toast}
+      rageUnlimited={rageUnlimited}
+      rageUsesRemaining={localUsesRemaining}
+      rageMax={rageMax}
+      onToggle={handleToggle}
+    />
   );
 }
