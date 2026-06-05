@@ -482,3 +482,23 @@ export interface SheetResponse {
    */
   inventoryEnriched?: EnrichedInventoryItem[];
 }
+
+/**
+ * Mirror of the API CharacterExportEnvelope.
+ * Returned by GET /characters/:id/export.
+ * REQ-EXP-TYPE-02, REQ-EXP-ENV-01–05.
+ * userId is intentionally excluded — re-import binds to the importing user.
+ */
+export interface CharacterExportEnvelope {
+  schemaVersion: 1;
+  exportedAt: string; // ISO 8601 UTC
+  character: {
+    id: string;
+    name: string;
+    worldId: string;
+    status: 'draft' | 'active' | 'retired' | 'dead' | 'pending_approval';
+    xp: number;
+    data: unknown;
+    inventory: unknown;
+  };
+}

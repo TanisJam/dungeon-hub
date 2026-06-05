@@ -17,6 +17,7 @@ import { InventarioTab } from './_tabs/inventario';
 import { NotasTab } from './_tabs/notas';
 import { RecursosTab } from './_tabs/recursos';
 import { DeleteCharacterButton } from './_delete-button';
+import { ExportButton } from './_export-button';
 import { RestActions } from './_rest-actions';
 import { DmAwareAffordances } from './_components/dm-aware-affordances';
 import { HpEditorSlot } from './_components/hp-editor-slot';
@@ -271,6 +272,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           <p className="text-xs font-semibold uppercase tracking-wide text-red-400 mb-3">
             Zona de peligro
           </p>
+          <ExportButton characterId={id} characterName={identity.name} />
           <DeleteCharacterButton characterId={id} characterName={identity.name} />
         </section>
       </div>
