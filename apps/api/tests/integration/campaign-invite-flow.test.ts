@@ -65,6 +65,9 @@ function extractToken(url: string): string {
 let gm: TestUser;
 let player: TestUser;
 let outsider: TestUser;
+// A second world-GM added to the SAME world but never to the campaign's
+// campaign_members table — exercises the "world-GM without a campaign row" path.
+let coGm: TestUser;
 let worldId: string;
 let campaignId: string;
 
@@ -74,16 +77,26 @@ describe('campaign-invite-flow', () => {
     gm = await createTestUser();
     player = await createTestUser();
     outsider = await createTestUser();
+    coGm = await createTestUser();
 
     ({ worldId } = await createWorldWithGm(gm.id, { name: 'Invite World' }));
     const campaign = await createCampaignForGm(gm.accessToken, worldId);
     campaignId = campaign.id;
+
+    // Add coGm as a world-level GM of the existing world WITHOUT any campaign_members row.
+    const { db } = await import('../../src/infra/db/client.js');
+    const { worldMembers } = await import('../../src/infra/db/schema.js');
+    await db
+      .insert(worldMembers)
+      .values({ worldId, userId: coGm.id, role: 'gm' })
+      .onConflictDoNothing();
   });
 
   afterAll(async () => {
     if (gm) await deleteTestUser(gm.id);
     if (player) await deleteTestUser(player.id);
     if (outsider) await deleteTestUser(outsider.id);
+    if (coGm) await deleteTestUser(coGm.id);
     await closeTestApp();
   });
 
@@ -184,6 +197,26 @@ describe('campaign-invite-flow', () => {
       const body = res.json() as { alreadyMember: boolean; worldRole: string | null };
       expect(body.alreadyMember).toBe(true);
       expect(body.worldRole).toBe('gm');
+    });
+
+    // verify W1 fix: a world-GM with NO campaign_members row must still be treated
+    // as alreadyMember (decision #4 — world-GMs have authority without a campaign row),
+    // so the page shows the GM CTA instead of the player accept-flow.
+    it('(a2b) world-GM without campaign_members row → alreadyMember:true + worldRole:gm', async () => {
+      const app = await getTestApp();
+      const freshTokenRes = await createInvite(gm.accessToken, campaignId);
+      const freshToken = extractToken(freshTokenRes.json().url);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/invites/status/${freshToken}`,
+        headers: { authorization: `Bearer ${coGm.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { alreadyMember: boolean; worldRole: string | null };
+      // coGm is a world-GM of this world but has NO campaign_members row for this campaign.
+      expect(body.worldRole).toBe('gm');
+      expect(body.alreadyMember).toBe(true);
     });
 
     it('(a3) alreadyMember player → worldRole: player', async () => {

@@ -80,8 +80,6 @@ export const invitesRoute: FastifyPluginAsync = async (app) => {
         )
         .limit(1);
 
-      const alreadyMember = memberRows.length > 0;
-
       // Resolve caller's world-level role so the invite page can branch on GM vs player.
       // ADR-A4: natural to do here since worldId is already in scope from the join.
       const wmRows = await db
@@ -90,6 +88,12 @@ export const invitesRoute: FastifyPluginAsync = async (app) => {
         .where(and(eq(worldMembers.worldId, row.worldId), eq(worldMembers.userId, userId)))
         .limit(1);
       const worldRole: 'gm' | 'player' | null = wmRows[0]?.role ?? null;
+
+      // A world-GM already has authority over this campaign (decision #4: world-GMs can
+      // run/list its sessions without a campaign_members row). Treat them as "already in"
+      // so the page shows the GM CTA instead of the player accept-flow, even if they were
+      // never added to campaign_members (e.g. a co-GM or a campaign created by another GM).
+      const alreadyMember = memberRows.length > 0 || worldRole === 'gm';
 
       // NEVER echo the raw token in the response.
       return {
