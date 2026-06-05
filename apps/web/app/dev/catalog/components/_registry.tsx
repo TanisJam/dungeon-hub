@@ -207,33 +207,67 @@ const pillEntry: ComponentEntry = {
   id: 'pill',
   name: 'Pill',
   group: 'ui',
-  notes: 'Semantic tones: primary (cyan) | accent (copper) | secondary (magenta) | ink | stone | amber | danger | success. B2: danger+success added.',
+  notes: [
+    'Tones (B3): primary | accent | secondary | ink | stone | amber | danger | success | neutral.',
+    'Fill axis: soft (default — zero-visual change for existing callers) | solid (brand bg + on-color text) | outline (transparent bg, colored border+text) | tint (translucent bg + brand border+text).',
+    'outline+neutral = on-dark ghost pill (hero level / review level). Wrap in dark bg to preview correctly.',
+    'tint+primary/secondary = campañas role-pill pattern.',
+    'solid+accent → text-on-accent (dark ink on copper). solid+secondary → text-on-secondary (dark ink on magenta). FLAG for sign-off.',
+    'className prop merged last for spacing/positioning.',
+  ].join(' '),
   propsSchema: {
-    tone:     { kind: 'enum', options: ['primary', 'accent', 'secondary', 'ink', 'stone', 'amber', 'danger', 'success'] as const, default: 'primary', label: 'Tone' },
-    size:     { kind: 'enum', options: ['sm', 'md'] as const,                                                                      default: 'md',      label: 'Size' },
-    children: { kind: 'node', default: 'Label',                                                                                    label: 'Label' },
+    tone:     { kind: 'enum', options: ['primary', 'accent', 'secondary', 'ink', 'stone', 'amber', 'danger', 'success', 'neutral'] as const, default: 'primary', label: 'Tone' },
+    fill:     { kind: 'enum', options: ['soft', 'solid', 'outline', 'tint'] as const,                                                         default: 'soft',    label: 'Fill' },
+    size:     { kind: 'enum', options: ['sm', 'md'] as const,                                                                                  default: 'md',      label: 'Size' },
+    children: { kind: 'node', default: 'Label',                                                                                                label: 'Label' },
   },
   matrixMode: 'list',
   explicitCombos: [
-    { tone: 'primary',   size: 'md', children: 'Active' },
-    { tone: 'accent',    size: 'md', children: 'Player' },
-    { tone: 'secondary', size: 'md', children: 'DM' },
-    { tone: 'ink',       size: 'md', children: 'Ink' },
-    { tone: 'stone',     size: 'md', children: 'Stone' },
-    { tone: 'amber',     size: 'md', children: 'Amber' },
-    { tone: 'danger',    size: 'md', children: 'Danger' },
-    { tone: 'success',   size: 'md', children: 'Success' },
-    { tone: 'primary',   size: 'sm', children: 'Active sm' },
-    { tone: 'accent',    size: 'sm', children: 'Player sm' },
+    // ── soft (default) — zero-regression for all existing tones ──
+    { _label: 'soft primary',   tone: 'primary',   fill: 'soft',    size: 'md', children: 'Active' },
+    { _label: 'soft accent',    tone: 'accent',    fill: 'soft',    size: 'md', children: 'Player' },
+    { _label: 'soft secondary', tone: 'secondary', fill: 'soft',    size: 'md', children: 'DM' },
+    { _label: 'soft stone',     tone: 'stone',     fill: 'soft',    size: 'md', children: 'Stone' },
+    { _label: 'soft amber',     tone: 'amber',     fill: 'soft',    size: 'md', children: 'Amber' },
+    { _label: 'soft danger',    tone: 'danger',    fill: 'soft',    size: 'md', children: 'Danger' },
+    { _label: 'soft success',   tone: 'success',   fill: 'soft',    size: 'md', children: 'Success' },
+    { _label: 'soft neutral',   tone: 'neutral',   fill: 'soft',    size: 'md', children: 'Neutral' },
+    // ── solid ──
+    { _label: 'solid accent',    tone: 'accent',    fill: 'solid',   size: 'md', children: 'Bardo' },
+    { _label: 'solid secondary', tone: 'secondary', fill: 'solid',   size: 'md', children: 'Dirigís' },
+    { _label: 'solid primary',   tone: 'primary',   fill: 'solid',   size: 'md', children: 'Online' },
+    // ── tint — campañas role-pill pattern ──
+    { _label: 'tint primary',   tone: 'primary',   fill: 'tint',    size: 'sm', children: 'Jugás' },
+    { _label: 'tint secondary', tone: 'secondary', fill: 'tint',    size: 'sm', children: 'Dirigís' },
+    { _label: 'tint accent',    tone: 'accent',    fill: 'tint',    size: 'sm', children: 'Activo' },
+    // ── outline on light bg ──
+    { _label: 'outline primary',   tone: 'primary',   fill: 'outline', size: 'md', children: 'Online' },
+    { _label: 'outline accent',    tone: 'accent',    fill: 'outline', size: 'md', children: 'Activo' },
+    { _label: 'outline secondary', tone: 'secondary', fill: 'outline', size: 'md', children: 'DM' },
+    // ── outline+neutral — on-dark ghost pill (dark wrapper required for correct preview) ──
+    { _label: 'outline neutral dark-bg md — ✦ Nivel 4', tone: 'neutral', fill: 'outline', size: 'md', children: '✦ Nivel 4' },
+    { _label: 'outline neutral dark-bg sm — ✦ Nivel 1', tone: 'neutral', fill: 'outline', size: 'sm', children: '✦ Nivel 1' },
   ],
-  render: (p) => (
-    <Pill
-      tone={p.tone as 'primary' | 'accent' | 'secondary' | 'ink' | 'stone' | 'amber' | 'danger' | 'success'}
-      size={p.size as 'sm' | 'md'}
-    >
-      {p.children as ReactNode}
-    </Pill>
-  ),
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const pill = (
+      <Pill
+        tone={p.tone as import('@/components/ui/pill').PillTone}
+        fill={p.fill as import('@/components/ui/pill').PillFill}
+        size={p.size as 'sm' | 'md'}
+      >
+        {p.children as ReactNode}
+      </Pill>
+    );
+    if (label.includes('dark-bg')) {
+      return (
+        <div className="rounded-md bg-ink px-3 py-2 flex items-center">
+          {pill}
+        </div>
+      );
+    }
+    return pill;
+  },
 };
 
 const cardEntry: ComponentEntry = {

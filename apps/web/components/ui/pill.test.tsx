@@ -104,4 +104,66 @@ describe('Pill', () => {
     const el = screen.getByText('Test');
     expect(el.getAttribute('data-tone')).toBe('danger');
   });
+
+  // ── fill axis (B3) ────────────────────────────────────────────────────────
+
+  it('fill="soft" (default) tone="primary" renders existing soft classes unchanged — zero-regression', () => {
+    render(<Pill tone="primary">Soft</Pill>);
+    const el = screen.getByText('Soft');
+    expect(el.className).toContain('bg-primary-soft');
+    expect(el.className).toContain('text-primary-deep');
+  });
+
+  it('fill="solid" tone="accent" → bg-accent and text-on-accent', () => {
+    render(<Pill tone="accent" fill="solid">Solid</Pill>);
+    const el = screen.getByText('Solid');
+    expect(el.className).toContain('bg-accent');
+    expect(el.className).toContain('text-on-accent');
+  });
+
+  it('fill="outline" tone="neutral" → border-white/40 and text-white/90 and bg-transparent', () => {
+    render(<Pill tone="neutral" fill="outline">Ghost</Pill>);
+    const el = screen.getByText('Ghost');
+    expect(el.className).toContain('border-white/40');
+    expect(el.className).toContain('text-white/90');
+    expect(el.className).toContain('bg-transparent');
+  });
+
+  it('fill="tint" tone="primary" → bg-primary/10 and border-primary/40 and text-primary', () => {
+    render(<Pill tone="primary" fill="tint">Tint</Pill>);
+    const el = screen.getByText('Tint');
+    expect(el.className).toContain('bg-primary/10');
+    expect(el.className).toContain('border-primary/40');
+    expect(el.className).toContain('text-primary');
+  });
+
+  it('fill="outline" tone="primary" → border-primary/50 and text-primary', () => {
+    render(<Pill tone="primary" fill="outline">Outline Primary</Pill>);
+    const el = screen.getByText('Outline Primary');
+    expect(el.className).toContain('border-primary/50');
+    expect(el.className).toContain('text-primary');
+  });
+
+  it('className prop is merged into output', () => {
+    render(<Pill tone="stone" className="mb-1">Merge</Pill>);
+    const el = screen.getByText('Merge');
+    expect(el.className).toContain('mb-1');
+  });
+
+  it('base classes (rounded-pill, size) are present regardless of fill', () => {
+    render(<Pill tone="neutral" fill="solid" size="sm">Base</Pill>);
+    const el = screen.getByText('Base');
+    expect(el.className).toContain('rounded-pill');
+    expect(el.className).toContain('px-2');
+    expect(el.className).toContain('text-[10px]');
+  });
+
+  // ── neutral tone ─────────────────────────────────────────────────────────
+
+  it('tone="neutral" fill="soft" (default) → bg-paper-soft text-ink-soft', () => {
+    render(<Pill tone="neutral">Neutral</Pill>);
+    const el = screen.getByText('Neutral');
+    expect(el.className).toContain('bg-paper-soft');
+    expect(el.className).toContain('text-ink-soft');
+  });
 });
