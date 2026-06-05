@@ -968,19 +968,20 @@ const bannerEntry: ComponentEntry = {
   id: 'sheet-banner',
   name: 'Banner',
   group: 'sheet',
-  notes: 'Reusable notification banner. tone: amber (bg-warning-soft / text-warning-deep / border-warning) | ink (bg-ink / text-surface) | stone (bg-paper-soft / text-ink-soft / border-line). Full-width, rounded-md, text-sm font-medium text-center.',
+  notes: 'Reusable notification banner. tone: amber (bg-warning-soft / text-warning-deep / border-warning) | ink (bg-ink / text-surface) | stone (bg-paper-soft / text-ink-soft / border-line) | danger (bg-danger-soft / text-danger / border-danger). Full-width, rounded-md, text-sm font-medium text-center.',
   propsSchema: {
-    tone:     { kind: 'enum',    options: ['amber', 'ink', 'stone'] as const, default: 'amber', label: 'Tone' },
+    tone:     { kind: 'enum',    options: ['amber', 'ink', 'stone', 'danger'] as const, default: 'amber', label: 'Tone' },
     children: { kind: 'node',    default: 'Mensaje del sistema',              label: 'Content' },
   },
   matrixMode: 'list',
   explicitCombos: [
-    { tone: 'amber', children: 'Personaje pendiente de aprobación del DM.' },
-    { tone: 'ink',   children: 'Tu turno — realizá una acción.' },
-    { tone: 'stone', children: 'Vista de solo lectura. Pedí al DM que habilite edición.' },
+    { tone: 'amber',  children: 'Personaje pendiente de aprobación del DM.' },
+    { tone: 'ink',    children: 'Tu turno — realizá una acción.' },
+    { tone: 'stone',  children: 'Vista de solo lectura. Pedí al DM que habilite edición.' },
+    { tone: 'danger', children: 'No se pudo guardar. Revisá tu conexión e intentá de nuevo.' },
   ],
   render: (p) => (
-    <Banner tone={p.tone as 'amber' | 'ink' | 'stone'}>
+    <Banner tone={p.tone as 'amber' | 'ink' | 'stone' | 'danger'}>
       {p.children as ReactNode}
     </Banner>
   ),
