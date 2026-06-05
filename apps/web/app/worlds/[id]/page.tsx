@@ -77,12 +77,19 @@ export default async function WorldLandingPage({ params, searchParams }: Props) 
     );
   }
 
+  // REQ-DPPMC-WORLDS-05: non-GM members have no business on the DM approval panel.
+  // Gate AFTER the try/catch so the redirect propagates correctly (not swallowed by catch).
+  // Redirect to /inicio (the player's world-scoped home).
+  if (world.callerRole !== 'gm') {
+    redirect('/inicio');
+  }
+
   // Pass the *effective* status param to StatusTabs so the active tab matches
   // what the server actually fetched. On first visit, that's `pending_approval`.
   const effectiveStatusParam = isFirstVisit ? DEFAULT_STATUS_PARAM : statusFromUrl;
 
   return (
-    <AppShell title={world.name} subtitle="PANEL DE MAESTRO" constructorHref="/characters/new">
+    <AppShell title={world.name} subtitle="PANEL DE MAESTRO" constructorHref="/characters/new" callerRole={world.callerRole}>
       <div className="space-y-4">
         <StatusTabs worldId={id} currentStatusParam={effectiveStatusParam} />
 
