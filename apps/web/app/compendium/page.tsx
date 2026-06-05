@@ -55,14 +55,16 @@ export default async function CompendiumPage() {
 
   if (activeCampaign) {
     const id = activeCampaign.id;
-    // Parallel fetch of 6 category counts — per-card .catch(() => null) fallback (ER3)
-    const [spellsRes, itemsRes, racesRes, classesRes, monstersRes, backgroundsRes] = await Promise.all([
+    // Parallel fetch of category counts — per-card .catch(() => null) fallback (ER3)
+    const [spellsRes, itemsRes, racesRes, classesRes, monstersRes, backgroundsRes, featsRes, conditionsRes] = await Promise.all([
       api.get<CountResult>(`/compendium/spells?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/items?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/races?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/classes?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/monsters?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
       api.get<CountResult>(`/compendium/backgrounds?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
+      api.get<CountResult>(`/compendium/feats?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
+      api.get<CountResult>(`/compendium/conditions?campaign=${id}&limit=1&offset=0`, token).catch(() => null),
     ]);
 
     counts = {
@@ -72,6 +74,8 @@ export default async function CompendiumPage() {
       classes:     classesRes?.total     ?? '—',
       monsters:    monstersRes?.total    ?? '—',
       backgrounds: backgroundsRes?.total ?? '—',
+      feats:       featsRes?.total       ?? '—',
+      conditions:  conditionsRes?.total  ?? '—',
       lore:        '∞',
     };
   } else {
@@ -83,6 +87,8 @@ export default async function CompendiumPage() {
       classes:     '—',
       monsters:    '—',
       backgrounds: '—',
+      feats:       '—',
+      conditions:  '—',
       lore:        '∞',
     };
   }

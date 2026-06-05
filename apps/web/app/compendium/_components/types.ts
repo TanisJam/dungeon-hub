@@ -6,9 +6,11 @@ export type CompendiumCategory =
   | 'races'
   | 'classes'
   | 'backgrounds'
-  | 'monsters';
+  | 'monsters'
+  | 'feats'
+  | 'conditions';
 
-// CategoryId is now an alias — the 6-card grid still uses 'lore' as the disabled card.
+// CategoryId is now an alias — the grid still uses 'lore' as the disabled card.
 // TODO #513: Once the backgrounds card is wired, CategoryId can be retired.
 export type CategoryId =
   | 'spells'
@@ -17,6 +19,8 @@ export type CategoryId =
   | 'classes'
   | 'backgrounds'
   | 'monsters'
+  | 'feats'
+  | 'conditions'
   | 'lore';
 
 export interface CategoryDef {

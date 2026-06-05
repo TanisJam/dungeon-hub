@@ -11,5 +11,7 @@ export const V3_COMPENDIUM_CATS: CategoryDef[] = [
   { id: 'classes',     name: 'Clases',        icon: 'shield',  cls: ''      },
   { id: 'monsters',    name: 'Monstruos',     icon: 'flame',   cls: ''      },
   { id: 'backgrounds', name: 'Trasfondos',    icon: 'scroll',  cls: ''      },
+  { id: 'feats',       name: 'Dotes',         icon: 'star',    cls: ''      },
+  { id: 'conditions',  name: 'Estados',       icon: 'bolt',    cls: ''      },
   { id: 'lore',        name: 'Lore',          icon: 'scroll',  cls: 'lore'  },
 ];

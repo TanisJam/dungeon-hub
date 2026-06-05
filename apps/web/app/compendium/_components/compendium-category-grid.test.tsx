@@ -10,15 +10,17 @@ const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
   classes: 13,
   monsters: 500,
   backgrounds: 40,
+  feats: 42,
+  conditions: 15,
   lore: '∞',
 };
 
 describe('CompendiumCategoryGrid', () => {
-  it('WCP-GRID-03: renders 7 category cards in document order (including backgrounds + lore)', () => {
+  it('WCP-GRID-03: renders 9 category cards in document order (including feats + conditions + lore)', () => {
     const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
     const cards = container.querySelectorAll('.compendium-init-cat-card');
-    // Now 7 cards: spells, items, races, classes, monsters, backgrounds, lore
-    expect(cards.length).toBe(7);
+    // Now 9 cards: spells, items, races, classes, monsters, backgrounds, feats, conditions, lore
+    expect(cards.length).toBe(9);
   });
 
   it('WCP-GRID-03 / WCP-COUNTS-01: numeric count renders as "320 entradas"', () => {
@@ -51,8 +53,8 @@ describe('CompendiumCategoryGrid', () => {
   it('WCP-GRID-03 / WCP-LORE-02: Lore card has .lore tint class', () => {
     const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
     const cards = container.querySelectorAll('.compendium-init-cat-card');
-    // Seventh card = Lore → cls: 'lore'
-    expect(cards[6]?.classList.contains('lore')).toBe(true);
+    // Ninth (last) card = Lore → cls: 'lore'
+    expect(cards[8]?.classList.contains('lore')).toBe(true);
   });
 
   it('REQ-CBROWSE-01: spell card has href to /compendium/spells?campaign=... when campaignId given', () => {

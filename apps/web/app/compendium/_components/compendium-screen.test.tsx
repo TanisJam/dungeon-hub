@@ -10,6 +10,8 @@ const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
   classes: 13,
   monsters: 500,
   backgrounds: 40,
+  feats: 42,
+  conditions: 15,
   lore: '∞',
 };
 

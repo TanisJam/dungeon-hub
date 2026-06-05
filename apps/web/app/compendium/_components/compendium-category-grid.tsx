@@ -4,9 +4,9 @@ import type { IconName } from '@/components/ui';
 import type { CategoryId } from './types';
 import { V3_COMPENDIUM_CATS } from './data';
 
-// The 6 V1 browser categories that have API endpoints (REQ-CBROWSE-01).
+// The browser categories that have API endpoints (REQ-CBROWSE-01).
 // 'lore' has no endpoint — rendered disabled with "Próximamente" affordance (ADR-7).
-const BROWSABLE_CATEGORIES = new Set<CategoryId>(['spells', 'items', 'races', 'classes', 'backgrounds', 'monsters']);
+const BROWSABLE_CATEGORIES = new Set<CategoryId>(['spells', 'items', 'races', 'classes', 'backgrounds', 'monsters', 'feats', 'conditions']);
 
 interface CompendiumCategoryGridProps {
   counts: Record<CategoryId, number | '—' | '∞'>;

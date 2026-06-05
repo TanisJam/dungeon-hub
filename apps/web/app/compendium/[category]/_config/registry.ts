@@ -8,12 +8,14 @@
 import type { ComponentType } from 'react';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 import { SpellHeader } from '@/app/compendium/_components/spell-header';
-import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView, MonsterRowView } from '../_components/row-views';
+import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView, MonsterRowView, FeatRowView, ConditionRowView } from '../_components/row-views';
 import { ItemHeader } from '../_components/item-header';
 import { RaceHeader } from '../_components/race-header';
 import { ClassHeader } from '../_components/class-header';
 import { BackgroundHeader } from '../_components/background-header';
 import { MonsterStatblockHeader } from '../_components/monster-statblock-header';
+import { FeatHeader } from '../_components/feat-header';
+import { ConditionHeader } from '../_components/condition-header';
 
 // ---------------------------------------------------------------------------
 // CategoryConfig — per-category wiring contract
@@ -74,5 +76,18 @@ export const CATEGORY_CONFIG: Record<CompendiumCategory, CategoryConfig> = {
     label: 'Monstruos',
     RowView: MonsterRowView,
     Header: MonsterStatblockHeader,
+  },
+  // P5 (#3.3) — feats + conditions browser. API+DB already existed; this is web wiring only.
+  feats: {
+    endpoint: 'feats',
+    label: 'Dotes',
+    RowView: FeatRowView,
+    Header: FeatHeader,
+  },
+  conditions: {
+    endpoint: 'conditions',
+    label: 'Estados',
+    RowView: ConditionRowView,
+    Header: ConditionHeader,
   },
 };
