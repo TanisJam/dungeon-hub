@@ -165,6 +165,13 @@ import { PoiDetailIsland } from './_islands/poi-detail-island';
 import { PoiMapDrawerIsland } from './_islands/poi-map-drawer-island';
 import { FactionChipSectionIsland } from './_islands/faction-chip-section-island';
 import { WorldMapPlaceholderIsland } from './_islands/world-map-placeholder-island';
+// world/ orchestrator islands (batch 9b)
+import { EventClientWrapperIsland } from './_islands/event-client-wrapper-island';
+import { FactionClientWrapperIsland } from './_islands/faction-client-wrapper-island';
+import { JournalClientWrapperIsland } from './_islands/journal-client-wrapper-island';
+import { HexClientWrapperIsland } from './_islands/hex-client-wrapper-island';
+import { NpcClientWrapperIsland } from './_islands/npc-client-wrapper-island';
+import { NpcDetailViewIsland } from './_islands/npc-detail-view-island';
 
 // inicio/ organisms (presentational)
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
@@ -3455,6 +3462,68 @@ const worldMapPlaceholderEntry: ComponentEntry = {
   render: () => <WorldMapPlaceholderIsland />,
 };
 
+// ── world/ orchestrator islands (batch 9b) ────────────────────────────────────
+
+const eventClientWrapperEntry: ComponentEntry = {
+  id: 'world-event-client-wrapper',
+  name: 'EventClientWrapper',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. Full event list+detail+CRUD orchestrator (Eventos). DM view: list rows, tap → detail sheet with dmNotes, FAB → create form, edit/delete in sheet. Search debounced. Tag filter chips. All mutations stub ~400ms. REQ-CRO-02, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <EventClientWrapperIsland />,
+};
+
+const factionClientWrapperEntry: ComponentEntry = {
+  id: 'world-faction-client-wrapper',
+  name: 'FactionClientWrapper',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. Full faction list+detail+CRUD orchestrator (Facciones). DM view: list rows, tap → detail sheet with dmNotes, FAB → create form, edit/delete in sheet. Search debounced. All mutations stub ~400ms. REQ-FAC-01, REQ-FAC-03, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <FactionClientWrapperIsland />,
+};
+
+const journalClientWrapperEntry: ComponentEntry = {
+  id: 'world-journal-client-wrapper',
+  name: 'JournalClientWrapper',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. Full journal list+detail+CRUD orchestrator (Notas). DM view: list rows, tap → detail sheet, FAB → create form, edit/delete in sheet. Search debounced. Tag filter chips. Body rendered as plain text (ADR-3). All mutations stub ~400ms. REQ-CRO-03, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <JournalClientWrapperIsland />,
+};
+
+const hexClientWrapperEntry: ComponentEntry = {
+  id: 'world-hex-client-wrapper',
+  name: 'HexClientWrapper',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. Full hex list+detail+CRUD orchestrator (Mapa/Ubicaciones). DM view: list rows, tap → detail sheet with PoiAccordion (lazy — expand to load fixture POIs ~300ms), FAB → create form. ← Ver mapa button (router.push). All mutations stub ~400ms. REQ-MAP-01, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <HexClientWrapperIsland />,
+};
+
+const npcClientWrapperEntry: ComponentEntry = {
+  id: 'world-npc-client-wrapper',
+  name: 'NpcClientWrapper',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. Full NPC list+detail+CRUD orchestrator (NPCs). DM view: list rows, tap → detail sheet with faction chips (attach/detach stubs), FAB → create form. Actions bundle threaded to NpcDetailView. All mutations stub ~400ms. REQ-NPC-01, REQ-NPC-02, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <NpcClientWrapperIsland />,
+};
+
+const npcDetailViewEntry: ComponentEntry = {
+  id: 'world-npc-detail-view',
+  name: 'NpcDetailView',
+  group: 'world',
+  notes: 'INTERACTIVE — client island; real component driven by injected stub actions, no backend. NPC detail sheet body: name, status pill, race, description, DM-gated dmNotes (amber block), FactionChipSection (DM: × detach + + attach; Player: read-only chips). attach/detach stubs ~350ms. REQ-NPC-02, REQ-GATE-01.',
+  propsSchema: {},
+  preview: 'bare',
+  render: () => <NpcDetailViewIsland />,
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -3592,4 +3661,11 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   poiMapDrawerEntry,
   factionChipSectionEntry,
   worldMapPlaceholderEntry,
+  // world/ orchestrator islands (batch 9b)
+  eventClientWrapperEntry,
+  factionClientWrapperEntry,
+  journalClientWrapperEntry,
+  hexClientWrapperEntry,
+  npcClientWrapperEntry,
+  npcDetailViewEntry,
 ];
