@@ -54,4 +54,19 @@ describe('HeroNextSession', () => {
     expect(numSpan).toBeTruthy();
     expect(numSpan!.textContent?.trim()).toBe('0');
   });
+
+  // CT-02 T5: CTA link renders with correct href — REQ-DPPMD-CTA-PLAYER-01
+  it('T5: renders CTA link with href /campanas/{campaign.id}', () => {
+    const campaignWithId: NextCampaign = { ...mockCampaign, id: 'camp-test' };
+    render(<HeroNextSession campaign={campaignWithId} />);
+    const link = screen.getByRole('link', { name: /ver sesiones/i });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/campanas/camp-test');
+  });
+
+  // CT-02 T6: CTA link text is 'Ver sesiones' — REQ-DPPMD-CTA-PLAYER-01
+  it('T6: CTA link text is "Ver sesiones"', () => {
+    render(<HeroNextSession campaign={mockCampaign} />);
+    expect(screen.getByRole('link', { name: /ver sesiones/i })).toBeTruthy();
+  });
 });

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Pill, Icon } from '@/components/ui';
 import type { NextCampaign } from './types';
 
@@ -30,6 +31,12 @@ export function HeroNextSession({ campaign }: HeroNextSessionProps) {
           <Icon name="dice" size={10} /> Sesión {campaign.sessions + 1}
         </Pill>
       </div>
+      <Link
+        href={`/campanas/${campaign.id}`}
+        className="mt-3.5 flex min-h-[44px] items-center justify-center rounded-md border border-accent/40 text-sm font-medium text-accent"
+      >
+        Ver sesiones
+      </Link>
     </section>
   );
 }

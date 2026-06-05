@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { DMCampaignNextSession } from '../types';
 import { Pill } from '@/components/ui/pill';
 
@@ -58,6 +59,12 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
           Sesión {sessions + 1}
         </span>
       </div>
+      <Link
+        href={`/campanas/${campaign.id}`}
+        className="mt-3.5 flex min-h-[44px] items-center justify-center rounded-md border border-line text-sm font-medium text-ink-soft"
+      >
+        Crear sesión
+      </Link>
     </div>
   );
 }

@@ -57,4 +57,23 @@ describe('DMNextSessionCard', () => {
     const { container } = render(<DMNextSessionCard campaign={zeroCampaign} />);
     expect(container.textContent).toContain('Sesión 1');
   });
+
+  // CT-03 T5: CTA link renders with correct href — REQ-DPPMD-CTA-DM-01
+  it('T5: renders CTA link with href /campanas/{campaign.id}', () => {
+    const { container } = render(<DMNextSessionCard campaign={MOCK_DM_NEXT_CAMPAIGN} />);
+    expect(container.querySelector('a[href="/campanas/mock-dm-camp-1"]')).toBeTruthy();
+  });
+
+  // CT-03 T6: CTA link text is 'Crear sesión' — REQ-DPPMD-CTA-DM-01
+  it('T6: CTA link text is "Crear sesión"', () => {
+    const { container } = render(<DMNextSessionCard campaign={MOCK_DM_NEXT_CAMPAIGN} />);
+    expect(container.textContent).toContain('Crear sesión');
+  });
+
+  // CT-03 T7: CTA does NOT have primary button styling — REQ-DPPMD-CTA-DM-05
+  it('T7: CTA does not have primary bg-accent styling', () => {
+    const { container } = render(<DMNextSessionCard campaign={MOCK_DM_NEXT_CAMPAIGN} />);
+    const ctaLink = container.querySelector('a[href*="/campanas/"]');
+    expect(ctaLink?.className).not.toContain('bg-accent');
+  });
 });
