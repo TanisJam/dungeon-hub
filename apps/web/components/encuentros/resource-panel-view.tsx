@@ -1,21 +1,17 @@
 'use client';
 
-// REQ-WCO-WEB-05 / REQ-WCO-WEB-06 / REQ-WCO-WEB-07 — ResourcePanel
-// 'use client' island: renders own-character resources with Use/Restore buttons
-// and short/long rest buttons. Calls route-local Server Actions; handles
-// VERSION_CONFLICT with a toast + router.refresh() per D4.
+// REQ-WCO-WEB-05 / REQ-WCO-WEB-06 / REQ-WCO-WEB-07 — ResourcePanelView pure presentational layer.
+// All state is derived externally; this component only renders.
+// Mobile-first 375px: Use/Restore buttons ≥44px, rest buttons full-width ≥44px (CLAUDE.md §2).
 
-import { useResource, restoreResource, shortRest, longRest } from '@/app/encuentros/[id]/actions';
 import { Button } from '@/components/ui/button';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { Toast } from '@/components/ui/toast';
-import { useToast } from '@/lib/use-toast';
-import { useEncounterAction } from './use-encounter-action';
 import type { ClassResourceView } from '@/lib/sheet-types';
 
 // Display name map — mirrors the subset shown in RecursosTab (recursos.tsx).
 // PHB references: Ki Points PHB p.76, Second Wind PHB p.72, etc.
-const RESOURCE_LABELS: Record<string, string> = {
+export const RESOURCE_LABELS: Record<string, string> = {
   'fighter:second-wind': 'Segundo Aire',
   'fighter:indomitable': 'Indómito',
   'monk:ki-points': 'Puntos de Ki',
@@ -28,38 +24,31 @@ const RESOURCE_LABELS: Record<string, string> = {
   'druid:natural-recovery': 'Recuperación Natural',
 };
 
-type Props = {
-  characterId: string;
-  encounterId: string;
+export type ResourcePanelViewProps = {
   resources: ClassResourceView[];
+  pending: boolean;
+  actionError: string | null;
+  toastMessage: string | null;
+  onUse: (slug: string) => void;
+  onRestore: (slug: string) => void;
+  onShortRest: () => void;
+  onLongRest: () => void;
 };
 
-export function ResourcePanel({ characterId, encounterId, resources }: Props) {
-  const { message: toast, showToast } = useToast();
-  const { isPending, actionError, runAction } = useEncounterAction({
-    onConflict: () => showToast('El estado cambió, actualizando...'),
-  });
-
-  function handleUse(slug: string) {
-    runAction(() => useResource(characterId, encounterId, slug));
-  }
-
-  function handleRestore(slug: string) {
-    runAction(() => restoreResource(characterId, encounterId, slug));
-  }
-
-  function handleShortRest() {
-    runAction(() => shortRest(characterId, encounterId));
-  }
-
-  function handleLongRest() {
-    runAction(() => longRest(characterId, encounterId));
-  }
-
+export function ResourcePanelView({
+  resources,
+  pending,
+  actionError,
+  toastMessage,
+  onUse,
+  onRestore,
+  onShortRest,
+  onLongRest,
+}: ResourcePanelViewProps) {
   return (
     <div className="flex flex-col gap-3">
       {/* REQ-WCO-WEB-07: VERSION_CONFLICT toast */}
-      <Toast message={toast} />
+      <Toast message={toastMessage} />
 
       <FormErrorAlert message={actionError} />
 
@@ -78,8 +67,8 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
               tone="ghost"
               size="sm"
               aria-label="Usar"
-              disabled={isPending || remaining <= 0}
-              onClick={() => handleUse(r.slug)}
+              disabled={pending || remaining <= 0}
+              onClick={() => onUse(r.slug)}
               className="min-h-[44px]"
             >
               Usar
@@ -88,8 +77,8 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
               tone="ghost"
               size="sm"
               aria-label="Restaurar"
-              disabled={isPending || r.used <= 0}
-              onClick={() => handleRestore(r.slug)}
+              disabled={pending || r.used <= 0}
+              onClick={() => onRestore(r.slug)}
               className="min-h-[44px]"
             >
               Restaurar
@@ -103,8 +92,8 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
         <Button
           tone="ghost"
           aria-label="Descanso corto"
-          disabled={isPending}
-          onClick={handleShortRest}
+          disabled={pending}
+          onClick={onShortRest}
           fullWidth
         >
           Descanso corto
@@ -112,8 +101,8 @@ export function ResourcePanel({ characterId, encounterId, resources }: Props) {
         <Button
           tone="ghost"
           aria-label="Descanso largo"
-          disabled={isPending}
-          onClick={handleLongRest}
+          disabled={pending}
+          onClick={onLongRest}
           fullWidth
         >
           Descanso largo

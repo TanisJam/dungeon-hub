@@ -1,19 +1,16 @@
 'use client';
 
-// REQ-WCR-WEB-UI-01 — RageControls client island.
-// Renders ONLY for the player's own Barbarian combatant.
-// Mobile-first 375px layout; button ≥44px touch target (CLAUDE.md §2).
-// No optimistic UI — success triggers revalidatePath in the Server Action,
-// then the Server Component re-renders with fresh data.
+// REQ-WCR-WEB-UI-01 — RageControlsIsland container layer.
+// Owns: useToast, useEncounterAction, isDisabled derivation, SA wiring.
+// Renders RageControlsView with all derived state.
+// Public prop interface is identical to the former RageControls monolith.
 // VERSION_CONFLICT → router.refresh() (mirrors ResourcePanel pattern).
 // PHB p.48 — Rage: enter/end as a bonus action on own turn.
 
 import { activateRage, deactivateRage } from '@/app/encuentros/[id]/actions';
-import { Button } from '@/components/ui/button';
-import { FormErrorAlert } from '@/components/ui/form-error-alert';
-import { Toast } from '@/components/ui/toast';
 import { useToast } from '@/lib/use-toast';
 import { useEncounterAction } from './use-encounter-action';
+import { RageControlsView } from './rage-controls-view';
 
 type Props = {
   combatantId: string;
@@ -43,7 +40,7 @@ type Props = {
   version: number;
 };
 
-export function RageControls({
+export function RageControlsIsland({
   combatantId,
   encounterId,
   isRaging,
@@ -76,31 +73,16 @@ export function RageControls({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* VERSION_CONFLICT toast */}
-      <Toast message={toast} />
-
-      <FormErrorAlert message={actionError} />
-
-      {/* Counter — PHB p.48 Rage uses; "Ilimitado" when L20 (sentinel 999) */}
-      <p className="text-sm text-ink-soft">
-        {rageUnlimited ? (
-          <>Ilimitado usos de Furia</>
-        ) : (
-          <>{rageUsesRemaining}&nbsp;/&nbsp;{rageMax}&nbsp;usos de Furia</>
-        )}
-      </p>
-
-      {/* Full-width ≥44px button (mobile-first 375px) */}
-      <Button
-        tone="ghost"
-        aria-label={isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
-        disabled={isDisabled || isPending}
-        onClick={handleClick}
-        fullWidth
-      >
-        {isRaging ? 'Terminar Furia' : 'Entrar en Furia'}
-      </Button>
-    </div>
+    <RageControlsView
+      isRaging={isRaging}
+      isDisabled={isDisabled}
+      pending={isPending}
+      actionError={actionError}
+      toastMessage={toast}
+      rageUnlimited={rageUnlimited}
+      rageUsesRemaining={rageUsesRemaining}
+      rageMax={rageMax}
+      onToggle={handleClick}
+    />
   );
 }

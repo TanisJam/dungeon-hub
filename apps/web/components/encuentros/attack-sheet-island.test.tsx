@@ -1,17 +1,16 @@
 /**
- * Tests for AttackSheet client island — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02
+ * Tests for AttackSheetIsland — container layer.
+ * REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02
  *
- * PHB p.194-195 — Attack roll: d20 + attack bonus vs target AC → hit/miss, then damage.
- * PHB p.189-190, 192 — weapon attack costs the Action for the turn (one-shot).
- * Mobile-first 375px: tap targets ≥44px (CLAUDE.md §2).
- *
- * Three-step flow: weapon pick → target pick → confirm (fires SA) → result display.
- * No optimistic UI. VERSION_CONFLICT → router.refresh() + close.
+ * Covers: triggerDisabled derivation (isOwnTurn/actionUsed), early-return when
+ * no weapons/targets, SA wiring (attackApplyAction), state machine (weapon→target→result),
+ * VERSION_CONFLICT → router.refresh() + close, FORBIDDEN → error, TARGET_NOT_NPC → error.
+ * PHB p.194-195 — attack roll + damage in a single round-trip.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { AttackSheet } from './attack-sheet';
+import { AttackSheetIsland } from './attack-sheet-island';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 import type { EncounterCombatant } from './types';
 
@@ -100,7 +99,7 @@ const BASE_PROPS = {
   actionUsed: false,
 };
 
-describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
+describe('AttackSheetIsland — container', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -108,38 +107,38 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
   // ─── Trigger button visibility ───────────────────────────────────────────────
 
   it('(a) renders "Atacar" trigger when isOwnTurn + !actionUsed + weapons + NPC targets', () => {
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     const btn = screen.getByRole('button', { name: /atacar/i });
     expect(btn).toBeTruthy();
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('(b) "Atacar" trigger is disabled when NOT own turn', () => {
-    render(<AttackSheet {...BASE_PROPS} isOwnTurn={false} />);
+    render(<AttackSheetIsland {...BASE_PROPS} isOwnTurn={false} />);
     const btn = screen.getByRole('button', { name: /atacar/i });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('(c) "Atacar" trigger is disabled when actionUsed', () => {
-    render(<AttackSheet {...BASE_PROPS} actionUsed={true} />);
+    render(<AttackSheetIsland {...BASE_PROPS} actionUsed={true} />);
     const btn = screen.getByRole('button', { name: /atacar/i });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('(d) trigger NOT rendered when no equipped weapons', () => {
-    render(<AttackSheet {...BASE_PROPS} equippedWeapons={[]} />);
+    render(<AttackSheetIsland {...BASE_PROPS} equippedWeapons={[]} />);
     expect(screen.queryByRole('button', { name: /atacar/i })).toBeNull();
   });
 
   it('(e) trigger NOT rendered when no living NPC targets', () => {
-    render(<AttackSheet {...BASE_PROPS} npcTargets={[]} />);
+    render(<AttackSheetIsland {...BASE_PROPS} npcTargets={[]} />);
     expect(screen.queryByRole('button', { name: /atacar/i })).toBeNull();
   });
 
   // ─── Touch target size ────────────────────────────────────────────────────────
 
   it('trigger has min-h-[44px] touch target (CLAUDE.md §2 mobile-first 375px)', () => {
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     const btn = screen.getByRole('button', { name: /atacar/i });
     expect(btn.className).toContain('min-h-[44px]');
   });
@@ -147,16 +146,14 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
   // ─── Step 1: weapon pick ─────────────────────────────────────────────────────
 
   it('(f) clicking "Atacar" opens the sheet and shows weapon list (step 1)', () => {
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
-    // Weapon name visible in the sheet
     expect(screen.getByText('Shortsword')).toBeTruthy();
   });
 
   it('(g) weapon list buttons have ≥44px touch target', () => {
-    render(<AttackSheet {...BASE_PROPS} equippedWeapons={[WEAPON_A, WEAPON_B]} />);
+    render(<AttackSheetIsland {...BASE_PROPS} equippedWeapons={[WEAPON_A, WEAPON_B]} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
-    // Both weapon buttons visible
     const weaponBtns = screen.getAllByRole('button', { name: /shortsword|handaxe/i });
     expect(weaponBtns.length).toBeGreaterThanOrEqual(1);
     weaponBtns.forEach((btn) => {
@@ -167,17 +164,15 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
   // ─── Step 2: target pick ─────────────────────────────────────────────────────
 
   it('(h) picking a weapon advances to target step — NPC shown with HP', () => {
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
-    // Pick weapon
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
-    // NPC target with HP visible
     expect(screen.getByText(/goblin guard/i)).toBeTruthy();
-    expect(screen.getByText(/7/)).toBeTruthy(); // HP
+    expect(screen.getByText(/7/)).toBeTruthy();
   });
 
   it('(i) NPC target buttons have ≥44px touch target', () => {
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     const targetBtn = screen.getByRole('button', { name: /goblin guard/i });
@@ -186,13 +181,13 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
 
   // ─── Confirm (fire SA) → result ───────────────────────────────────────────────
 
-  it('(j) picking target + confirming calls attackApplyAction with correct args', async () => {
+  it('(j) picking target calls attackApplyAction with correct args', async () => {
     vi.mocked(attackApplyAction).mockResolvedValueOnce({
       ok: true,
       result: { hit: true, d20: 15, total: 18, targetAc: 13, rolledDamage: 6, damageType: 'piercing', newHp: 1 },
     } as never);
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
@@ -214,18 +209,15 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
       result: { hit: true, d20: 15, total: 18, targetAc: 13, rolledDamage: 6, damageType: 'piercing', newHp: 1 },
     } as never);
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
 
-    // Result step should show hit indicator and damage
     await waitFor(() => {
       expect(screen.getByText(/impacto|hit/i)).toBeTruthy();
     });
-    // Damage value visible in the result section
     expect(screen.getByText(/Daño:/i)).toBeTruthy();
-    // New HP label visible
     expect(screen.getByText(/HP objetivo:/i)).toBeTruthy();
   });
 
@@ -235,7 +227,7 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
       result: { hit: false, d20: 4, total: 7, targetAc: 13 },
     } as never);
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
@@ -254,7 +246,7 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
     } as never);
     mockRefresh.mockClear();
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
@@ -262,7 +254,6 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
     await waitFor(() => {
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
-    // Sheet should close (Shortsword no longer visible)
     await waitFor(() => {
       expect(screen.queryByText('Shortsword')).toBeNull();
     });
@@ -274,7 +265,7 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
       code: 'FORBIDDEN',
     } as never);
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
@@ -291,7 +282,7 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
       code: 'TARGET_NOT_NPC',
     } as never);
 
-    render(<AttackSheet {...BASE_PROPS} />);
+    render(<AttackSheetIsland {...BASE_PROPS} />);
     fireEvent.click(screen.getByRole('button', { name: /atacar/i }));
     fireEvent.click(screen.getByRole('button', { name: /shortsword/i }));
     fireEvent.click(screen.getByRole('button', { name: /goblin guard/i }));
@@ -305,11 +296,8 @@ describe('AttackSheet — REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02', () => {
   // ─── Dead NPCs are excluded ───────────────────────────────────────────────────
 
   it('(p) dead NPCs (hpCurrent===0) are excluded from npcTargets prop', () => {
-    // This test verifies the prop contract (dead NPCs should be filtered by page.tsx)
-    // The sheet itself takes a pre-filtered list — empty targets → no trigger rendered
-    render(<AttackSheet {...BASE_PROPS} npcTargets={[NPC_DEAD]} />);
-    // The page.tsx filters hpCurrent > 0 before passing; here we verify the prop is respected
-    // by noting the trigger IS rendered (npcTargets is non-empty)
+    // The sheet itself takes a pre-filtered list — non-empty npcTargets → trigger rendered
+    render(<AttackSheetIsland {...BASE_PROPS} npcTargets={[NPC_DEAD]} />);
     expect(screen.getByRole('button', { name: /atacar/i })).toBeTruthy();
   });
 });

@@ -21,11 +21,11 @@ import { RosterList } from '@/components/encuentros/roster-row';
 import { TurnControlsIsland } from '@/components/encuentros/turn-controls-island';
 import { TurnBanner } from '@/components/encuentros/turn-banner';
 import { RefreshButton } from '@/components/encuentros/refresh-button';
-import { ResourcePanel } from '@/components/encuentros/resource-panel';
-import { RageControls } from '@/components/encuentros/rage-controls';
+import { ResourcePanelIsland } from '@/components/encuentros/resource-panel-island';
+import { RageControlsIsland } from '@/components/encuentros/rage-controls-island';
 import { PlayerActionPanel } from '@/components/encuentros/player-action-panel';
-import { PassTurnButton } from '@/components/encuentros/pass-turn-button';
-import { AttackSheet } from '@/components/encuentros/attack-sheet';
+import { PassTurnButtonIsland } from '@/components/encuentros/pass-turn-button-island';
+import { AttackSheetIsland } from '@/components/encuentros/attack-sheet-island';
 import type { EncounterDetail } from '@/components/encuentros/types';
 import type { ClassResourceView, SheetResponse, EnrichedInventoryItem } from '@/lib/sheet-types';
 
@@ -181,7 +181,7 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
             <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
               Furia
             </h2>
-            <RageControls
+            <RageControlsIsland
               combatantId={ownCombatant.id}
               encounterId={detail.id}
               isRaging={isRaging}
@@ -201,14 +201,14 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
             zero edits to PlayerActionPanel (ADR-3). Gated on own turn + active + weapons exist. */}
         {ownCombatant != null && isOwnTurn && detail.status === 'active' && (
           <PlayerActionPanel>
-            <PassTurnButton
+            <PassTurnButtonIsland
               encounterId={detail.id}
               combatantId={ownCombatant.id}
               version={detail.version}
               isOwnTurn={isOwnTurn}
             />
             {equippedWeapons.length > 0 && npcTargets.length > 0 && (
-              <AttackSheet
+              <AttackSheetIsland
                 encounterId={detail.id}
                 attackerCombatantId={ownCombatant.id}
                 equippedWeapons={equippedWeapons}
@@ -227,7 +227,7 @@ export default async function EncuentroDetailPage({ params }: { params: RoutePar
             <h2 className="text-sm font-semibold text-ink-soft uppercase tracking-wide">
               Recursos
             </h2>
-            <ResourcePanel
+            <ResourcePanelIsland
               characterId={ownCombatant.characterId!}
               encounterId={detail.id}
               resources={ownResources}

@@ -1,28 +1,23 @@
 'use client';
 
-// REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02 — AttackSheet client island.
-// ONE-SHOT weapon attack (PHB p.194-195 — attack roll + damage in a single round-trip).
+// REQ-WCA-WEB-UI-01, REQ-WCA-WEB-UI-02 — AttackSheetView pure presentational layer.
+// Receives all state as controlled props + callbacks from AttackSheetIsland.
 // Mobile-first 375px: all tap targets ≥44px (CLAUDE.md §2).
-// V3Sheet wraps a 3-step state machine: weapon → target → result.
-// No optimistic UI. VERSION_CONFLICT → router.refresh() + close (mirrors RageControls).
-// PHB p.189-190, 192 — weapon attack costs the Action for the turn.
+// PHB p.194-195 — attack roll + damage in a single round-trip.
 
-import { useState } from 'react';
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
-import { attackApplyAction } from '@/app/encuentros/[id]/actions';
-import { useEncounterAction } from './use-encounter-action';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 import type { EncounterCombatant } from './types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Step machine for the sheet flow. */
-type Step = 'weapon' | 'target' | 'result';
+export type AttackStep = 'weapon' | 'target' | 'result';
 
 /** Union of attack outcomes the SA returns. */
-type AttackHitResult = {
+export type AttackHitResult = {
   hit: true;
   d20: number;
   total: number;
@@ -33,110 +28,54 @@ type AttackHitResult = {
   crit?: boolean;
 };
 
-type AttackMissResult = {
+export type AttackMissResult = {
   hit: false;
   d20: number;
   total: number;
   targetAc: number;
 };
 
-type AttackResult = AttackHitResult | AttackMissResult;
+export type AttackResult = AttackHitResult | AttackMissResult;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-type Props = {
-  encounterId: string;
-  attackerCombatantId: string;
-  /** Equipped weapons from inventoryEnriched (v3Type==='weapon' && equipped). Pre-filtered by page.tsx. */
+export type AttackSheetViewProps = {
+  /** Whether the sheet is open. */
+  open: boolean;
+  step: AttackStep;
+  selectedWeapon: EnrichedInventoryItem | null;
+  attackResult: AttackResult | null;
+  attackError: string | null;
+  isPending: boolean;
+  /** Pre-derived: !isOwnTurn || actionUsed. View just applies it. */
+  triggerDisabled: boolean;
   equippedWeapons: EnrichedInventoryItem[];
-  /** Living NPC combatants (characterId===null && hpCurrent>0). Pre-filtered by page.tsx. */
   npcTargets: EncounterCombatant[];
-  /** Optimistic-concurrency version token. */
-  version: number;
-  /** True when it is this combatant's turn. */
-  isOwnTurn: boolean;
-  /** True when the action has already been spent this turn. */
-  actionUsed: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onPickWeapon: (weapon: EnrichedInventoryItem) => void;
+  onPickTarget: (target: EncounterCombatant) => void;
+  onBackToWeapon: () => void;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AttackSheet({
-  encounterId,
-  attackerCombatantId,
+export function AttackSheetView({
+  open,
+  step,
+  selectedWeapon,
+  attackResult,
+  attackError,
+  isPending,
+  triggerDisabled,
   equippedWeapons,
   npcTargets,
-  version,
-  isOwnTurn,
-  actionUsed,
-}: Props) {
-  const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<Step>('weapon');
-  const [selectedWeapon, setSelectedWeapon] = useState<EnrichedInventoryItem | null>(null);
-  const [attackResult, setAttackResult] = useState<AttackResult | null>(null);
-
-  // ADR-3: VERSION_CONFLICT → router.refresh() + close via onConflict callback.
-  const { isPending, actionError: attackError, runAction } = useEncounterAction({
-    fallbackError: 'Error al realizar el ataque. Intentá nuevamente.',
-    onConflict: () => setOpen(false),
-  });
-
-  // REQ-WCA-WEB-UI-01: trigger hidden when no weapons or no NPC targets
-  const hasWeapons = equippedWeapons.length > 0;
-  const hasTargets = npcTargets.length > 0;
-  if (!hasWeapons || !hasTargets) return null;
-
-  // Button is disabled when: not own turn, or action already spent.
-  const triggerDisabled = !isOwnTurn || actionUsed;
-
-  function handleOpen() {
-    // Reset state on each open
-    setStep('weapon');
-    setSelectedWeapon(null);
-    setAttackResult(null);
-    setOpen(true);
-  }
-
-  function handleClose() {
-    setOpen(false);
-  }
-
-  function handlePickWeapon(weapon: EnrichedInventoryItem) {
-    setSelectedWeapon(weapon);
-    setStep('target');
-  }
-
-  function handlePickTarget(target: EncounterCombatant) {
-    if (!selectedWeapon) return;
-
-    runAction(async () => {
-      const res = await attackApplyAction(
-        encounterId,
-        attackerCombatantId,
-        target.id,
-        selectedWeapon.instanceId,
-        version,
-      );
-
-      // Normalize TARGET_NOT_NPC with its component-specific message so the
-      // hook's generic error branch sets the correct text.
-      if (!res.ok && res.code === 'TARGET_NOT_NPC') {
-        return {
-          ...res,
-          message: 'El objetivo seleccionado no es un NPC. Recargá la página e intentá nuevamente.',
-        };
-      }
-
-      // On success advance to result step.
-      if (res.ok) {
-        setAttackResult(res.result as AttackResult);
-        setStep('result');
-      }
-
-      return res;
-    });
-  }
-
+  onOpen,
+  onClose,
+  onPickWeapon,
+  onPickTarget,
+  onBackToWeapon,
+}: AttackSheetViewProps) {
   return (
     <>
       {/* REQ-WCA-WEB-UI-01: full-width ≥44px trigger button */}
@@ -144,13 +83,13 @@ export function AttackSheet({
         tone="ghost"
         aria-label="Atacar"
         disabled={triggerDisabled || isPending}
-        onClick={handleOpen}
+        onClick={onOpen}
         fullWidth
       >
         Atacar
       </Button>
 
-      <V3Sheet open={open} onClose={handleClose} title="Atacar">
+      <V3Sheet open={open} onClose={onClose} title="Atacar">
         {/* ── Error banner (persists across steps) ─────────────────────────── */}
         <FormErrorAlert message={attackError} className="mb-3" />
 
@@ -162,7 +101,7 @@ export function AttackSheet({
               <button
                 key={weapon.instanceId}
                 type="button"
-                onClick={() => handlePickWeapon(weapon)}
+                onClick={() => onPickWeapon(weapon)}
                 className="w-full min-h-[44px] rounded border border-line text-sm font-medium text-left px-3"
               >
                 {weapon.displayName}
@@ -170,7 +109,7 @@ export function AttackSheet({
             ))}
             <button
               type="button"
-              onClick={handleClose}
+              onClick={onClose}
               className="w-full min-h-[44px] rounded text-sm text-ink-soft border border-line mt-2"
             >
               Cerrar
@@ -192,7 +131,7 @@ export function AttackSheet({
                   key={npc.id}
                   type="button"
                   disabled={isPending}
-                  onClick={() => handlePickTarget(npc)}
+                  onClick={() => onPickTarget(npc)}
                   className="w-full min-h-[44px] rounded border border-line text-sm font-medium text-left px-3 disabled:opacity-40"
                 >
                   {npc.name}
@@ -202,7 +141,7 @@ export function AttackSheet({
             )}
             <button
               type="button"
-              onClick={() => setStep('weapon')}
+              onClick={onBackToWeapon}
               className="w-full min-h-[44px] rounded text-sm text-ink-soft border border-line mt-2"
             >
               Volver
@@ -239,7 +178,7 @@ export function AttackSheet({
 
             <Button
               tone="ghost"
-              onClick={handleClose}
+              onClick={onClose}
               fullWidth
               className="mt-2"
             >

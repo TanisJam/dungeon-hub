@@ -1,16 +1,16 @@
 'use client';
 
-// REQ-WCPT-WEB-UI-01, REQ-WCPT-WEB-UI-02 — PassTurnButton client island.
-// Player taps once to pass their turn. No sub-flow or sheet.
-// Mobile-first 375px: full-width button ≥44px touch target (CLAUDE.md §2).
+// REQ-WCPT-WEB-UI-01, REQ-WCPT-WEB-UI-02 — PassTurnButtonIsland container layer.
+// Owns: useEncounterAction, isDisabled derivation, SA wiring.
+// Renders PassTurnButtonView with all derived state.
+// Public prop interface is identical to the former PassTurnButton monolith.
 // VERSION_CONFLICT → router.refresh() (no optimistic UI — mirrors RageControls pattern).
 // FORBIDDEN → inline error.
 // PHB p.189 — a creature may take fewer actions and declare its turn complete.
 
 import { passTurn } from '@/app/encuentros/[id]/actions';
-import { Button } from '@/components/ui/button';
-import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { useEncounterAction } from './use-encounter-action';
+import { PassTurnButtonView } from './pass-turn-button-view';
 
 type Props = {
   encounterId: string;
@@ -21,7 +21,7 @@ type Props = {
   isOwnTurn: boolean;
 };
 
-export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }: Props) {
+export function PassTurnButtonIsland({ encounterId, combatantId, version, isOwnTurn }: Props) {
   const { isPending, actionError, runAction } = useEncounterAction({
     fallbackError: 'Error al pasar el turno.',
   });
@@ -31,19 +31,11 @@ export function PassTurnButton({ encounterId, combatantId, version, isOwnTurn }:
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <FormErrorAlert message={actionError} />
-
-      {/* Full-width ≥44px button (mobile-first 375px — CLAUDE.md §2) */}
-      <Button
-        tone="ghost"
-        aria-label="Pasar turno"
-        disabled={!isOwnTurn || isPending}
-        onClick={handleClick}
-        fullWidth
-      >
-        Pasar Turno
-      </Button>
-    </div>
+    <PassTurnButtonView
+      isDisabled={!isOwnTurn}
+      pending={isPending}
+      actionError={actionError}
+      onPass={handleClick}
+    />
   );
 }
