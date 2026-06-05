@@ -62,7 +62,7 @@ export default async function CodexPage() {
   // PLAYER path — active character present (REQ-GRID-01, scenario "Player with active char")
   if (activeChar) {
     return (
-      <AppShell title="Códex" subtitle="COMPENDIO">
+      <AppShell title="Códex" subtitle="COMPENDIO" callerRole={aw?.callerRole ?? undefined}>
         <PlayerCodexGrid />
       </AppShell>
     );
@@ -82,7 +82,7 @@ export default async function CodexPage() {
   }
 
   return (
-    <AppShell title="Códex" subtitle="COMPENDIO">
+    <AppShell title="Códex" subtitle="COMPENDIO" callerRole={aw?.callerRole ?? undefined}>
       <V3Empty
         glyph="user"
         title="Todavía no tenés un personaje activo"
