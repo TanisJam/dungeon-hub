@@ -2,6 +2,12 @@ import { ScreenFrame, ScreenSection } from './_screen-frame';
 import { CampanasView } from '@/components/campanas/campanas-view';
 import type { CampaignSummary } from '@/components/campanas/types';
 
+import { InicioScreen } from './_screens/inicio-screen';
+import { PersonajesScreen } from './_screens/personajes-screen';
+import { EncuentrosScreen } from './_screens/encuentros-screen';
+import { SheetScreen } from './_screens/sheet-screen';
+import { WizardReviewScreen } from './_screens/wizard-review-screen';
+
 /**
  * Screens — flagship page-level compositions reproduced from fixtures.
  *
@@ -69,6 +75,20 @@ export default function ScreensPage() {
             </ScreenFrame>
           </div>
         </ScreenSection>
+        {/* ── Inicio ── */}
+        <InicioScreen />
+
+        {/* ── Personajes ── */}
+        <PersonajesScreen />
+
+        {/* ── Encuentros ── */}
+        <EncuentrosScreen />
+
+        {/* ── Character Sheet ── */}
+        <SheetScreen />
+
+        {/* ── Wizard Review ── */}
+        <WizardReviewScreen />
       </div>
     </div>
   );
