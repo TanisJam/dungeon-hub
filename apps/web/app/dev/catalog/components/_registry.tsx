@@ -90,6 +90,32 @@ import {
   RaceSectionIsland,
 } from './_islands/ficha-sections-island';
 
+// campanas/ organisms (presentational)
+import { CampanasView } from '@/components/campanas/campanas-view';
+import { V3CampCard } from '@/components/campanas/camp-card';
+import { CampanaDetailView } from '@/components/campanas/campana-detail-view';
+import type { CampanaSessionRow } from '@/components/campanas/campana-detail-view';
+import type { CampaignSummary, CampaignDetail } from '@/components/campanas/types';
+
+// inicio/ organisms (presentational)
+import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
+import { HeroNextSession } from '@/components/inicio/hero-next-session';
+import { NovedadesFeed } from '@/components/inicio/novedades-feed';
+import { QuickActions } from '@/components/inicio/quick-actions';
+import { DMNextSessionCard } from '@/components/inicio/dm/dm-next-session-card';
+import { DMQuickActions } from '@/components/inicio/dm/dm-quick-actions';
+import { PendientesFichaCard } from '@/components/inicio/dm/pendientes-ficha-card';
+import { PendientesSheetContent } from '@/components/inicio/dm/pendientes-sheet-content';
+import { QuestsSinTocarList } from '@/components/inicio/dm/quests-sin-tocar-list';
+import type {
+  ActiveCharacter,
+  NextCampaign,
+  Novedad,
+  PendingFichaSummary,
+  DMCampaignNextSession,
+  QuestSinTocar,
+} from '@/components/inicio/types';
+
 // Re-export types for page.tsx
 export type { ComponentGroup, ComponentEntry, VariantCombination } from './_registry-types';
 import type { ComponentEntry } from './_registry-types';
@@ -2075,6 +2101,346 @@ const raceSectionEntry: ComponentEntry = {
   },
 };
 
+// ── campanas/ group ───────────────────────────────────────────────────────────
+
+// Shared fixture campaigns used across campanas entries
+const _fixtureCampaignPlayer: CampaignSummary = {
+  id: 'cmp-strahd',
+  name: 'La Maldición de Strahd',
+  gmUserId: 'user-dm-01',
+  worldId: 'world-barovia',
+  createdAt: '2024-01-15T10:00:00Z',
+  memberRole: 'player',
+  playersCount: 4,
+  sessionsCount: 8,
+  nextSession: '2026-06-07T21:30:00Z',
+  pendingFichas: null,
+};
+
+const _fixtureCampaignDm: CampaignSummary = {
+  id: 'cmp-mines',
+  name: 'Las Minas Perdidas de Phandelver',
+  gmUserId: 'user-dm-01',
+  worldId: 'world-faerun',
+  createdAt: '2024-03-01T09:00:00Z',
+  memberRole: 'gm',
+  playersCount: 5,
+  sessionsCount: 3,
+  nextSession: '2026-06-14T20:00:00Z',
+  pendingFichas: 2,
+};
+
+const _fixtureCampaignDetail: CampaignDetail = {
+  ..._fixtureCampaignDm,
+  tagline: 'Aventuras en el Filo del Mundo',
+  members: [
+    { userId: 'user-dm-01', username: 'Aurelion', role: 'gm', joinedAt: '2024-03-01T09:00:00Z' },
+    { userId: 'user-p1',   username: 'Thorne',   role: 'player', joinedAt: '2024-03-02T12:00:00Z' },
+    { userId: 'user-p2',   username: 'Lyra',     role: 'player', joinedAt: '2024-03-02T12:30:00Z' },
+    { userId: 'user-p3',   username: 'Korrak',   role: 'player', joinedAt: '2024-03-03T18:00:00Z' },
+  ],
+};
+
+const _fixtureSessions: CampanaSessionRow[] = [
+  { id: 'ses-01', title: 'El camino a Phandalin',      status: 'completed',  scheduledAt: '2024-03-10T20:00:00Z' },
+  { id: 'ses-02', title: 'La guarida de los Trozos',   status: 'completed',  scheduledAt: '2024-03-24T20:00:00Z' },
+  { id: 'ses-03', title: 'Sildar Rescatado',            status: 'completed',  scheduledAt: '2024-04-07T20:00:00Z' },
+  { id: 'ses-04', title: 'El Castillo Cragmaw',         status: 'scheduled',  scheduledAt: '2026-06-14T20:00:00Z' },
+];
+
+const campanasViewEntry: ComponentEntry = {
+  id: 'campanas-view',
+  name: 'CampanasView',
+  group: 'campanas',
+  notes: 'Campaign list page. role="player" shows player campaigns + optional DM section; role="dm" shows DM campaigns only with "Iniciar campaña nueva" CTA. Props: role, campaigns.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Player role — 1 player + 1 dm campaign' },
+    { _label: 'DM role — 1 dm campaign' },
+    { _label: 'Player role — empty campaigns' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('DM role')) {
+      return (
+        <CampanasView
+          role="dm"
+          campaigns={[_fixtureCampaignDm]}
+        />
+      );
+    }
+    if (label.includes('empty campaigns')) {
+      return <CampanasView role="player" campaigns={[]} />;
+    }
+    // Player role default
+    return (
+      <CampanasView
+        role="player"
+        campaigns={[_fixtureCampaignPlayer, _fixtureCampaignDm]}
+      />
+    );
+  },
+};
+
+const v3CampCardEntry: ComponentEntry = {
+  id: 'v3-camp-card',
+  name: 'V3CampCard',
+  group: 'campanas',
+  notes: 'Single campaign card. memberRole="gm" → "Dirigís" pill (secondary tint) + DM styles; "player" → "Jugás" pill (primary tint). Shows name, player count, sessions, next session, and pending fichas (DM only). Props: campaign.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Player card — with next session' },
+    { _label: 'DM card — with pending fichas' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('DM card')) {
+      return <V3CampCard campaign={_fixtureCampaignDm} />;
+    }
+    return <V3CampCard campaign={_fixtureCampaignPlayer} />;
+  },
+};
+
+const campanaDetailViewEntry: ComponentEntry = {
+  id: 'campana-detail-view',
+  name: 'CampanaDetailView',
+  group: 'campanas',
+  notes: 'Campaign detail page. Shows campaign header, tagline, members list (with role pills), and sessions list (with status pills + scheduled date). Empty sessions branch renders "No hay sesiones aún". Props: detail, sessions.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Detail — 4 members + 4 sessions' },
+    { _label: 'Detail — empty sessions' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('empty sessions')) {
+      return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={[]} />;
+    }
+    return <CampanaDetailView detail={_fixtureCampaignDetail} sessions={_fixtureSessions} />;
+  },
+};
+
+// ── inicio/ group ─────────────────────────────────────────────────────────────
+
+const _fixtureActiveCharacter: ActiveCharacter = {
+  id: 'char-thorne',
+  name: 'Thorne Piedrahierro',
+  initial: 'T',
+  lineage: 'Semielfo · Bardo 4',
+  hp: '28/36',
+  ac: 14,
+  init: 2,
+};
+
+const _fixtureNextCampaign: NextCampaign = {
+  id: 'cmp-strahd',
+  name: 'La Maldición de Strahd',
+  tagline: 'El conde espera en las sombras',
+  daysToSession: 3,
+  nextSession: 'VIE 21:30',
+  sessions: 8,
+};
+
+const _fixtureNovedades: Novedad[] = [
+  { id: 'nov-1', ttl: 'Korrak subió al nivel 5',             sub: 'Las Minas Perdidas de Phandelver', when: 'hace 2h',    fresh: true  },
+  { id: 'nov-2', ttl: 'Lyra envió su ficha para revisión',   sub: 'La Maldición de Strahd',          when: 'hace 5h',    fresh: true  },
+  { id: 'nov-3', ttl: 'Sesión 7 marcada como completada',    sub: 'La Maldición de Strahd',          when: 'ayer',       fresh: false },
+];
+
+const _fixtureDmNextSession: DMCampaignNextSession = {
+  id: 'cmp-mines',
+  name: 'Las Minas Perdidas de Phandelver',
+  tagline: 'El eco de los enanos llama',
+  nextSession: 'SÁB 20:00',
+  players: 4,
+  pendingQuests: 2,
+  sessions: 3,
+};
+
+const _fixturePendingFichas: PendingFichaSummary[] = [
+  { id: 'ficha-lyra',   portraitInitial: 'L', pj: 'Lyra Luminosa',    lineage: 'Humana · Clérigo 3',   player: 'elena_r',   sent: 'hace 3h',   fresh: true  },
+  { id: 'ficha-korrak', portraitInitial: 'K', pj: 'Korrak el Impio',  lineage: 'Orco · Bárbaro 5',     player: 'matias_g',  sent: 'hace 1 día', fresh: false },
+];
+
+const _fixtureQuests: QuestSinTocar[] = [
+  { id: 'quest-1', title: 'El Medallón del Clan Rocaverde', lastChange: 'hace 3 días'  },
+  { id: 'quest-2', title: 'Vengar a Sildar',                 lastChange: 'hace 6 días'  },
+  { id: 'quest-3', title: 'Limpiar el Castillo Cragmaw',     lastChange: 'hace 8 días'  },
+];
+
+const activeCharacterCardEntry: ComponentEntry = {
+  id: 'active-character-card',
+  name: 'ActiveCharacterCard',
+  group: 'inicio',
+  notes: 'Player home widget — active character summary card. Shows name, lineage, HP / AC / Init pills. Links to /characters/:id. Props: char.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Active character — positive init' },
+    { _label: 'Active character — negative init' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('negative init')) {
+      return (
+        <ActiveCharacterCard
+          char={{ ..._fixtureActiveCharacter, init: -1, hp: '12/20', name: 'Arken Drûm', lineage: 'Enano · Guerrero 2' }}
+        />
+      );
+    }
+    return <ActiveCharacterCard char={_fixtureActiveCharacter} />;
+  },
+};
+
+const heroNextSessionEntry: ComponentEntry = {
+  id: 'hero-next-session',
+  name: 'HeroNextSession',
+  group: 'inicio',
+  notes: 'Player home hero card — next upcoming session. Shows campaign name, optional tagline, days countdown, time slot, and session number pill. Props: campaign.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'With tagline — 3 days out' },
+    { _label: 'No tagline — 0 days (today)' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('No tagline')) {
+      return (
+        <HeroNextSession
+          campaign={{ ..._fixtureNextCampaign, tagline: undefined, daysToSession: 0, nextSession: 'HOY 21:30' }}
+        />
+      );
+    }
+    return <HeroNextSession campaign={_fixtureNextCampaign} />;
+  },
+};
+
+const novedadesFeedEntry: ComponentEntry = {
+  id: 'novedades-feed',
+  name: 'NovedadesFeed',
+  group: 'inicio',
+  notes: 'Guild news feed. Shows up to 3 novedades with a dot indicator (fresh=true → accent dot). Empty state renders V3Empty. Props: items.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'With 3 novedades — mixed fresh' },
+    { _label: 'Empty feed' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Empty')) {
+      return <NovedadesFeed items={[]} />;
+    }
+    return <NovedadesFeed items={_fixtureNovedades} />;
+  },
+};
+
+const quickActionsEntry: ComponentEntry = {
+  id: 'quick-actions',
+  name: 'QuickActions',
+  group: 'inicio',
+  notes: 'Player home 3-cell quick-action grid. Links to /personajes, /compendium, /characters/new. Zero props.',
+  propsSchema: {},
+  render: () => <QuickActions />,
+};
+
+const dmNextSessionCardEntry: ComponentEntry = {
+  id: 'dm-next-session-card',
+  name: 'DMNextSessionCard',
+  group: 'inicio',
+  notes: 'DM home hero card — next campaign session. Shows campaign name, optional tagline, player count, optional pending quests, and session number. "Dirigís" solid-secondary pill. Props: campaign.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'With tagline + pending quests' },
+    { _label: 'Minimal — no tagline, no pending quests' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Minimal')) {
+      return (
+        <DMNextSessionCard
+          campaign={{ ..._fixtureDmNextSession, tagline: undefined, pendingQuests: undefined }}
+        />
+      );
+    }
+    return <DMNextSessionCard campaign={_fixtureDmNextSession} />;
+  },
+};
+
+const dmQuickActionsEntry: ComponentEntry = {
+  id: 'dm-quick-actions',
+  name: 'DMQuickActions',
+  group: 'inicio',
+  notes: 'DM home 3-cell quick-action grid. Iniciativa links to /encuentros; Nuevo NPC and Loot are aria-disabled stubs (future SDDs). Zero props.',
+  propsSchema: {},
+  render: () => <DMQuickActions />,
+};
+
+const pendientesFichaCardEntry: ComponentEntry = {
+  id: 'pendientes-ficha-card',
+  name: 'PendientesFichaCard',
+  group: 'inicio',
+  notes: 'DM ficha-approval card. Portrait, PJ name, lineage, player pill, sent-date pill. Renders PendientesActionButtons (client child — approve/reject actions no-op in catalog). fresh=true → accent border highlight. Props: ficha.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Fresh ficha — Lyra Luminosa' },
+    { _label: 'Stale ficha — Korrak el Impio' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    const ficha = _fixturePendingFichas.find((f) =>
+      label.includes('Korrak') ? f.id === 'ficha-korrak' : f.id === 'ficha-lyra',
+    ) ?? _fixturePendingFichas[0];
+    return <PendientesFichaCard ficha={ficha} />;
+  },
+};
+
+const pendientesSheetContentEntry: ComponentEntry = {
+  id: 'pendientes-sheet-content',
+  name: 'PendientesSheetContent',
+  group: 'inicio',
+  notes: 'DM bottom-sheet body — lists pending fichas (via PendientesFichaCard) and quests sin tocar (via QuestRow). Props: fichas, quests.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Populated — 2 fichas + 3 quests' },
+    { _label: 'Empty — no fichas, no quests' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Empty')) {
+      return <PendientesSheetContent fichas={[]} quests={[]} />;
+    }
+    return <PendientesSheetContent fichas={_fixturePendingFichas} quests={_fixtureQuests} />;
+  },
+};
+
+const questsSinTocarListEntry: ComponentEntry = {
+  id: 'quests-sin-tocar-list',
+  name: 'QuestsSinTocarList',
+  group: 'inicio',
+  notes: 'DM quest list — shows quests that haven\'t been touched recently, each with title and last-change subtitle via QuestRow. Meta count hidden when list is empty. Props: quests.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Populated — 3 quests' },
+    { _label: 'Empty — no quests' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Empty')) {
+      return <QuestsSinTocarList quests={[]} />;
+    }
+    return <QuestsSinTocarList quests={_fixtureQuests} />;
+  },
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -2150,4 +2516,18 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   backgroundSectionEntry,
   classSectionEntry,
   raceSectionEntry,
+  // campanas/
+  campanasViewEntry,
+  v3CampCardEntry,
+  campanaDetailViewEntry,
+  // inicio/
+  activeCharacterCardEntry,
+  heroNextSessionEntry,
+  novedadesFeedEntry,
+  quickActionsEntry,
+  dmNextSessionCardEntry,
+  dmQuickActionsEntry,
+  pendientesFichaCardEntry,
+  pendientesSheetContentEntry,
+  questsSinTocarListEntry,
 ];

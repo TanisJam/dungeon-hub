@@ -12,9 +12,11 @@ const GROUP_LABELS: Record<ComponentGroup, string> = {
   form:        'form/ primitives',
   encuentros:  'encuentros/ organisms',
   ficha:       'ficha/ organisms',
+  campanas:    'campanas/ components',
+  inicio:      'inicio/ components',
 };
 
-const GROUP_ORDER: ComponentGroup[] = ['ui', 'layout', 'sheet', 'wizard', 'form', 'encuentros', 'ficha'];
+const GROUP_ORDER: ComponentGroup[] = ['ui', 'layout', 'sheet', 'wizard', 'form', 'encuentros', 'ficha', 'campanas', 'inicio'];
 
 /**
  * Components gallery — renders every ComponentEntry × buildMatrix combos inside Frame375.
@@ -31,7 +33,7 @@ export default function ComponentsPage() {
       acc[g] = COMPONENT_REGISTRY.filter((e) => e.group === g);
       return acc;
     },
-    { ui: [], layout: [], sheet: [], wizard: [], form: [], encuentros: [], ficha: [] }
+    { ui: [], layout: [], sheet: [], wizard: [], form: [], encuentros: [], ficha: [], campanas: [], inicio: [] }
   );
 
   return (
