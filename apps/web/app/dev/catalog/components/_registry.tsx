@@ -97,6 +97,26 @@ import { CampanaDetailView } from '@/components/campanas/campana-detail-view';
 import type { CampanaSessionRow } from '@/components/campanas/campana-detail-view';
 import type { CampaignSummary, CampaignDetail } from '@/components/campanas/types';
 
+// compendium/ renderers
+import { CompendiumEntries, EntryNodeRenderer } from '@/components/compendium/index';
+import { InlineRenderer } from '@/components/compendium/inline';
+import { StatblockNodeView } from '@/components/compendium/nodes/statblock';
+import { TableNodeView } from '@/components/compendium/nodes/table';
+import { InsetNodeView, InsetReadaloudNodeView } from '@/components/compendium/nodes/inset';
+import { ImageNodeView, GalleryNodeView } from '@/components/compendium/nodes/image';
+import { QuoteNodeView } from '@/components/compendium/nodes/quote';
+import type {
+  Entry,
+  EntryNode,
+  StatblockNode,
+  TableNode,
+  InsetNode,
+  InsetReadaloudNode,
+  ImageNode,
+  GalleryNode,
+  QuoteNode,
+} from '@/components/compendium/types';
+
 // inicio/ organisms (presentational)
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
 import { HeroNextSession } from '@/components/inicio/hero-next-session';
@@ -2441,6 +2461,355 @@ const questsSinTocarListEntry: ComponentEntry = {
   },
 };
 
+// ── compendium/ group ─────────────────────────────────────────────────────────
+
+// Shared fixture data reused across compendium entries
+const _compendiumRichEntries: Entry[] = [
+  {
+    type: 'section',
+    name: 'Fireball',
+    entries: [
+      '3rd-level evocation',
+      {
+        type: 'entries',
+        name: 'Description',
+        entries: [
+          'A bright streak flashes from your pointing finger to a point you choose within range and then blossoms with a low roar into an explosion of flame. Each creature in a 20-foot-radius sphere centered on that point must make a {@dc 14} {@skill Dexterity} saving throw.',
+          'A creature takes {@damage 8d6} fire damage on a failed save, or half as much damage on a successful one.',
+          'You can use this to ignite flammable objects in the area that aren\'t being worn or carried. See {@spell fireball|PHB} for full details.',
+        ],
+      },
+      {
+        type: 'list',
+        items: [
+          'Casting Time: 1 action',
+          'Range: 150 feet',
+          'Components: V, S, M (a tiny ball of bat guano and sulfur)',
+          'Duration: Instantaneous',
+        ],
+      },
+      {
+        type: 'table',
+        caption: 'Upcasting Damage',
+        colLabels: ['Slot Level', 'Damage'],
+        rows: [
+          ['3rd', '{@damage 8d6}'],
+          ['4th', '{@damage 9d6}'],
+          ['5th', '{@damage 10d6}'],
+        ],
+      },
+      {
+        type: 'inset',
+        name: 'Designer Note',
+        entries: [
+          'The 20-foot radius is measured from the point of origin, not from the caster. This matters when the caster is near a wall.',
+        ],
+      },
+      {
+        type: 'insetReadaloud',
+        entries: [
+          'The air crackles with heat as a small bead of fire streaks toward its destination — and then the world ignites.',
+        ],
+      },
+      {
+        type: 'quote',
+        entries: ['With great power comes great responsibility — and great fire.'],
+        by: 'Gandalf the Red (after the incident)',
+      },
+      {
+        type: 'image',
+        href: { type: 'internal', path: 'img/spells/fireball.webp' },
+        title: 'Fireball eruption',
+        altText: 'A massive ball of fire explodes across a dungeon corridor',
+      },
+      {
+        type: 'statblock',
+        tag: 'creature',
+        name: 'Fire Elemental',
+        source: 'MM',
+      },
+    ],
+  },
+];
+
+const _compendiumCompositeNode: EntryNode = {
+  type: 'entries',
+  name: 'Dragon\'s Breath (3rd level)',
+  entries: [
+    'When you or a creature you choose within range exhales, it deals {@damage 3d6} {@condition prone}-inducing fire damage in a 15-foot cone.',
+    {
+      type: 'list',
+      items: [
+        'Range: 60 feet',
+        'Duration: 1 minute (concentration)',
+        'Save: {@dc 13} Constitution',
+      ],
+    },
+    {
+      type: 'inset',
+      name: 'At Higher Levels',
+      entries: ['When cast using a 4th-level slot, the damage increases by {@damage 1d6} per slot level above 3rd.'],
+    },
+  ],
+};
+
+const compendiumEntriesEntry: ComponentEntry = {
+  id: 'compendium-entries',
+  name: 'CompendiumEntries',
+  group: 'compendium',
+  notes: 'Top-level renderer for a 5etools entries array. Dispatches each Entry by type — strings go through StringNode (inline tags), objects go through NODE_REGISTRY. Rich fixture exercises: section, entries, list, table, inset, insetReadaloud, quote, image, statblock nodes.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Fireball spell — rich multi-node fixture' },
+  ],
+  render: () => <CompendiumEntries entries={_compendiumRichEntries} />,
+};
+
+const entryNodeRendererEntry: ComponentEntry = {
+  id: 'entry-node-renderer',
+  name: 'EntryNodeRenderer',
+  group: 'compendium',
+  notes: 'Per-entry dispatcher. Exported for recursive use by node components (entries, list, item, table cells). Accepts Entry (string | EntryNode). Fixture: a composite entries node with list and inset.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Composite entries node' },
+    { _label: 'Plain string with inline tags' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('string')) {
+      const entry: Entry = 'A target must make a {@dc 15} {@skill Strength} saving throw or be pushed {@dice 2d6} × 5 feet away and knocked {@condition prone}.';
+      return <EntryNodeRenderer entry={entry} />;
+    }
+    return <EntryNodeRenderer entry={_compendiumCompositeNode} />;
+  },
+};
+
+const inlineRendererEntry: ComponentEntry = {
+  id: 'inline-renderer',
+  name: 'InlineRenderer',
+  group: 'compendium',
+  notes: 'Tokenizes a 5etools string and renders inline {@tag args} tokens via TAG_REGISTRY. Unknown tags fall through to UnknownTag (keeps prose readable). Fixture covers: {@damage}, {@condition}, {@spell}, {@dice}, {@dc}, {@skill}.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Mixed inline tags — damage + condition + spell' },
+    { _label: 'DC + skill save' },
+    { _label: 'Plain text — no tags' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('DC')) {
+      return <InlineRenderer text="The target must succeed on a {@dc 14} {@skill Dexterity} saving throw or take {@damage 2d6} bludgeoning damage." />;
+    }
+    if (label.includes('Plain')) {
+      return <InlineRenderer text="A creature takes the listed damage and the effect ends at the start of its next turn." />;
+    }
+    return <InlineRenderer text="On a hit, the target takes {@damage 3d8 + 5} fire damage and is {@condition prone} until the start of your next turn. See {@spell fireball|PHB} for full rules. Roll {@dice 1d20+7} to attack." />;
+  },
+};
+
+const _statblockFixture: StatblockNode = {
+  type: 'statblock',
+  tag: 'creature',
+  name: 'Goblin',
+  source: 'MM',
+};
+
+const statblockNodeViewEntry: ComponentEntry = {
+  id: 'statblock-node-view',
+  name: 'StatblockNodeView',
+  group: 'compendium',
+  notes: 'v1: renders a data-compendium-ref link-styled span for a creature/object/hazard stat block. No inline expansion yet (future SDD). Props: node (StatblockNode) — requires name, source; tag defaults to "creature".',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Goblin (MM)' },
+    { _label: 'Adult Red Dragon (MM)' },
+    { _label: 'object tag — Ballista' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Dragon')) {
+      const node: StatblockNode = { type: 'statblock', tag: 'creature', name: 'Adult Red Dragon', source: 'MM' };
+      return <StatblockNodeView node={node} />;
+    }
+    if (label.includes('Ballista')) {
+      const node: StatblockNode = { type: 'statblock', tag: 'object', name: 'Ballista', source: 'DMG' };
+      return <StatblockNodeView node={node} />;
+    }
+    return <StatblockNodeView node={_statblockFixture} />;
+  },
+};
+
+const _tableFixture: TableNode = {
+  type: 'table',
+  caption: 'Wild Magic Surge (d100)',
+  colLabels: ['d100', 'Effect'],
+  rows: [
+    ['01–02', 'Roll on this table at the start of each of your turns for the next minute, ignoring this result on subsequent rolls.'],
+    ['03–04', 'For the next minute, you can see any {@condition invisible} creature if you have line of sight to it.'],
+    ['05–06', 'A modron chosen and controlled by the DM appears in an unoccupied space within 5 feet of you, then disappears 1 minute later.'],
+    ['07–08', 'You cast {@spell fireball} as a 3rd-level spell centered on yourself.'],
+    ['09–10', 'You cast {@spell magic missile} as a 5th-level spell.'],
+  ],
+};
+
+const tableNodeViewEntry: ComponentEntry = {
+  id: 'table-node-view',
+  name: 'TableNodeView',
+  group: 'compendium',
+  notes: 'Table renderer with optional caption and column headers. Cells are arbitrary Entry values (go through EntryNodeRenderer, so they can contain inline tags). Fixture: Wild Magic Surge table.',
+  propsSchema: {},
+  render: () => <TableNodeView node={_tableFixture} />,
+};
+
+const _insetFixture: InsetNode = {
+  type: 'inset',
+  name: 'Variant: Flanking',
+  entries: [
+    'If a character is wielding a melee weapon and is on the opposite side of the target from an ally, both the character and the ally are flanking the target.',
+    'While flanking a target, each flanking creature has advantage on melee attack rolls against that target.',
+  ],
+};
+
+const _insetReadaloudFixture: InsetReadaloudNode = {
+  type: 'insetReadaloud',
+  entries: [
+    'The iron door groans open, revealing a vast chamber. Columns of obsidian rise to a ceiling lost in shadow. At the far end, upon a throne of bones, sits a figure draped in tattered robes — and it looks up as you enter.',
+  ],
+};
+
+const insetNodeViewEntry: ComponentEntry = {
+  id: 'inset-node-view',
+  name: 'InsetNodeView',
+  group: 'compendium',
+  notes: 'Sidebar callout — neutral surface (bg-paper-soft + border). Renders name as h4 when present, then entries. Fixture: optional Flanking variant rule.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Named inset — Flanking variant' },
+    { _label: 'Unnamed inset' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('Unnamed')) {
+      const node: InsetNode = {
+        type: 'inset',
+        entries: ['This rule is optional and applies only when the DM explicitly enables it.'],
+      };
+      return <InsetNodeView node={node} />;
+    }
+    return <InsetNodeView node={_insetFixture} />;
+  },
+};
+
+const insetReadaloudNodeViewEntry: ComponentEntry = {
+  id: 'inset-readaloud-node-view',
+  name: 'InsetReadaloudNodeView',
+  group: 'compendium',
+  notes: 'Read-aloud callout — italicised prose on primary-tinted surface (bg-primary-soft). Fixture: dungeon room description the DM reads aloud to players.',
+  propsSchema: {},
+  render: () => <InsetReadaloudNodeView node={_insetReadaloudFixture} />,
+};
+
+const _imageFixture: ImageNode = {
+  type: 'image',
+  href: { type: 'internal', path: 'img/environments/dungeon-entrance.webp' },
+  title: 'Dungeon Entrance',
+  altText: 'A stone archway leading into darkness',
+  width: 800,
+  height: 600,
+};
+
+const _galleryFixture: GalleryNode = {
+  type: 'gallery',
+  images: [
+    {
+      type: 'image',
+      href: { type: 'internal', path: 'img/items/sword-of-sharpness.webp' },
+      title: 'Sword of Sharpness',
+      altText: 'A gleaming longsword with a razor edge',
+    },
+    {
+      type: 'image',
+      href: { type: 'external', url: 'https://5etools-mirror-2.github.io/img/items/bag-of-holding.webp' },
+      title: 'Bag of Holding',
+      altText: 'A cloth bag that is larger on the inside',
+    },
+  ],
+};
+
+const imageNodeViewEntry: ComponentEntry = {
+  id: 'image-node-view',
+  name: 'ImageNodeView',
+  group: 'compendium',
+  notes: 'v1: image nodes render as figure placeholders (data-image-ref attribute for future swap). href: internal (path) or external (url). title / altText used as figcaption. Fixture: internal + external href shapes.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'Internal href' },
+    { _label: 'External href' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('External')) {
+      const node: ImageNode = {
+        type: 'image',
+        href: { type: 'external', url: 'https://5etools-mirror-2.github.io/img/environments/market.webp' },
+        title: 'Town Market',
+        altText: 'A bustling medieval market',
+      };
+      return <ImageNodeView node={node} />;
+    }
+    return <ImageNodeView node={_imageFixture} />;
+  },
+};
+
+const galleryNodeViewEntry: ComponentEntry = {
+  id: 'gallery-node-view',
+  name: 'GalleryNodeView',
+  group: 'compendium',
+  notes: 'Grid of ImageNodeView — renders each image in the images array as a figure placeholder. Fixture: 2-item gallery with internal + external href.',
+  propsSchema: {},
+  render: () => <GalleryNodeView node={_galleryFixture} />,
+};
+
+const _quoteFixture: QuoteNode = {
+  type: 'quote',
+  entries: [
+    'Not all those who wander are lost — but most of them forgot to buy a torch.',
+  ],
+  by: 'Elminster Aumar',
+  from: 'Tome of the Wandering Mage',
+};
+
+const quoteNodeViewEntry: ComponentEntry = {
+  id: 'quote-node-view',
+  name: 'QuoteNodeView',
+  group: 'compendium',
+  notes: 'Block quote — italicised entries on left border (border-secondary). Attribution rendered in footer as em-dash + cite when by or from is present. Fixture: flavor quote with by + from.',
+  propsSchema: {},
+  matrixMode: 'list',
+  explicitCombos: [
+    { _label: 'With attribution' },
+    { _label: 'No attribution' },
+  ],
+  render: (p) => {
+    const label = (p._label as string) ?? '';
+    if (label.includes('No attribution')) {
+      const node: QuoteNode = {
+        type: 'quote',
+        entries: ['The dragon does not concern itself with the opinion of the sheep.'],
+      };
+      return <QuoteNodeView node={node} />;
+    }
+    return <QuoteNodeView node={_quoteFixture} />;
+  },
+};
+
 // ── Registry export ───────────────────────────────────────────────────────────
 
 export const COMPONENT_REGISTRY: ComponentEntry[] = [
@@ -2530,4 +2899,15 @@ export const COMPONENT_REGISTRY: ComponentEntry[] = [
   pendientesFichaCardEntry,
   pendientesSheetContentEntry,
   questsSinTocarListEntry,
+  // compendium/
+  compendiumEntriesEntry,
+  entryNodeRendererEntry,
+  inlineRendererEntry,
+  statblockNodeViewEntry,
+  tableNodeViewEntry,
+  insetNodeViewEntry,
+  insetReadaloudNodeViewEntry,
+  imageNodeViewEntry,
+  galleryNodeViewEntry,
+  quoteNodeViewEntry,
 ];

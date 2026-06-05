@@ -30,7 +30,7 @@ export interface VariantCombination {
   label: string;
 }
 
-export type ComponentGroup = 'ui' | 'layout' | 'sheet' | 'wizard' | 'form' | 'encuentros' | 'ficha' | 'campanas' | 'inicio';
+export type ComponentGroup = 'ui' | 'layout' | 'sheet' | 'wizard' | 'form' | 'encuentros' | 'ficha' | 'campanas' | 'inicio' | 'compendium';
 
 export interface ComponentEntry<P = Record<string, unknown>> {
   id: string;
