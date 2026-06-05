@@ -121,6 +121,27 @@ describe('SessionCreateForm', () => {
     });
   });
 
+  it('converts the datetime-local value to a full ISO 8601 datetime (API .datetime())', async () => {
+    mockCreateSession.mockResolvedValueOnce({ ok: true, data: { id: 's-1' } });
+
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText(/título/i), { target: { value: 'Sesión con fecha' } });
+    fireEvent.change(screen.getByLabelText(/fecha y hora/i), { target: { value: '2026-06-05T20:50' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /crear sesión/i }));
+
+    await waitFor(() => {
+      expect(mockCreateSession).toHaveBeenCalledOnce();
+    });
+    const sentBody = mockCreateSession.mock.calls[0]![0] as { scheduledAt?: string };
+    // Must be a full ISO datetime (ends with Z), NOT the raw "2026-06-05T20:50".
+    expect(sentBody.scheduledAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
+    expect(sentBody.scheduledAt).not.toBe('2026-06-05T20:50');
+    // Round-trips to the same instant the user picked (local → UTC → Date).
+    expect(new Date(sentBody.scheduledAt!).getTime()).toBe(new Date('2026-06-05T20:50').getTime());
+  });
+
   it('omits optional numeric fields when blank (does not send empty string)', async () => {
     mockCreateSession.mockResolvedValueOnce({ ok: true, data: { id: 's-1' } });
 

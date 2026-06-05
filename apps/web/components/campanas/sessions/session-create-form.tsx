@@ -50,6 +50,18 @@ export function SessionCreateForm({ campaignId, onDone }: SessionCreateFormProps
       return;
     }
 
+    // The datetime-local input yields "YYYY-MM-DDTHH:mm" (local, no tz), but the
+    // API expects a full ISO 8601 datetime (Zod .datetime()). Convert before send.
+    let scheduledAtIso: string | undefined;
+    if (scheduledAt) {
+      const parsed = new Date(scheduledAt);
+      if (Number.isNaN(parsed.getTime())) {
+        setError('La fecha y hora no es válida.');
+        return;
+      }
+      scheduledAtIso = parsed.toISOString();
+    }
+
     setSubmitting(true);
 
     const body = {
@@ -57,7 +69,7 @@ export function SessionCreateForm({ campaignId, onDone }: SessionCreateFormProps
       title: title.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(dmNotes.trim() ? { dmNotes: dmNotes.trim() } : {}),
-      ...(scheduledAt ? { scheduledAt } : {}),
+      ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
       ...(min !== undefined ? { levelMin: min } : {}),
       ...(max !== undefined ? { levelMax: max } : {}),
       ...(maxPlayers !== '' ? { maxPlayers: Number(maxPlayers) } : {}),
