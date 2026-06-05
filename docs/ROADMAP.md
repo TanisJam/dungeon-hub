@@ -14,15 +14,16 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 | 1 | **JSON import/export (remaining)** | Character EXPORT ✅ shipped. Remaining: character RE-IMPORT (reuses the `schemaVersion:1` envelope; aligns slug algorithms first — see follow-up), then config/NPC/world export. Referential integrity on re-import is the hard part. | #3.9 Import/export |
 | 2 | **West Marches write-path** (`wm-knowledge-layer`, paused at #1808) | Player contribution to Bitácora: sightings, rumors, waypoints, session recaps. Sealing/debunking by DM. Bitácora→codex link. `NovedadesFeed` backend hookup. | #3.10 WM knowledge |
 | 3 | **Custom content via JSON upload** (DEC-1, locked 2026-06-04) | DM-accessible import surface: upload a JSON pack, enable per-world via `rulesProfile`. Reuses existing `compendium-import` pipeline. Visual authoring is post-MVP. | #3.8 Custom content |
-| 4 | **Quests** | DB table + API CRUD + wire existing `QuestsSinTocarList` UI shell. Currently zero backend. | #3.7 World content |
-| 5 | **Codex cross-category search + item type filter** | Landing-page search across all categories; items `?type=` filter in browser UI (API param already exists). | #3.4 Codex nav/search |
-| 6 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
+| 4 | **Codex cross-category search + item type filter** | Landing-page search across all categories; items `?type=` filter in browser UI (API param already exists). | #3.4 Codex nav/search |
+| 5 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
 
 > ✅ **Campaign invite flow** (gap #782, was P1) — SHIPPED 2026-06-05 via SDD `campaign-invite-flow` (engram archive #1877). Invite-link mechanism (`campaign_invite_tokens` + `POST /campaigns/:id/invite` + `/invites/status|confirm` + `/invite/[token]` accept screen, atomic `worldMembers`+`campaignMembers` dual-write). Closes #3.6 DM campaigns.
 >
 > ✅ **Character JSON export** (MVP #3.9 first slice) — SHIPPED 2026-06-05 via SDD `character-json-export` (engram archive #1885). `GET /characters/:id/export` (owner-only) → versioned envelope `{schemaVersion:1, …, character:{…, data, inventory}}` (raw passthrough, no response schema) + sheet danger-zone download island. Follow-up before re-import: align the web (NFD) vs api (drop-non-ASCII) slug algorithms.
 >
 > ✅ **Feats + Conditions compendium browser** (MVP #3.3) — SHIPPED 2026-06-05, direct web wiring (no SDD; API+DB already existed). Two `CATEGORY_CONFIG` entries + `FeatRowView`/`ConditionRowView` + `FeatHeader`/`ConditionHeader` + two grid cards (`Dotes`/`Estados`) + landing counts. Browser route/list/detail were already generic (ADR-2 open/closed seam), so zero changes to route, list island, detail sheet, or actions. Feats surface prerequisite (PHB p.165); conditions surface condition-vs-status kind (PHB p.290). Closes #3.3.
+>
+> ✅ **Quests** (MVP #3.7 world content) — SHIPPED 2026-06-05 via SDD `quests` (engram archive #1895). World-scoped CRUD cloning the `journal_entries` stack: `quests` table + migration `0038` (status/visibility = text+CHECK), `GET/POST /worlds/:worldId/quests` + `GET/PATCH/DELETE /quests/:questId` (GM-only write, members read public, `dmNotes` stripped per-field server-side via `projectQuestForAccess`), `/codex/quests` page + components + codex SubNav tab, and `/inicio` DM dashboard wiring (live `QuestsSinTocarList` + `pendingQuests` count). 15 integration tests + 12 component tests. No `packages/domain` change (pure CRUD content). Deferred post-MVP: `giverNpcId`, `hexId`, `reward`, `tags`. Closes #3.7.
 
 ---
 
