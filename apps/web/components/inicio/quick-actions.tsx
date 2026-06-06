@@ -2,16 +2,18 @@ import Link from 'next/link';
 import { SectionHead, Icon } from '@/components/ui';
 
 const actions = [
-  { href: '/personajes',     icon: 'user' as const,  label: 'Ficha activa' },
-  { href: '/compendium',     icon: 'book' as const,  label: 'Buscar'       },
-  { href: '/characters/new', icon: 'plus' as const,  label: 'Crear PJ'    },
+  { href: '/personajes',     icon: 'user' as const,    label: 'Ficha activa' },
+  { href: '/compendium',     icon: 'book' as const,    label: 'Buscar'       },
+  { href: '/characters/new', icon: 'plus' as const,    label: 'Crear PJ'    },
+  // Biblioteca W1 — Mesa tab removed; /campanas still reachable via Inicio (REQ-NAV-02).
+  { href: '/campanas',       icon: 'compass' as const, label: 'Mesa'         },
 ];
 
 export function QuickActions() {
   return (
     <>
       <SectionHead title="Atajos" />
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {actions.map((a) => (
           <Link
             key={a.href}

@@ -1,9 +1,13 @@
 /**
  * Unit tests for QuickActions component.
  *
- * T1: Exactly 3 <a> elements rendered within the grid (QUICK-01).
- * T2: Each link has correct href and label text (QUICK-02).
+ * Biblioteca W1 — REQ-NAV-02: Mesa absorbed into Inicio QuickActions.
+ * Player QuickActions now includes a link to /campanas (Mesa entry).
+ *
+ * T1: Exactly 4 <a> elements rendered within the grid (QUICK-01 updated).
+ * T2: Each link has correct href and label text (QUICK-02 updated).
  * T3: Each tile renders an SVG icon element (QUICK-02).
+ * T4: /campanas link present (Mesa absorption — REQ-NAV-02).
  */
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -11,10 +15,10 @@ import { render, screen } from '@testing-library/react';
 import { QuickActions } from './quick-actions';
 
 describe('QuickActions', () => {
-  it('T1: renders exactly 3 link elements', () => {
+  it('T1: renders exactly 4 link elements (added Mesa/Campañas)', () => {
     render(<QuickActions />);
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(3);
+    expect(links).toHaveLength(4);
   });
 
   it('T2: each link has the correct href and label text', () => {
@@ -22,15 +26,23 @@ describe('QuickActions', () => {
     const personajesLink = screen.getByRole('link', { name: /Ficha activa/i });
     const compendiumLink = screen.getByRole('link', { name: /Buscar/i });
     const newCharLink = screen.getByRole('link', { name: /Crear PJ/i });
+    const campañasLink = screen.getByRole('link', { name: /Mesa|Campañas/i });
 
     expect(personajesLink.getAttribute('href')).toBe('/personajes');
     expect(compendiumLink.getAttribute('href')).toBe('/compendium');
     expect(newCharLink.getAttribute('href')).toBe('/characters/new');
+    expect(campañasLink.getAttribute('href')).toBe('/campanas');
   });
 
   it('T3: each tile renders an SVG icon element', () => {
     const { container } = render(<QuickActions />);
     const svgs = container.querySelectorAll('svg');
-    expect(svgs.length).toBe(3);
+    expect(svgs.length).toBe(4);
+  });
+
+  it('T4: /campanas link present (Mesa absorption — REQ-NAV-02)', () => {
+    render(<QuickActions />);
+    const campañasLink = screen.getByRole('link', { name: /Mesa|Campañas/i });
+    expect(campañasLink.getAttribute('href')).toBe('/campanas');
   });
 });

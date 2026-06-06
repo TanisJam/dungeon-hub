@@ -1,7 +1,11 @@
 /**
  * Tests for DMQuickActions component
  *
- * REQ-IDM-QUICK-ACTIONS-05: Iniciativa Link to /encuentros, NPC + Loot as stub buttons with aria-disabled
+ * Biblioteca W1 — REQ-NAV-02, REQ-DMTOOLS-01:
+ *   - DM QuickActions renders /campanas (Mesa absorbed into Inicio).
+ *   - DM QuickActions renders /herramientas/facciones (Herramientas del DM entry).
+ *
+ * REQ-IDM-QUICK-ACTIONS-05: Iniciativa Link to /encuentros, NPC + Loot as stub buttons with aria-disabled.
  */
 import React from 'react';
 import { describe, it, expect } from 'vitest';
@@ -46,5 +50,19 @@ describe('DMQuickActions', () => {
     expect(() => {
       buttons.forEach((btn) => fireEvent.click(btn));
     }).not.toThrow();
+  });
+
+  it('T6: /campanas link present (Mesa absorption — REQ-NAV-02)', () => {
+    const { container } = render(<DMQuickActions />);
+    const links = container.querySelectorAll('a');
+    const campañasLink = Array.from(links).find((a) => a.getAttribute('href') === '/campanas');
+    expect(campañasLink).toBeTruthy();
+  });
+
+  it('T7: /herramientas/facciones link present (DM tools entry — REQ-DMTOOLS-01)', () => {
+    const { container } = render(<DMQuickActions />);
+    const links = container.querySelectorAll('a');
+    const herramientasLink = Array.from(links).find((a) => a.getAttribute('href') === '/herramientas/facciones');
+    expect(herramientasLink).toBeTruthy();
   });
 });
