@@ -49,7 +49,6 @@ const baseDetail: SessionDetail = {
   levelMin: 3,
   levelMax: 5,
   maxPlayers: 4,
-  currentPlayers: 2,
   locationHexId: null,
   gmUserId: 'gm-user-1',
   createdAt: '2025-01-01T00:00:00.000Z',
@@ -143,6 +142,12 @@ describe('SessionDetailView', () => {
   it('renders GM name in header', () => {
     renderDetailView({ gmName: 'Thorin el DM' });
     expect(screen.getByText(/thorin el dm/i)).toBeTruthy();
+  });
+
+  it('derives player count from ACTIVE participants (verify BUG-1: no currentPlayers on detail)', () => {
+    // baseDetail has maxPlayers 4, participants = 1 active + 1 left → 1/4, NOT undefined/4.
+    renderDetailView();
+    expect(screen.getByText('1/4 jugadores')).toBeTruthy();
   });
 
   // --- Participants ---

@@ -54,7 +54,12 @@ function handleApiError(err: unknown): ActionResult<never> {
 
 export type SessionStatus = 'scheduled' | 'active' | 'paused' | 'completed' | 'cancelled';
 
-export interface SessionRow {
+// Raw session row as returned by create / start / pause / resume / cancel /
+// complete (plain `.returning()` / `loadSession`). NO aggregates — the list
+// endpoint attaches `currentPlayers`+`participants`, the detail endpoint
+// attaches enriched `participants`. Keeping those off the base is what makes the
+// action return types honest (the API does NOT put them on these responses).
+export interface SessionBase {
   id: string;
   campaignId: string;
   title: string;
@@ -65,11 +70,24 @@ export interface SessionRow {
   levelMin: number | null;
   levelMax: number | null;
   maxPlayers: number | null;
-  currentPlayers: number;
   locationHexId: string | null;
   gmUserId: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Non-enriched participant ref (list rows + join/leave envelope).
+export interface SessionParticipantRef {
+  characterId: string;
+  userId: string;
+  joinedAt: string;
+  leftAt: string | null;
+}
+
+// List row (GET /sessions?campaignId): base + the two attached aggregates.
+export interface SessionRow extends SessionBase {
+  currentPlayers: number;
+  participants: SessionParticipantRef[];
 }
 
 export interface EnrichedParticipant {
@@ -82,8 +100,16 @@ export interface EnrichedParticipant {
   level: number;
 }
 
-export interface SessionDetail extends SessionRow {
+// Detail (GET /sessions/:id): base + enriched participants. NO `currentPlayers`
+// — the detail endpoint does not attach it; derive it from active participants.
+export interface SessionDetail extends SessionBase {
   participants: EnrichedParticipant[];
+}
+
+// join/leave return this envelope (NOT a flat SessionDetail).
+export interface SessionMutationResult {
+  session: SessionBase;
+  participants: SessionParticipantRef[];
 }
 
 export interface SessionEvent {
@@ -199,12 +225,12 @@ export async function getSession(
 
 export async function createSession(
   body: CreateSessionBody,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const created = await api.post<SessionRow>('/sessions', body, token);
+    const created = await api.post<SessionBase>('/sessions', body, token);
     revalidateCampaignDetail(body.campaignId);
     return { ok: true, data: created };
   } catch (err) {
@@ -220,12 +246,12 @@ export async function joinSession(
   sessionId: string,
   characterId: string,
   campaignId: string,
-): Promise<ActionResult<SessionDetail>> {
+): Promise<ActionResult<SessionMutationResult>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionDetail>(
+    const res = await api.post<SessionMutationResult>(
       `/sessions/${sessionId}/join`,
       { characterId },
       token,
@@ -245,12 +271,12 @@ export async function leaveSession(
   sessionId: string,
   characterId: string,
   campaignId: string,
-): Promise<ActionResult<SessionDetail>> {
+): Promise<ActionResult<SessionMutationResult>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionDetail>(
+    const res = await api.post<SessionMutationResult>(
       `/sessions/${sessionId}/leave`,
       { characterId },
       token,
@@ -269,12 +295,12 @@ export async function leaveSession(
 export async function startSession(
   sessionId: string,
   campaignId: string,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionRow>(`/sessions/${sessionId}/start`, undefined, token);
+    const res = await api.post<SessionBase>(`/sessions/${sessionId}/start`, undefined, token);
     revalidateSessionPaths(campaignId, sessionId);
     return { ok: true, data: res };
   } catch (err) {
@@ -289,12 +315,12 @@ export async function startSession(
 export async function pauseSession(
   sessionId: string,
   campaignId: string,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionRow>(`/sessions/${sessionId}/pause`, undefined, token);
+    const res = await api.post<SessionBase>(`/sessions/${sessionId}/pause`, undefined, token);
     revalidateSessionPaths(campaignId, sessionId);
     return { ok: true, data: res };
   } catch (err) {
@@ -309,12 +335,12 @@ export async function pauseSession(
 export async function resumeSession(
   sessionId: string,
   campaignId: string,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionRow>(`/sessions/${sessionId}/resume`, undefined, token);
+    const res = await api.post<SessionBase>(`/sessions/${sessionId}/resume`, undefined, token);
     revalidateSessionPaths(campaignId, sessionId);
     return { ok: true, data: res };
   } catch (err) {
@@ -329,12 +355,12 @@ export async function resumeSession(
 export async function cancelSession(
   sessionId: string,
   campaignId: string,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionRow>(`/sessions/${sessionId}/cancel`, undefined, token);
+    const res = await api.post<SessionBase>(`/sessions/${sessionId}/cancel`, undefined, token);
     revalidateSessionPaths(campaignId, sessionId);
     return { ok: true, data: res };
   } catch (err) {
@@ -350,12 +376,12 @@ export async function completeSession(
   sessionId: string,
   campaignId: string,
   body: CompleteSessionBody,
-): Promise<ActionResult<SessionRow>> {
+): Promise<ActionResult<SessionBase>> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'No autenticado', status: 401 };
 
   try {
-    const res = await api.post<SessionRow>(`/sessions/${sessionId}/complete`, body, token);
+    const res = await api.post<SessionBase>(`/sessions/${sessionId}/complete`, body, token);
     revalidateSessionPaths(campaignId, sessionId);
     return { ok: true, data: res };
   } catch (err) {

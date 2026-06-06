@@ -114,7 +114,9 @@ export function SessionDetailView({
             <span>Nv {detail.levelMin}–{detail.levelMax}</span>
           )}
           {detail.maxPlayers !== null && (
-            <span>{detail.currentPlayers}/{detail.maxPlayers} jugadores</span>
+            <span>
+              {detail.participants.filter((p) => p.leftAt === null).length}/{detail.maxPlayers} jugadores
+            </span>
           )}
         </div>
 
