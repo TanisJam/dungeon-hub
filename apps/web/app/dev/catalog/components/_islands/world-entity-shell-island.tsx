@@ -18,8 +18,8 @@ import { WorldEntityShell } from '@/components/world/_shell/world-entity-shell';
 import type { WorldEntityShellProps } from '@/components/world/_shell/world-entity-shell';
 import { NpcRowView } from '@/components/world/npcs/npc-row';
 import { NpcForm } from '@/components/world/npcs/npc-form';
-import type { NpcRow, NpcBody, NpcStatus } from '@/app/codex/actions';
-import type { FactionState } from '@/app/codex/actions';
+import type { NpcRow, NpcBody, NpcStatus } from '@/app/herramientas/actions';
+import type { FactionState } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Fixture data — Barovia NPCs

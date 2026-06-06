@@ -1,4 +1,10 @@
 /**
+ * W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave.
+ * All tests in this file are quarantined until the Bitácora wave re-introduces
+ * the /characters/[id]/codex surface.
+ */
+
+/**
  * J8 — codex-knowledge E2E round-trip @ 375px
  *
  * codex-knowledge B-5 (SDD tasks #1950, spec #1947 Area 8):
@@ -43,7 +49,8 @@ const VIEWPORT = { width: 375, height: 667 };
 // E2E-A: Full knowledge round-trip (REQ-CK-E2E-01)
 // ---------------------------------------------------------------------------
 
-test.describe('J8-A — codex-knowledge round-trip @ 375px', () => {
+test.describe.skip('J8-A — codex-knowledge round-trip @ 375px', () => {
+  // W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave
   test(
     'DM grants goblin via session-complete → player /codex/monsters shows it → player adds note',
     async ({ browser }: { browser: Browser }) => {
@@ -178,7 +185,8 @@ test.describe('J8-A — codex-knowledge round-trip @ 375px', () => {
 // E2E-B: Empty state for character with zero knowledge (REQ-CK-E2E-04)
 // ---------------------------------------------------------------------------
 
-test.describe('J8-B — codex-knowledge empty state @ 375px', () => {
+test.describe.skip('J8-B — codex-knowledge empty state @ 375px', () => {
+  // W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave
   test(
     'Player character with zero character_knowledge rows sees empty state on /codex/monsters',
     async ({ browser }: { browser: Browser }) => {

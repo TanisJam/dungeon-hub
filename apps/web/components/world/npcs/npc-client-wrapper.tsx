@@ -25,9 +25,9 @@ import {
   createNpc,
   updateNpc,
   deleteNpc,
-} from '@/app/codex/actions';
-import type { NpcRow, NpcBody, FactionRow } from '@/app/codex/actions';
-import { attachNpcFaction, detachNpcFaction } from '@/app/codex/actions';
+} from '@/app/herramientas/actions';
+import type { NpcRow, NpcBody, FactionRow } from '@/app/herramientas/actions';
+import { attachNpcFaction, detachNpcFaction } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Dependency injection bundle

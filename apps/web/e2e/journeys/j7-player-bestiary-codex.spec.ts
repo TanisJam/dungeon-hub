@@ -51,7 +51,8 @@ const VIEWPORT = { width: 375, height: 667 };
 // ephemeral character. Used to assert it is absent from the player DOM.
 const UNGRANTED_SLUG = 'tarrasque';
 
-test.describe('J7 — Player Bestiary Codex (CodexList) @ 375px', () => {
+test.describe.skip('J7 — Player Bestiary Codex (CodexList) @ 375px', () => {
+  // W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave
   test(
     'DM grants goblin → player codex shows it; ungranted tarrasque absent; no silhouettes',
     async ({ browser }: { browser: Browser }) => {

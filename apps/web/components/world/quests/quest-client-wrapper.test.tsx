@@ -25,7 +25,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuestClientWrapper } from './quest-client-wrapper';
-import type { QuestRow } from '@/app/codex/quests/actions';
+import type { QuestRow } from '@/app/herramientas/quests/actions';
 
 // WorldEntityShell calls useRouter().refresh() after mutations
 vi.mock('next/navigation', () => ({
@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({
 // ─── Mock Server Actions ─────────────────────────────────────────────────────
 // IMPORTANT: vi.mock is hoisted — do NOT reference outer variables inside the factory.
 
-vi.mock('@/app/codex/quests/actions', () => ({
+vi.mock('@/app/herramientas/quests/actions', () => ({
   listQuests: vi.fn(),
   getQuestDetail: vi.fn(),
   createQuest: vi.fn(),
@@ -98,7 +98,7 @@ function renderWrapper(effectiveView: 'dm' | 'player', quests: QuestRow[] = [moc
 }
 
 // Import the mocked module to set .mockResolvedValue in beforeEach
-import * as actions from '@/app/codex/quests/actions';
+import * as actions from '@/app/herramientas/quests/actions';
 
 // ─── (a) Initial list renders quest rows ─────────────────────────────────────
 

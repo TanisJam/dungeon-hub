@@ -10,8 +10,8 @@
 // REQ-GATE-03: chips ≥44px tap targets at 375px.
 
 import { useState } from 'react';
-import type { NpcFaction } from '@/app/codex/actions';
-import type { FactionRow } from '@/app/codex/actions';
+import type { NpcFaction } from '@/app/herramientas/actions';
+import type { FactionRow } from '@/app/herramientas/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
 

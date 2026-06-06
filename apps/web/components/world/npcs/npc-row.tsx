@@ -3,7 +3,7 @@
 
 import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
-import type { NpcRow as NpcRowData, NpcStatus } from '@/app/codex/actions';
+import type { NpcRow as NpcRowData, NpcStatus } from '@/app/herramientas/actions';
 
 interface NpcRowProps {
   row: NpcRowData;

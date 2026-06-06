@@ -28,7 +28,7 @@ import { ContributionComposer } from './contribution-composer';
 // ---------------------------------------------------------------------------
 
 // Mock the Server Action
-vi.mock('@/app/codex/actions', () => ({
+vi.mock('@/app/herramientas/actions', () => ({
   createContribution: vi.fn(),
 }));
 
@@ -43,7 +43,7 @@ vi.mock('@/components/ui', () => ({
     ) : null,
 }));
 
-import { createContribution } from '@/app/codex/actions';
+import { createContribution } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Props

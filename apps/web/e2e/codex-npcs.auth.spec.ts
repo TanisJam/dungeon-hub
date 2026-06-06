@@ -1,15 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * codex-npcs — E2E spec for the NPCs section in the Codex tab.
- * REQ-NPC-01, REQ-NPC-02, REQ-GATE-01, REQ-GATE-03.
+ * herramientas-npcs — E2E spec for the NPCs section under Herramientas del DM.
+ * Biblioteca W1 (ADR-2): updated from /codex/npcs → /herramientas/npcs.
+ *
+ * REQ-NPC-01, REQ-NPC-02, REQ-GATE-01, REQ-GATE-03, REQ-DMTOOLS-01, REQ-DMTOOLS-02.
  *
  * Verifies:
- *   (a) /codex/npcs renders for GM (DM view).
+ *   (a) /herramientas/npcs renders for GM (DM view).
  *   (b) DM sees FAB "Crear" button.
  *   (c) DM creates an NPC → appears in list.
  *   (d) DM opens NPC detail → faction chip section is visible.
- *   (e) Player view (role toggled) sees no FAB, no chip controls.
+ *   (e) SubNav pills visible (Facciones/NPCs).
  *
  * CRITICAL: FAB/forms are hydrated client islands — tests MUST use
  * waitUntil:'networkidle' + await expect(fab).toBeVisible() BEFORE clicking,
@@ -22,27 +24,27 @@ const MOBILE = { width: 375, height: 812 };
 
 test.use({ viewport: MOBILE });
 
-test('NPCs page renders for GM (DM view)', async ({ page }) => {
-  await page.goto('/codex/npcs', { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
+test('NPCs page renders for GM (DM view) at /herramientas/npcs', async ({ page }) => {
+  await page.goto('/herramientas/npcs', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/herramientas\/npcs/, { timeout: 10_000 });
 
   // Page rendered without error — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('SubNav pills are visible on /codex/npcs: Facciones and NPCs', async ({ page }) => {
-  await page.goto('/codex/npcs', { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
+test('SubNav pills are visible on /herramientas/npcs: Facciones and NPCs', async ({ page }) => {
+  await page.goto('/herramientas/npcs', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/herramientas\/npcs/, { timeout: 10_000 });
 
   // Both sub-nav pills should be visible
   await expect(page.getByRole('link', { name: /facciones/i })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('link', { name: /npcs/i })).toBeVisible({ timeout: 10_000 });
 });
 
-test('DM view: FAB "Crear" is visible at /codex/npcs', async ({ page }) => {
-  await page.goto('/codex/npcs', { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
+test('DM view: FAB "Crear" is visible at /herramientas/npcs', async ({ page }) => {
+  await page.goto('/herramientas/npcs', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveURL(/\/herramientas\/npcs/, { timeout: 10_000 });
 
   // DM (callerRole='gm') should see the FAB — REQ-NPC-01, REQ-GATE-01
   const fab = page.getByRole('button', { name: /crear/i });
@@ -51,8 +53,8 @@ test('DM view: FAB "Crear" is visible at /codex/npcs', async ({ page }) => {
 
 test('DM can create an NPC via FAB', async ({ page }) => {
   // networkidle: the FAB is a hydrated client island — must wait before clicking
-  await page.goto('/codex/npcs', { waitUntil: 'networkidle' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
+  await page.goto('/herramientas/npcs', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/herramientas\/npcs/, { timeout: 10_000 });
 
   // Open create form
   const fab = page.getByRole('button', { name: /crear/i });
@@ -77,8 +79,8 @@ test('DM can create an NPC via FAB', async ({ page }) => {
 
 test('DM opens NPC detail: faction chip section is visible', async ({ page }) => {
   // First create an NPC so there's something to open
-  await page.goto('/codex/npcs', { waitUntil: 'networkidle' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
+  await page.goto('/herramientas/npcs', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/herramientas\/npcs/, { timeout: 10_000 });
 
   const fab = page.getByRole('button', { name: /crear/i });
   await expect(fab).toBeVisible({ timeout: 10_000 });
@@ -98,14 +100,4 @@ test('DM opens NPC detail: faction chip section is visible', async ({ page }) =>
 
   // Detail sheet should open — "Facciones" label visible (faction chip section)
   await expect(page.getByText('Facciones', { exact: true })).toBeVisible({ timeout: 5_000 });
-});
-
-test('Codex tab remains active when on /codex/npcs', async ({ page }) => {
-  await page.goto('/codex/npcs', { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(/\/codex\/npcs/, { timeout: 10_000 });
-
-  // Codex tab should remain highlighted (TabBar matches startsWith('/codex'))
-  const nav = page.locator('nav[aria-label="Navegación principal"]');
-  const codexLink = nav.locator('a[href^="/codex"]');
-  await expect(codexLink.first()).toBeVisible({ timeout: 5_000 });
 });

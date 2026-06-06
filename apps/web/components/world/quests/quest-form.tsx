@@ -5,7 +5,7 @@
 // REQ-GATE-03: mobile-first, ≥44px inputs.
 
 import { useState } from 'react';
-import type { QuestRow, QuestBody, QuestStatus, QuestVisibility } from '@/app/codex/quests/actions';
+import type { QuestRow, QuestBody, QuestStatus, QuestVisibility } from '@/app/herramientas/quests/actions';
 import { FormLabel } from '@/components/ui/form-label';
 import { FormInput } from '@/components/ui/form-input';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';

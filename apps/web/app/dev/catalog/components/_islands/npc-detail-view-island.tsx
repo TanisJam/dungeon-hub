@@ -19,7 +19,7 @@
 
 import { NpcDetailView } from '@/components/world/npcs/npc-detail';
 import type { NpcDetailActions } from '@/components/world/npcs/npc-detail';
-import type { NpcRow, FactionRow } from '@/app/codex/actions';
+import type { NpcRow, FactionRow } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

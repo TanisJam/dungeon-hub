@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { FactionChipSection } from '@/components/world/npcs/faction-chip-section';
-import type { NpcFaction, FactionRow, FactionState } from '@/app/codex/actions';
+import type { NpcFaction, FactionRow, FactionState } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

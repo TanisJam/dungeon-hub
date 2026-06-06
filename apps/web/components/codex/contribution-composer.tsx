@@ -17,7 +17,7 @@
 
 import { useState } from 'react';
 import { V3Sheet } from '@/components/ui';
-import { createContribution } from '@/app/codex/actions';
+import { createContribution } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Props

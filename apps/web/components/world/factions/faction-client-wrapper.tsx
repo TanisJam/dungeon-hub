@@ -24,8 +24,8 @@ import {
   createFaction,
   updateFaction,
   deleteFaction,
-} from '@/app/codex/actions';
-import type { FactionRow, FactionBody } from '@/app/codex/actions';
+} from '@/app/herramientas/actions';
+import type { FactionRow, FactionBody } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Dependency injection bundle

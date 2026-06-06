@@ -4,7 +4,7 @@
 
 import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
-import type { QuestRow as QuestRowData, QuestStatus, QuestVisibility } from '@/app/codex/quests/actions';
+import type { QuestRow as QuestRowData, QuestStatus, QuestVisibility } from '@/app/herramientas/quests/actions';
 
 interface QuestRowProps {
   row: QuestRowData;

@@ -3,7 +3,7 @@
 
 import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
-import type { FactionRow as FactionRowData, FactionState } from '@/app/codex/actions';
+import type { FactionRow as FactionRowData, FactionState } from '@/app/herramientas/actions';
 
 interface FactionRowProps {
   row: FactionRowData;

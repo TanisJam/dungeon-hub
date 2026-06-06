@@ -13,7 +13,7 @@
 
 import { FactionClientWrapper } from '@/components/world/factions/faction-client-wrapper';
 import type { FactionWrapperActions } from '@/components/world/factions/faction-client-wrapper';
-import type { FactionRow, SearchResult } from '@/app/codex/actions';
+import type { FactionRow, SearchResult } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

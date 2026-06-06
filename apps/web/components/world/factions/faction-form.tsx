@@ -6,7 +6,7 @@
 // B1 refactor: replaced inline inputClass/labelClass/error/submit with ui/ primitives.
 
 import { useState } from 'react';
-import type { FactionRow, FactionBody, FactionState } from '@/app/codex/actions';
+import type { FactionRow, FactionBody, FactionState } from '@/app/herramientas/actions';
 import { FormLabel } from '@/components/ui/form-label';
 import { FormInput } from '@/components/ui/form-input';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';

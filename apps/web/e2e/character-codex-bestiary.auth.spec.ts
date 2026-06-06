@@ -62,7 +62,8 @@ async function resolveFirstMonster(request: import('@playwright/test').APIReques
   return data.data?.[0] ?? null;
 }
 
-test.describe('Character Codex Browser @ 375px', () => {
+test.describe.skip('Character Codex Browser @ 375px', () => {
+  // W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave
   test(
     'DM grants a monster → player codex shows it as known in CodexList',
     async ({ page, request }) => {

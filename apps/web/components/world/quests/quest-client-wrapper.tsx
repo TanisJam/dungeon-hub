@@ -25,8 +25,8 @@ import {
   createQuest,
   updateQuest,
   deleteQuest,
-} from '@/app/codex/quests/actions';
-import type { QuestRow, QuestBody } from '@/app/codex/quests/actions';
+} from '@/app/herramientas/quests/actions';
+import type { QuestRow, QuestBody } from '@/app/herramientas/quests/actions';
 
 // ---------------------------------------------------------------------------
 // Dependency injection bundle

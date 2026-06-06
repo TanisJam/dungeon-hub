@@ -148,8 +148,8 @@ import { HexRowView } from '@/components/world/map/hex-row';
 import { NpcRowView } from '@/components/world/npcs/npc-row';
 import type { EventRow, EventVisibility } from '@/app/cronica/actions';
 import type { JournalRow, JournalVisibility } from '@/app/cronica/actions';
-import type { FactionRow, FactionState } from '@/app/codex/actions';
-import type { NpcRow, NpcStatus } from '@/app/codex/actions';
+import type { FactionRow, FactionState } from '@/app/herramientas/actions';
+import type { NpcRow, NpcStatus } from '@/app/herramientas/actions';
 import type { HexRow, HexStatus } from '@/app/mapa/actions';
 
 // world/ interactive islands (batch 9a)

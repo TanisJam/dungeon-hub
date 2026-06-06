@@ -4,7 +4,7 @@
 import { Pill } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import type { FactionRow, FactionState } from '@/app/codex/actions';
+import type { FactionRow, FactionState } from '@/app/herramientas/actions';
 
 interface FactionDetailProps {
   detail: FactionRow;

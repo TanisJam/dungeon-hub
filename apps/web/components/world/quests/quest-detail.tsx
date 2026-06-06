@@ -5,7 +5,7 @@
 import { Pill } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import type { QuestRow, QuestStatus, QuestVisibility } from '@/app/codex/quests/actions';
+import type { QuestRow, QuestStatus, QuestVisibility } from '@/app/herramientas/quests/actions';
 
 interface QuestDetailProps {
   detail: QuestRow;

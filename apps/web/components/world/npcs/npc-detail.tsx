@@ -11,8 +11,8 @@ import { useState } from 'react';
 import { Pill } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import type { NpcRow, NpcFaction, NpcStatus, FactionRow } from '@/app/codex/actions';
-import { getNpcDetail, attachNpcFaction, detachNpcFaction } from '@/app/codex/actions';
+import type { NpcRow, NpcFaction, NpcStatus, FactionRow } from '@/app/herramientas/actions';
+import { getNpcDetail, attachNpcFaction, detachNpcFaction } from '@/app/herramientas/actions';
 import { FactionChipSection } from './faction-chip-section';
 
 // ---------------------------------------------------------------------------

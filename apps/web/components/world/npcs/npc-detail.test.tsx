@@ -21,9 +21,9 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { NpcDetailView } from './npc-detail';
-import type { NpcRow, FactionRow } from '@/app/codex/actions';
+import type { NpcRow, FactionRow } from '@/app/herramientas/actions';
 
-vi.mock('@/app/codex/actions', () => ({
+vi.mock('@/app/herramientas/actions', () => ({
   getNpcDetail: vi.fn(),
   attachNpcFaction: vi.fn(),
   detachNpcFaction: vi.fn(),
@@ -76,7 +76,7 @@ const mockWorldFaction: FactionRow = {
   updatedAt: '2024-01-01T00:00:00Z',
 };
 
-import * as actions from '@/app/codex/actions';
+import * as actions from '@/app/herramientas/actions';
 
 // ─── DM view tests ───────────────────────────────────────────────────────────
 

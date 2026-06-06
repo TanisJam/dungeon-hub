@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { FactionForm } from '@/components/world/factions/faction-form';
-import type { FactionBody } from '@/app/codex/actions';
+import type { FactionBody } from '@/app/herramientas/actions';
 
 export function FactionFormIsland({ mode }: { mode?: 'create' | 'edit' }) {
   const [lastAction, setLastAction] = useState<string | null>(null);

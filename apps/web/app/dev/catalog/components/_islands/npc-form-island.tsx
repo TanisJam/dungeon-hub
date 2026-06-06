@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { NpcForm } from '@/components/world/npcs/npc-form';
-import type { NpcBody } from '@/app/codex/actions';
+import type { NpcBody } from '@/app/herramientas/actions';
 
 export function NpcFormIsland({ mode }: { mode?: 'create' | 'edit' }) {
   const [lastAction, setLastAction] = useState<string | null>(null);

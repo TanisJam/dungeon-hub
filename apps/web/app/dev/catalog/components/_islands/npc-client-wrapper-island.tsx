@@ -18,7 +18,7 @@
 
 import { NpcClientWrapper } from '@/components/world/npcs/npc-client-wrapper';
 import type { NpcWrapperActions } from '@/components/world/npcs/npc-client-wrapper';
-import type { NpcRow, NpcSearchResult, FactionRow } from '@/app/codex/actions';
+import type { NpcRow, NpcSearchResult, FactionRow } from '@/app/herramientas/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -24,7 +24,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NpcClientWrapper } from './npc-client-wrapper';
-import type { NpcRow, FactionRow } from '@/app/codex/actions';
+import type { NpcRow, FactionRow } from '@/app/herramientas/actions';
 
 // WorldEntityShell calls useRouter().refresh() after mutations
 vi.mock('next/navigation', () => ({
@@ -35,7 +35,7 @@ vi.mock('next/navigation', () => ({
 // IMPORTANT: vi.mock is hoisted — do NOT reference outer variables (mockNpcRow etc.)
 // inside the factory. Use vi.fn() and set .mockResolvedValue in beforeEach.
 
-vi.mock('@/app/codex/actions', () => ({
+vi.mock('@/app/herramientas/actions', () => ({
   listNpcs: vi.fn(),
   getNpcDetail: vi.fn(),
   createNpc: vi.fn(),
@@ -101,7 +101,7 @@ function renderWrapper(
 }
 
 // Import the mocked module to set .mockResolvedValue in beforeEach
-import * as actions from '@/app/codex/actions';
+import * as actions from '@/app/herramientas/actions';
 
 // ─── DM view tests ───────────────────────────────────────────────────────────
 
