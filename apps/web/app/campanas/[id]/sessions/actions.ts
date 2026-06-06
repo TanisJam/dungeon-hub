@@ -446,6 +446,50 @@ export async function searchSessionMonsters(
 }
 
 // ---------------------------------------------------------------------------
+// searchSessionItems — GET /compendium/items?campaign=&q= (complete-form item picker)
+// ---------------------------------------------------------------------------
+
+/** Item typeahead hit — subset of GET /compendium/items row. */
+export interface ItemHit {
+  slug: string;
+  source: string;
+  name: string;
+  type: string | null;
+  weight: number | null;
+}
+
+/**
+ * Debounced item typeahead for the CompleteForm reward rows. Scoped to the
+ * campaign's world (endpoint requires exactly one of ?campaign= or ?world=).
+ * Unlike monsters, items ARE rules-profile filtered server-side — search only
+ * returns items enabled for the world, so a picked item always resolves on submit
+ * (fixes the "item not found" from typing a free-text slug).
+ *
+ * Returns [] on any error (typeahead must never throw into the form).
+ */
+export async function searchSessionItems(
+  campaignId: string,
+  query: string,
+): Promise<ItemHit[]> {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) return [];
+
+  const token = await getToken();
+  if (!token) return [];
+
+  try {
+    const params = new URLSearchParams({ campaign: campaignId, q: trimmed, limit: '50' });
+    const res = await api.get<{ data: ItemHit[] }>(
+      `/compendium/items?${params.toString()}`,
+      token,
+    );
+    return res.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // listSessionEvents — GET /sessions/:id/events (REQ-DPPMB-DETAIL-05)
 // ---------------------------------------------------------------------------
 

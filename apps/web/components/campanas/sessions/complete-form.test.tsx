@@ -50,9 +50,14 @@ vi.mock('@/components/ui/sheet', () => ({
 vi.mock('@/app/campanas/[id]/sessions/actions', () => ({
   completeSession: vi.fn(),
   searchSessionMonsters: vi.fn().mockResolvedValue([]),
+  searchSessionItems: vi.fn().mockResolvedValue([]),
 }));
 
-import { completeSession, searchSessionMonsters } from '@/app/campanas/[id]/sessions/actions';
+import {
+  completeSession,
+  searchSessionMonsters,
+  searchSessionItems,
+} from '@/app/campanas/[id]/sessions/actions';
 
 // ── Mock next/link ────────────────────────────────────────────────────────────
 vi.mock('next/link', () => ({
@@ -65,6 +70,7 @@ vi.mock('next/link', () => ({
 
 const mockComplete = completeSession as ReturnType<typeof vi.fn>;
 const mockSearchMonsters = searchSessionMonsters as ReturnType<typeof vi.fn>;
+const mockSearchItems = searchSessionItems as ReturnType<typeof vi.fn>;
 
 const activeParticipants: EnrichedParticipant[] = [
   {
@@ -125,6 +131,8 @@ describe('CompleteForm', () => {
     mockComplete.mockReset();
     mockSearchMonsters.mockReset();
     mockSearchMonsters.mockResolvedValue([]);
+    mockSearchItems.mockReset();
+    mockSearchItems.mockResolvedValue([]);
   });
 
   // ── REQ-DPPMB-COMPLETE-04: participant summary ────────────────────────────────
@@ -216,25 +224,33 @@ describe('CompleteForm', () => {
     });
   });
 
-  it('submits item rows with exact field names: characterId, slug, source, quantity', async () => {
+  it('submits item rows with exact field names: characterId, slug, source, quantity (via picker)', async () => {
     mockComplete.mockResolvedValueOnce({ ok: true, data: { id: 'sess-1', status: 'completed' } });
+    mockSearchItems.mockResolvedValue([
+      { slug: 'potion-healing', source: 'PHB', name: 'Potion of Healing', type: null, weight: null },
+    ]);
     renderForm();
 
     // Add one item row
     fireEvent.click(screen.getByRole('button', { name: /agregar ítem/i }));
 
-    // Fill the row fields
-    const recipientSelect = screen.getByTestId('item-row-0-recipient');
-    fireEvent.change(recipientSelect, { target: { value: 'char-1' } });
+    // Recipient
+    fireEvent.change(screen.getByTestId('item-row-0-recipient'), { target: { value: 'char-1' } });
 
-    const slugInput = screen.getByTestId('item-row-0-slug');
-    fireEvent.change(slugInput, { target: { value: 'potion-healing' } });
+    // Item — search + pick (no free-text slug). The picker sets slug+source.
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/buscar ítem/i), { target: { value: 'pot' } });
+    });
+    await waitFor(() => screen.getByRole('button', { name: /Potion of Healing/i }), {
+      timeout: 1000,
+    });
+    expect(mockSearchItems).toHaveBeenCalledWith('camp-1', 'pot');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Potion of Healing/i }));
+    });
 
-    const sourceInput = screen.getByTestId('item-row-0-source');
-    fireEvent.change(sourceInput, { target: { value: 'PHB' } });
-
-    const qtyInput = screen.getByTestId('item-row-0-quantity');
-    fireEvent.change(qtyInput, { target: { value: '2' } });
+    // Quantity
+    fireEvent.change(screen.getByTestId('item-row-0-quantity'), { target: { value: '2' } });
 
     fireEvent.click(screen.getByRole('button', { name: /cerrar sesión y repartir/i }));
 

@@ -17,6 +17,7 @@ import type { EnrichedParticipant } from '@/app/campanas/[id]/sessions/actions';
 import { completeSession } from '@/app/campanas/[id]/sessions/actions';
 import { KnowledgeGrantSection, type KnowledgeGrant, type CandidateEntity } from '@/components/codex/knowledge-grant-section';
 import { MonsterGrantPicker } from '@/components/codex/monster-grant-picker';
+import { ItemRewardPicker, type PickedItem } from '@/components/campanas/sessions/item-reward-picker';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +28,8 @@ interface ItemRow {
   characterId: string;
   slug: string;
   source: string;
+  /** Display name of the picked item ('' until an item is chosen via the picker). */
+  name: string;
   quantity: string; // kept as string until submit
 }
 
@@ -102,6 +105,7 @@ function newItemRow(): ItemRow {
     characterId: '',
     slug: '',
     source: '',
+    name: '',
     quantity: '1',
   };
 }
@@ -177,6 +181,21 @@ export function CompleteForm({
   function updateItem(index: number, field: keyof ItemRow, value: string) {
     setItems((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    );
+  }
+
+  // Item picked from the typeahead → store exact slug+source+name (no free-text slug).
+  function pickItem(index: number, picked: PickedItem) {
+    setItems((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, slug: picked.slug, source: picked.source, name: picked.name } : row,
+      ),
+    );
+  }
+
+  function clearItemPick(index: number) {
+    setItems((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, slug: '', source: '', name: '' } : row)),
     );
   }
 
@@ -380,42 +399,34 @@ export function CompleteForm({
                 </select>
               </div>
 
-              {/* Slug */}
+              {/* Item — typeahead picker (no free-text slug). Bug fix #1953. */}
               <div className="mb-2">
-                <label
-                  htmlFor={`item-slug-${index}`}
-                  className="block font-sans text-xs text-ink-mute"
-                >
-                  Slug del ítem
-                </label>
-                <input
-                  id={`item-slug-${index}`}
-                  data-testid={`item-row-${index}-slug`}
-                  type="text"
-                  value={row.slug}
-                  onChange={(e) => updateItem(index, 'slug', e.target.value)}
-                  placeholder="ej. potion-healing"
-                  className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 font-sans text-sm text-ink"
-                />
-              </div>
-
-              {/* Source */}
-              <div className="mb-2">
-                <label
-                  htmlFor={`item-source-${index}`}
-                  className="block font-sans text-xs text-ink-mute"
-                >
-                  Fuente
-                </label>
-                <input
-                  id={`item-source-${index}`}
-                  data-testid={`item-row-${index}-source`}
-                  type="text"
-                  value={row.source}
-                  onChange={(e) => updateItem(index, 'source', e.target.value)}
-                  placeholder="ej. PHB"
-                  className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 font-sans text-sm text-ink"
-                />
+                {row.slug ? (
+                  <div
+                    data-testid={`item-row-${index}-picked`}
+                    className="flex items-center justify-between gap-2 rounded-md border border-line bg-paper-soft px-3 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-sans text-sm text-ink">
+                      {row.name || row.slug}
+                      <span className="ml-2 text-[10px] uppercase tracking-wide text-ink-mute">
+                        {row.source}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => clearItemPick(index)}
+                      className="flex-shrink-0 font-sans text-xs text-ink-soft underline-offset-2 hover:underline"
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <ItemRewardPicker
+                    campaignId={campaignId}
+                    idSuffix={`-${index}`}
+                    onPick={(picked) => pickItem(index, picked)}
+                  />
+                )}
               </div>
 
               {/* Quantity */}
