@@ -38,6 +38,7 @@ import {
   listSessionEvents,
   recordSessionEvent,
 } from '../../use-cases/sessions/events.js';
+import { emitCharacterEvent } from '../../use-cases/characters/emit-character-event.js';
 
 const ParamsWithId = z.object({ id: z.string().uuid() });
 
@@ -121,6 +122,28 @@ const CompleteSessionBody = z.object({
       }),
     )
     .max(50)
+    .optional(),
+  /**
+   * codex-knowledge FORK 1 (#1944) — HYBRID unlock model.
+   * Optional bulk knowledge grants to emit per participant per entity INSIDE
+   * this session's complete transaction.
+   *
+   * Authorization: world-GM only (checked before parsing this field).
+   * Idempotent: character_knowledge UNIQUE ON CONFLICT DO NOTHING.
+   * Non-participant characterIds are silently skipped (not errored).
+   *
+   * REQ-CK-UNLOCK-03, UNLOCK-04, UNLOCK-05, UNLOCK-06, UNLOCK-07.
+   */
+  knowledgeGrants: z
+    .array(
+      z.object({
+        characterId: z.string().uuid(),
+        kind: z.enum(['bestiary', 'item', 'spell', 'npc', 'faction', 'location', 'lore']),
+        refKey: z.string().min(1),
+        refSource: z.string().min(1),
+      }),
+    )
+    .max(500)
     .optional(),
 });
 
@@ -866,6 +889,29 @@ export const sessionsRoute: FastifyPluginAsync = async (app) => {
             ...(wc.tags && { tags: wc.tags }),
           })),
         );
+      }
+
+      // codex-knowledge FORK 1 (#1944): optional bulk knowledge grants.
+      // Wire INSIDE this transaction — same tx, same pipeline. No new tx.
+      // emitCharacterEvent handles ON CONFLICT DO NOTHING (idempotent).
+      // Non-participant characterIds are silently skipped (REQ-CK-UNLOCK-05).
+      // Authorization gate (world-GM) already passed at session.complete entry.
+      // REQ-CK-UNLOCK-03, UNLOCK-04, UNLOCK-06.
+      if (body.knowledgeGrants && body.knowledgeGrants.length > 0) {
+        for (const g of body.knowledgeGrants) {
+          // Skip non-active-participant characters (tolerant — do not 500)
+          if (!activeCharIds.has(g.characterId)) continue;
+
+          await emitCharacterEvent(tx, {
+            characterId: g.characterId,
+            worldId: completeWorldId,
+            type: `${g.kind}_discovered`,
+            refKey: g.refKey,
+            refSource: g.refSource,
+            grantedByUserId: userId,
+            sessionId: id,
+          });
+        }
       }
 
       // Auto-summary si no vino en el body.
