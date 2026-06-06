@@ -461,9 +461,10 @@ export interface ItemHit {
 /**
  * Debounced item typeahead for the CompleteForm reward rows. Scoped to the
  * campaign's world (endpoint requires exactly one of ?campaign= or ?world=).
- * Unlike monsters, items ARE rules-profile filtered server-side — search only
- * returns items enabled for the world, so a picked item always resolves on submit
- * (fixes the "item not found" from typing a free-text slug).
+ * A picked item always resolves on complete: the hit comes straight from
+ * compendium_items, and the complete-session tx resolves rewards by slug+source
+ * against that same table (no profile filter), so it can't miss. This fixes the
+ * "item not found" you'd get from typing a free-text slug.
  *
  * Returns [] on any error (typeahead must never throw into the form).
  */
