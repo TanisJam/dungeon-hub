@@ -14,6 +14,13 @@ import { CATEGORY_CONFIG } from '../_config/registry';
 import type { CompendiumCategory } from '@/app/compendium/_components/types';
 import { searchCompendium, type CompendiumScope } from '../actions';
 import { DetailSheet } from './detail-sheet';
+import { ITEM_TYPE_LABELS } from './row-views';
+
+// Item type filter options (#3.4) — sorted by label. Items-only; the API
+// GET /compendium/items?type= already supports it. Static vocabulary (PHB p.150).
+const ITEM_TYPE_OPTIONS = Object.entries(ITEM_TYPE_LABELS)
+  .map(([code, label]) => ({ code, label }))
+  .sort((a, b) => a.label.localeCompare(b.label));
 
 interface CompendiumListProps {
   category: CompendiumCategory;
@@ -43,6 +50,9 @@ export function CompendiumList({
 }: CompendiumListProps) {
   // Resolve config client-side — avoids passing function components as props (RSC boundary).
   const config = CATEGORY_CONFIG[category];
+  // Item type filter (#3.4) — items-only. Empty string = no filter.
+  const showTypeFilter = category === 'items';
+  const [typeFilter, setTypeFilter] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<unknown[]>(initialRows);
   const [totalCount, setTotalCount] = useState(initialTotal);
@@ -52,11 +62,15 @@ export function CompendiumList({
   const [loadingMore, setLoadingMore] = useState(false);
   const reqIdRef = useRef(0);
 
+  // Active filters passed to searchCompendium (currently items ?type= only).
+  const activeFilters: Record<string, string> = typeFilter ? { type: typeFilter } : {};
+
   // Debounced search — 200ms, stale-drop. Clone of Picker pattern.
+  // Re-runs on query OR type-filter change.
   useEffect(() => {
     const trimmed = query.trim();
-    if (trimmed.length === 0) {
-      // Reset to SSR initial rows on clear
+    // Only fall back to the SSR rows when there is NEITHER a query NOR a filter.
+    if (trimmed.length === 0 && !typeFilter) {
       setResults(initialRows);
       setTotalCount(initialTotal);
       setOffset(initialRows.length);
@@ -67,7 +81,13 @@ export function CompendiumList({
     setSearching(true);
     const myReqId = ++reqIdRef.current;
     const handle = setTimeout(async () => {
-      const res = await searchCompendium(category, scope, trimmed, 0);
+      const res = await searchCompendium(
+        category,
+        scope,
+        trimmed,
+        0,
+        typeFilter ? { type: typeFilter } : {},
+      );
       if (reqIdRef.current === myReqId) {
         setResults(res.rows);
         setTotalCount(res.total);
@@ -78,13 +98,13 @@ export function CompendiumList({
     return () => clearTimeout(handle);
   // scope is a stable object reference passed from RSC — serialized by value.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, category, JSON.stringify(scope), initialRows, initialTotal]);
+  }, [query, typeFilter, category, JSON.stringify(scope), initialRows, initialTotal]);
 
   async function handleLoadMore() {
     if (loadingMore || offset >= totalCount) return;
     setLoadingMore(true);
     const trimmed = query.trim();
-    const res = await searchCompendium(category, scope, trimmed, offset);
+    const res = await searchCompendium(category, scope, trimmed, offset, activeFilters);
     setResults((prev) => [...prev, ...res.rows]);
     setTotalCount(res.total);
     setOffset((prev) => prev + res.rows.length);
@@ -96,7 +116,7 @@ export function CompendiumList({
   return (
     <div className="flex flex-col">
       {/* Sticky search input — REQ-CBROWSE-04, 44px min-height */}
-      <div className="sticky top-0 z-10 border-b border-line bg-paper px-4 py-2">
+      <div className="sticky top-0 z-10 flex flex-col gap-2 border-b border-line bg-paper px-4 py-2">
         <input
           type="search"
           inputMode="search"
@@ -106,6 +126,20 @@ export function CompendiumList({
           aria-label={`Buscar ${config.label.toLowerCase()}`}
           className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-4 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
         />
+        {/* Item type filter (#3.4) — items category only */}
+        {showTypeFilter && (
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            aria-label="Filtrar por tipo"
+            className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+          >
+            <option value="">Todos los tipos</option>
+            {ITEM_TYPE_OPTIONS.map(({ code, label }) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* List */}

@@ -107,6 +107,26 @@ describe('searchCompendium', () => {
     const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
     expect(calledUrl).not.toContain('q=');
   });
+
+  // #3.4 — item type filter param
+  it('appends extra filter params (items ?type=) to the URL', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [], total: 0 });
+
+    await searchCompendium('items', { campaign: CAMPAIGN_ID }, '', 0, { type: 'M' });
+
+    const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
+    expect(calledUrl).toContain('/compendium/items');
+    expect(calledUrl).toContain('type=M');
+  });
+
+  it('omits empty filter values from the URL', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [], total: 0 });
+
+    await searchCompendium('items', { campaign: CAMPAIGN_ID }, '', 0, { type: '' });
+
+    const [calledUrl] = vi.mocked(api.get).mock.calls[0] as [string, string];
+    expect(calledUrl).not.toContain('type=');
+  });
 });
 
 // ---------------------------------------------------------------------------

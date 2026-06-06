@@ -62,6 +62,7 @@ export async function searchCompendium(
   scope: CompendiumScope,
   q: string,
   offset = 0,
+  filters: Record<string, string> = {},
 ): Promise<SearchResult> {
   if (!(category in CATEGORY_CONFIG)) return { rows: [], total: 0 };
 
@@ -83,6 +84,10 @@ export async function searchCompendium(
       offset: String(offset),
     });
     if (trimmed.length > 0) params.set('q', trimmed);
+    // Extra per-category filters (e.g. items ?type=). Skip empty values.
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+    }
 
     const res = await api.get<Envelope>(
       `/compendium/${config.endpoint}?${params.toString()}`,

@@ -116,7 +116,7 @@ export function SpellRowView({ row }: { row: SpellListHit }) {
 // ---------------------------------------------------------------------------
 
 // PHB p.144-150 item type codes → readable labels
-const ITEM_TYPE_LABELS: Record<string, string> = {
+export const ITEM_TYPE_LABELS: Record<string, string> = {
   A: 'Armor',
   AT: 'Artisan Tool',
   EXP: 'Explosive',
