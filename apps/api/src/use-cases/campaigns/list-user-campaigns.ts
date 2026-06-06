@@ -11,7 +11,7 @@
  * One-shot aware: zero sessions, null nextSession both render as valid steady states.
  * See sdd/campanas-v3/design (engram #1035) and memory #1031.
  */
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { campaigns, campaignMembers } from '../../infra/db/schema.js';
 
@@ -22,13 +22,27 @@ export interface UserCampaignRow {
   worldId: string;
   createdAt: Date;
   memberRole: 'gm' | 'player';
+  status: string;
   playersCount: number;
   sessionsCount: number;
   nextSession: Date | null;
   pendingFichas: number | null;
 }
 
-export async function listUserCampaigns(userId: string): Promise<UserCampaignRow[]> {
+/**
+ * Lists campaigns where the user is a member.
+ * @param userId - the authenticated user's id.
+ * @param statusFilter - optional; when provided, only rows with that status are returned.
+ */
+export async function listUserCampaigns(
+  userId: string,
+  statusFilter?: string,
+): Promise<UserCampaignRow[]> {
+  const whereClause =
+    statusFilter === 'active' || statusFilter === 'archived'
+      ? and(eq(campaignMembers.userId, userId), eq(campaigns.status, statusFilter))
+      : eq(campaignMembers.userId, userId);
+
   const rows = await db
     .select({
       id: campaigns.id,
@@ -36,6 +50,7 @@ export async function listUserCampaigns(userId: string): Promise<UserCampaignRow
       gmUserId: campaigns.gmUserId,
       worldId: campaigns.worldId,
       createdAt: campaigns.createdAt,
+      status: campaigns.status,
       memberRole: campaignMembers.role,
       playersCount: sql<string>`(
         SELECT COUNT(*) FROM campaign_members
@@ -60,7 +75,7 @@ export async function listUserCampaigns(userId: string): Promise<UserCampaignRow
     })
     .from(campaigns)
     .innerJoin(campaignMembers, eq(campaignMembers.campaignId, campaigns.id))
-    .where(eq(campaignMembers.userId, userId));
+    .where(whereClause);
 
   return rows.map((r) => ({
     id: r.id,
@@ -68,6 +83,7 @@ export async function listUserCampaigns(userId: string): Promise<UserCampaignRow
     gmUserId: r.gmUserId,
     worldId: r.worldId,
     createdAt: r.createdAt,
+    status: r.status,
     memberRole: r.memberRole as 'gm' | 'player',
     playersCount: Number(r.playersCount),
     sessionsCount: Number(r.sessionsCount),

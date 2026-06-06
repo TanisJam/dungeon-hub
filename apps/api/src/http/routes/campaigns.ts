@@ -171,9 +171,12 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
   // ---- GET /campaigns ------------------------------------------------------
   // Lista las campañas donde el user es miembro, con aggregates v3
   // (playersCount, sessionsCount, nextSession, pendingFichas DM-only).
+  // Optional ?status=active|archived to filter by status.
   app.get('/campaigns', { preHandler: app.authenticate }, async (request) => {
     const userId = request.user!.sub;
-    const data = await listUserCampaigns(userId);
+    const query = request.query as Record<string, string | undefined>;
+    const statusFilter = query['status'];
+    const data = await listUserCampaigns(userId, statusFilter);
     return { data };
   });
 
@@ -280,5 +283,57 @@ export const campaignsRoute: FastifyPluginAsync = async (app) => {
       url: buildAppUrl('invite', token),
       expiresAt: expiresAt.toISOString(),
     });
+  });
+
+  // ---- POST /campaigns/:id/archive -----------------------------------------
+  // GM-only. Sets status='archived' (idempotent — always returns 200).
+  app.post('/campaigns/:id/archive', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const campaign = await loadCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const check = await assertWorldGm(campaign.worldId, userId);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: campaign.worldId, userId }],
+      });
+    }
+
+    const [updated] = await db
+      .update(campaigns)
+      .set({ status: 'archived', updatedAt: new Date() })
+      .where(eq(campaigns.id, id))
+      .returning();
+
+    return { ...updated };
+  });
+
+  // ---- POST /campaigns/:id/unarchive ----------------------------------------
+  // GM-only. Sets status='active' (idempotent — always returns 200).
+  app.post('/campaigns/:id/unarchive', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const userId = request.user!.sub;
+
+    const campaign = await loadCampaign(id);
+    if (!campaign) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const check = await assertWorldGm(campaign.worldId, userId);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: campaign.worldId, userId }],
+      });
+    }
+
+    const [updated] = await db
+      .update(campaigns)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(eq(campaigns.id, id))
+      .returning();
+
+    return { ...updated };
   });
 };

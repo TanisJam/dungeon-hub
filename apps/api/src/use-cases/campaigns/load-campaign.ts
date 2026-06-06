@@ -55,6 +55,7 @@ export interface LoadedCampaign {
   name: string;
   gmUserId: string;
   worldId: string;
+  status: string;
   rulesProfile: RulesProfile;
 }
 
@@ -73,6 +74,7 @@ export async function loadCampaign(id: string): Promise<LoadedCampaign | null> {
       name: campaigns.name,
       gmUserId: campaigns.gmUserId,
       worldId: campaigns.worldId,
+      status: campaigns.status,
       rulesProfile: worlds.rulesProfile,
     })
     .from(campaigns)
@@ -95,6 +97,7 @@ export async function loadCampaign(id: string): Promise<LoadedCampaign | null> {
     name: row.name,
     gmUserId: row.gmUserId,
     worldId: row.worldId,
+    status: row.status,
     rulesProfile: parsed.data,
   };
 }
