@@ -372,6 +372,59 @@ export async function detachNpcFaction(
 }
 
 // ===========================================================================
+// createContribution — player writes a personal note on a known entity
+// ===========================================================================
+//
+// codex-knowledge B-2 (SDD tasks #1950, spec #1947, design #1948 §4.3):
+// REQ-CK-NOTE-01: POST /worlds/:worldId/contributions
+// REQ-CK-NOTE-02: visibility defaults to 'personal'
+// REQ-CK-GC-03: append-only — no edit/delete Server Action exposed
+//
+// This arc encodes NO PHB rule.
+
+export interface ContributionBody {
+  worldId: string;
+  body: string;
+  contributionType: string;
+  refEntityKind?: string;
+  refEntityId?: string;
+  visibility?: 'personal' | 'guild' | 'canonical';
+}
+
+export interface ContributionRow {
+  id: string;
+  worldId: string;
+  authorUserId: string;
+  contributionType: string;
+  body: string;
+  refEntityKind: string | null;
+  refEntityId: string | null;
+  sealedStatus: 'confirmed' | 'debunked' | null;
+  visibility: 'personal' | 'guild' | 'canonical';
+  occurredAt: string;
+  createdAt: string;
+}
+
+export async function createContribution(
+  input: ContributionBody,
+): Promise<ActionResult<ContributionRow>> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'No autenticado', status: 401 };
+
+  try {
+    const { worldId, ...rest } = input;
+    const created = await api.post<ContributionRow>(
+      `/worlds/${worldId}/contributions`,
+      { ...rest, visibility: rest.visibility ?? 'personal' },
+      token,
+    );
+    return { ok: true, data: created };
+  } catch (err) {
+    return handleApiError(err);
+  }
+}
+
+// ===========================================================================
 // getActiveWorldForCodex — convenience wrapper for page-level use
 // ===========================================================================
 
