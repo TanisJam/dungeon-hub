@@ -267,6 +267,13 @@
       "when": 1780620000000,
       "tag": "0038_quests",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1780700000000,
+      "tag": "0039_campaign_status",
+      "breakpoints": true
     }
   ]
 }

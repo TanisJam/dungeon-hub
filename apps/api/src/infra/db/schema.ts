@@ -122,19 +122,25 @@ export const worldMembers = pgTable(
 // ---------------------------------------------------------------------------
 // campaigns — world_id added; rules_profile DROPPED (moved to worlds).
 // gm_user_id RETAINED — session-runner identity (locked decision #774).
+// status: 'active' | 'archived' — soft close/reopen (campaign-archive SDD).
 // ---------------------------------------------------------------------------
-export const campaigns = pgTable('campaigns', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  name: text('name').notNull(),
-  gmUserId: uuid('gm_user_id')
-    .notNull()
-    .references(() => users.id),
-  worldId: uuid('world_id')
-    .notNull()
-    .references(() => worlds.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    name: text('name').notNull(),
+    gmUserId: uuid('gm_user_id')
+      .notNull()
+      .references(() => users.id),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    status: text('status', { enum: ['active', 'archived'] }).notNull().default('active'),
+  },
+  (t) => [check('campaigns_status_check', sql`status IN ('active', 'archived')`)],
+);
 
 // ---------------------------------------------------------------------------
 // campaign_members — un user puede jugar en varias campañas
