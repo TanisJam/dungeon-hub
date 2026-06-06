@@ -56,7 +56,7 @@ import { ABILITY_KEYS, type AbilityKey, type AbilityScores } from '@dungeon-hub/
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
 import { db } from '../../infra/db/client.js';
-import { characters, compendiumSpells, encounters, sessionEvents, sessionParticipants, sessions, worldMembers } from '../../infra/db/schema.js';
+import { characters, compendiumSpells, encounters, sessionEvents, sessionParticipants, sessions, users, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
 import {
   getCharacterAccess,
@@ -260,10 +260,13 @@ const GrantKnowledgeBody = z.object({
 
 // character-codex-browser: GET /knowledge/:kind param validation.
 // URL kind 'monsters' maps to DB kind 'bestiary' inside readCharacterCodexCategory.
-// Add new URL kinds here as future slices land (items, spells, etc.).
+// codex-knowledge Slice 1: all 5 world-knowledge URL kinds are supported here.
+// Reference kinds (spells/items/etc.) are NOT served by this endpoint — web routes them.
+// ADR-2 Option A (#1946): monsters wired FULL; npcs/factions/locations/lore return gated-EMPTY.
+// REQ-CK-GATE-04: unknown kinds → 400 INVALID_KIND (Zod enum validation).
 const KnowledgeKindParam = z.object({
   id: z.string().uuid(),
-  kind: z.enum(['monsters'] as [CodexKind, ...CodexKind[]]),
+  kind: z.enum(['monsters', 'npcs', 'factions', 'locations', 'lore'] as [CodexKind, ...CodexKind[]]),
 });
 
 // engine-timeline-duration: optional encounterId querystring param for GET /sheet
@@ -1804,8 +1807,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const access = await getCharacterAccess(character, userId);
       const gmCheck = await assertWorldGm(character.worldId, userId);
 
+      // codex-knowledge FORK 5 (#1944): devMode bypass.
+      // Load caller's devMode flag. If true, treat as 'dm' view (sees all, no gate).
+      // REQ-CK-DEV-01, REQ-CK-DEV-02.
+      const callerRows = await db
+        .select({ devMode: users.devMode })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const callerDevMode = callerRows[0]?.devMode ?? false;
+
       let effectiveView: 'dm' | 'player';
-      if (gmCheck.ok) {
+      if (gmCheck.ok || callerDevMode) {
+        // DM always sees all; devMode players see all too (FORK 5 bypass)
         effectiveView = 'dm';
       } else if (access !== 'none') {
         effectiveView = 'player';

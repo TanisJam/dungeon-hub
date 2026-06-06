@@ -9,21 +9,26 @@ export type EffectiveView = 'dm' | 'player';
  * Supported URL/API kind values for the codex read endpoint.
  * Maps to DB character_knowledge.kind values via KIND_TO_DB_KIND.
  *
- * URL kind | DB kind    | Notes
- * -------- | ---------- | ---------------------------------------------------
- * monsters | bestiary   | The URL key is 'monsters' to match the compendium
- *           |            | category (GET /compendium/monsters). The DB enum
- *           |            | stays 'bestiary' — do NOT rename it; the grant
- *           |            | route + upsert-character-knowledge.ts use 'bestiary'.
- *           |            | This mapping is the intentional seam (ADR-1, CCB).
+ * URL kind  | DB kind    | Notes
+ * --------- | ---------- | ---------------------------------------------------
+ * monsters  | bestiary   | Full catalog + known flags (ADR-2 Option A, #1946)
+ * npcs      | npc        | gated-EMPTY in Slice 1 (UUID bridge deferred #1946)
+ * factions  | faction    | gated-EMPTY in Slice 1 (UUID bridge deferred #1946)
+ * locations | location   | gated-EMPTY in Slice 1 (UUID bridge deferred #1946)
+ * lore      | lore       | gated-EMPTY in Slice 1 (no lore table, deferred)
+ *
+ * Reference kinds (spells/items/classes/races/backgrounds/feats/conditions) are
+ * NOT served by this endpoint — the web routes them to /compendium.
+ *
+ * codex-knowledge SDD design #1948 §3.2, decisions #1944 FORK 2.
  */
-export type CodexKind = 'monsters';
+export type CodexKind = 'monsters' | 'npcs' | 'factions' | 'locations' | 'lore';
 
 /**
  * DB-level kind enum for character_knowledge.kind.
  * Always use this when querying the DB — not the URL kind.
  */
-type DbKind = 'bestiary';
+type DbKind = 'bestiary' | 'npc' | 'faction' | 'location' | 'lore';
 
 /**
  * Maps URL/API codex kind → DB character_knowledge.kind.
@@ -32,6 +37,10 @@ type DbKind = 'bestiary';
  */
 const KIND_TO_DB_KIND: Record<CodexKind, DbKind> = {
   monsters: 'bestiary',
+  npcs: 'npc',
+  factions: 'faction',
+  locations: 'location',
+  lore: 'lore',
 };
 
 // ---------------------------------------------------------------------------
@@ -125,33 +134,61 @@ async function readMonstersKind(
 }
 
 // ---------------------------------------------------------------------------
+// Gated-empty stub helpers (ADR-2 Option A, codex-knowledge #1946)
+//
+// npcs/factions/locations/lore: these world-knowledge kinds have UUID-keyed
+// entities (npcs schema.ts:538, factions:504). The read-side bridge that maps
+// character_knowledge.refKey=UUID → world entity table is deferred.
+// Slice 1 closes the metagaming leak for ALL 5 categories by routing them to
+// the gated endpoint — monsters fully wired, the other four return empty.
+//
+// // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+// ---------------------------------------------------------------------------
+
+function readGatedEmptyKind(): { rows: never[]; total: number; knownCount: number } {
+  // ADR-2 Option A: return empty gated result.
+  // Metagaming leak is closed (no data leaks through), resolver deferred.
+  // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+  return { rows: [], total: 0, knownCount: 0 };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Reads the character's scoped codex for the given kind.
  *
- * URL kind → DB kind mapping:
- *   'monsters' → character_knowledge.kind = 'bestiary'
+ * URL kind → DB kind mapping (KIND_TO_DB_KIND above).
  *
- * For DM effectiveView: all compendium entries + known flag.
- * For player effectiveView: ONLY entries the character knows (seesEntry gate applied).
+ * monsters: full catalog + known flags (ADR-2 Option A, real round-trip).
+ * npcs/factions/locations/lore: gated-EMPTY (ADR-2 Option A, deferred).
  *
- * REQ-CCB-API-01 (spec character-codex-browser).
+ * For DM/devMode effectiveView='dm': all entries + known flag.
+ * For player effectiveView='player': ONLY known entries (seesEntry gate).
+ *
+ * REQ-CCB-API-01, REQ-CK-GATE-03, GATE-04, codex-knowledge SDD design #1948.
  */
 export async function readCharacterCodexCategory(
   characterId: string,
   kind: CodexKind,
   effectiveView: EffectiveView,
 ): Promise<ReadCharacterCodexResult> {
-  // This switch is the extension point for future codex kinds (items, spells, etc.)
-  // Each kind maps to its own DB table + per-kind row projection.
-  // The DB enum for character_knowledge.kind is validated here via KIND_TO_DB_KIND.
-  void KIND_TO_DB_KIND[kind]; // static check — kind must be a valid CodexKind
+  // Static check — kind must be a valid CodexKind (compile-time guard)
+  void KIND_TO_DB_KIND[kind];
 
   switch (kind) {
     case 'monsters': {
       const { rows, total, knownCount } = await readMonstersKind(characterId, effectiveView);
+      return { rows, total, knownCount, effectiveView };
+    }
+    case 'npcs':
+    case 'factions':
+    case 'locations':
+    case 'lore': {
+      // ADR-2 Option A: gated-empty. Metagaming leak closed for all 5 categories.
+      // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+      const { rows, total, knownCount } = readGatedEmptyKind();
       return { rows, total, knownCount, effectiveView };
     }
   }
