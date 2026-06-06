@@ -27,6 +27,7 @@ describe('bitácora pages CRUD routes', () => {
   let gm: TestUser;
   let player: TestUser;
   let outsider: TestUser;
+  let otherPlayer: TestUser; // world-member non-GM who does NOT own the character
   let worldId: string;
   let characterId: string;
 
@@ -36,9 +37,11 @@ describe('bitácora pages CRUD routes', () => {
     gm = await createTestUser();
     player = await createTestUser();
     outsider = await createTestUser();
+    otherPlayer = await createTestUser(); // in the same world, does not own the character
 
     ({ worldId } = await createWorldWithGm(gm.id));
     await addWorldMember(worldId, player.id, 'player');
+    await addWorldMember(worldId, otherPlayer.id, 'player');
 
     const charRes = await app.inject({
       method: 'POST',
@@ -54,6 +57,7 @@ describe('bitácora pages CRUD routes', () => {
     if (gm) await deleteTestUser(gm.id);
     if (player) await deleteTestUser(player.id);
     if (outsider) await deleteTestUser(outsider.id);
+    if (otherPlayer) await deleteTestUser(otherPlayer.id);
     await closeTestApp();
   });
 
@@ -140,6 +144,7 @@ describe('bitácora pages CRUD routes', () => {
   describe('GET /characters/:id/bitacora/pages', () => {
     let page1Id: string;
     let page2Id: string;
+    let refPageId: string; // page with a monster ref (for ?refKey=/?refKind= filter test)
 
     beforeAll(async () => {
       // Create 2 pages: one monsters tag, one lore tag
@@ -159,6 +164,19 @@ describe('bitácora pages CRUD routes', () => {
         payload: { body: 'Lore page', tags: ['lore'], refs: [] },
       });
       page2Id = r2.json<{ page: { id: string } }>().page.id;
+
+      // Page with a specific monster ref for ?refKey=/?refKind= filter test (REQ-BP-API-02)
+      const r3 = await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${characterId}/bitacora/pages`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+        payload: {
+          body: 'Goblin research notes',
+          tags: ['monsters'],
+          refs: [{ kind: 'monster', refKey: 'goblin', refSource: 'mm' }],
+        },
+      });
+      refPageId = r3.json<{ page: { id: string } }>().page.id;
     });
 
     it('owner lists all pages → 200 { pages, total }', async () => {
@@ -214,6 +232,44 @@ describe('bitácora pages CRUD routes', () => {
 
       expect(res.statusCode).toBe(403);
     });
+
+    it('world-member non-GM (other player) list → 403 FORBIDDEN (SECURITY: personal pages)', async () => {
+      // WARNING-1 / CRITICAL-1: a player who is a world-member but does NOT own the
+      // character and is NOT a GM must NOT be able to read personal bitácora pages.
+      // Access model (ADR-3): reads allowed only for owner | GM | devMode.
+      // getCharacterAccess returns 'world-member' for otherPlayer, which must NOT
+      // pass the gate. Previously the gate was `access === 'none'` (BUG); correct
+      // condition is `access !== 'owner'`.
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/bitacora/pages`,
+        headers: { authorization: `Bearer ${otherPlayer.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('?refKey=goblin&refKind=monster filter returns only pages referencing that monster (REQ-BP-API-02)', async () => {
+      // CRITICAL-2: GET list must support ?refKey= + ?refKind= to filter pages by entity reference.
+      // This enables the monster-detail "this monster's pages" view (design #1975 §ADR-4).
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/bitacora/pages?refKey=goblin&refKind=monster`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const data = res.json<{ pages: Array<{ id: string; refs: Array<{ kind: string; refKey: string }> }> }>();
+      // Only the refPage (goblin research) should match; pages without the ref must be excluded
+      expect(data.pages.length).toBeGreaterThanOrEqual(1);
+      expect(data.pages.every((p) => p.refs.some((r) => r.kind === 'monster' && r.refKey === 'goblin'))).toBe(true);
+      // The ref page id must be in the results
+      expect(data.pages.some((p) => p.id === refPageId)).toBe(true);
+    });
   });
 
   // ── GET /characters/:id/bitacora/pages/:pageId ──────────────────────────────
@@ -257,6 +313,21 @@ describe('bitácora pages CRUD routes', () => {
       });
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('world-member non-GM (other player) get single → 403 FORBIDDEN (SECURITY: personal pages)', async () => {
+      // CRITICAL-1 / WARNING-1: same gate bug applies to the single-page GET.
+      // A world-member (non-owner, non-GM) must be rejected with 403.
+      // Access model (ADR-3): reads allowed only for owner | GM | devMode.
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/bitacora/pages/${pageId}`,
+        headers: { authorization: `Bearer ${otherPlayer.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(403);
     });
   });
 

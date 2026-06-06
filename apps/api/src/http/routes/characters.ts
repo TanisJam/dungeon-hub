@@ -286,6 +286,9 @@ const UpdateBitacoraPageBody = z.object({
 
 const BitacoraListQuery = z.object({
   tag: z.string().optional(),
+  // REQ-BP-API-02: filter pages by entity reference (monster-detail "this monster's pages" view)
+  refKey: z.string().min(1).optional(),
+  refKind: z.enum(['monster']).optional(), // only 'monster' supported this wave (design ADR-1)
 });
 
 const ParamsWithIdAndPageId = z.object({
@@ -5026,12 +5029,15 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       if (!queryResult.success) {
         return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: queryResult.error.issues });
       }
-      const { tag } = queryResult.data;
+      const { tag, refKey, refKind } = queryResult.data;
 
       const character = await loadCharacter(id);
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
-      // Reads: owner OR GM OR devMode (mirrors knowledge read gate)
+      // Reads: owner OR GM OR devMode ONLY (ADR-3: world-member non-GM → 403).
+      // CRITICAL-1 fix: gate is `access !== 'owner'` not `access === 'none'`.
+      // getCharacterAccess returns 'world-member' for any world member; without this
+      // fix a non-owner non-GM player in the same world would pass the old 'none' check.
       const access = await getCharacterAccess(character, userId);
       const gmCheck = await assertWorldGm(character.worldId, userId);
       const callerRows = await db
@@ -5041,14 +5047,14 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .limit(1);
       const callerDevMode = callerRows[0]?.devMode ?? false;
 
-      if (access === 'none' && !gmCheck.ok && !callerDevMode) {
+      if (access !== 'owner' && !gmCheck.ok && !callerDevMode) {
         return reply.code(403).send({
           error: 'FORBIDDEN',
-          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+          issues: [{ code: 'BITACORA_ACCESS_DENIED', worldId: character.worldId, userId }],
         });
       }
 
-      const result = await listBitacoraPages({ characterId: id, tag });
+      const result = await listBitacoraPages({ characterId: id, tag, refKey, refKind });
       return reply.code(200).send(result);
     },
   );
@@ -5070,6 +5076,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const character = await loadCharacter(id);
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
+      // Reads: owner OR GM OR devMode ONLY (ADR-3: world-member non-GM → 403).
+      // CRITICAL-1 fix: gate is `access !== 'owner'` not `access === 'none'`.
       const access = await getCharacterAccess(character, userId);
       const gmCheck = await assertWorldGm(character.worldId, userId);
       const callerRows = await db
@@ -5079,10 +5087,10 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .limit(1);
       const callerDevMode = callerRows[0]?.devMode ?? false;
 
-      if (access === 'none' && !gmCheck.ok && !callerDevMode) {
+      if (access !== 'owner' && !gmCheck.ok && !callerDevMode) {
         return reply.code(403).send({
           error: 'FORBIDDEN',
-          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+          issues: [{ code: 'BITACORA_ACCESS_DENIED', worldId: character.worldId, userId }],
         });
       }
 
