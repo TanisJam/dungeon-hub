@@ -63,7 +63,7 @@ export default async function CodexKindPage({ params }: KindPageProps) {
   if (!activeChar) {
     // No active character: render a minimal empty state inside the shell
     return (
-      <AppShell title={config.label} subtitle="CÓDEX">
+      <AppShell title={config.label} subtitle="CÓDEX" backHref="/codex">
         <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
           <p>Seleccioná un personaje activo para ver este listado.</p>
         </div>
@@ -85,7 +85,7 @@ export default async function CodexKindPage({ params }: KindPageProps) {
   const total = initialData?.total ?? 0;
 
   return (
-    <AppShell title={config.label} subtitle="CÓDEX">
+    <AppShell title={config.label} subtitle="CÓDEX" backHref="/codex">
       <CompendiumList
         category={kind as CompendiumCategory}
         scope={{ world: worldId }}
