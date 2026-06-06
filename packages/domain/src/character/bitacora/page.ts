@@ -43,10 +43,10 @@ export interface BitacoraPageRef {
 }
 
 export interface BitacoraPageInput {
-  title?: string | null;
+  title?: string | null | undefined;
   body: string;
   tags: string[];
-  refs?: BitacoraPageRef[];
+  refs?: BitacoraPageRef[] | undefined;
 }
 
 // ---------------------------------------------------------------------------
