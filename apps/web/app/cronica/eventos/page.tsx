@@ -7,17 +7,17 @@ import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { SubNav } from '@/components/world/_shell/sub-nav';
 import { EventClientWrapper } from '@/components/world/events/event-client-wrapper';
-import { CronicaFeed } from '@/components/world/cronica/cronica-feed';
 import { V3Empty } from '@/components/ui';
-import type { EventRow, FeedItem } from '../actions';
+import type { EventRow } from '../actions';
 
 /**
  * Eventos — source-facet of the unified Bitácora del Gremio (bitacora-gremio W4).
  *
  * REQ-GREM-FD-04, ADR-4, ADR-7.
- * Deep-link preserved: /cronica/eventos still resolves (now as a facet, not a standalone).
- * EventClientWrapper RETAINED: DM create/edit/delete affordances must not be lost (T-12 check).
- * CronicaFeed added with source="evento" — unified tag filter applies to world_events only.
+ * Deep-link preserved: /cronica/eventos still resolves (now a facet of the unified feed).
+ * Renders the EventClientWrapper ONLY (DM create/edit/delete + its own tag-filtered list).
+ * The unified FeedCard view lives at /cronica (Todo) — rendering CronicaFeed here too
+ * duplicated the list (verify W-01), so the facet keeps just its legacy wrapper.
  *
  * REQ-CRO-01, REQ-CRO-02.
  */
@@ -95,22 +95,6 @@ export default async function EventosPage({
     // Render with empty list
   }
 
-  // SSR initial cronica-feed items for the unified feed facet
-  let initialFeedItems: FeedItem[] = [];
-  let initialNextOffset: number | null = null;
-  try {
-    const params = new URLSearchParams({ limit: '50', offset: '0', source: 'evento' });
-    if (tag) params.set('tag', tag);
-    const res = await api.get<{ rows: FeedItem[]; total: number; nextOffset: number | null }>(
-      `/worlds/${aw.id}/cronica-feed?${params.toString()}`,
-      token,
-    );
-    initialFeedItems = res.rows ?? [];
-    initialNextOffset = res.nextOffset ?? null;
-  } catch {
-    // Use events-derived initial items as fallback
-  }
-
   return (
     <AppShell
       title="Bitácora"
@@ -119,21 +103,12 @@ export default async function EventosPage({
       callerRole={callerRole}
     >
       <SubNav items={subNavItems} activePath="/cronica/eventos" />
-      {/* EventClientWrapper: DM CRUD affordances (create/edit/delete) — MUST NOT be removed (ADR-7, T-12) */}
+      {/* EventClientWrapper: DM CRUD affordances (create/edit/delete) + tag-filtered list */}
       <EventClientWrapper
         worldId={aw.id}
         effectiveView={effectiveView}
         initialEvents={initialEvents}
         initialTag={tag}
-      />
-      {/* CronicaFeed source-facet: unified tag filter + FeedCard layout for eventos */}
-      <CronicaFeed
-        worldId={aw.id}
-        source="evento"
-        initialItems={initialFeedItems}
-        initialTag={tag}
-        initialNextOffset={initialNextOffset}
-        effectiveView={effectiveView}
       />
     </AppShell>
   );

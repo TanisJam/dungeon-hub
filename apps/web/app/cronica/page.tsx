@@ -64,7 +64,7 @@ export default async function CronicaPage({
     return (
       <AppShell
         title="Bitácora"
-        subtitle="TODO"
+        subtitle="GREMIO"
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
