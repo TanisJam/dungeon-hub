@@ -16,6 +16,7 @@ import { journalRoute } from './http/routes/journal.js';
 import { questsRoute } from './http/routes/quests.js';
 import { encountersRoute } from './http/routes/encounters.js';
 import { invitesRoute } from './http/routes/invites.js';
+import { contributionsRoute } from './http/routes/contributions.js';
 
 export async function buildServer() {
   const isDev = env.NODE_ENV === 'development';
@@ -54,6 +55,7 @@ export async function buildServer() {
       await api.register(questsRoute);
       await api.register(encountersRoute);
       await api.register(invitesRoute);
+      await api.register(contributionsRoute);
     },
     { prefix: '/api/v1' },
   );

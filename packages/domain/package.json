@@ -33,6 +33,8 @@
     "./calculations": "./src/calculations/index.ts",
     "./use-cases": "./src/use-cases/index.ts",
     "./world": "./src/world/index.ts",
+    "./world/codex": "./src/world/codex/index.ts",
+    "./world/contribution": "./src/world/contribution/index.ts",
     "./engine": "./src/engine/index.ts"
   },
   "scripts": {
