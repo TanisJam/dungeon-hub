@@ -1405,6 +1405,12 @@ export const guildContributions = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
     /** Immutable insert time. */
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * text[] ⊆ KNOWLEDGE_TAGS. GIN-indexed for ?tag= filter + cronica-feed aggregation.
+     * WRITE-AT-CREATE ONLY — append-only invariant; no PATCH path touches tags.
+     * Backfilled from ref_entity_kind on migration 0042 (bitacora-gremio W4).
+     */
+    tags: text('tags').array().notNull().default(sql`'{}'`),
   },
   (t) => [
     // Feed query: most recent contributions for a world
@@ -1415,6 +1421,8 @@ export const guildContributions = pgTable(
     index('idx_gc_world_sealed').on(t.worldId, t.sealedStatus),
     // Per-user queries
     index('idx_gc_author').on(t.authorUserId),
+    // Tag filter — GIN for ?tag= + cronica-feed tag aggregation (bitacora-gremio W4)
+    index('idx_gc_tags').using('gin', t.tags),
   ],
 );
 

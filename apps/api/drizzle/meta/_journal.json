@@ -288,6 +288,13 @@
       "when": 1780900000000,
       "tag": "0041_bitacora_pages",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0042_guild_contributions_tags",
+      "breakpoints": true
     }
   ]
 }
