@@ -112,6 +112,7 @@ describe('ContributionComposer (B-2)', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
+      // tags: [] is now always sent (bitacora-gremio W4, REQ-GREM-CT-02 — tags optional field)
       expect(createContribution).toHaveBeenCalledWith({
         worldId: 'world-test',
         body: 'Encontré un goblin en la cueva.',
@@ -119,6 +120,7 @@ describe('ContributionComposer (B-2)', () => {
         refEntityKind: 'bestiary',
         refEntityId: 'goblin',
         visibility: 'personal',
+        tags: [],
       });
     });
   });

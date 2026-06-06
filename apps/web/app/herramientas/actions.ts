@@ -383,6 +383,8 @@ export interface ContributionBody {
   refEntityKind?: string;
   refEntityId?: string;
   visibility?: 'personal' | 'guild' | 'canonical';
+  /** Optional tags ⊆ KNOWLEDGE_TAGS (bitacora-gremio W4, REQ-GREM-CT-02). */
+  tags?: string[];
 }
 
 export interface ContributionRow {

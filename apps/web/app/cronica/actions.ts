@@ -1,7 +1,9 @@
 'use server';
 
 // Crónica Server Actions — Eventos (world_events) + Notas (journal_entries) CRUD.
+// + Unified cronica-feed aggregation (bitacora-gremio W4).
 // REQ-CRO-02, REQ-CRO-03, REQ-GATE-02: propagate 400/403/404 to UI; no swallowed errors.
+// REQ-GREM-FD-01: listCronicaFeed action.
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
@@ -322,5 +324,58 @@ export async function deleteJournalEntry(entryId: string): Promise<ActionResult>
     return { ok: true, data: undefined };
   } catch (err) {
     return handleApiError(err);
+  }
+}
+
+// ===========================================================================
+// Unified cronica-feed (bitacora-gremio W4) — REQ-GREM-FD-01
+// ===========================================================================
+
+export type FeedSource = 'gremio' | 'dm' | 'evento';
+
+/** Normalized feed item returned by GET /worlds/:worldId/cronica-feed */
+export interface FeedItem {
+  id: string;
+  source: FeedSource;
+  title: string | null;
+  body: string | null;
+  tags: string[];
+  sortAt: string; // ISO string — normalized recency key (ADR-5)
+  sealedStatus?: 'confirmed' | 'debunked' | null;
+  visibility: string;
+  refEntityKind?: string | null;
+  refEntityId?: string | null;
+  authorUserId?: string | null;
+}
+
+export interface CronicaFeedResult {
+  rows: FeedItem[];
+  total: number;
+  nextOffset: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// listCronicaFeed — unified guild bitácora feed (REQ-GREM-FD-01)
+// ---------------------------------------------------------------------------
+
+export async function listCronicaFeed(
+  worldId: string,
+  opts: { tag?: string; source?: FeedSource; offset?: number; limit?: number },
+): Promise<CronicaFeedResult> {
+  const token = await getToken();
+  if (!token) return { rows: [], total: 0, nextOffset: null };
+
+  try {
+    const params = new URLSearchParams({ limit: String(opts.limit ?? 50), offset: String(opts.offset ?? 0) });
+    if (opts.tag?.trim()) params.set('tag', opts.tag.trim());
+    if (opts.source) params.set('source', opts.source);
+
+    const res = await api.get<CronicaFeedResult>(
+      `/worlds/${worldId}/cronica-feed?${params.toString()}`,
+      token,
+    );
+    return res;
+  } catch {
+    return { rows: [], total: 0, nextOffset: null };
   }
 }

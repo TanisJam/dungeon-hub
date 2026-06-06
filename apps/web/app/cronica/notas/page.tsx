@@ -7,15 +7,18 @@ import { AppShell } from '@/components/layout/app-shell';
 import { WorldSwitcherShell } from '@/app/_components/world-switcher-shell';
 import { SubNav } from '@/components/world/_shell/sub-nav';
 import { JournalClientWrapper } from '@/components/world/journal/journal-client-wrapper';
+import { CronicaFeed } from '@/components/world/cronica/cronica-feed';
 import { V3Empty } from '@/components/ui';
-import type { JournalRow } from '../actions';
+import type { JournalRow, FeedItem } from '../actions';
 
 /**
- * Notas — Server Component.
+ * Notas — source-facet of the unified Bitácora del Gremio (bitacora-gremio W4).
  *
- * Resolves active world + view preference in parallel (REQ-CRO-03).
- * Computes effectiveView from callerRole (world authority) and dh:role cookie overlay.
- * SSR-fetches initial journal entries; renders SubNav + JournalClientWrapper.
+ * REQ-GREM-FD-04, ADR-4, ADR-7.
+ * Deep-link preserved: /cronica/notas still resolves (now as a facet).
+ * JournalClientWrapper RETAINED: DM create/edit/delete affordances must not be lost (T-12 check).
+ * CronicaFeed added with source="dm" — unified tag filter applies to journal_entries only.
+ *
  * REQ-CRO-01, REQ-CRO-03.
  */
 export default async function NotasPage({
@@ -52,7 +55,9 @@ export default async function NotasPage({
     />
   ) : undefined;
 
+  // 3-item SubNav — Todo | Eventos | Notas (active) (ADR-4)
   const subNavItems = [
+    { label: 'Todo', href: '/cronica' },
     { label: 'Eventos', href: '/cronica/eventos' },
     { label: 'Notas', href: '/cronica/notas' },
   ];
@@ -76,7 +81,7 @@ export default async function NotasPage({
     );
   }
 
-  // SSR initial journal entries list
+  // SSR initial journal entries via JournalClientWrapper (DM create affordance) — legacy data fetch
   let initialEntries: JournalRow[] = [];
   try {
     const params = new URLSearchParams({ limit: '50', offset: '0' });
@@ -87,7 +92,23 @@ export default async function NotasPage({
     );
     initialEntries = res.data ?? [];
   } catch {
-    // If fetch fails, render with empty list — client can retry via search
+    // Render with empty list
+  }
+
+  // SSR initial cronica-feed items for the unified feed facet
+  let initialFeedItems: FeedItem[] = [];
+  let initialNextOffset: number | null = null;
+  try {
+    const params = new URLSearchParams({ limit: '50', offset: '0', source: 'dm' });
+    if (tag) params.set('tag', tag);
+    const res = await api.get<{ rows: FeedItem[]; total: number; nextOffset: number | null }>(
+      `/worlds/${aw.id}/cronica-feed?${params.toString()}`,
+      token,
+    );
+    initialFeedItems = res.rows ?? [];
+    initialNextOffset = res.nextOffset ?? null;
+  } catch {
+    // Use entries-derived initial items as fallback
   }
 
   return (
@@ -98,11 +119,21 @@ export default async function NotasPage({
       callerRole={callerRole}
     >
       <SubNav items={subNavItems} activePath="/cronica/notas" />
+      {/* JournalClientWrapper: DM CRUD affordances (create/edit/delete) — MUST NOT be removed (ADR-7, T-12) */}
       <JournalClientWrapper
         worldId={aw.id}
         effectiveView={effectiveView}
         initialEntries={initialEntries}
         initialTag={tag}
+      />
+      {/* CronicaFeed source-facet: unified tag filter + FeedCard layout for notas */}
+      <CronicaFeed
+        worldId={aw.id}
+        source="dm"
+        initialItems={initialFeedItems}
+        initialTag={tag}
+        initialNextOffset={initialNextOffset}
+        effectiveView={effectiveView}
       />
     </AppShell>
   );
