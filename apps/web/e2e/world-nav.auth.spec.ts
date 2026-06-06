@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
  *   (c) Stub routes (Mapa, Crónica) render without error.
  *   (d) Biblioteca tab navigates to /compendium.
  *   (e) No Mesa tab visible.
- *   (f) Bitácora tab redirects to /cronica/eventos.
+ *   (f) Bitácora tab renders /cronica unified feed (no redirect — bitacora-gremio W4 ADR-4).
  *
  * Mobile-first: runs at 375px viewport (iPhone SE) per project convention.
  */
@@ -77,10 +77,11 @@ test('Biblioteca tab navigates to /compendium and renders content', async ({ pag
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('Bitácora tab redirects to /cronica/eventos and renders content', async ({ page }) => {
+test('Bitácora tab renders /cronica unified feed (no longer redirects — bitacora-gremio W4)', async ({ page }) => {
   await page.goto('/cronica', { waitUntil: 'domcontentloaded' });
-  // /cronica redirects to /cronica/eventos (ADR-1, REQ-CRO-01)
-  await expect(page).toHaveURL(/\/cronica\/eventos/, { timeout: 10_000 });
+  // bitacora-gremio W4 ADR-4: /cronica is now the unified feed, NOT a redirect to /cronica/eventos.
+  // The URL stays at /cronica (unified feed).
+  await expect(page).toHaveURL(/\/cronica$/, { timeout: 10_000 });
   // Page renders without 404 — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });
