@@ -195,7 +195,7 @@ export function BitacoraComposer({
           </label>
           <textarea
             id="bp-body"
-            autoFocus
+            data-autofocus
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Escribí tus notas…"

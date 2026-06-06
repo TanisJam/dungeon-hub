@@ -28,12 +28,22 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
 
+  // Keep the latest onClose in a ref so the focus/keyboard effect does NOT depend
+  // on its identity. Callers usually pass an inline closure (new each render); if
+  // onClose were an effect dep, every parent re-render (e.g. typing in a field)
+  // would re-run the effect and steal focus back to the first focusable element.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   // Mount guard — prevents SSR portal creation
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Body overflow lock + keyboard handling + focus management
+  // Body overflow lock + keyboard handling + focus management.
+  // Depends ONLY on `open` — runs once per open/close transition, not on every render.
   useEffect(() => {
     if (!open) return;
 
@@ -47,7 +57,7 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -74,10 +84,14 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
 
     document.addEventListener('keydown', onKey);
 
-    // Focus first focusable element on open
+    // Focus on open: prefer an explicit [data-autofocus] element (e.g. the composer's
+    // body textarea — React strips the `autofocus` attr, so we use a data marker),
+    // else the first focusable. Runs once per open.
     requestAnimationFrame(() => {
-      const nodes = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
-      nodes?.[0]?.focus();
+      const panel = panelRef.current;
+      if (!panel) return;
+      const preferred = panel.querySelector<HTMLElement>('[data-autofocus]');
+      (preferred ?? panel.querySelector<HTMLElement>(FOCUSABLE))?.focus();
     });
 
     return () => {
@@ -85,7 +99,7 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
       document.body.style.overflow = prevOverflow;
       restoreRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted || !open) return null;
 
