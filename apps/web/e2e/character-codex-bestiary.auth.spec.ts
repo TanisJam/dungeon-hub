@@ -62,10 +62,11 @@ async function resolveFirstMonster(request: import('@playwright/test').APIReques
   return data.data?.[0] ?? null;
 }
 
-test.describe.skip('Character Codex Browser @ 375px', () => {
-  // W1 Biblioteca: world-knowledge gated surface deleted; re-enabled by Bitácora wave
+test.describe('Character Codex Browser @ 375px', () => {
+  // Bitácora W2: known monsters surface rebuilt in Bitácora tab → Conocidos sub-view.
+  // Un-skipped per bitacora-personal SDD REQ-BP-TEST-01.
   test(
-    'DM grants a monster → player codex shows it as known in CodexList',
+    'DM grants a monster → player Bitácora Conocidos shows it as known',
     async ({ page, request }) => {
       // Navigate to home first to capture the session token
       await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -113,28 +114,27 @@ test.describe.skip('Character Codex Browser @ 375px', () => {
       );
       expect(grantRes.status()).toBe(200);
 
-      // 2. Navigate to /characters/:id/codex (grid page — replaces /codex/bestiario)
-      await page.goto(`/characters/${characterId}/codex`, { waitUntil: 'networkidle', timeout: 60_000 });
-      await expect(page).toHaveURL(/\/codex$/, { timeout: 15_000 });
+      // 2. Navigate to the character ficha Bitácora tab → Conocidos sub-view
+      await page.goto(
+        `/characters/${characterId}?tab=notas&sub=conocidos`,
+        { waitUntil: 'networkidle', timeout: 60_000 },
+      );
+      await expect(page).toHaveURL(/tab=notas/, { timeout: 15_000 });
 
-      // 3. Grid page: "N de M descubiertos" progress text visible (REQ-CCB-WEB-01)
-      await expect(page.getByText(/descubiertos/)).toBeVisible({ timeout: 10_000 });
+      // 3. Segmented nav: "Conocidos" pill is visible and active (REQ-BP-WEB-01)
+      await expect(page.getByRole('link', { name: 'Conocidos' })).toBeVisible({ timeout: 10_000 });
 
-      // 4. Navigate to /characters/:id/codex/monsters (the scoped list)
-      await page.goto(`/characters/${characterId}/codex/monsters`, { waitUntil: 'networkidle', timeout: 60_000 });
-      await expect(page).toHaveURL(/\/codex\/monsters/, { timeout: 15_000 });
-
-      // 5. The granted monster appears in CodexList with its name
+      // 4. The granted monster appears in Conocidos list with its name (REQ-BP-WEB-02)
       await expect(page.getByText(monster.name)).toBeVisible({ timeout: 10_000 });
 
-      // 6. No horizontal overflow at 375px (REQ-CCB-WEB-02)
+      // 5. No horizontal overflow at 375px (REQ-BP-WEB-01)
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(scrollWidth, 'No horizontal overflow at 375px').toBeLessThanOrEqual(375);
     },
   );
 
   test(
-    'Ungranted monster NOT in player DOM — statblock data absent (REQ-CCB-WEB-02)',
+    'Ungranted monster NOT in player Conocidos DOM (REQ-BP-WEB-02)',
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
@@ -165,23 +165,22 @@ test.describe.skip('Character Codex Browser @ 375px', () => {
       const knownRes = await request.get(`${API}/api/v1/characters/${characterId}/knowledge/monsters`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const knownData = await knownRes.json() as { rows: Array<{ slug: string }> };
-      const knowsTarrasque = knownData.rows.some((r) => r.slug === 'tarrasque');
+      const knownData = await knownRes.json() as { rows: Array<{ slug: string; known?: boolean }> };
+      const knowsTarrasque = knownData.rows.some((r) => r.slug === 'tarrasque' && r.known !== false);
 
-      await page.goto(`/characters/${characterId}/codex/monsters`, { waitUntil: 'networkidle', timeout: 60_000 });
-      await expect(page).toHaveURL(/\/codex\/monsters/, { timeout: 15_000 });
+      // Navigate to Bitácora → Conocidos sub-view
+      await page.goto(
+        `/characters/${characterId}?tab=notas&sub=conocidos`,
+        { waitUntil: 'networkidle', timeout: 60_000 },
+      );
+      await expect(page).toHaveURL(/tab=notas/, { timeout: 15_000 });
 
       if (!knowsTarrasque) {
-        // CRITICAL: CodexList (player view) only renders API-returned rows.
-        // Ungranted monsters never appear — API gate + no silhouette DOM.
-        // [data-monster-slug] is gone — we check by monster name absence.
+        // CRITICAL: Conocidos only renders API-returned known monsters.
+        // Ungranted monsters never appear — API gate enforced server-side.
         const tarrasqueEl = page.getByText('Tarrasque');
         const count = await tarrasqueEl.count();
-        expect(count, 'Ungranted tarrasque must not appear in player CodexList').toBe(0);
-
-        // Also confirm no [data-monster-slug] attributes (old DOM model removed)
-        const slugAttrCount = await page.locator('[data-monster-slug]').count();
-        expect(slugAttrCount, '[data-monster-slug] DOM model removed — CodexList uses MonsterRowView buttons').toBe(0);
+        expect(count, 'Ungranted tarrasque must not appear in Conocidos').toBe(0);
       }
       // If user knows the tarrasque — test is N/A (skip assertion)
     },

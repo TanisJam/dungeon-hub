@@ -14,7 +14,7 @@ const TABS: { slug: SheetTab; label: string }[] = [
   { slug: 'hechizos', label: 'Hechizos' },
   { slug: 'recursos', label: 'Recursos' },
   { slug: 'inventario', label: 'Inventario' },
-  { slug: 'notas', label: 'Notas' },
+  { slug: 'notas', label: 'Bitácora' },
 ];
 
 export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {

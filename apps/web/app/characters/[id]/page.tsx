@@ -50,13 +50,14 @@ function buildClassSummary(data: SheetResponse): string {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; sub?: string }>;
 };
 
 export default async function CharacterSheetPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, sub: subParam } = await searchParams;
   const tab: SheetTab = isValidTab(tabParam) ? tabParam : 'resumen';
+  const sub = subParam ?? 'conocidos';
 
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
@@ -254,7 +255,15 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
               sheet={sheet}
             />
           )}
-          {tab === 'notas' && <NotasTab />}
+          {tab === 'notas' && (
+            <NotasTab
+              characterId={id}
+              worldId={character.worldId}
+              accessToken={session.access_token}
+              callerRole={callerRole}
+              sub={sub}
+            />
+          )}
         </div>
 
         <Link

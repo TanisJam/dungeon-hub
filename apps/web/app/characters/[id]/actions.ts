@@ -580,6 +580,7 @@ export async function fetchInventoryDetail(
 
 export type GrantKnowledgeState = { ok: false; error: string } | { ok: true };
 
+
 export type KnowledgeKind = 'bestiary' | 'item' | 'spell' | 'npc' | 'faction' | 'location' | 'lore';
 
 /**
@@ -615,8 +616,136 @@ export async function grantKnowledge(
     return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
   }
 
-  // Retargeted from /codex/bestiario → /codex (character-codex-browser Slice 1')
-  revalidatePath(`/characters/${characterId}/codex`);
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+// ── bitacora-personal: page CRUD ──────────────────────────────────────────────
+
+export type BitacoraPageState =
+  | { ok: true }
+  | { ok: false; error: string; issues?: Array<{ code: string; message: string; path?: string }> };
+
+export interface CreateBitacoraPageInput {
+  title?: string | null | undefined;
+  body: string;
+  tags: string[];
+  refs: Array<{ kind: string; refKey: string; refSource: string }>;
+}
+
+export interface UpdateBitacoraPageInput {
+  title?: string | null | undefined;
+  body?: string | undefined;
+  tags?: string[] | undefined;
+  refs?: Array<{ kind: string; refKey: string; refSource: string }> | undefined;
+}
+
+/**
+ * Create a personal bitácora page for the given character.
+ * REQ-BP-WEB-04 (spec #1974), bitacora-personal SDD.
+ */
+export async function createBitacoraPage(
+  characterId: string,
+  input: CreateBitacoraPageInput,
+): Promise<BitacoraPageState> {
+  if (!UUID_RE.test(characterId)) {
+    return { ok: false, error: 'ID de personaje inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.post(
+      `/characters/${characterId}/bitacora/pages`,
+      input,
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { error?: string; issues?: Array<{ code: string; message: string; path?: string }> } | null;
+      return {
+        ok: false,
+        error: body?.error ?? `API ${err.status}`,
+        issues: body?.issues,
+      };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/**
+ * Update a personal bitácora page (partial update).
+ * REQ-BP-WEB-04 (spec #1974), bitacora-personal SDD.
+ */
+export async function updateBitacoraPage(
+  characterId: string,
+  pageId: string,
+  input: UpdateBitacoraPageInput,
+): Promise<BitacoraPageState> {
+  if (!UUID_RE.test(characterId) || !UUID_RE.test(pageId)) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.patch(
+      `/characters/${characterId}/bitacora/pages/${pageId}`,
+      input,
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { error?: string; issues?: Array<{ code: string; message: string; path?: string }> } | null;
+      return {
+        ok: false,
+        error: body?.error ?? `API ${err.status}`,
+        issues: body?.issues,
+      };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
+  revalidatePath(`/characters/${characterId}`);
+  return { ok: true };
+}
+
+/**
+ * Delete a personal bitácora page.
+ * REQ-BP-WEB-06 (spec #1974), bitacora-personal SDD.
+ */
+export async function deleteBitacoraPage(
+  characterId: string,
+  pageId: string,
+): Promise<BitacoraPageState> {
+  if (!UUID_RE.test(characterId) || !UUID_RE.test(pageId)) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    await api.delete(
+      `/characters/${characterId}/bitacora/pages/${pageId}`,
+      session.access_token,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { error?: string } | null;
+      return { ok: false, error: body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+
   revalidatePath(`/characters/${characterId}`);
   return { ok: true };
 }
