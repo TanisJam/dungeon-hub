@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { IdentityHeader } from './_identity-header';
 import { CharactersSection } from './_characters-section';
 import { CampaignsSection } from './_campaigns-section';
+import { DevModeToggle } from '@/components/codex/dev-mode-toggle';
 
 type Me = {
   id: string;
@@ -13,6 +14,8 @@ type Me = {
   role: 'admin' | 'dm' | 'player';
   discordId: string | null;
   discordUsername: string | null;
+  // codex-knowledge B-4 gap closure (#1953): server-resolved devMode for the toggle.
+  devMode: boolean;
 };
 
 type CharacterRow = {
@@ -68,6 +71,16 @@ export default async function DashboardPage() {
       <div className="mt-8 flex flex-col gap-10">
         <CharactersSection characters={characters} />
         <CampaignsSection campaigns={campaigns} currentUserId={me.id} />
+
+        {/* Account preferences — codex-knowledge B-4 (#1953): per-user devMode. */}
+        <section aria-label="Preferencias">
+          <h2 className="mb-3 font-sans text-xs font-semibold uppercase tracking-wide text-ink-mute">
+            Preferencias
+          </h2>
+          <div className="rounded-md border border-line bg-surface-raised px-3 py-2">
+            <DevModeToggle currentValue={me.devMode} />
+          </div>
+        </section>
       </div>
     </AppShell>
   );
