@@ -3,6 +3,8 @@ import { render } from '@testing-library/react';
 import { CompendiumCategoryGrid } from './compendium-category-grid';
 import type { CategoryId } from './types';
 
+// counts is typed Record<CategoryId> (all keys) — the grid only renders the
+// 6 Biblioteca categories (codex-ia-reframe W1: items/monsters/lore dropped).
 const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
   spells: 320,
   items: 145,
@@ -16,53 +18,43 @@ const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
 };
 
 describe('CompendiumCategoryGrid', () => {
-  it('WCP-GRID-03: renders 9 category cards in document order (including feats + conditions + lore)', () => {
+  it('REQ-BIB-02: renders the 6 library cards only (no items/monsters/lore)', () => {
     const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
     const cards = container.querySelectorAll('.compendium-init-cat-card');
-    // Now 9 cards: spells, items, races, classes, monsters, backgrounds, feats, conditions, lore
-    expect(cards.length).toBe(9);
+    expect(cards.length).toBe(6);
   });
 
-  it('WCP-GRID-03 / WCP-COUNTS-01: numeric count renders as "320 entradas"', () => {
+  it('REQ-BIB-02: items, monsters and lore cards are NOT rendered', () => {
+    const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId="c1" />);
+    expect(container.querySelector('[data-category="items"]')).toBeNull();
+    expect(container.querySelector('[data-category="monsters"]')).toBeNull();
+    expect(container.querySelector('[data-category="lore"]')).toBeNull();
+    expect(container.querySelector('.lore')).toBeNull();
+  });
+
+  it('WCP-COUNTS-01: numeric count renders as "320 entradas"', () => {
     const { getByText } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
-    // WCP-COUNTS-01: number → "{n} entradas"
     expect(getByText('320 entradas')).toBeTruthy();
   });
 
   it('WCP-COUNTS-01: em-dash fallback renders as "— entradas"', () => {
     const counts = { ...defaultCounts, spells: '—' as const };
     const { getAllByText } = render(<CompendiumCategoryGrid counts={counts} campaignId={null} />);
-    // Multiple '—' categories when null campaign, but at least one
     const dashes = getAllByText('— entradas');
     expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('WCP-LORE-02: lore card shows "Próximamente" (always disabled, no endpoint)', () => {
-    const { getByText } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
-    // WCP-LORE-02: Lore card is disabled with "Próximamente"
-    expect(getByText('Próximamente')).toBeTruthy();
-  });
-
-  it('WCP-GRID-03: Hechizos card has .spell tint class', () => {
+  it('WCP-GRID-03: Hechizos card is first and has .spell tint class', () => {
     const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
     const cards = container.querySelectorAll('.compendium-init-cat-card');
-    // First card = Hechizos → cls: 'spell'
     expect(cards[0]?.classList.contains('spell')).toBe(true);
   });
 
-  it('WCP-GRID-03 / WCP-LORE-02: Lore card has .lore tint class', () => {
-    const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
-    const cards = container.querySelectorAll('.compendium-init-cat-card');
-    // Ninth (last) card = Lore → cls: 'lore'
-    expect(cards[8]?.classList.contains('lore')).toBe(true);
-  });
-
-  it('REQ-CBROWSE-01: spell card has href to /compendium/spells?campaign=... when campaignId given', () => {
+  it('REQ-CBROWSE-01: spell card links to /compendium/spells?campaign=... when campaignId given', () => {
     const campaignId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
     const { container } = render(
       <CompendiumCategoryGrid counts={defaultCounts} campaignId={campaignId} />,
     );
-    // REQ-CBROWSE-01: spell card must be a link with the correct href
     const spellCard = container.querySelector('[data-category="spells"]');
     expect(spellCard?.tagName).toBe('A');
     expect(spellCard?.getAttribute('href')).toBe(`/compendium/spells?campaign=${campaignId}`);
@@ -78,13 +70,11 @@ describe('CompendiumCategoryGrid', () => {
     expect(bgCard?.getAttribute('href')).toContain('/compendium/backgrounds');
   });
 
-  it('ADR-7: lore card is disabled even when campaignId is provided', () => {
-    const { container } = render(
-      <CompendiumCategoryGrid counts={defaultCounts} campaignId="some-campaign-id" />,
-    );
-    const loreCard = container.querySelector('.lore');
-    // Lore is always a button (disabled), never a Link
-    expect(loreCard?.tagName).toBe('BUTTON');
-    expect(loreCard?.hasAttribute('disabled')).toBe(true);
+  it('renders non-navigating buttons (not links) when campaignId is null', () => {
+    const { container } = render(<CompendiumCategoryGrid counts={defaultCounts} campaignId={null} />);
+    const firstCard = container.querySelector('.compendium-init-cat-card');
+    expect(firstCard?.tagName).toBe('BUTTON');
+    // Links (which carry data-category) are not rendered without a campaign.
+    expect(container.querySelector('[data-category="spells"]')).toBeNull();
   });
 });

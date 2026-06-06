@@ -4,9 +4,9 @@ import type { IconName } from '@/components/ui';
 import type { CategoryId } from './types';
 import { V3_COMPENDIUM_CATS } from './data';
 
-// The browser categories that have API endpoints (REQ-CBROWSE-01).
-// 'lore' has no endpoint — rendered disabled with "Próximamente" affordance (ADR-7).
-const BROWSABLE_CATEGORIES = new Set<CategoryId>(['spells', 'items', 'races', 'classes', 'backgrounds', 'monsters', 'feats', 'conditions']);
+// Biblioteca categories — all have API endpoints (REQ-CBROWSE-01).
+// codex-ia-reframe W1: items/monsters/lore are no longer library cards (see data.ts).
+const BROWSABLE_CATEGORIES = new Set<CategoryId>(['spells', 'races', 'classes', 'backgrounds', 'feats', 'conditions']);
 
 interface CompendiumCategoryGridProps {
   counts: Record<CategoryId, number | '—' | '∞'>;
@@ -15,10 +15,9 @@ interface CompendiumCategoryGridProps {
 }
 
 /**
- * CompendiumCategoryGrid — 6-card grid. ADR-7.
+ * CompendiumCategoryGrid — Biblioteca grid (6 library categories).
  * Browsable categories → Link to /compendium/[cat]?campaign=[id].
- * 'lore' → disabled button with "Próximamente" affordance (no API endpoint).
- * If campaignId is null → all cards rendered as buttons with no navigation + banner.
+ * If campaignId is null → cards render as buttons with no navigation + banner.
  */
 export function CompendiumCategoryGrid({ counts, campaignId }: CompendiumCategoryGridProps) {
   return (
@@ -47,22 +46,14 @@ export function CompendiumCategoryGrid({ counts, campaignId }: CompendiumCategor
           );
         }
 
-        // Lore (no endpoint) or no campaign → disabled button
+        // No campaign → non-navigating button (banner explains why).
         return (
-          <button
-            key={cat.id}
-            type="button"
-            disabled={cat.id === 'lore'}
-            aria-disabled={cat.id === 'lore' ? 'true' : undefined}
-            className={`${cardClass}${cat.id === 'lore' ? ' opacity-50 cursor-not-allowed' : ''}`}
-          >
+          <button key={cat.id} type="button" className={cardClass}>
             <div className="ic">
               <Icon name={cat.icon as IconName} size={18} />
             </div>
             <div className="ttl">{cat.name}</div>
-            <div className="ct">
-              {cat.id === 'lore' ? 'Próximamente' : display}
-            </div>
+            <div className="ct">{display}</div>
           </button>
         );
       })}

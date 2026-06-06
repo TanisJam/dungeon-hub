@@ -1,17 +1,15 @@
 import type { CategoryDef } from './types';
 
-// PHB 2014 — category icons and tints for the 7-card grid.
+// PHB 2014 — Biblioteca grid: ONLY general/manual knowledge anyone can read.
+// codex-ia-reframe W1 (REQ-BIB-02, decision #1966): items move to the Mercado wave;
+// monsters + lore are world-knowledge (Bitácora wave) — they are NOT library cards.
+// Their detail routes stay reachable (direct/linked); only the cards are dropped here.
 // Labels only — counts are real and fetched server-side in page.tsx.
-// 'lore' has no API endpoint and renders disabled ("Próximamente").
-// 'backgrounds' is new in V1 browser; REQ-CBROWSE-01.
 export const V3_COMPENDIUM_CATS: CategoryDef[] = [
   { id: 'spells',      name: 'Hechizos',     icon: 'sparkle', cls: 'spell' },
-  { id: 'items',       name: 'Items',         icon: 'bag',     cls: ''      },
   { id: 'races',       name: 'Razas',         icon: 'user',    cls: ''      },
   { id: 'classes',     name: 'Clases',        icon: 'shield',  cls: ''      },
-  { id: 'monsters',    name: 'Monstruos',     icon: 'flame',   cls: ''      },
   { id: 'backgrounds', name: 'Trasfondos',    icon: 'scroll',  cls: ''      },
   { id: 'feats',       name: 'Dotes',         icon: 'star',    cls: ''      },
   { id: 'conditions',  name: 'Estados',       icon: 'bolt',    cls: ''      },
-  { id: 'lore',        name: 'Lore',          icon: 'scroll',  cls: 'lore'  },
 ];
