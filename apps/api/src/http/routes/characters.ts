@@ -103,6 +103,11 @@ import { applyActiveEffect } from '../../use-cases/characters/apply-active-effec
 import { removeByConcentrationToken } from '../../use-cases/characters/remove-by-concentration-token.js';
 import { removeByEndCondition } from '../../use-cases/characters/remove-by-end-condition.js';
 import { grantStartingEquipment } from '../../use-cases/characters/grant-starting-equipment.js';
+import { createBitacoraPage } from '../../use-cases/characters/create-bitacora-page.js';
+import { listBitacoraPages } from '../../use-cases/characters/list-bitacora-pages.js';
+import { getBitacoraPage } from '../../use-cases/characters/get-bitacora-page.js';
+import { updateBitacoraPage } from '../../use-cases/characters/update-bitacora-page.js';
+import { deleteBitacoraPage } from '../../use-cases/characters/delete-bitacora-page.js';
 import {
   createInMemoryRegistry,
   resolveStat,
@@ -256,6 +261,36 @@ const GrantKnowledgeBody = z.object({
   kind: z.enum(['bestiary', 'item', 'spell', 'npc', 'faction', 'location', 'lore']),
   refKey: z.string().min(1),
   refSource: z.string().min(1),
+});
+
+// bitacora-personal: page CRUD bodies (spec #1974, design #1975 §ADR-3)
+const BitacoraRefSchema = z.object({
+  kind: z.string().min(1),
+  refKey: z.string().min(1),
+  refSource: z.string().min(1),
+});
+
+const CreateBitacoraPageBody = z.object({
+  title: z.string().max(120).optional().nullable(),
+  body: z.string().max(10000),
+  tags: z.array(z.string()).default([]),
+  refs: z.array(BitacoraRefSchema).default([]),
+});
+
+const UpdateBitacoraPageBody = z.object({
+  title: z.string().max(120).optional().nullable(),
+  body: z.string().max(10000).optional(),
+  tags: z.array(z.string()).optional(),
+  refs: z.array(BitacoraRefSchema).optional(),
+});
+
+const BitacoraListQuery = z.object({
+  tag: z.string().optional(),
+});
+
+const ParamsWithIdAndPageId = z.object({
+  id: z.string().uuid(),
+  pageId: z.string().uuid(),
 });
 
 // character-codex-browser: GET /knowledge/:kind param validation.
@@ -4921,6 +4956,229 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       }
 
       return reply.code(200).send({ ok: true });
+    },
+  );
+
+  // ── POST /characters/:id/bitacora/pages ─────────────────────────────────────
+  // Owner-only: create a personal bitácora page.
+  // 200 on success (house convention — mirrors knowledge grant at line 1782).
+  // REQ-BP-API-01, bitacora-personal SDD spec #1974.
+  app.post(
+    '/characters/:id/bitacora/pages',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      const bodyResult = CreateBitacoraPageBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: bodyResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const body = bodyResult.data;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Owner-only writes (ADR-3: GM does NOT write personal pages)
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'BITACORA_OWNER_REQUIRED', characterId: id, userId }],
+        });
+      }
+
+      const result = await createBitacoraPage({
+        characterId: id,
+        worldId: character.worldId,
+        title: body.title ?? null,
+        body: body.body,
+        tags: body.tags,
+        refs: body.refs,
+      });
+
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
+      }
+
+      return reply.code(200).send({ page: result.page });
+    },
+  );
+
+  // ── GET /characters/:id/bitacora/pages ──────────────────────────────────────
+  // Reads: owner + GM + devMode. Supports optional ?tag= filter.
+  // REQ-BP-API-02, bitacora-personal SDD spec #1974.
+  app.get(
+    '/characters/:id/bitacora/pages',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+      const userId = request.user!.sub;
+
+      const queryResult = BitacoraListQuery.safeParse(request.query);
+      if (!queryResult.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: queryResult.error.issues });
+      }
+      const { tag } = queryResult.data;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // Reads: owner OR GM OR devMode (mirrors knowledge read gate)
+      const access = await getCharacterAccess(character, userId);
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      const callerRows = await db
+        .select({ devMode: users.devMode })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const callerDevMode = callerRows[0]?.devMode ?? false;
+
+      if (access === 'none' && !gmCheck.ok && !callerDevMode) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+        });
+      }
+
+      const result = await listBitacoraPages({ characterId: id, tag });
+      return reply.code(200).send(result);
+    },
+  );
+
+  // ── GET /characters/:id/bitacora/pages/:pageId ──────────────────────────────
+  // Reads: owner + GM + devMode. 404 if not found or wrong character.
+  // REQ-BP-API-03, bitacora-personal SDD spec #1974.
+  app.get(
+    '/characters/:id/bitacora/pages/:pageId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const paramsResult = ParamsWithIdAndPageId.safeParse(request.params);
+      if (!paramsResult.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: paramsResult.error.issues });
+      }
+      const { id, pageId } = paramsResult.data;
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      const gmCheck = await assertWorldGm(character.worldId, userId);
+      const callerRows = await db
+        .select({ devMode: users.devMode })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const callerDevMode = callerRows[0]?.devMode ?? false;
+
+      if (access === 'none' && !gmCheck.ok && !callerDevMode) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'NOT_WORLD_MEMBER', worldId: character.worldId, userId }],
+        });
+      }
+
+      const page = await getBitacoraPage(pageId, id);
+      if (!page) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      return reply.code(200).send({ page });
+    },
+  );
+
+  // ── PATCH /characters/:id/bitacora/pages/:pageId ─────────────────────────────
+  // Owner-only: partial update. Merges with existing document and re-validates.
+  // REQ-BP-API-04, bitacora-personal SDD spec #1974.
+  app.patch(
+    '/characters/:id/bitacora/pages/:pageId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const paramsResult = ParamsWithIdAndPageId.safeParse(request.params);
+      if (!paramsResult.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: paramsResult.error.issues });
+      }
+      const { id, pageId } = paramsResult.data;
+      const userId = request.user!.sub;
+
+      const bodyResult = UpdateBitacoraPageBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: bodyResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const body = bodyResult.data;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'BITACORA_OWNER_REQUIRED', characterId: id, userId }],
+        });
+      }
+
+      const result = await updateBitacoraPage({
+        pageId,
+        characterId: id,
+        ...body,
+      });
+
+      if (!result.ok && 'notFound' in result) {
+        return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
+      if (!result.ok) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: (result as { issues: unknown[] }).issues });
+      }
+
+      return reply.code(200).send({ page: result.page });
+    },
+  );
+
+  // ── DELETE /characters/:id/bitacora/pages/:pageId ────────────────────────────
+  // Owner-only: delete a page. 204 on success, 404 if not found.
+  // REQ-BP-API-05, bitacora-personal SDD spec #1974.
+  app.delete(
+    '/characters/:id/bitacora/pages/:pageId',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const paramsResult = ParamsWithIdAndPageId.safeParse(request.params);
+      if (!paramsResult.success) {
+        return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: paramsResult.error.issues });
+      }
+      const { id, pageId } = paramsResult.data;
+      const userId = request.user!.sub;
+
+      const character = await loadCharacter(id);
+      if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      const access = await getCharacterAccess(character, userId);
+      if (access !== 'owner') {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'BITACORA_OWNER_REQUIRED', characterId: id, userId }],
+        });
+      }
+
+      const result = await deleteBitacoraPage(pageId, id);
+      if (!result.deleted) {
+        return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
+
+      return reply.code(204).send();
     },
   );
 };
