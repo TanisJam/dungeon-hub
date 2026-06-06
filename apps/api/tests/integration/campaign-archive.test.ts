@@ -254,6 +254,31 @@ describe('campaign-archive', () => {
     }
   });
 
+  it('CARCH-API-11: GET /campaigns?status=archived returns only archived rows', async () => {
+    const app = await getTestApp();
+    const { id: archivedId } = await createCampaign('Status Filter Archived Only');
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/campaigns/${archivedId}/archive`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/campaigns?status=archived',
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json() as { data: Array<{ id: string; status: string }> };
+    // The archived campaign must appear, and every returned row must be archived.
+    expect(data.find((c) => c.id === archivedId)).toBeDefined();
+    for (const row of data) {
+      expect(row.status).toBe('archived');
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Archive preserves sessions + members (no cascade)
   // ---------------------------------------------------------------------------

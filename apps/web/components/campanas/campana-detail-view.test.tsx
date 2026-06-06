@@ -146,6 +146,34 @@ describe('CampanaDetailView', () => {
     expect(screen.queryByRole('button', { name: 'Nueva sesión' })).toBeNull();
   });
 
+  // REQ-CARCH-WEB-BUTTON-01: archive/reopen affordance is GM-only (verify W2)
+  it('REQ-CARCH-WEB-BUTTON-01: GM sees "Cerrar campaña" on an active campaign', () => {
+    render(
+      <CampanaDetailView
+        detail={{ ...baseDetail, callerRole: 'gm', status: 'active' }}
+        sessions={[]}
+        callerUserId="u-gm"
+        worldId="w-1"
+        callerCharacters={[]}
+      />,
+    );
+    expect(screen.getByText('Cerrar campaña')).toBeTruthy();
+  });
+
+  it('REQ-CARCH-WEB-BUTTON-01: non-GM does NOT see the archive/reopen affordance', () => {
+    render(
+      <CampanaDetailView
+        detail={{ ...baseDetail, callerRole: 'player', status: 'active' }}
+        sessions={[]}
+        callerUserId="u-p1"
+        worldId="w-1"
+        callerCharacters={[]}
+      />,
+    );
+    expect(screen.queryByText('Cerrar campaña')).toBeNull();
+    expect(screen.queryByText('Reabrir campaña')).toBeNull();
+  });
+
   // REQ-DPPMB-CT-01: active participant derivation
   it('REQ-DPPMB-CT-01: active participant charIds derived from sessions for current user', () => {
     render(
