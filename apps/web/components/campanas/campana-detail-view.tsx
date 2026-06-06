@@ -35,6 +35,13 @@ type Props = {
   worldId: string;
   /** Active characters the caller owns in this world — passed to SessionList → JoinSheet. */
   callerCharacters: RosterCharacter[];
+  /**
+   * Toggle-aware role for UI affordance gating. A GM previewing as player (dh:role
+   * toggle) gets 'player' here so DM affordances hide — while detail.callerRole stays
+   * the real membership role (used for nothing security-related; the API enforces).
+   * Defaults to detail.callerRole when omitted (no toggle awareness).
+   */
+  effectiveRole?: CampaignMemberRole;
 };
 
 const ROLE_LABEL: Record<CampaignMemberRole, string> = {
@@ -46,7 +53,9 @@ const ROLE_TONE: Record<CampaignMemberRole, 'accent' | 'stone'> = {
   player: 'stone',
 };
 
-export function CampanaDetailView({ detail, sessions, callerUserId, worldId, callerCharacters }: Props) {
+export function CampanaDetailView({ detail, sessions, callerUserId, worldId, callerCharacters, effectiveRole }: Props) {
+  // Toggle-aware role for affordances; falls back to the real membership role.
+  const uiRole: CampaignMemberRole = effectiveRole ?? detail.callerRole ?? 'player';
   // Derive the set of character IDs that the caller is an ACTIVE participant in
   // (leftAt IS NULL, userId matches the caller). Passed into SessionList so each
   // SessionCard can render the correct affordance without additional fetches.
@@ -86,7 +95,7 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId, cal
             </li>
           ))}
         </ul>
-        {detail.callerRole === 'gm' && (
+        {uiRole === 'gm' && (
           <>
             <InviteAffordance campaignId={detail.id} />
             <ArchiveAffordance campaignId={detail.id} status={detail.status} />
@@ -98,7 +107,7 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId, cal
         campaignId={detail.id}
         worldId={worldId}
         sessions={sessions}
-        callerRole={detail.callerRole ?? 'player'}
+        callerRole={uiRole}
         activeParticipantCharIds={activeParticipantCharIds}
         callerCharacters={callerCharacters}
       />

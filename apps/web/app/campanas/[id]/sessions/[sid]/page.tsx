@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { getActiveWorld } from '@/lib/active-world';
+import { getViewPreference } from '@/lib/role';
 import { AppShell } from '@/components/layout/app-shell';
 import { SessionDetailView } from '@/components/campanas/sessions/session-detail-view';
 import { DmControls } from '@/components/campanas/sessions/dm-controls';
@@ -86,15 +87,36 @@ export default async function SessionDetailPage({ params }: { params: RouteParam
   if (sessionDetail.campaignId !== id) notFound();
 
   // Resolve active world for callerRole — used for access derivation and AppShell.
-  const activeWorld = await getActiveWorld(token);
+  const [activeWorld, viewPref] = await Promise.all([
+    getActiveWorld(token),
+    getViewPreference(),
+  ]);
   const callerWorldRole = activeWorld?.callerRole ?? null;
 
   // REQ-DPPMB-DETAIL-02: derive access level.
-  const accessLevel = deriveAccessLevel(sessionDetail, user.id, callerWorldRole);
+  let accessLevel = deriveAccessLevel(sessionDetail, user.id, callerWorldRole);
+
+  // Preview-as-player: a GM (world-GM or this session's GM) who toggled dh:role=player
+  // should see the session as a player would — hide DmControls. Downgrade the gm access
+  // level to participant/campaign-member based on actual participation. The RoleSwitcher
+  // stays available (AppShell gets the real role) so they can toggle back. API enforcement
+  // is independent of this UI clamp.
+  const previewAsPlayer =
+    viewPref === 'player' && (callerWorldRole === 'gm' || sessionDetail.gmUserId === user.id);
+  if (previewAsPlayer && accessLevel === 'gm') {
+    const isParticipant = sessionDetail.participants.some(
+      (p) => p.userId === user.id && p.leftAt === null,
+    );
+    accessLevel = isParticipant ? 'participant' : 'campaign-member';
+  }
 
   // Resolve GM display name from campaign members list.
   const gmMember = detail.members.find((m) => m.userId === sessionDetail.gmUserId);
   const gmName = gmMember?.username ?? 'DM';
+
+  // AppShell role drives the RoleSwitcher visibility — must reflect the REAL role so a
+  // GM previewing as player can still toggle back to DM (don't use the clamped accessLevel).
+  const realIsGm = callerWorldRole === 'gm' || sessionDetail.gmUserId === user.id;
 
   return (
     <AppShell
@@ -102,7 +124,7 @@ export default async function SessionDetailPage({ params }: { params: RouteParam
       subtitle="SESIÓN"
       // REQ-DPPMB-DETAIL-07: back link to campaign.
       backHref={`/campanas/${id}`}
-      callerRole={accessLevel === 'gm' ? 'gm' : 'player'}
+      callerRole={realIsGm ? 'gm' : 'player'}
     >
       {/* B5: DmControls wired into the dmControlsSlot (REQ-DPPMB-CTRL-01, contract from B4). */}
       <SessionDetailView

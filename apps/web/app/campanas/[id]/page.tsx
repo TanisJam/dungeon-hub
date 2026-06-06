@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { getActiveWorld } from '@/lib/active-world';
+import { getViewPreference } from '@/lib/role';
 import { AppShell } from '@/components/layout/app-shell';
 import { CampanaDetailView, type CampanaSessionRow } from '@/components/campanas/campana-detail-view';
 import type { CampaignDetail } from '@/components/campanas/types';
@@ -33,7 +34,7 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
   // Parallelize sessions + roster + active world (ADR-A5: gate at call site).
   // REQ-DPPMB-LIST-08: include participants so callerRole active-char derivation works.
   // ADR-B4: roster fetched here (GET /characters?status=active); world-filtered in JoinSheet.
-  const [sessionsResult, activeWorld, rosterResult] = await Promise.all([
+  const [sessionsResult, activeWorld, rosterResult, viewPref] = await Promise.all([
     api
       .get<{ data: CampanaSessionRow[] }>(`/sessions?campaignId=${id}`, token)
       .catch(() => ({ data: [] as CampanaSessionRow[] })),
@@ -44,9 +45,16 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
         token,
       )
       .catch(() => ({ data: [] as Array<{ id: string; name: string; lineage: string; worldId: string }> })),
+    getViewPreference(),
   ]);
 
   const worldId = activeWorld?.id ?? detail.worldId;
+
+  // Toggle-aware role for UI affordances: a GM previewing as player (dh:role cookie)
+  // sees player affordances. The RoleSwitcher itself stays visible (AppShell.callerRole
+  // = real role) so they can toggle back. API enforcement is independent.
+  const effectiveRole: 'gm' | 'player' =
+    detail.callerRole === 'gm' ? (viewPref === 'player' ? 'player' : 'gm') : 'player';
 
   // Filter roster to this world (ADR-B4: client-side world filter).
   const callerCharacters = (rosterResult.data ?? [])
@@ -66,6 +74,7 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
         callerUserId={user.id}
         worldId={worldId}
         callerCharacters={callerCharacters}
+        effectiveRole={effectiveRole}
       />
     </AppShell>
   );

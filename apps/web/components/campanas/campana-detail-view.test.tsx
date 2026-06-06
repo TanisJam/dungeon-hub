@@ -146,6 +146,25 @@ describe('CampanaDetailView', () => {
     expect(screen.queryByRole('button', { name: 'Nueva sesión' })).toBeNull();
   });
 
+  // codex-knowledge gap (#1953): preview-as-player toggle hides DM affordances
+  // even when the real membership role is gm.
+  it('effectiveRole=player overrides a gm callerRole → no FAB, no archive affordance', () => {
+    render(
+      <CampanaDetailView
+        detail={{ ...baseDetail, callerRole: 'gm', status: 'active' }}
+        sessions={[scheduledSession]}
+        callerUserId="u-gm"
+        worldId="w-1"
+        callerCharacters={[]}
+        effectiveRole="player"
+      />,
+    );
+    const list = screen.getByTestId('session-list');
+    expect(list.getAttribute('data-caller-role')).toBe('player');
+    expect(screen.queryByRole('button', { name: 'Nueva sesión' })).toBeNull();
+    expect(screen.queryByText('Cerrar campaña')).toBeNull();
+  });
+
   // REQ-CARCH-WEB-BUTTON-01: archive/reopen affordance is GM-only (verify W2)
   it('REQ-CARCH-WEB-BUTTON-01: GM sees "Cerrar campaña" on an active campaign', () => {
     render(
