@@ -188,7 +188,7 @@ function DmGrantModal({
             <ItemTab characterId={characterId} worldId={worldId} onClose={onClose} />
           )}
           {activeTab === 'bestiary' && (
-            <BestiarioTab characterId={characterId} onClose={onClose} />
+            <BestiarioTab characterId={characterId} worldId={worldId} onClose={onClose} />
           )}
         </div>
       </div>
@@ -526,9 +526,11 @@ function ItemTab({
 
 function BestiarioTab({
   characterId,
+  worldId,
   onClose,
 }: {
   characterId: string;
+  worldId: string;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
@@ -556,14 +558,14 @@ function BestiarioTab({
     setSearching(true);
     const myReqId = ++reqIdRef.current;
     const handle = setTimeout(async () => {
-      const hits = await searchCompendiumMonsters(trimmed);
+      const hits = await searchCompendiumMonsters(worldId, trimmed);
       if (reqIdRef.current === myReqId) {
         setResults(hits);
         setSearching(false);
       }
     }, 200);
     return () => clearTimeout(handle);
-  }, [query]);
+  }, [query, worldId]);
 
   function handlePickMonster(monster: CompendiumMonsterHit) {
     setPicked(monster);

@@ -334,6 +334,10 @@ describe('DmGrantPanel — Bestiario tab (REQ-CK-WEB-01)', () => {
       { timeout: 1000 },
     );
 
+    // The endpoint requires a scope param — verify worldId is passed (regression
+    // guard: scopeless calls 400 → silent [], dead typeahead).
+    expect(searchCompendiumMonsters).toHaveBeenCalledWith('world-1', 'gob');
+
     // Pick the monster
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Goblin/i }));

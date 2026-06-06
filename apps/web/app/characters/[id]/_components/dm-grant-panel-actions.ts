@@ -27,11 +27,16 @@ export type CompendiumMonsterHit = {
 
 /**
  * Debounced monster typeahead for DmGrantPanel BestiarioTab.
- * Maps to GET /compendium/monsters?q=<term>&limit=50.
+ * Maps to GET /compendium/monsters?world=<id>&q=<term>&limit=50.
+ *
+ * The endpoint requires exactly one of ?campaign= or ?world= (resolveProfile XOR,
+ * compendium.ts). Passing neither returns 400 → the catch swallowed it into [],
+ * which made the Bestiario typeahead silently dead. Scoped by the character's world.
  *
  * REQ-CK-WEB-01 (spec #1626, character-codex)
  */
 export async function searchCompendiumMonsters(
+  worldId: string,
   query: string,
 ): Promise<CompendiumMonsterHit[]> {
   const trimmed = query.trim();
@@ -43,7 +48,7 @@ export async function searchCompendiumMonsters(
 
   type Envelope = { data: CompendiumMonsterHit[]; total: number };
   try {
-    const params = new URLSearchParams({ q: trimmed, limit: '50' });
+    const params = new URLSearchParams({ world: worldId, q: trimmed, limit: '50' });
     const res = await api.get<Envelope>(
       `/compendium/monsters?${params.toString()}`,
       session.access_token,
