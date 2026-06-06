@@ -155,6 +155,16 @@ export interface CompleteSessionBody {
     visibility?: 'public' | 'dm-only';
     tags?: string[];
   }>;
+  /**
+   * Optional bulk knowledge grants for active participants.
+   * codex-knowledge B-3: REQ-CK-UNLOCK-03 — processed inside the session complete tx.
+   */
+  knowledgeGrants?: Array<{
+    characterId: string;
+    kind: string;
+    refKey: string;
+    refSource: string;
+  }>;
 }
 
 interface SessionListResponse {

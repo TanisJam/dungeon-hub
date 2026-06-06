@@ -15,6 +15,7 @@ import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { FormSubmitButton } from '@/components/ui/form-submit-button';
 import type { EnrichedParticipant } from '@/app/campanas/[id]/sessions/actions';
 import { completeSession } from '@/app/campanas/[id]/sessions/actions';
+import { KnowledgeGrantSection, type KnowledgeGrant, type CandidateEntity } from '@/components/codex/knowledge-grant-section';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,6 +131,11 @@ export function CompleteForm({
   const [goldPerPlayer, setGoldPerPlayer] = useState('');
   const [items, setItems] = useState<ItemRow[]>([]);
   const [worldChanges, setWorldChanges] = useState<WorldChangeRow[]>([]);
+  const [knowledgeGrants, setKnowledgeGrants] = useState<KnowledgeGrant[]>([]);
+
+  // Candidate entities for knowledge grants — Slice 1: DM manually adds slugs.
+  // TODO: auto-populate from session_events in a follow-up slice (codex-knowledge #1946).
+  const candidateEntities: CandidateEntity[] = [];
 
   const [submitting, setSubmitting] = useState(false);
   const [topLevelError, setTopLevelError] = useState<string | null>(null);
@@ -225,6 +231,16 @@ export function CompleteForm({
       ...(summary.trim() ? { summary: summary.trim() } : {}),
       ...(Object.keys(rewards).length > 0 ? { rewards } : {}),
       ...(validWorldChanges.length > 0 ? { worldChanges: validWorldChanges } : {}),
+      // codex-knowledge B-3: optional knowledge grants bulk-unlock.
+      // REQ-CK-UNLOCK-03: knowledgeGrants[] inside the complete tx.
+      ...(knowledgeGrants.length > 0 ? {
+        knowledgeGrants: knowledgeGrants.map((g) => ({
+          characterId: g.characterId,
+          kind: g.kind,
+          refKey: g.refKey,
+          refSource: g.refSource,
+        })),
+      } : {}),
     };
 
     const result = await completeSession(sessionId, campaignId, body);
@@ -524,6 +540,13 @@ export function CompleteForm({
             </div>
           ))}
         </section>
+
+        {/* ── Conocimiento a otorgar — codex-knowledge B-3 REQ-CK-UNLOCK-08 ── */}
+        <KnowledgeGrantSection
+          participants={activeParticipants}
+          candidateEntities={candidateEntities}
+          onGrantsChange={setKnowledgeGrants}
+        />
 
         {/* ── Submit — REQ-DPPMB-COMPLETE-07: sticky at bottom via V3Sheet overflow ── */}
         <div className="sticky bottom-0 bg-surface py-2">
