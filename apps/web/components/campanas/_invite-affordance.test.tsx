@@ -34,6 +34,10 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -45,6 +49,7 @@ const baseDetail: CampaignDetail = {
   worldId: 'w-1',
   createdAt: '2026-01-01T00:00:00Z',
   memberRole: 'gm',
+  status: 'active',
   callerRole: 'gm',
   playersCount: 3,
   sessionsCount: 7,

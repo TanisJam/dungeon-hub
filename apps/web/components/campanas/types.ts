@@ -7,6 +7,7 @@ export type CampaignSummary = {
   worldId: string;
   createdAt: string;
   memberRole: CampaignMemberRole;
+  status: 'active' | 'archived';
   playersCount: number;
   sessionsCount: number;
   nextSession: string | null;

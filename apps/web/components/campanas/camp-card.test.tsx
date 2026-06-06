@@ -10,6 +10,7 @@ const baseCampaign: CampaignSummary = {
   worldId: 'world-1',
   createdAt: '2026-01-01T00:00:00Z',
   memberRole: 'player',
+  status: 'active',
   playersCount: 5,
   sessionsCount: 4,
   nextSession: '2026-06-01T21:30:00Z',

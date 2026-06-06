@@ -36,6 +36,7 @@ interface UserCampaignRow {
   worldId: string;
   createdAt: string;
   memberRole: 'gm' | 'player';
+  status: 'active' | 'archived';
   playersCount: number;
   sessionsCount: number;
   nextSession: string | null;
@@ -242,7 +243,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
     : Promise.resolve(null));
 
   const campaigns = campaignsResult?.data ?? [];
-  const gmCampaign = campaigns.find((c) => c.memberRole === 'gm') ?? null;
+  const gmCampaign = campaigns.find((c) => c.memberRole === 'gm' && c.status !== 'archived') ?? null;
 
   // Fetch pending fichas list if we have a GM campaign with a worldId
   let fichasData: PendingFichaSummary[] = [];

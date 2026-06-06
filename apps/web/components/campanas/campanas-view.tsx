@@ -9,15 +9,20 @@ type Props = {
 };
 
 export function CampanasView({ role, campaigns }: Props) {
-  const player = campaigns.filter((c) => c.memberRole === 'player');
-  const dm = campaigns.filter((c) => c.memberRole === 'gm');
+  const playerActive = campaigns.filter((c) => c.memberRole === 'player' && c.status !== 'archived');
+  const playerArchived = campaigns.filter((c) => c.memberRole === 'player' && c.status === 'archived');
+  const dmActive = campaigns.filter((c) => c.memberRole === 'gm' && c.status !== 'archived');
+  const dmArchived = campaigns.filter((c) => c.memberRole === 'gm' && c.status === 'archived');
+
+  // All archived across both roles (for the unified Archivadas section)
+  const archived = [...dmArchived, ...playerArchived];
 
   if (role === 'dm') {
     return (
       <div className="flex flex-col gap-4">
-        <SectionHead title="Tus campañas como DM" meta={dm.length} />
+        <SectionHead title="Tus campañas como DM" meta={dmActive.length} />
         <div className="flex flex-col gap-3">
-          {dm.map((c) => (
+          {dmActive.map((c) => (
             <V3CampCard key={c.id} campaign={c} />
           ))}
         </div>
@@ -25,6 +30,16 @@ export function CampanasView({ role, campaigns }: Props) {
           <span className="text-lg text-accent">+</span>
           <span>Iniciar campaña nueva</span>
         </DashedCTA>
+        {archived.length > 0 ? (
+          <section className="mt-2">
+            <SectionHead title="Archivadas" meta={archived.length} />
+            <div className="mt-3 flex flex-col gap-3">
+              {archived.map((c) => (
+                <V3CampCard key={c.id} campaign={c} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -32,18 +47,28 @@ export function CampanasView({ role, campaigns }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <section>
-        <SectionHead title="Donde jugás" meta={`${player.length} activas`} />
+        <SectionHead title="Donde jugás" meta={`${playerActive.length} activas`} />
         <div className="mt-3 flex flex-col gap-3">
-          {player.map((c) => (
+          {playerActive.map((c) => (
             <V3CampCard key={c.id} campaign={c} />
           ))}
         </div>
       </section>
-      {dm.length > 0 ? (
+      {dmActive.length > 0 ? (
         <section>
-          <SectionHead title="Donde dirigís" meta={dm.length} />
+          <SectionHead title="Donde dirigís" meta={dmActive.length} />
           <div className="mt-3 flex flex-col gap-3">
-            {dm.map((c) => (
+            {dmActive.map((c) => (
+              <V3CampCard key={c.id} campaign={c} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {archived.length > 0 ? (
+        <section>
+          <SectionHead title="Archivadas" meta={archived.length} />
+          <div className="mt-3 flex flex-col gap-3">
+            {archived.map((c) => (
               <V3CampCard key={c.id} campaign={c} />
             ))}
           </div>

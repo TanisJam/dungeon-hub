@@ -2,6 +2,7 @@ import { SectionHead } from '@/components/ui/section-head';
 import { Pill } from '@/components/ui/pill';
 import type { CampaignDetail, CampaignMemberRole } from './types';
 import { InviteAffordance } from './_invite-affordance';
+import { ArchiveAffordance } from './_archive-affordance';
 import { SessionList } from '@/components/campanas/sessions/session-list';
 import type { RosterCharacter } from '@/components/campanas/sessions/join-sheet';
 
@@ -85,7 +86,12 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId, cal
             </li>
           ))}
         </ul>
-        {detail.callerRole === 'gm' && <InviteAffordance campaignId={detail.id} />}
+        {detail.callerRole === 'gm' && (
+          <>
+            <InviteAffordance campaignId={detail.id} />
+            <ArchiveAffordance campaignId={detail.id} status={detail.status} />
+          </>
+        )}
       </section>
 
       <SessionList
