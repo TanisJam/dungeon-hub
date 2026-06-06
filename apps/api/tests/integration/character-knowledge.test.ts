@@ -309,6 +309,11 @@ describe('character knowledge routes', () => {
 
       // knownCount matches the actual returned count (player view: rows = known only)
       expect(body.rows).toHaveLength(body.knownCount);
+
+      // total = gated universe (known set), NOT the full catalog — so the web's
+      // "Cargar más" (hasMore = offset < total) stops once all known are loaded.
+      // #1953: a catalog-sized total here would make load-more fetch nothing forever.
+      expect(body.total).toBe(body.knownCount);
     });
 
     it('Player view: does NOT include unknown monsters (gate enforced)', async () => {

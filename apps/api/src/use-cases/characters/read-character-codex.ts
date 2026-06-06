@@ -117,7 +117,6 @@ async function readMonstersKind(
   const knownSet = new Set(knownRows.map((r) => `${r.refKey}|${r.refSource}`));
 
   const defaulted = isMonsterKnownByDefault();
-  const total = allMonsters.length;
   let knownCount = 0;
 
   const rows: CodexMonsterRow[] = [];
@@ -139,6 +138,12 @@ async function readMonstersKind(
       }
     }
   }
+
+  // total = the gated universe the caller can page through (DM: q-filtered catalog;
+  // player: known q-filtered entries). CodexList uses it ONLY for load-more
+  // (hasMore = offset < total), so it MUST match the gated set — using the raw
+  // catalog count here would make a player's "Cargar más" fetch nothing forever.
+  const total = rows.length;
 
   // Paginate the gated rows only when the caller explicitly requests it (limit/offset).
   // Callers that omit both get the full gated set unchanged (backward compatible).
