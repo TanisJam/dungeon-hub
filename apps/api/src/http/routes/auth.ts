@@ -53,6 +53,10 @@ export const authRoute: FastifyPluginAsync = async (app) => {
         discordId: users.discordId,
         discordUsername: users.discordUsername,
         canImpersonate: users.canImpersonate,
+        // codex-knowledge B-4 gap closure: expose devMode so account-level UI
+        // (DevModeToggle on /dashboard) can render the current value server-side.
+        // REQ-CK-DEV-03 (read side). Toggle writes via POST /users/me/dev-mode.
+        devMode: users.devMode,
       })
       .from(users)
       .where(eq(users.id, userId))
