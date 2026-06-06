@@ -57,6 +57,11 @@ vi.mock('@/lib/active-character', () => ({
   })),
 }));
 
+// dh:role view-preference (preview-as-player toggle). Defaults to null (no override).
+vi.mock('@/lib/role', () => ({
+  getViewPreference: vi.fn(() => Promise.resolve(null)),
+}));
+
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(() => { throw new Error('redirect'); }),
   notFound: vi.fn(() => { throw new Error('notFound'); }),
@@ -186,6 +191,31 @@ describe('CodexKindPage — routing split (B-1)', () => {
 
     expect(screen.getByTestId('codex-list')).toBeTruthy();
     expect(screen.queryByTestId('compendium-list')).toBeNull();
+  });
+
+  // ── Preview-as-player toggle forwarded as ?view=player (#1953) ────────────
+
+  it('forwards ?view=player to the knowledge endpoint when dh:role toggle is player', async () => {
+    const { getViewPreference } = await import('@/lib/role');
+    vi.mocked(getViewPreference).mockResolvedValueOnce('player');
+    vi.mocked(api.get).mockResolvedValueOnce(KNOWLEDGE_RESPONSE);
+
+    const element = await CodexKindPage({ params: Promise.resolve({ kind: 'monsters' }) });
+    render(element as React.ReactElement);
+
+    const url = vi.mocked(api.get).mock.calls[0]![0] as string;
+    expect(url).toContain('/characters/char-active/knowledge/monsters');
+    expect(url).toContain('view=player');
+  });
+
+  it('omits ?view= when dh:role toggle is not player (GM default = full view)', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce(KNOWLEDGE_RESPONSE);
+
+    const element = await CodexKindPage({ params: Promise.resolve({ kind: 'monsters' }) });
+    render(element as React.ReactElement);
+
+    const url = vi.mocked(api.get).mock.calls[0]![0] as string;
+    expect(url).not.toContain('view=');
   });
 
   // ── Empty state (REQ-CK-GATE-09) ──────────────────────────────────────────
