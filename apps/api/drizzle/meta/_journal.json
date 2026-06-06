@@ -281,6 +281,13 @@
       "when": 1780800000000,
       "tag": "0040_codex_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1780900000000,
+      "tag": "0041_bitacora_pages",
+      "breakpoints": true
     }
   ]
 }

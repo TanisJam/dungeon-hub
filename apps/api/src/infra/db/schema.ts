@@ -1418,6 +1418,65 @@ export const guildContributions = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// bitacora_pages — player-authored personal bitácora pages (bitacora-personal W2)
+//
+// Mutable personal notes. Each page can have an optional title, a required body,
+// an optional list of entity refs (kind='monster' only this wave), and tags
+// (⊆ KNOWLEDGE_TAGS vocabulary).
+//
+// UNLIKE guild_contributions (append-only), these pages are fully editable:
+// title/body/refs/tags all mutable via PATCH. Personal pages belong to the player.
+//
+// refs: JSONB array of { kind, refKey, refSource }. Validated at write.
+// tags: text[] GIN-indexed for ?tag= filter. ⊆ KNOWLEDGE_TAGS.
+// visibility: 'personal' (default) | 'guild' | 'canonical' — W3 promotion path.
+// world_id: scopes future guild-share; cascades on world delete (mirrors character_knowledge).
+//
+// bitacora-personal SDD spec #1974, design #1975 §ADR-1.
+// ---------------------------------------------------------------------------
+export const bitacoraPages = pgTable(
+  'bitacora_pages',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    /** Optional title. Free-form notes may be untitled. */
+    title: text('title'),
+    /** Narrative body. Required column; empty string on insert is allowed by DB but rejected by domain. */
+    body: text('body').notNull().default(''),
+    /**
+     * JSONB array of { kind, refKey, refSource }.
+     * Only kind='monster' validated this wave. Stored tolerantly; validated at write.
+     */
+    refs: jsonb('refs').notNull().default([]),
+    /**
+     * text[] ⊆ KNOWLEDGE_TAGS. GIN-indexed for ?tag= filter.
+     * Validated at write by domain validateBitacoraPage.
+     */
+    tags: text('tags').array().notNull().default(sql`'{}'`),
+    /**
+     * CLOSED enum: 'personal' (default) | 'guild' | 'canonical'.
+     * W3 guild-share promotion path. Only 'personal' used this wave.
+     */
+    visibility: text('visibility', { enum: ['personal', 'guild', 'canonical'] })
+      .notNull()
+      .default('personal'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Hot-path: list a character's pages
+    index('idx_bp_character').on(t.characterId),
+    // Tag filter in SQL
+    index('idx_bp_tags').using('gin', t.tags),
+  ],
+);
+
 export const characterConcentration = pgTable(
   'character_concentration',
   {
