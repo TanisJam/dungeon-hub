@@ -174,6 +174,80 @@ describe('applySeal — REQ-CK-NOTE-07 (pure function, no mutation, FORK 4 #1944
   });
 });
 
+// ── validateContribution — tag validation (REQ-GREM-CT-02) ───────────────────
+
+describe('validateContribution — tags validation (REQ-GREM-CT-02, bitacora-gremio W4)', () => {
+  // PHB reference: N/A — West Marches knowledge model (design principle, not PHB rule).
+  // Tags ⊆ KNOWLEDGE_TAGS enforced in domain (pure function — strict TDD, RED first).
+  // Issue code symmetry: CONTRIBUTION_TAG_INVALID / CONTRIBUTION_TAG_DUPLICATE (mirrors
+  // BITACORA_PAGE_TAG_INVALID / DUPLICATE pattern from bitacora-personal W2).
+
+  const validInput = {
+    contributionType: 'rumor',
+    body: 'Spotted orcs at the old fort',
+    visibility: 'guild' as const,
+  };
+
+  // Scenario 1: valid tags → { ok: true }
+  it("tags: ['lore', 'monsters'] → { ok: true }", () => {
+    const result = validateContribution({ ...validInput, tags: ['lore', 'monsters'] });
+    expect(result).toEqual({ ok: true });
+  });
+
+  // Scenario 2: invalid tag → CONTRIBUTION_TAG_INVALID with got field
+  it("tags: ['invalid-tag'] → { ok: false, CONTRIBUTION_TAG_INVALID got: 'invalid-tag' }", () => {
+    const result = validateContribution({ ...validInput, tags: ['invalid-tag'] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: 'CONTRIBUTION_TAG_INVALID', got: 'invalid-tag' }),
+      );
+    }
+  });
+
+  // Scenario 3: empty tags array → { ok: true }
+  it('tags: [] (empty) → { ok: true }', () => {
+    const result = validateContribution({ ...validInput, tags: [] });
+    expect(result).toEqual({ ok: true });
+  });
+
+  // Scenario 4: duplicate tags → CONTRIBUTION_TAG_DUPLICATE with got field
+  it("tags: ['lore', 'lore'] → { ok: false, CONTRIBUTION_TAG_DUPLICATE got: 'lore' }", () => {
+    const result = validateContribution({ ...validInput, tags: ['lore', 'lore'] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: 'CONTRIBUTION_TAG_DUPLICATE', got: 'lore' }),
+      );
+    }
+  });
+
+  // Scenario 5: no tags field → { ok: true } (tags optional)
+  it('no tags field → { ok: true } (tags optional)', () => {
+    const result = validateContribution({ ...validInput });
+    expect(result).toEqual({ ok: true });
+  });
+
+  // Scenario 6: all valid KNOWLEDGE_TAGS accepted
+  it.each(['monsters', 'locations', 'npcs', 'factions', 'lore', 'items', 'spells'] as const)(
+    "tag='%s' is valid",
+    (tag) => {
+      expect(validateContribution({ ...validInput, tags: [tag] })).toEqual({ ok: true });
+    },
+  );
+
+  // Scenario 7: mixed valid + invalid → only the invalid one emits CONTRIBUTION_TAG_INVALID
+  it("tags: ['lore', 'unknown'] → ok: false, CONTRIBUTION_TAG_INVALID got: 'unknown'", () => {
+    const result = validateContribution({ ...validInput, tags: ['lore', 'unknown'] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: 'CONTRIBUTION_TAG_INVALID', got: 'unknown' }),
+      );
+    }
+  });
+});
+
 // ── isVisibleTo ───────────────────────────────────────────────────────────────
 
 describe('isVisibleTo — REQ-CK-NOTE-08 (FORK 4 #1944, visibility semantics)', () => {

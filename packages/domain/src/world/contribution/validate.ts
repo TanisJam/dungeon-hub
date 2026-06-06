@@ -12,7 +12,10 @@
  * // DB-as-runtime-SoT lands (codex-knowledge OQ1 resolution #1946).
  *
  * REQ-CK-NOTE-06, REQ-CK-NOTE-07, REQ-CK-NOTE-08, REQ-CK-DOMAIN-01.
+ * REQ-GREM-CT-02: tags validation (bitacora-gremio W4).
  */
+
+import { isKnowledgeTag } from '../../world/codex/tags.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,6 +77,9 @@ const VALID_VISIBILITY: ReadonlySet<string> = new Set<ContributionVisibility>([
  * - contributionType must be in the seed list (TODO #513)
  * - visibility must be personal|guild|canonical
  * - refEntityKind and refEntityId must both be present or both absent
+ * - tags must be ⊆ KNOWLEDGE_TAGS (REQ-GREM-CT-02, bitacora-gremio W4)
+ * - tags must have no duplicates (CONTRIBUTION_TAG_DUPLICATE mirrors BITACORA_PAGE_TAG_DUPLICATE)
+ * - tags are WRITE-AT-CREATE ONLY — append-only invariant (ADR-2)
  */
 export function validateContribution(input: {
   contributionType: string;
@@ -81,6 +87,8 @@ export function validateContribution(input: {
   refEntityKind?: string | null;
   refEntityId?: string | null;
   visibility: string;
+  /** Optional tags array. Each tag must be in KNOWLEDGE_TAGS. No duplicates. */
+  tags?: string[];
 }): ValidateContributionResult {
   const issues: ContributionIssue[] = [];
 
@@ -115,6 +123,23 @@ export function validateContribution(input: {
       code: 'CONTRIBUTION_REF_PARTIAL',
       message: 'refEntityKind and refEntityId must both be set or both absent',
     });
+  }
+
+  // tags ⊆ KNOWLEDGE_TAGS, no duplicates (REQ-GREM-CT-02, bitacora-gremio W4)
+  if (input.tags !== undefined) {
+    const seen = new Set<string>();
+    for (const tag of input.tags) {
+      // Duplicate check (mirrors BITACORA_PAGE_TAG_DUPLICATE pattern)
+      if (seen.has(tag)) {
+        issues.push({ code: 'CONTRIBUTION_TAG_DUPLICATE', got: tag });
+      } else {
+        seen.add(tag);
+      }
+      // Membership check — tag must be in KNOWLEDGE_TAGS vocabulary
+      if (!isKnowledgeTag(tag)) {
+        issues.push({ code: 'CONTRIBUTION_TAG_INVALID', got: tag });
+      }
+    }
   }
 
   if (issues.length > 0) {
