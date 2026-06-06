@@ -461,6 +461,10 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     // REQ-SEQUIP-08, ADR-4: category picker source for equipment wizard step.
     // Maps EquipmentType values to JSONB / type-column predicates.
     category: EquipmentTypeEnum.optional(),
+    // REQ-MERC-API-01, ADR-1: optional mundane filter. false → exclude magic items.
+    // true or omitted → no predicate (all items, backward-compatible).
+    // Only "true"/"false" strings coerce to boolean; other strings fail Zod validation.
+    magic: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   });
   app.get('/compendium/items', { preHandler: app.authenticate }, async (request, reply) => {
     const campaign = await resolveProfile(request, reply);
@@ -469,7 +473,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
     }
-    const { limit, offset, q, type, category } = parsed.data;
+    const { limit, offset, q, type, category, magic } = parsed.data;
 
     const filter = profileFilterConditions({
       profile: campaign.rulesProfile,
@@ -490,6 +494,24 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
       if (spec.jsonbCondition) {
         where.push(sql.raw(spec.jsonbCondition));
       }
+    }
+    if (magic === false) {
+      // REQ-MERC-API-01, ADR-1: MUNDANE predicate.
+      // Mirrors the inverse of deriveV3Type 'magic' heuristic:
+      //   - rarity NOT in magic tiers (stored as "very rare" WITH SPACE in raw JSONB)
+      //   - type NOT in magic type codes (RD/ST/WD/RG)
+      //   - reqAttune absent
+      // 'none'/'varies'/missing rarity are retained (normalizeRarity → null = mundane).
+      // Tools (T/AT/GS/INS), trade goods (TG), generic variants (GV) have no magic
+      // rarity or code — retained. Backward-compat: omitted or magic=true → no predicate.
+      where.push(
+        sql.raw(
+          `( (data->>'rarity') IS NULL` +
+          ` OR (data->>'rarity') NOT IN ('common','uncommon','rare','very rare','legendary','artifact') )` +
+          ` AND (type IS NULL OR type NOT IN ('RD','ST','WD','RG'))` +
+          ` AND (data->>'reqAttune') IS NULL`,
+        ),
+      );
     }
     const conds = and(...where)!;
 
