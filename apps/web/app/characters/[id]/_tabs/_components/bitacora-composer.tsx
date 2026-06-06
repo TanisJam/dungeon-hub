@@ -16,22 +16,13 @@
  */
 
 import { useState } from 'react';
+import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { V3Sheet } from '@/components/ui';
 import { createBitacoraPage, updateBitacoraPage } from '../../actions';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-const KNOWLEDGE_TAGS = [
-  'monsters',
-  'locations',
-  'npcs',
-  'factions',
-  'lore',
-  'items',
-  'spells',
-] as const;
 
 export interface KnownMonster {
   slug: string;

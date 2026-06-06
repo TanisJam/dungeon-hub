@@ -13,18 +13,9 @@
  */
 
 import { useState } from 'react';
+import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { BitacoraComposer, type KnownMonster, type BitacoraPageRef } from './bitacora-composer';
 import { deleteBitacoraPage } from '../../actions';
-
-const KNOWLEDGE_TAGS = [
-  'monsters',
-  'locations',
-  'npcs',
-  'factions',
-  'lore',
-  'items',
-  'spells',
-] as const;
 
 export interface BitacoraPageItem {
   id: string;
