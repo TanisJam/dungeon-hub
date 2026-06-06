@@ -16,6 +16,8 @@
 
 import { useState } from 'react';
 import { MonsterRowView } from '@/app/compendium/[category]/_components/row-views';
+import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
+import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
 import { BitacoraComposer, type BitacoraPageRef } from './bitacora-composer';
 
 export interface KnownMonsterHit {
@@ -41,12 +43,15 @@ interface ConocidosViewProps {
   characterId: string;
   monsters: KnownMonsterHit[];
   pages: ConocidosPageItem[];
+  worldId: string;
+  accessToken: string;
 }
 
-export function ConocidosView({ characterId, monsters, pages }: ConocidosViewProps) {
+export function ConocidosView({ characterId, monsters, pages, worldId, accessToken }: ConocidosViewProps) {
   const [selectedMonster, setSelectedMonster] = useState<KnownMonsterHit | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [prefilledRef, setPrefilledRef] = useState<BitacoraPageRef | undefined>(undefined);
+  const [statblockOpen, setStatblockOpen] = useState(false);
 
   // Build a quick lookup: which monster slugs have attached pages
   const monsterSlugsWithPages = new Set(
@@ -92,10 +97,28 @@ export function ConocidosView({ characterId, monsters, pages }: ConocidosViewPro
           <span>Conocidos</span>
         </button>
 
-        {/* Monster header */}
-        <div className="rounded-xl border border-line bg-surface px-4 py-3">
+        {/* Monster header — tap to open the full statblock (REQ: "más detalles") */}
+        <button
+          type="button"
+          onClick={() => setStatblockOpen(true)}
+          className="w-full text-left rounded-xl border border-line bg-surface px-4 py-3 hover:bg-paper transition-colors"
+          aria-label={`Ver ficha completa de ${selectedMonster.name}`}
+        >
           <MonsterRowView row={{ ...selectedMonster, crNumeric: selectedMonster.crNumeric ?? null }} />
-        </div>
+          <span className="mt-1 block text-xs font-medium text-accent">Ver ficha completa →</span>
+        </button>
+
+        {/* Full statblock — reuses the compendium DetailSheet (fetches GET /compendium/monsters/:slug). */}
+        <DetailSheet
+          open={statblockOpen}
+          category="monsters"
+          row={selectedMonster}
+          scope={{ world: worldId }}
+          worldId={worldId}
+          accessToken={accessToken}
+          config={CATEGORY_CONFIG.monsters}
+          onClose={() => setStatblockOpen(false)}
+        />
 
         {/* Mis notas — REQ-BP-WEB-05 */}
         <div>

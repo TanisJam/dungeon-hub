@@ -14,6 +14,8 @@
 
 import { useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
+import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
+import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
 import { BitacoraComposer, type KnownMonster, type BitacoraPageRef } from './bitacora-composer';
 import { deleteBitacoraPage } from '../../actions';
 
@@ -31,15 +33,18 @@ interface PaginasViewProps {
   characterId: string;
   pages: BitacoraPageItem[];
   knownMonsters: KnownMonster[];
+  worldId: string;
+  accessToken: string;
 }
 
-export function PaginasView({ characterId, pages, knownMonsters }: PaginasViewProps) {
+export function PaginasView({ characterId, pages, knownMonsters, worldId, accessToken }: PaginasViewProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editPage, setEditPage] = useState<BitacoraPageItem | null>(null);
   const [detailPage, setDetailPage] = useState<BitacoraPageItem | null>(null);
   const [localPages, setLocalPages] = useState<BitacoraPageItem[]>(pages);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [statblockOpen, setStatblockOpen] = useState(false);
 
   const filteredPages = activeTag
     ? localPages.filter((p) => p.tags.includes(activeTag))
@@ -100,9 +105,14 @@ export function PaginasView({ characterId, pages, knownMonsters }: PaginasViewPr
             <h2 className="text-base font-semibold text-ink">{detailPage.title}</h2>
           )}
           {monster && (
-            <p className="text-xs text-ink-mute font-medium">
-              Monstruo: <span className="text-ink">{monster.name}</span>
-            </p>
+            <button
+              type="button"
+              onClick={() => setStatblockOpen(true)}
+              className="self-start rounded-md border border-line bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink hover:bg-paper transition-colors"
+              aria-label={`Ver ficha de ${monster.name}`}
+            >
+              Monstruo: <span className="text-accent">{monster.name}</span> →
+            </button>
           )}
           <p className="text-sm text-ink whitespace-pre-wrap">{detailPage.body}</p>
           {detailPage.tags.length > 0 && (
@@ -135,6 +145,20 @@ export function PaginasView({ characterId, pages, knownMonsters }: PaginasViewPr
             </button>
           </div>
         </div>
+
+        {/* Linked monster statblock — reuses the compendium DetailSheet (Bug #3). */}
+        {monster && (
+          <DetailSheet
+            open={statblockOpen}
+            category="monsters"
+            row={monster}
+            scope={{ world: worldId }}
+            worldId={worldId}
+            accessToken={accessToken}
+            config={CATEGORY_CONFIG.monsters}
+            onClose={() => setStatblockOpen(false)}
+          />
+        )}
 
         <BitacoraComposer
           characterId={characterId}

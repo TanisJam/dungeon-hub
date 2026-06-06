@@ -50,7 +50,7 @@ export interface NotasTabProps {
 
 export async function NotasTab({
   characterId,
-  worldId: _worldId,
+  worldId,
   accessToken,
   callerRole: _callerRole,
   sub,
@@ -125,12 +125,16 @@ export async function NotasTab({
           characterId={characterId}
           monsters={knownOnly}
           pages={pages}
+          worldId={worldId}
+          accessToken={accessToken}
         />
       ) : (
         <PaginasView
           characterId={characterId}
           pages={pages}
           knownMonsters={knownMonstersForComposer}
+          worldId={worldId}
+          accessToken={accessToken}
         />
       )}
     </div>
