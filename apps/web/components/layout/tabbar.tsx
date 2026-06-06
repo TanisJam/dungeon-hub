@@ -7,16 +7,18 @@ import { Icon, type IconName } from '@/components/ui/icon';
 type Tab = { key: string; label: string; icon: IconName; href: string };
 
 /**
- * World-scoped 4-tab navigation (Biblioteca W1 — REQ-NAV-01, REQ-NAV-02, ADR-1).
- * Mesa removed; slot freed for future Mercado/Bitácora wave.
- * Codex renamed Biblioteca; href changed to /compendium (direct, no dispatcher).
+ * World-scoped 5-tab navigation (Mercado W3 — REQ-NAV-01, REQ-NAV-02, REQ-MERC-NAV-01, ADR-2).
+ * Mesa removed W1; Mercado added W3 (items-as-shop, fills the reserved slot).
+ * Codex renamed Biblioteca; href /compendium (direct, no dispatcher).
  * Static tabs — not role-split. Role still affects content per-page.
- * @375px layout: 93px/column (grid-cols-4). Better tap targets than 75px (grid-cols-5).
+ * @375px layout: 75px/column (grid-cols-5). Touch height ≥44px preserved (pt-2 pb-1 + icon 20px + label 9px).
+ * Tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora (REQ-MERC-NAV-01).
  */
 const WORLD_TABS: Tab[] = [
   { key: 'inicio',    label: 'Inicio',    icon: 'home',   href: '/inicio' },
   { key: 'mapa',      label: 'Mapa',      icon: 'feather', href: '/mapa' },
   { key: 'biblioteca', label: 'Biblioteca', icon: 'book',  href: '/compendium' },
+  { key: 'mercado',   label: 'Mercado',   icon: 'bag',    href: '/mercado' },
   { key: 'cronica',   label: 'Bitácora',  icon: 'scroll', href: '/cronica' },
 ];
 
@@ -26,7 +28,7 @@ export function TabBar() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 px-1.5 pt-2 bg-paper/95 backdrop-blur-md border-t border-line"
+      className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 px-1.5 pt-2 bg-paper/95 backdrop-blur-md border-t border-line"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 18px)' }}
     >
       {WORLD_TABS.map((tab) => {

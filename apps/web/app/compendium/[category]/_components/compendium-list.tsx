@@ -30,6 +30,12 @@ interface CompendiumListProps {
   accessToken: string;
   initialRows: unknown[];
   total: number;
+  /**
+   * Extra per-call filters merged into activeFilters and forwarded to searchCompendium.
+   * Callers that do not pass this prop receive the current behavior unchanged.
+   * REQ-MERC-SURF-01, ADR-3: Mercado passes { magic: 'false' } to pin mundane-only.
+   */
+  extraFilters?: Record<string, string>;
   // NOTE: config is NOT in props — resolved client-side from CATEGORY_CONFIG to avoid
   // serialization of function components across the Server/Client boundary.
 }
@@ -47,6 +53,7 @@ export function CompendiumList({
   accessToken,
   initialRows,
   total: initialTotal,
+  extraFilters = {},
 }: CompendiumListProps) {
   // Resolve config client-side — avoids passing function components as props (RSC boundary).
   const config = CATEGORY_CONFIG[category];
@@ -62,14 +69,21 @@ export function CompendiumList({
   const [loadingMore, setLoadingMore] = useState(false);
   const reqIdRef = useRef(0);
 
-  // Active filters passed to searchCompendium (currently items ?type= only).
-  const activeFilters: Record<string, string> = typeFilter ? { type: typeFilter } : {};
+  // Active filters passed to searchCompendium: extra pinned filters (e.g. magic=false
+  // from /mercado) merged with dynamic per-request filters (e.g. type picker).
+  // extraFilters are stable (from props) and always included; typeFilter is transient.
+  const activeFilters: Record<string, string> = {
+    ...extraFilters,
+    ...(typeFilter ? { type: typeFilter } : {}),
+  };
 
   // Debounced search — 200ms, stale-drop. Clone of Picker pattern.
   // Re-runs on query OR type-filter change.
+  // extraFilters are stable from props and always forwarded (e.g. magic=false from Mercado).
   useEffect(() => {
     const trimmed = query.trim();
-    // Only fall back to the SSR rows when there is NEITHER a query NOR a filter.
+    // Fall back to SSR rows when there is NEITHER a query NOR a dynamic filter.
+    // extraFilters are always active (pinned from caller) — they do NOT block SSR fallback.
     if (trimmed.length === 0 && !typeFilter) {
       setResults(initialRows);
       setTotalCount(initialTotal);
@@ -86,7 +100,7 @@ export function CompendiumList({
         scope,
         trimmed,
         0,
-        typeFilter ? { type: typeFilter } : {},
+        activeFilters,
       );
       if (reqIdRef.current === myReqId) {
         setResults(res.rows);
@@ -96,9 +110,9 @@ export function CompendiumList({
       }
     }, 200);
     return () => clearTimeout(handle);
-  // scope is a stable object reference passed from RSC — serialized by value.
+  // scope and extraFilters are stable object references passed from RSC — serialized by value.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, typeFilter, category, JSON.stringify(scope), initialRows, initialTotal]);
+  }, [query, typeFilter, category, JSON.stringify(scope), JSON.stringify(extraFilters), initialRows, initialTotal]);
 
   async function handleLoadMore() {
     if (loadingMore || offset >= totalCount) return;

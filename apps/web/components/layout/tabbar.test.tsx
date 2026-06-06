@@ -1,6 +1,6 @@
 /**
- * TabBar — Biblioteca W1 component tests (REQ-NAV-01, REQ-NAV-02)
- * Verifies the 4-tab world-scoped navigation layout after Mesa removal.
+ * TabBar — 5-tab world-scoped navigation tests (REQ-NAV-01, REQ-MERC-NAV-01).
+ * Updated for mercado Wave 3: 4-tab → 5-tab (Inicio·Mapa·Biblioteca·Mercado·Bitácora).
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -20,15 +20,15 @@ vi.mock('next/navigation', () => ({
 
 import { TabBar } from './tabbar';
 
-describe('TabBar — 4-tab world nav (REQ-NAV-01, REQ-NAV-02)', () => {
+describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/inicio');
   });
 
-  it('(a) renders exactly 4 Link elements', () => {
+  it('(a) renders exactly 5 Link elements', () => {
     render(<TabBar />);
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
   });
 
   it('(b) active tab determined by pathname — /inicio marks Inicio as active', () => {
@@ -47,9 +47,9 @@ describe('TabBar — 4-tab world nav (REQ-NAV-01, REQ-NAV-02)', () => {
     expect(activeLink?.getAttribute('href')).toBe('/mapa');
   });
 
-  it('(c) each label text is non-empty — new labels: Inicio, Mapa, Biblioteca, Bitácora', () => {
+  it('(c) all 5 labels are present: Inicio, Mapa, Biblioteca, Mercado, Bitácora', () => {
     render(<TabBar />);
-    const expectedLabels = ['Inicio', 'Mapa', 'Biblioteca', 'Bitácora'];
+    const expectedLabels = ['Inicio', 'Mapa', 'Biblioteca', 'Mercado', 'Bitácora'];
     for (const label of expectedLabels) {
       expect(screen.getByText(label)).toBeTruthy();
     }
@@ -101,7 +101,7 @@ describe('TabBar — 4-tab world nav (REQ-NAV-01, REQ-NAV-02)', () => {
     expect(screen.queryByText('Crónica')).toBeNull();
   });
 
-  it('RENAME-S2: Bitácora tab has aria-current="page" when pathname is /cronica', () => {
+  it('Bitácora tab has aria-current="page" when pathname is /cronica', () => {
     mockUsePathname.mockReturnValue('/cronica');
     const { container } = render(<TabBar />);
     const activeLink = container.querySelector('[aria-current="page"]');
@@ -110,10 +110,36 @@ describe('TabBar — 4-tab world nav (REQ-NAV-01, REQ-NAV-02)', () => {
     expect(activeLink?.textContent).toContain('Bitácora');
   });
 
-  it('grid has grid-cols-4 class (Mesa removed, better 375px tap targets — ADR-1)', () => {
+  // REQ-MERC-NAV-01: Mercado tab renders with href /mercado
+  it('REQ-MERC-NAV-01: renders Mercado tab link with href /mercado', () => {
+    render(<TabBar />);
+    const link = screen.getByRole('link', { name: /mercado/i });
+    expect(link).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/mercado');
+  });
+
+  // REQ-MERC-NAV-01: Mercado tab is active when pathname is /mercado
+  it('REQ-MERC-NAV-01: Mercado tab has aria-current="page" when pathname is /mercado', () => {
+    mockUsePathname.mockReturnValue('/mercado');
+    const { container } = render(<TabBar />);
+    const activeLink = container.querySelector('[aria-current="page"]');
+    expect(activeLink).toBeTruthy();
+    expect(activeLink?.getAttribute('href')).toBe('/mercado');
+    expect(activeLink?.textContent).toContain('Mercado');
+  });
+
+  it('grid has grid-cols-5 class (Mercado tab added, ADR-2 — 75px/column @375px)', () => {
     const { container } = render(<TabBar />);
     const nav = container.querySelector('nav');
-    expect(nav?.className).toContain('grid-cols-4');
-    expect(nav?.className).not.toContain('grid-cols-5');
+    expect(nav?.className).toContain('grid-cols-5');
+    expect(nav?.className).not.toContain('grid-cols-4');
+  });
+
+  // Tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora (REQ-MERC-NAV-01)
+  it('tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora', () => {
+    render(<TabBar />);
+    const links = screen.getAllByRole('link');
+    const hrefs = links.map((l) => l.getAttribute('href'));
+    expect(hrefs).toEqual(['/inicio', '/mapa', '/compendium', '/mercado', '/cronica']);
   });
 });
