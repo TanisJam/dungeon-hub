@@ -348,6 +348,69 @@ describe('character knowledge routes', () => {
       }
     });
 
+    // ── codex-knowledge gap (#1953): ?view=player downgrade + ?q= filter ──────
+
+    it('GM with ?view=player → effectiveView=player (preview-as-player downgrade)', async () => {
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/monsters?view=player`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{
+        rows: Array<{ known: boolean }>;
+        effectiveView: string;
+      }>();
+      // GM downgraded to player view: gate enforced, every row is known.
+      expect(body.effectiveView).toBe('player');
+      for (const m of body.rows) expect(m.known).toBe(true);
+    });
+
+    it('Player cannot escalate: ?view=dm is clamped to player', async () => {
+      const app = await getTestApp();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/monsters?view=dm`,
+        headers: { authorization: `Bearer ${player.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json<{ effectiveView: string }>().effectiveView).toBe('player');
+    });
+
+    it('?q= filters monsters by name (case-insensitive)', async () => {
+      const app = await getTestApp();
+
+      // Get the DM (full) list to derive a real substring to search for.
+      const dmRes = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/monsters`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+      const dmRows = dmRes.json<{ rows: Array<{ name: string }> }>().rows;
+      if (dmRows.length === 0) return; // empty catalog in this env — nothing to assert
+
+      // First 3 chars of a real monster name, uppercased to prove case-insensitivity.
+      const term = dmRows[0]!.name.slice(0, 3).toUpperCase();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/characters/${characterId}/knowledge/monsters?q=${encodeURIComponent(term)}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json<{ rows: Array<{ name: string }>; total: number }>();
+      for (const m of body.rows) {
+        expect(m.name.toLowerCase()).toContain(term.toLowerCase());
+      }
+      expect(body.total).toBeLessThanOrEqual(dmRows.length);
+    });
+
     it('Outsider (no world membership) → 403 FORBIDDEN', async () => {
       const app = await getTestApp();
 

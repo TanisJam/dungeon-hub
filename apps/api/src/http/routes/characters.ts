@@ -269,6 +269,22 @@ const KnowledgeKindParam = z.object({
   kind: z.enum(['monsters', 'npcs', 'factions', 'locations', 'lore'] as [CodexKind, ...CodexKind[]]),
 });
 
+// Query for GET /characters/:id/knowledge/:kind.
+//   q       — case-insensitive name filter (typeahead).
+//   limit   — page size (1..200, default 50).
+//   offset  — page offset (default 0).
+//   view    — OPTIONAL view override. Only 'player' has effect: it lets a GM/devMode
+//             caller DOWNGRADE to the player-gated view (preview-as-player via the
+//             dh:role toggle, which the API can't read — the web forwards it here).
+//             'dm' or omitted = caller's max view. A non-privileged caller can never
+//             escalate (clamped to player regardless).
+const KnowledgeQuery = z.object({
+  q: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+  view: z.enum(['dm', 'player']).optional(),
+});
+
 // engine-timeline-duration: optional encounterId querystring param for GET /sheet
 // and POST active-effects. When present, the route loads encounter.round and threads
 // it into ctx.encounterRound (evaluateDuration) / startRound (write path).
@@ -1800,6 +1816,19 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       const { id, kind } = paramsResult.data;
       const userId = request.user!.sub;
 
+      const queryResult = KnowledgeQuery.safeParse(request.query);
+      if (!queryResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: queryResult.error.issues.map((i) => ({
+            code: i.code,
+            path: i.path,
+            message: i.message,
+          })),
+        });
+      }
+      const { q, limit, offset, view: requestedView } = queryResult.data;
+
       const character = await loadCharacter(id);
       if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
 
@@ -1817,12 +1846,12 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         .limit(1);
       const callerDevMode = callerRows[0]?.devMode ?? false;
 
-      let effectiveView: 'dm' | 'player';
+      // Caller's MAX permitted view. GM and devMode can see the full (dm) view.
+      let maxView: 'dm' | 'player';
       if (gmCheck.ok || callerDevMode) {
-        // DM always sees all; devMode players see all too (FORK 5 bypass)
-        effectiveView = 'dm';
+        maxView = 'dm';
       } else if (access !== 'none') {
-        effectiveView = 'player';
+        maxView = 'player';
       } else {
         return reply.code(403).send({
           error: 'FORBIDDEN',
@@ -1830,7 +1859,16 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const result = await readCharacterCodexCategory(id, kind, effectiveView);
+      // Apply the optional view override: 'player' is a safe downgrade (preview-as-player
+      // from the dh:role toggle, forwarded by the web). Anything else = max view.
+      // Escalation is impossible — a player requesting 'dm' is still clamped to maxView.
+      const effectiveView: 'dm' | 'player' = requestedView === 'player' ? 'player' : maxView;
+
+      const result = await readCharacterCodexCategory(id, kind, effectiveView, {
+        ...(q !== undefined ? { q } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+        ...(offset !== undefined ? { offset } : {}),
+      });
 
       return {
         rows: result.rows,

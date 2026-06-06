@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ilike } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { characterKnowledge, compendiumMonsters } from '../../infra/db/schema.js';
 import { seesEntry, isMonsterKnownByDefault } from '@dungeon-hub/domain/character/knowledge';
@@ -67,6 +67,13 @@ export interface ReadCharacterCodexResult {
   effectiveView: EffectiveView;
 }
 
+/** Optional list query: case-insensitive name filter + pagination. */
+export interface CodexQueryOpts {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Per-kind query helpers
 // ---------------------------------------------------------------------------
@@ -74,8 +81,10 @@ export interface ReadCharacterCodexResult {
 async function readMonstersKind(
   characterId: string,
   effectiveView: EffectiveView,
+  opts: CodexQueryOpts = {},
 ): Promise<{ rows: CodexMonsterRow[]; total: number; knownCount: number }> {
-  // Load all compendium monsters
+  const q = opts.q?.trim();
+  // Load compendium monsters, optionally filtered by name (case-insensitive).
   const allMonsters = await db
     .select({
       slug: compendiumMonsters.slug,
@@ -86,6 +95,7 @@ async function readMonstersKind(
       size: compendiumMonsters.size,
     })
     .from(compendiumMonsters)
+    .where(q ? ilike(compendiumMonsters.name, `%${q}%`) : undefined)
     .orderBy(compendiumMonsters.name);
 
   // Load character's known bestiary entries (DB kind = 'bestiary')
@@ -130,7 +140,16 @@ async function readMonstersKind(
     }
   }
 
-  return { rows, total, knownCount };
+  // Paginate the gated rows only when the caller explicitly requests it (limit/offset).
+  // Callers that omit both get the full gated set unchanged (backward compatible).
+  // Slicing is applied AFTER gating so a player's page reflects only their visible set.
+  const offset = opts.offset ?? 0;
+  const paged =
+    opts.limit === undefined && offset === 0
+      ? rows
+      : rows.slice(offset, opts.limit === undefined ? undefined : offset + opts.limit);
+
+  return { rows: paged, total, knownCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -173,13 +192,14 @@ export async function readCharacterCodexCategory(
   characterId: string,
   kind: CodexKind,
   effectiveView: EffectiveView,
+  opts: CodexQueryOpts = {},
 ): Promise<ReadCharacterCodexResult> {
   // Static check — kind must be a valid CodexKind (compile-time guard)
   void KIND_TO_DB_KIND[kind];
 
   switch (kind) {
     case 'monsters': {
-      const { rows, total, knownCount } = await readMonstersKind(characterId, effectiveView);
+      const { rows, total, knownCount } = await readMonstersKind(characterId, effectiveView, opts);
       return { rows, total, knownCount, effectiveView };
     }
     case 'npcs':
