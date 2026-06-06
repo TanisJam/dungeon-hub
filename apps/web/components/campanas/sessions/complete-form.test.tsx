@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { CompleteForm } from './complete-form';
 import type { EnrichedParticipant } from '@/app/campanas/[id]/sessions/actions';
 
@@ -43,12 +43,16 @@ vi.mock('@/components/ui/sheet', () => ({
     ) : null,
 }));
 
-// ── Mock Server Action ────────────────────────────────────────────────────────
+// ── Mock Server Actions ───────────────────────────────────────────────────────
+// searchSessionMonsters is imported by the MonsterGrantPicker rendered inside the
+// complete form (codex-knowledge B-3 gap, #1953). Defaults to [] so unrelated tests
+// that never type into the monster search don't trigger a real fetch.
 vi.mock('@/app/campanas/[id]/sessions/actions', () => ({
   completeSession: vi.fn(),
+  searchSessionMonsters: vi.fn().mockResolvedValue([]),
 }));
 
-import { completeSession } from '@/app/campanas/[id]/sessions/actions';
+import { completeSession, searchSessionMonsters } from '@/app/campanas/[id]/sessions/actions';
 
 // ── Mock next/link ────────────────────────────────────────────────────────────
 vi.mock('next/link', () => ({
@@ -60,6 +64,7 @@ vi.mock('next/link', () => ({
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const mockComplete = completeSession as ReturnType<typeof vi.fn>;
+const mockSearchMonsters = searchSessionMonsters as ReturnType<typeof vi.fn>;
 
 const activeParticipants: EnrichedParticipant[] = [
   {
@@ -118,6 +123,8 @@ function renderForm({
 describe('CompleteForm', () => {
   beforeEach(() => {
     mockComplete.mockReset();
+    mockSearchMonsters.mockReset();
+    mockSearchMonsters.mockResolvedValue([]);
   });
 
   // ── REQ-DPPMB-COMPLETE-04: participant summary ────────────────────────────────
@@ -314,6 +321,49 @@ describe('CompleteForm', () => {
     expect(screen.getByTestId('world-change-row-0')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /eliminar cambio 0/i }));
     expect(screen.queryByTestId('world-change-row-0')).toBeNull();
+  });
+
+  // ── codex-knowledge B-3 gap (#1953): monster picker → candidate → grant ──────
+
+  it('picking a monster then toggling its chip submits knowledgeGrants for all active participants', async () => {
+    mockComplete.mockResolvedValueOnce({ ok: true, data: { id: 'sess-1', status: 'completed' } });
+    mockSearchMonsters.mockResolvedValue([
+      { slug: 'goblin', source: 'MM', name: 'Goblin', cr: '1/4', type: 'humanoid' },
+    ]);
+    renderForm();
+
+    // 1. Search a monster in the DM grant picker.
+    await act(async () => {
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'gob' } });
+    });
+    await waitFor(() => screen.getByRole('button', { name: /Goblin/i }), { timeout: 1000 });
+
+    // 2. Pick it → becomes a candidate chip.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Goblin/i }));
+    });
+
+    // 3. Toggle the candidate chip ON (aria-pressed button in KnowledgeGrantSection).
+    const chip = await screen.findByRole('button', { name: 'Goblin', pressed: false });
+    await act(async () => {
+      fireEvent.click(chip);
+    });
+
+    // 4. Submit → knowledgeGrants[] = selected entity × active participants (2).
+    fireEvent.click(screen.getByRole('button', { name: /cerrar sesión y repartir/i }));
+
+    await waitFor(() => {
+      expect(mockComplete).toHaveBeenCalledWith(
+        'sess-1',
+        'camp-1',
+        expect.objectContaining({
+          knowledgeGrants: [
+            { characterId: 'char-1', kind: 'bestiary', refKey: 'goblin', refSource: 'MM' },
+            { characterId: 'char-2', kind: 'bestiary', refKey: 'goblin', refSource: 'MM' },
+          ],
+        }),
+      );
+    });
   });
 
   it('includes worldChanges in submitted payload with exact field names', async () => {

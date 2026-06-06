@@ -16,6 +16,7 @@ import { FormSubmitButton } from '@/components/ui/form-submit-button';
 import type { EnrichedParticipant } from '@/app/campanas/[id]/sessions/actions';
 import { completeSession } from '@/app/campanas/[id]/sessions/actions';
 import { KnowledgeGrantSection, type KnowledgeGrant, type CandidateEntity } from '@/components/codex/knowledge-grant-section';
+import { MonsterGrantPicker } from '@/components/codex/monster-grant-picker';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,9 +134,23 @@ export function CompleteForm({
   const [worldChanges, setWorldChanges] = useState<WorldChangeRow[]>([]);
   const [knowledgeGrants, setKnowledgeGrants] = useState<KnowledgeGrant[]>([]);
 
-  // Candidate entities for knowledge grants — Slice 1: DM manually adds slugs.
-  // TODO: auto-populate from session_events in a follow-up slice (codex-knowledge #1946).
-  const candidateEntities: CandidateEntity[] = [];
+  // Candidate entities for knowledge grants — populated by the DM monster picker
+  // (codex-knowledge B-3 gap closure, #1953). ADR-2 (#1946): bestiary only in Slice 1.
+  // Layer 2 (#1946) will auto-populate from session_events; deferred for now.
+  const [candidateEntities, setCandidateEntities] = useState<CandidateEntity[]>([]);
+
+  function addCandidateEntity(entity: CandidateEntity) {
+    const key = `${entity.kind}|${entity.refKey}|${entity.refSource}`;
+    setCandidateEntities((prev) =>
+      prev.some((e) => `${e.kind}|${e.refKey}|${e.refSource}` === key)
+        ? prev
+        : [...prev, entity],
+    );
+  }
+
+  const candidateKeys = new Set(
+    candidateEntities.map((e) => `${e.kind}|${e.refKey}|${e.refSource}`),
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [topLevelError, setTopLevelError] = useState<string | null>(null);
@@ -542,11 +557,19 @@ export function CompleteForm({
         </section>
 
         {/* ── Conocimiento a otorgar — codex-knowledge B-3 REQ-CK-UNLOCK-08 ── */}
-        <KnowledgeGrantSection
-          participants={activeParticipants}
-          candidateEntities={candidateEntities}
-          onGrantsChange={setKnowledgeGrants}
-        />
+        {/* DM searches monsters → adds candidates → toggles which to grant (#1953). */}
+        <section aria-label="Otorgar conocimiento" className="flex flex-col gap-3">
+          <MonsterGrantPicker
+            campaignId={campaignId}
+            existingKeys={candidateKeys}
+            onAdd={addCandidateEntity}
+          />
+          <KnowledgeGrantSection
+            participants={activeParticipants}
+            candidateEntities={candidateEntities}
+            onGrantsChange={setKnowledgeGrants}
+          />
+        </section>
 
         {/* ── Submit — REQ-DPPMB-COMPLETE-07: sticky at bottom via V3Sheet overflow ── */}
         <div className="sticky bottom-0 bg-surface py-2">

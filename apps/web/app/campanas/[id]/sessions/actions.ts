@@ -400,6 +400,52 @@ export async function completeSession(
 }
 
 // ---------------------------------------------------------------------------
+// searchSessionMonsters — GET /compendium/monsters?campaign=&q= (codex-knowledge B-3 gap)
+// ---------------------------------------------------------------------------
+
+/** Monster typeahead hit — subset of GET /compendium/monsters row. */
+export interface MonsterHit {
+  slug: string;
+  source: string;
+  name: string;
+  cr: string | null;
+  type: string | null;
+}
+
+/**
+ * Debounced monster typeahead for the DM "Conocimiento a otorgar" picker inside
+ * CompleteForm. Scoped to the campaign's world (the endpoint requires exactly one
+ * of ?campaign= or ?world=). Monsters are NOT rules-profile filtered server-side
+ * (they are DM content) — campaign here is the auth/scope gate only.
+ *
+ * codex-knowledge B-3 gap closure: feeds candidateEntities so knowledgeGrants[]
+ * can be produced from the complete form (REQ-CK-UNLOCK-03/08).
+ *
+ * Returns [] on any error (typeahead must never throw into the form).
+ */
+export async function searchSessionMonsters(
+  campaignId: string,
+  query: string,
+): Promise<MonsterHit[]> {
+  const trimmed = query.trim();
+  if (trimmed.length === 0) return [];
+
+  const token = await getToken();
+  if (!token) return [];
+
+  try {
+    const params = new URLSearchParams({ campaign: campaignId, q: trimmed, limit: '50' });
+    const res = await api.get<{ data: MonsterHit[] }>(
+      `/compendium/monsters?${params.toString()}`,
+      token,
+    );
+    return res.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // listSessionEvents — GET /sessions/:id/events (REQ-DPPMB-DETAIL-05)
 // ---------------------------------------------------------------------------
 
