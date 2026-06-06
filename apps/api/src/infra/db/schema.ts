@@ -37,6 +37,11 @@ export const users = pgTable('users', {
   // Service flag — cuando true, este user puede actuar en nombre de otros via
   // header X-Acting-As-Discord-Id. Reservado para el bot account.
   canImpersonate: boolean('can_impersonate').notNull().default(false),
+  // codex-knowledge FORK 5: per-user server-side bypass for the knowledge gate.
+  // devMode=true → user sees all codex entries regardless of character_knowledge rows.
+  // NOT an env var (per-user), NOT a world setting (different semantic).
+  // REQ-CK-DEV-01, REQ-CK-DEV-02.
+  devMode: boolean('dev_mode').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1337,6 +1342,79 @@ export const characterKnowledge = pgTable(
     // Hot-path for player-bestiary query
     index('idx_ck_character_kind').on(t.characterId, t.kind),
     index('idx_ck_world').on(t.worldId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// guild_contributions — append-only player/guild knowledge notes (codex-knowledge Slice 1).
+//
+// DESIGN INTENT: West Marches misinformation-as-feature. Players can record
+// sightings, rumors, notes about world entities they've encountered. DM can
+// seal (confirm/debunk) them. FORK 4 decision: guild_contributions from day 1,
+// not a throwaway character_notes table.
+//
+// APPEND-ONLY INVARIANT: body/contributionType/authorUserId NEVER UPDATEd.
+// Only sealedStatus/sealedBy/sealedAt/visibility MAY be updated.
+// No DELETE route, no content PATCH route.
+//
+// contribution_type: OPEN text (§1.2 homebrew; domain validates vs seed list).
+// ref_entity_kind / ref_entity_id: OPEN text / NO FK (polymorphic by-key).
+// sealed_status / visibility: CLOSED enums (lifecycle semantics, locked FORK 4).
+//
+// codex-knowledge SDD spec #1947, design #1948, decisions #1944.
+// ---------------------------------------------------------------------------
+export const guildContributions = pgTable(
+  'guild_contributions',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    worldId: uuid('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** OPEN text — validated at domain layer against seed list. TODO #513: project from DB. */
+    contributionType: text('contribution_type').notNull(),
+    /** Narrative body. NEVER UPDATEd (append-only). */
+    body: text('body').notNull(),
+    /**
+     * OPEN text — aligns to character_knowledge.kind taxonomy:
+     * bestiary|item|spell|npc|faction|location|lore. Nullable (not all notes tag an entity).
+     */
+    refEntityKind: text('ref_entity_kind'),
+    /**
+     * Polymorphic by-key — compendium slug OR world-entity UUID.
+     * NO FK constraint (heterogeneous targets). Tolerate dangling at read.
+     */
+    refEntityId: text('ref_entity_id'),
+    /**
+     * CLOSED enum: null=rumor (unsealed), 'confirmed', 'debunked'.
+     * Only sealed_* columns mutate (D3 audit).
+     */
+    sealedStatus: text('sealed_status', { enum: ['confirmed', 'debunked'] }),
+    sealedBy: uuid('sealed_by').references(() => users.id, { onDelete: 'set null' }),
+    sealedAt: timestamp('sealed_at', { withTimezone: true }),
+    /**
+     * CLOSED enum: 'personal' (author-only) | 'guild' (all members) | 'canonical'.
+     * Default: 'personal'. REQ-CK-GC-04.
+     */
+    visibility: text('visibility', { enum: ['personal', 'guild', 'canonical'] })
+      .notNull()
+      .default('personal'),
+    /** Author-set in/out-world time. */
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Immutable insert time. */
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Feed query: most recent contributions for a world
+    index('idx_gc_world_occurred').on(t.worldId, t.occurredAt),
+    // Codex reverse-lookup: notes for a specific entity
+    index('idx_gc_ref').on(t.refEntityKind, t.refEntityId),
+    // Canonical/rumor filter
+    index('idx_gc_world_sealed').on(t.worldId, t.sealedStatus),
+    // Per-user queries
+    index('idx_gc_author').on(t.authorUserId),
   ],
 );
 
