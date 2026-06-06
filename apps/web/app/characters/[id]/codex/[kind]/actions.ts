@@ -13,6 +13,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
+import { getViewPreference } from '@/lib/role';
 import { CODEX_CATEGORY_CONFIG, type CodexKind } from './_config/registry';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,6 +53,9 @@ export async function searchCodexCategory(
       offset: String(offset),
     });
     if (trimmed.length > 0) params.set('q', trimmed);
+    // Forward the "preview as player" toggle (safe downgrade) so search results
+    // stay player-gated when a GM is previewing as player. See page.tsx.
+    if ((await getViewPreference()) === 'player') params.set('view', 'player');
 
     const res = await api.get<Envelope>(
       `/characters/${charId}/knowledge/${kind}?${params.toString()}`,

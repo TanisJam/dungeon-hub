@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { getActiveCharacter } from '@/lib/active-character';
+import { getViewPreference } from '@/lib/role';
 import { AppShell } from '@/components/layout/app-shell';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
 import { CompendiumList } from '@/app/compendium/[category]/_components/compendium-list';
@@ -136,9 +137,15 @@ export default async function CodexKindPage({ params }: KindPageProps) {
   const knowledgeKind = kind as WorldKnowledgeKind;
   const title = WORLD_KNOWLEDGE_LABELS[knowledgeKind] ?? capitalizeKind(knowledgeKind);
 
+  // Forward the GM "preview as player" toggle to the API: the API can't read the
+  // dh:role cookie (web→API is Bearer-only), so we pass ?view=player as a safe
+  // downgrade. Omitted otherwise → API returns the caller's max view (unchanged).
+  const viewPref = await getViewPreference();
+  const viewParam = viewPref === 'player' ? '&view=player' : '';
+
   const initialData = await api
     .get<KnowledgeEnvelope>(
-      `/characters/${activeChar.id}/knowledge/${knowledgeKind}?limit=50&offset=0`,
+      `/characters/${activeChar.id}/knowledge/${knowledgeKind}?limit=50&offset=0${viewParam}`,
       token,
     )
     .catch(() => null);
