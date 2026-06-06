@@ -17,6 +17,7 @@ import { questsRoute } from './http/routes/quests.js';
 import { encountersRoute } from './http/routes/encounters.js';
 import { invitesRoute } from './http/routes/invites.js';
 import { contributionsRoute } from './http/routes/contributions.js';
+import { cronicaFeedRoute } from './http/routes/cronica-feed.js';
 import { usersRoute } from './http/routes/users.js';
 
 export async function buildServer() {
@@ -57,6 +58,7 @@ export async function buildServer() {
       await api.register(encountersRoute);
       await api.register(invitesRoute);
       await api.register(contributionsRoute);
+      await api.register(cronicaFeedRoute);
       await api.register(usersRoute);
     },
     { prefix: '/api/v1' },

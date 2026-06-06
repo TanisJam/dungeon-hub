@@ -20,7 +20,7 @@
  */
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, arrayContains, desc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { guildContributions } from '../../infra/db/schema.js';
 import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
@@ -30,6 +30,7 @@ import {
   applySeal,
   isVisibleTo,
 } from '@dungeon-hub/domain/world/contribution';
+import { isKnowledgeTag } from '@dungeon-hub/domain/world/codex';
 
 // ---------------------------------------------------------------------------
 // Zod schemas
@@ -47,6 +48,8 @@ const CreateContributionBody = z.object({
   refEntityId: z.string().min(1).max(200).nullable().optional(),
   visibility: CONTRIBUTION_VISIBILITY.optional(),
   occurredAt: z.string().datetime().optional(),
+  /** Optional tags ⊆ KNOWLEDGE_TAGS. Write-at-create only (ADR-2, REQ-GREM-CT-02). */
+  tags: z.array(z.string().min(1).max(40)).max(10).optional(),
 });
 
 const SealBody = z.object({
@@ -63,6 +66,8 @@ const ListContributionsQuery = z.object({
   authorUserId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  /** Filter contributions whose tags[] contains this value. Must be ⊆ KNOWLEDGE_TAGS. */
+  tag: z.string().min(1).max(40).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -99,6 +104,7 @@ export const contributionsRoute: FastifyPluginAsync = async (app) => {
         refEntityKind: body.refEntityKind ?? null,
         refEntityId: body.refEntityId ?? null,
         visibility: body.visibility ?? 'personal',
+        ...(body.tags !== undefined && { tags: body.tags }),
       });
       if (!domainResult.ok) {
         return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: domainResult.issues });
@@ -114,6 +120,7 @@ export const contributionsRoute: FastifyPluginAsync = async (app) => {
           refEntityKind: body.refEntityKind ?? null,
           refEntityId: body.refEntityId ?? null,
           visibility: body.visibility ?? 'personal',
+          tags: body.tags ?? [],
           ...(body.occurredAt && { occurredAt: new Date(body.occurredAt) }),
         })
         .returning();
@@ -145,6 +152,14 @@ export const contributionsRoute: FastifyPluginAsync = async (app) => {
       const limit = query.limit ?? 50;
       const offset = ((query.page ?? 1) - 1) * limit;
 
+      // Validate ?tag= against KNOWLEDGE_TAGS before querying (REQ-GREM-CT-03)
+      if (query.tag !== undefined && !isKnowledgeTag(query.tag)) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'CONTRIBUTION_TAG_INVALID', got: query.tag }],
+        });
+      }
+
       // Build base conditions
       const conditions = [eq(guildContributions.worldId, worldId)];
       if (query.refEntityKind) {
@@ -155,6 +170,10 @@ export const contributionsRoute: FastifyPluginAsync = async (app) => {
       }
       if (query.authorUserId) {
         conditions.push(eq(guildContributions.authorUserId, query.authorUserId));
+      }
+      // GIN tag filter — arrayContains(tags, [tag]) mirrors journal + world_events pattern
+      if (query.tag) {
+        conditions.push(arrayContains(guildContributions.tags, [query.tag]));
       }
 
       // Load rows — no hard join on refEntityId (tolerate dangling)
