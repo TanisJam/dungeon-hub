@@ -21,14 +21,19 @@
 import type { ComponentType } from 'react';
 import { MonsterRowView } from '@/app/compendium/[category]/_components/row-views';
 import { MonsterStatblockHeader } from '@/app/compendium/[category]/_components/monster-statblock-header';
+import { WorldEntityRowView, WorldEntityHeader } from '../_components/world-entity-views';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Valid codex kind URL params. Mirrors CodexKind on the API side. */
-export type CodexKind = 'monsters';
-// Future slices add: | 'items' | 'spells' | 'identidad'
+/**
+ * Valid codex kind URL params. Mirrors CodexKind on the API side.
+ *
+ * codex-knowledge B-1: expanded to all 5 world-knowledge kinds (design #1948 §4.1).
+ * ADR-2 Option A (#1946): monsters fully wired; npcs/factions/locations/lore → gated-EMPTY from API.
+ */
+export type CodexKind = 'monsters' | 'npcs' | 'factions' | 'locations' | 'lore';
 
 export interface CodexCategoryConfig {
   /**
@@ -53,7 +58,8 @@ export interface CodexCategoryConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Registry — Slice 1': monsters only. Add entries here for future slices.
+// Registry — Slice 1: monsters fully wired; npcs/factions/locations/lore stub (gated-EMPTY).
+// codex-knowledge B-1, design #1948 §4.1, ADR-2 Option A (#1946).
 // ---------------------------------------------------------------------------
 
 export const CODEX_CATEGORY_CONFIG: Record<CodexKind, CodexCategoryConfig> = {
@@ -63,5 +69,35 @@ export const CODEX_CATEGORY_CONFIG: Record<CodexKind, CodexCategoryConfig> = {
     label: 'Monstruos',
     RowView: MonsterRowView,
     Header: MonsterStatblockHeader,
+  },
+  // gated-EMPTY in Slice 1 — API returns { rows: [], total: 0 } for these kinds.
+  // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+  npcs: {
+    apiKind: 'npcs',
+    compendiumCategory: 'npcs',
+    label: 'PNJs',
+    RowView: WorldEntityRowView,
+    Header: WorldEntityHeader,
+  },
+  factions: {
+    apiKind: 'factions',
+    compendiumCategory: 'factions',
+    label: 'Facciones',
+    RowView: WorldEntityRowView,
+    Header: WorldEntityHeader,
+  },
+  locations: {
+    apiKind: 'locations',
+    compendiumCategory: 'locations',
+    label: 'Lugares',
+    RowView: WorldEntityRowView,
+    Header: WorldEntityHeader,
+  },
+  lore: {
+    apiKind: 'lore',
+    compendiumCategory: 'lore',
+    label: 'Tradición',
+    RowView: WorldEntityRowView,
+    Header: WorldEntityHeader,
   },
 };
