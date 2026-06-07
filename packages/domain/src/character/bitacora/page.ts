@@ -73,8 +73,13 @@ const MAX_TITLE = 120;
 /** Maximum body length in characters. Design default (design #1975 §ADR-2). */
 const MAX_BODY = 10_000;
 
-/** This wave: only monster refs are supported (compendium slug+source pair). */
-const SUPPORTED_REF_KINDS = ['monster'] as const;
+/**
+ * Supported ref kinds for bitácora pages.
+ * Wave 1: monster (compendium slug+source pair).
+ * Wave 5a (uuid-bridge-npc): npc (UUID refKey, refSource='world').
+ * factions/locations/lore remain unsupported until subsequent UUID bridge slices.
+ */
+const SUPPORTED_REF_KINDS = ['monster', 'npc'] as const;
 
 // ---------------------------------------------------------------------------
 // Zod schema (structural)

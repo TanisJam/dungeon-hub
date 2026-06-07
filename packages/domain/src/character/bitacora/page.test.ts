@@ -84,16 +84,46 @@ describe('validateBitacoraPage — invalid tag', () => {
   });
 });
 
+// ── Supported NPC ref kind (uuid-bridge-npc B-1) ──────────────────────────────
+
+describe('validateBitacoraPage — npc ref kind (uuid-bridge-npc Wave 5a)', () => {
+  it('ref.kind = "npc" with UUID refKey → ok:true, no REF_KIND_UNSUPPORTED', () => {
+    // uuid-bridge-npc B-1: npc refs are now supported (SUPPORTED_REF_KINDS += 'npc').
+    // REQ-UBN-BITACORA: domain accepts npc refs; refSource='world' is the convention.
+    const result = validateBitacoraPage({
+      body: 'Notes about the innkeeper.',
+      tags: ['npcs'],
+      refs: [{ kind: 'npc', refKey: '550e8400-e29b-41d4-a716-446655440000', refSource: 'world' }],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('ref.kind = "npc" does NOT emit BITACORA_PAGE_REF_KIND_UNSUPPORTED', () => {
+    // Regression guard: 'npc' must NOT be in the unsupported set after this wave.
+    const result = validateBitacoraPage({
+      body: 'Met the blacksmith.',
+      tags: ['npcs'],
+      refs: [{ kind: 'npc', refKey: '550e8400-e29b-41d4-a716-446655440001', refSource: 'world' }],
+    });
+    if (!result.ok) {
+      const hasUnsupported = result.issues.some(
+        (i) => i.code === 'BITACORA_PAGE_REF_KIND_UNSUPPORTED',
+      );
+      expect(hasUnsupported).toBe(false);
+    }
+  });
+});
+
 // ── Unsupported ref kind ───────────────────────────────────────────────────────
 
 describe('validateBitacoraPage — unsupported ref kind', () => {
-  it('ref.kind = "npc" → ok:false, BITACORA_PAGE_REF_KIND_UNSUPPORTED', () => {
-    // Design intent: this wave only supports monster refs (compendium slugs).
-    // npc/faction/location blocked until UUID bridge #1946 lands.
+  it('ref.kind = "faction" → ok:false, BITACORA_PAGE_REF_KIND_UNSUPPORTED (not this slice)', () => {
+    // uuid-bridge-npc B-1: factions/locations/lore remain unsupported this wave.
+    // Only monster + npc are in SUPPORTED_REF_KINDS.
     const result = validateBitacoraPage({
-      body: 'Notes about an NPC.',
-      tags: ['npcs'],
-      refs: [{ kind: 'npc', refKey: 'innkeeper', refSource: 'world' }],
+      body: 'Notes about the thieves guild.',
+      tags: ['lore'],
+      refs: [{ kind: 'faction', refKey: 'thieves-guild-uuid', refSource: 'world' }],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
