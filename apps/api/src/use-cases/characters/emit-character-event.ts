@@ -68,7 +68,10 @@ function resolveKind(
     case 'bestiary_discovered': return 'bestiary';
     case 'item_granted': return 'item';
     case 'spell_learned': return 'spell';
-    case 'npc_met': return 'npc';
+    case 'npc_met':
+    // uuid-bridge-npc B-2: DM grant sends type='npc_discovered' (mirrors bestiary_discovered convention).
+    // Both aliases produce the same knowledge row kind='npc'.
+    case 'npc_discovered': return 'npc';
     case 'faction_encountered': return 'faction';
     case 'location_discovered': return 'location';
     case 'lore_learned': return 'lore';

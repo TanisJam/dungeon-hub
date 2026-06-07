@@ -2,6 +2,7 @@ import { and, eq, ilike } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { characterKnowledge, compendiumMonsters } from '../../infra/db/schema.js';
 import { seesEntry, isMonsterKnownByDefault } from '@dungeon-hub/domain/character/knowledge';
+import { listNpcsInWorld, sanitizeNpcForRole, type NpcStatus } from '../world/load-npc.js';
 
 export type EffectiveView = 'dm' | 'player';
 
@@ -58,7 +59,24 @@ export interface CodexMonsterRow {
   known: boolean;
 }
 
-export type CodexRow = CodexMonsterRow;
+/**
+ * Codex NPC row shape — NO dmNotes field (ADR-1, ADR-6 uuid-bridge-npc).
+ * dmNotes is stripped both by sanitizeNpcForRole and by structural exclusion here.
+ * Defense-in-depth: even if sanitize is bypassed, the field cannot appear in this type.
+ *
+ * refKey = npc.id (UUID); refSource = 'world' (LOCKED convention, ADR-2).
+ */
+export interface CodexNpcRow {
+  id: string;         // UUID — the refKey used in character_knowledge
+  name: string;
+  race: string | null;
+  status: NpcStatus;
+  description: string | null;
+  known: boolean;
+  // NO dmNotes field — structurally impossible to leak (ADR-6, REQ-UBN-SECURITY)
+}
+
+export type CodexRow = CodexMonsterRow | CodexNpcRow;
 
 export interface ReadCharacterCodexResult {
   rows: CodexRow[];
@@ -67,11 +85,17 @@ export interface ReadCharacterCodexResult {
   effectiveView: EffectiveView;
 }
 
-/** Optional list query: case-insensitive name filter + pagination. */
+/**
+ * Optional list query: case-insensitive name filter + pagination.
+ * worldId is required for UUID-based kinds (npcs, factions, etc.) — derived
+ * from the character in the route handler and passed here (D4, uuid-bridge-npc).
+ */
 export interface CodexQueryOpts {
   q?: string;
   limit?: number;
   offset?: number;
+  /** Required for npc/faction/location/lore kinds (UUID-based resolvers, ADR-1 uuid-bridge-npc). */
+  worldId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,21 +182,105 @@ async function readMonstersKind(
 }
 
 // ---------------------------------------------------------------------------
+// NPC resolver — uuid-bridge-npc Wave 5a (ADR-1, ADR-2, ADR-6)
+//
+// Mirrors readMonstersKind: loads all world NPCs, intersects with
+// character_knowledge(kind='npc'), gates by effectiveView, ALWAYS runs
+// sanitizeNpcForRole (player='player', DM='gm') on every row.
+//
+// Security: dmNotes stripped by sanitize AND by CodexNpcRow type (double guard).
+// refSource='world' is LOCKED for UUID kinds (ADR-2). Match key = npc.id (UUID).
+// Orphaned UUIDs (deleted NPC) silently dropped — knownSet references missing ids.
+// ---------------------------------------------------------------------------
+
+async function readNpcsKind(
+  characterId: string,
+  worldId: string,
+  effectiveView: EffectiveView,
+  opts: CodexQueryOpts = {},
+): Promise<{ rows: CodexNpcRow[]; total: number; knownCount: number }> {
+  // 1. Load all world NPCs (small list — client-side filter is fine, ADR-3 D2)
+  const allNpcs = await listNpcsInWorld(worldId);
+
+  // 2. Load the character's known NPC set (DB kind='npc')
+  const knownRows = await db
+    .select({ refKey: characterKnowledge.refKey })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        // DB enum 'npc' — matches KIND_TO_DB_KIND['npcs']
+        eq(characterKnowledge.kind, 'npc'),
+      ),
+    );
+
+  // 3. Build a fast UUID lookup set (refSource is constant 'world' for UUID kinds)
+  const knownSet = new Set(knownRows.map((r) => r.refKey));
+
+  // 4. Optional name filter (client-side; world NPC lists are small)
+  const q = opts.q?.trim().toLowerCase();
+
+  // 5. Map WorldAccess for sanitize
+  const access = effectiveView === 'dm' ? ('gm' as const) : ('player' as const);
+
+  let knownCount = 0;
+  const rows: CodexNpcRow[] = [];
+
+  for (const npc of allNpcs) {
+    // Apply optional name filter
+    if (q && !npc.name.toLowerCase().includes(q)) continue;
+
+    const knows = knownSet.has(npc.id);
+    if (knows) knownCount++;
+
+    // DM: all rows + known flag; player: known-only
+    if (effectiveView !== 'dm' && !knows) continue;
+
+    // SECURITY: sanitize on every row (ADR-6). dmNotes dropped for player access.
+    const sanitized = sanitizeNpcForRole(npc, access);
+
+    rows.push({
+      id: sanitized.id,
+      name: sanitized.name,
+      race: sanitized.race,
+      status: sanitized.status,
+      description: sanitized.description,
+      known: knows,
+      // NO dmNotes — CodexNpcRow type enforces structural absence
+    });
+  }
+
+  // total = ALL world NPCs (unfiltered by effectiveView, filtered by optional name query).
+  // For the player, this shows the full world size so they know how many NPCs exist.
+  // knownCount = number of known NPCs (for display, e.g. "1/2 known").
+  // This differs from the monster pattern (where total=gated) because NPC spec requires
+  // total=world count, knownCount=known count (REQ-UBN-READ: total=2, knownCount=1 for player).
+  const totalNpcsInUniverse = allNpcs.filter((npc) => !q || npc.name.toLowerCase().includes(q)).length;
+
+  // Paginate gated rows (the rows the caller can see)
+  const offset = opts.offset ?? 0;
+  const paged =
+    opts.limit === undefined && offset === 0
+      ? rows
+      : rows.slice(offset, opts.limit === undefined ? undefined : offset + opts.limit);
+
+  return { rows: paged, total: totalNpcsInUniverse, knownCount };
+}
+
+// ---------------------------------------------------------------------------
 // Gated-empty stub helpers (ADR-2 Option A, codex-knowledge #1946)
 //
-// npcs/factions/locations/lore: these world-knowledge kinds have UUID-keyed
-// entities (npcs schema.ts:538, factions:504). The read-side bridge that maps
-// character_knowledge.refKey=UUID → world entity table is deferred.
+// factions/locations/lore: these world-knowledge kinds have UUID-keyed
+// entities. The read-side bridge is deferred for these kinds.
+// npcs: RESOLVED in uuid-bridge-npc Wave 5a (readNpcsKind above).
 // Slice 1 closes the metagaming leak for ALL 5 categories by routing them to
-// the gated endpoint — monsters fully wired, the other four return empty.
-//
-// // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+// the gated endpoint — monsters + npcs fully wired, others return empty.
 // ---------------------------------------------------------------------------
 
 function readGatedEmptyKind(): { rows: never[]; total: number; knownCount: number } {
   // ADR-2 Option A: return empty gated result.
   // Metagaming leak is closed (no data leaks through), resolver deferred.
-  // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+  // TODO: wire UUID-based resolver for factions/locations/lore in follow-up slices.
   return { rows: [], total: 0, knownCount: 0 };
 }
 
@@ -186,12 +294,16 @@ function readGatedEmptyKind(): { rows: never[]; total: number; knownCount: numbe
  * URL kind → DB kind mapping (KIND_TO_DB_KIND above).
  *
  * monsters: full catalog + known flags (ADR-2 Option A, real round-trip).
- * npcs/factions/locations/lore: gated-EMPTY (ADR-2 Option A, deferred).
+ * npcs:     UUID-based resolver — readNpcsKind (uuid-bridge-npc Wave 5a).
+ * factions/locations/lore: gated-EMPTY (ADR-2 Option A, deferred).
  *
  * For DM/devMode effectiveView='dm': all entries + known flag.
  * For player effectiveView='player': ONLY known entries (seesEntry gate).
  *
+ * opts.worldId is required for the 'npcs' kind (D4: caller derives it from loadCharacter).
+ *
  * REQ-CCB-API-01, REQ-CK-GATE-03, GATE-04, codex-knowledge SDD design #1948.
+ * REQ-UBN-READ, uuid-bridge-npc SDD design #2003.
  */
 export async function readCharacterCodexCategory(
   characterId: string,
@@ -207,12 +319,18 @@ export async function readCharacterCodexCategory(
       const { rows, total, knownCount } = await readMonstersKind(characterId, effectiveView, opts);
       return { rows, total, knownCount, effectiveView };
     }
-    case 'npcs':
+    case 'npcs': {
+      // uuid-bridge-npc Wave 5a: real NPC resolver replacing gated-empty.
+      // opts.worldId is derived from character.worldId by the route handler (D4).
+      const worldId = opts.worldId ?? '';
+      const { rows, total, knownCount } = await readNpcsKind(characterId, worldId, effectiveView, opts);
+      return { rows, total, knownCount, effectiveView };
+    }
     case 'factions':
     case 'locations':
     case 'lore': {
-      // ADR-2 Option A: gated-empty. Metagaming leak closed for all 5 categories.
-      // TODO: wire UUID-based resolver in follow-up slice (codex-knowledge #1946).
+      // ADR-2 Option A: gated-empty. Metagaming leak closed for remaining categories.
+      // TODO: wire UUID-based resolver for factions/locations/lore in follow-up slices.
       const { rows, total, knownCount } = readGatedEmptyKind();
       return { rows, total, knownCount, effectiveView };
     }

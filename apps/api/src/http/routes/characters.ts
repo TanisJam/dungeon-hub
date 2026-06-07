@@ -288,7 +288,7 @@ const BitacoraListQuery = z.object({
   tag: z.string().optional(),
   // REQ-BP-API-02: filter pages by entity reference (monster-detail "this monster's pages" view)
   refKey: z.string().min(1).optional(),
-  refKind: z.enum(['monster']).optional(), // only 'monster' supported this wave (design ADR-1)
+  refKind: z.enum(['monster', 'npc']).optional(), // uuid-bridge-npc B-2: added 'npc' (ADR-5)
 });
 
 const ParamsWithIdAndPageId = z.object({
@@ -1902,10 +1902,13 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       // Escalation is impossible — a player requesting 'dm' is still clamped to maxView.
       const effectiveView: 'dm' | 'player' = requestedView === 'player' ? 'player' : maxView;
 
+      // Pass worldId for UUID-based resolvers (npcs/factions/locations/lore).
+      // character is already loaded above — no extra DB call (D4, uuid-bridge-npc).
       const result = await readCharacterCodexCategory(id, kind, effectiveView, {
         ...(q !== undefined ? { q } : {}),
         ...(limit !== undefined ? { limit } : {}),
         ...(offset !== undefined ? { offset } : {}),
+        worldId: character.worldId,
       });
 
       return {
@@ -1943,7 +1946,9 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const counts = await getCodexCounts(id);
+      // worldId required for NPC counts (uuid-bridge-npc Wave 5a, REQ-UBN-COUNTS).
+      // character is already loaded above — no extra DB call.
+      const counts = await getCodexCounts(id, character.worldId);
       return counts;
     },
   );

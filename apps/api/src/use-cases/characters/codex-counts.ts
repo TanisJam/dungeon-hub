@@ -1,9 +1,11 @@
 import { and, count, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characterKnowledge, compendiumMonsters } from '../../infra/db/schema.js';
+import { characterKnowledge, compendiumMonsters, npcs } from '../../infra/db/schema.js';
 
 export interface CodexCounts {
   monsters: { known: number; total: number };
+  /** NPC counts — uuid-bridge-npc Wave 5a (REQ-UBN-COUNTS). */
+  npc: { known: number; total: number };
 }
 
 /**
@@ -14,24 +16,30 @@ export interface CodexCounts {
  *
  * DB kind mapping:
  *   monsters → character_knowledge.kind = 'bestiary'
+ *   npc      → character_knowledge.kind = 'npc' (uuid-bridge-npc Wave 5a)
+ *
+ * worldId is required for NPC counts (total = world NPC count via DB query).
  *
  * REQ-CCB-API-02 (spec character-codex-browser).
+ * REQ-UBN-COUNTS (spec uuid-bridge-npc #2002).
  *
  * NOTE: Spec REQ-CCB-API-02 originally specified parallel SSR reuse of the
  * knowledge envelope as the grid-counts mechanism. The design (ADR-1) selected
  * a dedicated lightweight counts endpoint instead — one access check, one round-
  * trip, naturally extensible as more kinds land in later slices.
  */
-export async function getCodexCounts(characterId: string): Promise<CodexCounts> {
+export async function getCodexCounts(characterId: string, worldId: string): Promise<CodexCounts> {
+  // ── Monsters ────────────────────────────────────────────────────────────────
+
   // Total monsters in compendium (unfiltered)
-  const [totalRow] = await db
+  const [totalMonstersRow] = await db
     .select({ value: count() })
     .from(compendiumMonsters);
 
-  const total = totalRow?.value ?? 0;
+  const totalMonsters = totalMonstersRow?.value ?? 0;
 
   // Known monsters for this character (DB kind = 'bestiary')
-  const [knownRow] = await db
+  const [knownMonstersRow] = await db
     .select({ value: count() })
     .from(characterKnowledge)
     .where(
@@ -41,9 +49,33 @@ export async function getCodexCounts(characterId: string): Promise<CodexCounts> 
       ),
     );
 
-  const known = knownRow?.value ?? 0;
+  const knownMonsters = knownMonstersRow?.value ?? 0;
+
+  // ── NPCs (uuid-bridge-npc Wave 5a) ──────────────────────────────────────────
+
+  // Total NPCs in this world
+  const [totalNpcsRow] = await db
+    .select({ value: count() })
+    .from(npcs)
+    .where(eq(npcs.worldId, worldId));
+
+  const totalNpcs = totalNpcsRow?.value ?? 0;
+
+  // Known NPCs for this character (DB kind = 'npc')
+  const [knownNpcsRow] = await db
+    .select({ value: count() })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        eq(characterKnowledge.kind, 'npc'),
+      ),
+    );
+
+  const knownNpcs = knownNpcsRow?.value ?? 0;
 
   return {
-    monsters: { known, total },
+    monsters: { known: knownMonsters, total: totalMonsters },
+    npc: { known: knownNpcs, total: totalNpcs },
   };
 }
