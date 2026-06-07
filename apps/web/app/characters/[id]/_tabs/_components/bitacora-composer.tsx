@@ -41,6 +41,28 @@ export interface KnownNpc {
   name: string;
 }
 
+/**
+ * Known Faction for the ref picker — projects to {id, name, state} only.
+ * NO dmNotes — ADR-6 rule: web props for factions carry ONLY safe fields.
+ * uuid-bridge-factions-pois B-3, REQ-UBFP-BITACORA.
+ */
+export interface KnownFaction {
+  id: string;    // UUID — used as refKey
+  name: string;
+  state: string; // FactionState — display only
+}
+
+/**
+ * Known Location (POI) for the ref picker — projects to {id, name, status} only.
+ * NO dmNotes, NO parentHexStatus — ADR-6 rule + C10: web props carry ONLY safe fields.
+ * uuid-bridge-factions-pois B-3, REQ-UBFP-BITACORA.
+ */
+export interface KnownLocation {
+  id: string;     // UUID — used as refKey
+  name: string;
+  status: string; // PoiStatus — display only
+}
+
 export interface BitacoraPageRef {
   kind: string;
   refKey: string;
@@ -55,14 +77,18 @@ export interface BitacoraPageData {
   refs: BitacoraPageRef[];
 }
 
-/** Ref kind for the picker switch. uuid-bridge-npc adds 'npc'. */
-type RefKindSwitch = 'monster' | 'npc';
+/** Ref kind for the picker switch. uuid-bridge-factions-pois adds 'faction' + 'location'. */
+type RefKindSwitch = 'monster' | 'npc' | 'faction' | 'location';
 
 interface BitacoraComposerProps {
   characterId: string;
   knownMonsters: KnownMonster[];
   /** Known NPCs for the ref picker. uuid-bridge-npc B-3. NO dmNotes. */
   knownNpcs?: KnownNpc[];
+  /** Known factions for the ref picker. uuid-bridge-factions-pois B-3. NO dmNotes. */
+  knownFactions?: KnownFaction[];
+  /** Known locations for the ref picker. uuid-bridge-factions-pois B-3. NO dmNotes/parentHexStatus. */
+  knownLocations?: KnownLocation[];
   // When provided, composer opens in edit mode
   editPage?: BitacoraPageData;
   // Pre-populate with a ref (from Conocidos detail shortcut)
@@ -79,6 +105,8 @@ export function BitacoraComposer({
   characterId,
   knownMonsters,
   knownNpcs = [],
+  knownFactions = [],
+  knownLocations = [],
   editPage,
   prefilledRef,
   onClose,
@@ -94,10 +122,15 @@ export function BitacoraComposer({
   );
 
   // Kind switch: which entity type is the ref picker showing?
-  // Defaults to 'npc' if the prefilled ref is an npc, otherwise 'monster'.
-  const initialKindSwitch: RefKindSwitch =
-    (editPage?.refs[0]?.kind ?? prefilledRef?.kind) === 'npc' ? 'npc' : 'monster';
-  const [refKindSwitch, setRefKindSwitch] = useState<RefKindSwitch>(initialKindSwitch);
+  // Derives from the prefilled/edit ref kind, defaulting to 'monster'.
+  function resolveInitialKindSwitch(): RefKindSwitch {
+    const kind = editPage?.refs[0]?.kind ?? prefilledRef?.kind;
+    if (kind === 'npc') return 'npc';
+    if (kind === 'faction') return 'faction';
+    if (kind === 'location') return 'location';
+    return 'monster';
+  }
+  const [refKindSwitch, setRefKindSwitch] = useState<RefKindSwitch>(resolveInitialKindSwitch());
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +167,32 @@ export function BitacoraComposer({
     }
     // NPC value encodes just the UUID; refSource is always 'world'
     setSelectedRef({ kind: 'npc', refKey: val, refSource: 'world' });
+  }
+
+  /**
+   * Faction ref picker handler — uuid-bridge-factions-pois B-3.
+   * refSource='world' LOCKED for UUID kinds (ADR-2).
+   */
+  function handleFactionRefChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    if (!val) {
+      setSelectedRef(null);
+      return;
+    }
+    setSelectedRef({ kind: 'faction', refKey: val, refSource: 'world' });
+  }
+
+  /**
+   * Location ref picker handler — uuid-bridge-factions-pois B-3.
+   * refSource='world' LOCKED for UUID kinds (ADR-2).
+   */
+  function handleLocationRefChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    if (!val) {
+      setSelectedRef(null);
+      return;
+    }
+    setSelectedRef({ kind: 'location', refKey: val, refSource: 'world' });
   }
 
   function handleKindSwitch(newKind: RefKindSwitch) {
@@ -206,7 +265,9 @@ export function BitacoraComposer({
 
   const hasMonsters = knownMonsters.length > 0;
   const hasNpcs = knownNpcs.length > 0;
-  const hasAnyRef = hasMonsters || hasNpcs;
+  const hasFactions = knownFactions.length > 0;
+  const hasLocations = knownLocations.length > 0;
+  const hasAnyRef = hasMonsters || hasNpcs || hasFactions || hasLocations;
 
   const title_label = isEditMode ? 'Editar página' : 'Nueva página';
   const submitLabel = submitting ? 'Guardando…' : isEditMode ? 'Guardar cambios' : 'Crear página';
@@ -292,9 +353,10 @@ export function BitacoraComposer({
           )}
         </div>
 
-        {/* Ref picker — kind switch (Monstruo | NPC) + entity list.
-            uuid-bridge-npc B-3: added NPC kind switch above the select.
-            NOTE: API/domain accept refs to any known entity; UI restricts to known for UX. */}
+        {/* Ref picker — kind switch (Monstruo | NPC | Facción | Lugar) + entity list.
+            uuid-bridge-factions-pois B-3: extended from 2 to 4 kinds (ADR-5 delta).
+            NOTE: API/domain accept refs to any known entity; UI restricts to known for UX.
+            Pills may wrap to 2 rows at 375px — acceptable (ADR-5 mobile note). */}
         {hasAnyRef && (
           <div>
             <p className="block text-xs font-semibold uppercase tracking-wide text-ink-mute mb-2">
@@ -302,40 +364,74 @@ export function BitacoraComposer({
               <span className="text-ink-soft font-normal normal-case">(opcional)</span>
             </p>
 
-            {/* Kind switch pills — only show if both kinds have entries */}
-            {hasMonsters && hasNpcs && (
-              <div className="flex gap-2 mb-2">
-                <button
-                  type="button"
-                  onClick={() => handleKindSwitch('monster')}
-                  className={[
-                    'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
-                    refKindSwitch === 'monster'
-                      ? 'bg-ink text-paper border-ink'
-                      : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
-                  ].join(' ')}
-                  aria-pressed={refKindSwitch === 'monster'}
-                >
-                  Monstruo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleKindSwitch('npc')}
-                  className={[
-                    'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
-                    refKindSwitch === 'npc'
-                      ? 'bg-ink text-paper border-ink'
-                      : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
-                  ].join(' ')}
-                  aria-pressed={refKindSwitch === 'npc'}
-                >
-                  NPC
-                </button>
+            {/* Kind switch pills — show when multiple kinds are available */}
+            {(hasMonsters || hasNpcs || hasFactions || hasLocations) && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {hasMonsters && (
+                  <button
+                    type="button"
+                    onClick={() => handleKindSwitch('monster')}
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      refKindSwitch === 'monster'
+                        ? 'bg-ink text-paper border-ink'
+                        : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                    ].join(' ')}
+                    aria-pressed={refKindSwitch === 'monster'}
+                  >
+                    Monstruo
+                  </button>
+                )}
+                {hasNpcs && (
+                  <button
+                    type="button"
+                    onClick={() => handleKindSwitch('npc')}
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      refKindSwitch === 'npc'
+                        ? 'bg-ink text-paper border-ink'
+                        : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                    ].join(' ')}
+                    aria-pressed={refKindSwitch === 'npc'}
+                  >
+                    NPC
+                  </button>
+                )}
+                {hasFactions && (
+                  <button
+                    type="button"
+                    onClick={() => handleKindSwitch('faction')}
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      refKindSwitch === 'faction'
+                        ? 'bg-ink text-paper border-ink'
+                        : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                    ].join(' ')}
+                    aria-pressed={refKindSwitch === 'faction'}
+                  >
+                    Facción
+                  </button>
+                )}
+                {hasLocations && (
+                  <button
+                    type="button"
+                    onClick={() => handleKindSwitch('location')}
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      refKindSwitch === 'location'
+                        ? 'bg-ink text-paper border-ink'
+                        : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                    ].join(' ')}
+                    aria-pressed={refKindSwitch === 'location'}
+                  >
+                    Lugar
+                  </button>
+                )}
               </div>
             )}
 
-            {/* Monster ref picker (unchanged from original) */}
-            {(refKindSwitch === 'monster' || !hasNpcs) && hasMonsters && (
+            {/* Monster ref picker */}
+            {refKindSwitch === 'monster' && hasMonsters && (
               <select
                 id="bp-ref"
                 value={selectedRef?.kind === 'monster' ? `${selectedRef.refKey}|${selectedRef.refSource}` : ''}
@@ -352,7 +448,7 @@ export function BitacoraComposer({
             )}
 
             {/* NPC ref picker — uuid-bridge-npc B-3. refSource='world' LOCKED (ADR-2). */}
-            {(refKindSwitch === 'npc' || !hasMonsters) && hasNpcs && (
+            {refKindSwitch === 'npc' && hasNpcs && (
               <select
                 id="bp-ref-npc"
                 value={selectedRef?.kind === 'npc' ? selectedRef.refKey : ''}
@@ -363,6 +459,40 @@ export function BitacoraComposer({
                 {knownNpcs.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Faction ref picker — uuid-bridge-factions-pois B-3. refSource='world' LOCKED (ADR-2). */}
+            {refKindSwitch === 'faction' && hasFactions && (
+              <select
+                id="bp-ref-faction"
+                value={selectedRef?.kind === 'faction' ? selectedRef.refKey : ''}
+                onChange={handleFactionRefChange}
+                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+              >
+                <option value="">Sin facción</option>
+                {knownFactions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Location ref picker — uuid-bridge-factions-pois B-3. refSource='world' LOCKED (ADR-2). */}
+            {refKindSwitch === 'location' && hasLocations && (
+              <select
+                id="bp-ref-location"
+                value={selectedRef?.kind === 'location' ? selectedRef.refKey : ''}
+                onChange={handleLocationRefChange}
+                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+              >
+                <option value="">Sin lugar</option>
+                {knownLocations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
                   </option>
                 ))}
               </select>

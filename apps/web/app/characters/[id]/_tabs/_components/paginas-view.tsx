@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
-import { BitacoraComposer, type KnownMonster, type KnownNpc, type BitacoraPageRef } from './bitacora-composer';
+import { BitacoraComposer, type KnownMonster, type KnownNpc, type KnownFaction, type KnownLocation, type BitacoraPageRef } from './bitacora-composer';
 import { deleteBitacoraPage } from '../../actions';
 
 export interface BitacoraPageItem {
@@ -36,17 +36,34 @@ const NPC_STATUS_LABELS: Record<string, string> = {
   unknown: 'Desconocido',
 };
 
+const FACTION_STATE_LABELS: Record<string, string> = {
+  active: 'Activa',
+  disbanded: 'Disuelta',
+  unknown: 'Desconocida',
+};
+
+const POI_STATUS_LABELS: Record<string, string> = {
+  known: 'Conocido',
+  rumored: 'Rumoreado',
+  hidden: 'Oculto',
+  unknown: 'Desconocido',
+};
+
 interface PaginasViewProps {
   characterId: string;
   pages: BitacoraPageItem[];
   knownMonsters: KnownMonster[];
   /** Known NPCs for the ref picker and NPC linked-entity card. uuid-bridge-npc B-3. */
   knownNpcs?: KnownNpc[];
+  /** Known factions for the ref picker and faction linked-entity card. uuid-bridge-factions-pois B-3. */
+  knownFactions?: KnownFaction[];
+  /** Known locations (POIs) for the ref picker and location linked-entity card. uuid-bridge-factions-pois B-3. */
+  knownLocations?: KnownLocation[];
   worldId: string;
   accessToken: string;
 }
 
-export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [], worldId, accessToken }: PaginasViewProps) {
+export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [], knownFactions = [], knownLocations = [], worldId, accessToken }: PaginasViewProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editPage, setEditPage] = useState<BitacoraPageItem | null>(null);
@@ -104,6 +121,18 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
       detailPage.refs.some((r) => r.kind === 'npc' && r.refKey === n.id && r.refSource === 'world'),
     );
 
+    // Faction linked entity — uuid-bridge-factions-pois B-3 (REQ-UBFP-BITACORA linked-entity).
+    // Resolved from knownFactions ({id, name, state} only — NO dmNotes, ADR-6).
+    const linkedFaction = knownFactions.find((f) =>
+      detailPage.refs.some((r) => r.kind === 'faction' && r.refKey === f.id && r.refSource === 'world'),
+    );
+
+    // Location linked entity — uuid-bridge-factions-pois B-3 (REQ-UBFP-BITACORA linked-entity).
+    // Resolved from knownLocations ({id, name, status} only — NO dmNotes, NO parentHexStatus, ADR-6 + C10).
+    const linkedLocation = knownLocations.find((l) =>
+      detailPage.refs.some((r) => r.kind === 'location' && r.refKey === l.id && r.refSource === 'world'),
+    );
+
     return (
       <div className="flex flex-col gap-4">
         <button
@@ -135,6 +164,28 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute mb-1">NPC</p>
               <p className="text-sm font-medium text-ink">{linkedNpc.name}</p>
               {/* dmNotes intentionally absent — KnownNpc carries only {id, name} (ADR-6) */}
+            </div>
+          )}
+          {/* Faction linked-entity inline card — uuid-bridge-factions-pois B-3 (REQ-UBFP-BITACORA). */}
+          {/* dmNotes intentionally absent — KnownFaction carries only {id, name, state} (ADR-6). */}
+          {linkedFaction && (
+            <div className="rounded-md border border-line bg-paper-soft px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute mb-1">Facción</p>
+              <p className="text-sm font-medium text-ink">{linkedFaction.name}</p>
+              <p className="text-xs text-ink-mute mt-0.5">
+                {FACTION_STATE_LABELS[linkedFaction.state] ?? linkedFaction.state}
+              </p>
+            </div>
+          )}
+          {/* Location linked-entity inline card — uuid-bridge-factions-pois B-3 (REQ-UBFP-BITACORA). */}
+          {/* dmNotes + parentHexStatus intentionally absent — KnownLocation carries only {id, name, status} (ADR-6, C10). */}
+          {linkedLocation && (
+            <div className="rounded-md border border-line bg-paper-soft px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute mb-1">Lugar</p>
+              <p className="text-sm font-medium text-ink">{linkedLocation.name}</p>
+              <p className="text-xs text-ink-mute mt-0.5">
+                {POI_STATUS_LABELS[linkedLocation.status] ?? linkedLocation.status}
+              </p>
             </div>
           )}
           <p className="text-sm text-ink whitespace-pre-wrap">{detailPage.body}</p>
@@ -187,6 +238,8 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
           characterId={characterId}
           knownMonsters={knownMonsters}
           knownNpcs={knownNpcs}
+          knownFactions={knownFactions}
+          knownLocations={knownLocations}
           editPage={editPage ?? undefined}
           open={composerOpen}
           onClose={handleComposerClose}

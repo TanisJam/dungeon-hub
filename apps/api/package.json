@@ -18,7 +18,8 @@
     "seed-modifier-definitions": "tsx scripts/seed-modifier-definitions.ts",
     "db:seed": "pnpm db:migrate && pnpm import:5etools && pnpm seed-modifier-definitions",
     "db:cleanup": "tsx scripts/cleanup-dev-data.ts",
-    "db:seed:e2e": "tsx scripts/seed-e2e-fixture.ts"
+    "db:seed:e2e": "tsx scripts/seed-e2e-fixture.ts",
+    "seed-dev-encounter": "tsx scripts/seed-dev-encounter.ts"
   },
   "dependencies": {
     "@dungeon-hub/compendium-import": "workspace:*",

@@ -293,8 +293,8 @@ describe('DmGrantPanel — Bestiario tab (REQ-CK-WEB-01)', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
     });
-    // Bestiario tab must be present in the tab list
-    expect(screen.getByRole('tab', { name: 'Bestiario' })).toBeTruthy();
+    // Bestias tab must be present in the tab list (label shortened to fit 7-tab mobile layout)
+    expect(screen.getByRole('tab', { name: 'Bestias' })).toBeTruthy();
   });
 
   it('(b) player → no trigger button at all (DM grant affordance absent)', () => {
@@ -317,7 +317,7 @@ describe('DmGrantPanel — Bestiario tab (REQ-CK-WEB-01)', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Otorgar recompensa de DM' }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByRole('tab', { name: 'Bestiario' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Bestias' }));
     });
 
     // Search input is present

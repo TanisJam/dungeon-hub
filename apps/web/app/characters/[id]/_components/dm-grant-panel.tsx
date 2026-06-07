@@ -29,13 +29,17 @@ import {
 import {
   searchCompendiumMonsters,
   searchWorldNpcs,
+  searchWorldFactions,
+  searchWorldPois,
   type CompendiumMonsterHit,
   type WorldNpcHit,
+  type WorldFactionHit,
+  type WorldPoiHit,
 } from './dm-grant-panel-actions';
 
 type CallerRole = 'gm' | 'player' | null;
-/** uuid-bridge-npc B-3: added 'npc' tab (REQ-UBN-GRANT, ADR-3). */
-type Tab = 'xp' | 'gold' | 'item' | 'bestiary' | 'npc';
+/** uuid-bridge-factions-pois B-3: added 'faction' + 'location' tabs (REQ-UBFP-GRANT, ADR-3 delta). */
+type Tab = 'xp' | 'gold' | 'item' | 'bestiary' | 'npc' | 'faction' | 'location';
 
 interface DmGrantPanelProps {
   characterId: string;
@@ -159,22 +163,28 @@ function DmGrantModal({
           </button>
         </div>
 
-        {/* Tabs ABOVE form — thumb reach at 375px. 5 equal flex-1 tabs at 375px. */}
-        <div className="flex border-b border-line" role="tablist">
-          {(['xp', 'gold', 'item', 'bestiary', 'npc'] as const).map((tab) => (
+        {/* Tabs ABOVE form — thumb reach at 375px. 7 tabs: short labels (R4, ADR-3 delta). */}
+        <div className="flex border-b border-line overflow-x-auto" role="tablist">
+          {(['xp', 'gold', 'item', 'bestiary', 'npc', 'faction', 'location'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               role="tab"
               aria-selected={activeTab === tab}
               onClick={() => onTabChange(tab)}
-              className={`min-h-[44px] flex-1 px-2 py-3 text-xs font-semibold transition-colors ${
+              className={`min-h-[44px] flex-1 min-w-0 px-1 py-3 text-xs font-semibold transition-colors whitespace-nowrap ${
                 activeTab === tab
                   ? 'border-b-2 border-primary text-primary-deep'
                   : 'text-ink-mute hover:text-ink'
               }`}
             >
-              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : tab === 'item' ? 'Ítem' : tab === 'bestiary' ? 'Bestiario' : 'NPC'}
+              {tab === 'xp' ? 'XP'
+                : tab === 'gold' ? 'Oro'
+                : tab === 'item' ? 'Ítem'
+                : tab === 'bestiary' ? 'Bestias'
+                : tab === 'npc' ? 'NPC'
+                : tab === 'faction' ? 'Facción'
+                : 'Lugar'}
             </button>
           ))}
         </div>
@@ -195,6 +205,12 @@ function DmGrantModal({
           )}
           {activeTab === 'npc' && (
             <NpcTab characterId={characterId} worldId={worldId} onClose={onClose} />
+          )}
+          {activeTab === 'faction' && (
+            <FactionTab characterId={characterId} worldId={worldId} onClose={onClose} />
+          )}
+          {activeTab === 'location' && (
+            <LocationTab characterId={characterId} worldId={worldId} onClose={onClose} />
           )}
         </div>
       </div>
@@ -669,6 +685,311 @@ function BestiarioTab({
         className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isPending ? 'Otorgando…' : 'Revelar monstruo'}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Faction tab — uuid-bridge-factions-pois Wave 5b (REQ-UBFP-GRANT, ADR-3 delta)
+//
+// Loads all world factions ONCE on mount, filters name client-side (D2: small list).
+// On pick → grantKnowledge(kind='faction', refKey=faction.id (UUID), refSource='world').
+// refSource='world' is LOCKED for UUID kinds (ADR-2).
+// Mobile: ≥44px rows, full-screen modal already.
+// ---------------------------------------------------------------------------
+
+function FactionTab({
+  characterId,
+  worldId,
+  onClose,
+}: {
+  characterId: string;
+  worldId: string;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [allFactions, setAllFactions] = useState<WorldFactionHit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState<WorldFactionHit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Load all world factions once on mount (D2: client-side filter, no ?q= param)
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    searchWorldFactions(worldId).then((factions) => {
+      if (!cancelled) {
+        setAllFactions(factions);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [worldId]);
+
+  // Focus input after load
+  useEffect(() => {
+    if (!loading) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  // Client-side name filter
+  const filtered = query.trim().length === 0
+    ? allFactions
+    : allFactions.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()));
+
+  function handlePickFaction(faction: WorldFactionHit) {
+    setPicked(faction);
+    setQuery(faction.name);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!picked) {
+      setError('Seleccioná una facción de la lista.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      // refSource='world' LOCKED for UUID kinds (ADR-2, uuid-bridge-factions-pois)
+      const result = await grantKnowledge(characterId, {
+        kind: 'faction',
+        refKey: picked.id,
+        refSource: 'world',
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="faction-search" className="block text-sm font-medium text-ink mb-1">
+          Buscar facción
+        </label>
+        <input
+          ref={inputRef}
+          id="faction-search"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPicked(null);
+          }}
+          placeholder="Nombre de la facción…"
+          disabled={loading}
+          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+        />
+      </div>
+
+      {!picked && !loading && (
+        <div className="rounded-md border border-line bg-white overflow-hidden">
+          {filtered.length === 0 && (
+            <p className="px-4 py-3 text-sm text-ink-mute">
+              {allFactions.length === 0 ? 'No hay facciones en este mundo.' : 'Sin resultados.'}
+            </p>
+          )}
+          {filtered.length > 0 && (
+            <ul className="divide-y divide-line max-h-48 overflow-y-auto">
+              {filtered.map((faction) => (
+                <li key={faction.id}>
+                  <button
+                    type="button"
+                    onClick={() => handlePickFaction(faction)}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-paper-soft transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{faction.name}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                        {faction.state}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <p className="text-sm text-ink-mute">Cargando facciones…</p>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isPending || !picked}
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isPending ? 'Otorgando…' : 'Revelar facción'}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Location tab — uuid-bridge-factions-pois Wave 5b (REQ-UBFP-GRANT, ADR-3 delta)
+//
+// Loads all world POIs ONCE on mount, filters name client-side (D2: small list).
+// On pick → grantKnowledge(kind='location', refKey=poi.id (UUID), refSource='world').
+// refSource='world' is LOCKED for UUID kinds (ADR-2).
+// ---------------------------------------------------------------------------
+
+function LocationTab({
+  characterId,
+  worldId,
+  onClose,
+}: {
+  characterId: string;
+  worldId: string;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [allPois, setAllPois] = useState<WorldPoiHit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState<WorldPoiHit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Load all world POIs once on mount
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    searchWorldPois(worldId).then((pois) => {
+      if (!cancelled) {
+        setAllPois(pois);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [worldId]);
+
+  // Focus input after load
+  useEffect(() => {
+    if (!loading) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  // Client-side name filter
+  const filtered = query.trim().length === 0
+    ? allPois
+    : allPois.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()));
+
+  function handlePickPoi(poi: WorldPoiHit) {
+    setPicked(poi);
+    setQuery(poi.name);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!picked) {
+      setError('Seleccioná un lugar de la lista.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      // refSource='world' LOCKED for UUID kinds (ADR-2, uuid-bridge-factions-pois)
+      const result = await grantKnowledge(characterId, {
+        kind: 'location',
+        refKey: picked.id,
+        refSource: 'world',
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="location-search" className="block text-sm font-medium text-ink mb-1">
+          Buscar lugar
+        </label>
+        <input
+          ref={inputRef}
+          id="location-search"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPicked(null);
+          }}
+          placeholder="Nombre del lugar…"
+          disabled={loading}
+          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+        />
+      </div>
+
+      {!picked && !loading && (
+        <div className="rounded-md border border-line bg-white overflow-hidden">
+          {filtered.length === 0 && (
+            <p className="px-4 py-3 text-sm text-ink-mute">
+              {allPois.length === 0 ? 'No hay lugares en este mundo.' : 'Sin resultados.'}
+            </p>
+          )}
+          {filtered.length > 0 && (
+            <ul className="divide-y divide-line max-h-48 overflow-y-auto">
+              {filtered.map((poi) => (
+                <li key={poi.id}>
+                  <button
+                    type="button"
+                    onClick={() => handlePickPoi(poi)}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-paper-soft transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{poi.name}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                        {poi.status}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <p className="text-sm text-ink-mute">Cargando lugares…</p>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isPending || !picked}
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isPending ? 'Otorgando…' : 'Revelar lugar'}
       </button>
     </form>
   );
