@@ -77,9 +77,10 @@ const MAX_BODY = 10_000;
  * Supported ref kinds for bitácora pages.
  * Wave 1: monster (compendium slug+source pair).
  * Wave 5a (uuid-bridge-npc): npc (UUID refKey, refSource='world').
- * factions/locations/lore remain unsupported until subsequent UUID bridge slices.
+ * Wave 5b (uuid-bridge-factions-pois): faction + location (UUID refKey, refSource='world').
+ * lore remains unsupported until a lore-entity SDD lands.
  */
-const SUPPORTED_REF_KINDS = ['monster', 'npc'] as const;
+const SUPPORTED_REF_KINDS = ['monster', 'npc', 'faction', 'location'] as const;
 
 // ---------------------------------------------------------------------------
 // Zod schema (structural)

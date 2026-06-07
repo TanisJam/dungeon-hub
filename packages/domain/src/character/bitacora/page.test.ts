@@ -114,16 +114,76 @@ describe('validateBitacoraPage — npc ref kind (uuid-bridge-npc Wave 5a)', () =
   });
 });
 
-// ── Unsupported ref kind ───────────────────────────────────────────────────────
+// ── Supported faction ref kind (uuid-bridge-factions-pois B-1) ───────────────
 
-describe('validateBitacoraPage — unsupported ref kind', () => {
-  it('ref.kind = "faction" → ok:false, BITACORA_PAGE_REF_KIND_UNSUPPORTED (not this slice)', () => {
-    // uuid-bridge-npc B-1: factions/locations/lore remain unsupported this wave.
-    // Only monster + npc are in SUPPORTED_REF_KINDS.
+describe('validateBitacoraPage — faction ref kind (uuid-bridge-factions-pois Wave 5b)', () => {
+  it('ref.kind = "faction" with UUID refKey → ok:true, no REF_KIND_UNSUPPORTED', () => {
+    // uuid-bridge-factions-pois B-1: faction refs are now supported.
+    // REQ-UBFP-BITACORA: domain accepts faction refs; refSource='world' is the convention.
     const result = validateBitacoraPage({
       body: 'Notes about the thieves guild.',
+      tags: ['factions'],
+      refs: [{ kind: 'faction', refKey: '550e8400-e29b-41d4-a716-000000000001', refSource: 'world' }],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('ref.kind = "faction" does NOT emit BITACORA_PAGE_REF_KIND_UNSUPPORTED', () => {
+    // Regression guard: 'faction' must NOT be in the unsupported set after this wave.
+    const result = validateBitacoraPage({
+      body: 'Notes about the merchant guild.',
+      tags: ['factions'],
+      refs: [{ kind: 'faction', refKey: '550e8400-e29b-41d4-a716-000000000002', refSource: 'world' }],
+    });
+    if (!result.ok) {
+      const hasUnsupported = result.issues.some(
+        (i) => i.code === 'BITACORA_PAGE_REF_KIND_UNSUPPORTED',
+      );
+      expect(hasUnsupported).toBe(false);
+    }
+  });
+});
+
+// ── Supported location ref kind (uuid-bridge-factions-pois B-1) ──────────────
+
+describe('validateBitacoraPage — location ref kind (uuid-bridge-factions-pois Wave 5b)', () => {
+  it('ref.kind = "location" with UUID refKey → ok:true, no REF_KIND_UNSUPPORTED', () => {
+    // uuid-bridge-factions-pois B-1: location refs are now supported.
+    // REQ-UBFP-BITACORA: domain accepts location refs; refSource='world' is the convention.
+    const result = validateBitacoraPage({
+      body: 'Notes about the ancient ruins.',
+      tags: ['locations'],
+      refs: [{ kind: 'location', refKey: '550e8400-e29b-41d4-a716-000000000003', refSource: 'world' }],
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('ref.kind = "location" does NOT emit BITACORA_PAGE_REF_KIND_UNSUPPORTED', () => {
+    // Regression guard: 'location' must NOT be in the unsupported set after this wave.
+    const result = validateBitacoraPage({
+      body: 'Notes about the hidden cave.',
+      tags: ['locations'],
+      refs: [{ kind: 'location', refKey: '550e8400-e29b-41d4-a716-000000000004', refSource: 'world' }],
+    });
+    if (!result.ok) {
+      const hasUnsupported = result.issues.some(
+        (i) => i.code === 'BITACORA_PAGE_REF_KIND_UNSUPPORTED',
+      );
+      expect(hasUnsupported).toBe(false);
+    }
+  });
+});
+
+// ── Unsupported ref kind — regression guard (unknown still rejects) ────────────
+
+describe('validateBitacoraPage — unsupported ref kind', () => {
+  it('ref.kind = "lore" → ok:false, BITACORA_PAGE_REF_KIND_UNSUPPORTED (not this slice)', () => {
+    // uuid-bridge-factions-pois B-1: lore remains unsupported this wave.
+    // Only monster + npc + faction + location are in SUPPORTED_REF_KINDS.
+    const result = validateBitacoraPage({
+      body: 'Notes about ancient lore.',
       tags: ['lore'],
-      refs: [{ kind: 'faction', refKey: 'thieves-guild-uuid', refSource: 'world' }],
+      refs: [{ kind: 'lore', refKey: 'some-lore-uuid', refSource: 'world' }],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -136,6 +196,18 @@ describe('validateBitacoraPage — unsupported ref kind', () => {
       body: 'Notes about a spell.',
       tags: ['spells'],
       refs: [{ kind: 'spell', refKey: 'fireball', refSource: 'phb' }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.some((i) => i.code === 'BITACORA_PAGE_REF_KIND_UNSUPPORTED')).toBe(true);
+    }
+  });
+
+  it('ref.kind = "unknown-kind" → ok:false, BITACORA_PAGE_REF_KIND_UNSUPPORTED', () => {
+    const result = validateBitacoraPage({
+      body: 'Notes about something.',
+      tags: ['lore'],
+      refs: [{ kind: 'unknown-kind', refKey: 'some-uuid', refSource: 'world' }],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
