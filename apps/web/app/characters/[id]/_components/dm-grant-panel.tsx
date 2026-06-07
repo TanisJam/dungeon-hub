@@ -28,11 +28,14 @@ import {
 } from '../actions';
 import {
   searchCompendiumMonsters,
+  searchWorldNpcs,
   type CompendiumMonsterHit,
+  type WorldNpcHit,
 } from './dm-grant-panel-actions';
 
 type CallerRole = 'gm' | 'player' | null;
-type Tab = 'xp' | 'gold' | 'item' | 'bestiary';
+/** uuid-bridge-npc B-3: added 'npc' tab (REQ-UBN-GRANT, ADR-3). */
+type Tab = 'xp' | 'gold' | 'item' | 'bestiary' | 'npc';
 
 interface DmGrantPanelProps {
   characterId: string;
@@ -156,22 +159,22 @@ function DmGrantModal({
           </button>
         </div>
 
-        {/* Tabs ABOVE form — thumb reach at 375px */}
+        {/* Tabs ABOVE form — thumb reach at 375px. 5 equal flex-1 tabs at 375px. */}
         <div className="flex border-b border-line" role="tablist">
-          {(['xp', 'gold', 'item', 'bestiary'] as const).map((tab) => (
+          {(['xp', 'gold', 'item', 'bestiary', 'npc'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               role="tab"
               aria-selected={activeTab === tab}
               onClick={() => onTabChange(tab)}
-              className={`min-h-[44px] flex-1 px-2 py-3 text-sm font-semibold transition-colors ${
+              className={`min-h-[44px] flex-1 px-2 py-3 text-xs font-semibold transition-colors ${
                 activeTab === tab
                   ? 'border-b-2 border-primary text-primary-deep'
                   : 'text-ink-mute hover:text-ink'
               }`}
             >
-              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : tab === 'item' ? 'Ítem' : 'Bestiario'}
+              {tab === 'xp' ? 'XP' : tab === 'gold' ? 'Oro' : tab === 'item' ? 'Ítem' : tab === 'bestiary' ? 'Bestiario' : 'NPC'}
             </button>
           ))}
         </div>
@@ -189,6 +192,9 @@ function DmGrantModal({
           )}
           {activeTab === 'bestiary' && (
             <BestiarioTab characterId={characterId} worldId={worldId} onClose={onClose} />
+          )}
+          {activeTab === 'npc' && (
+            <NpcTab characterId={characterId} worldId={worldId} onClose={onClose} />
           )}
         </div>
       </div>
@@ -663,6 +669,170 @@ function BestiarioTab({
         className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isPending ? 'Otorgando…' : 'Revelar monstruo'}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NPC tab — uuid-bridge-npc Wave 5a (REQ-UBN-GRANT, ADR-3)
+//
+// Loads all world NPCs ONCE on mount, filters name client-side (D2: small list).
+// On pick → grantKnowledge(kind='npc', refKey=npc.id (UUID), refSource='world').
+// refSource='world' is LOCKED for UUID kinds (ADR-2).
+// Mobile: ≥44px rows, full-screen modal already.
+// ---------------------------------------------------------------------------
+
+function NpcTab({
+  characterId,
+  worldId,
+  onClose,
+}: {
+  characterId: string;
+  worldId: string;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [allNpcs, setAllNpcs] = useState<WorldNpcHit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState<WorldNpcHit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Load all world NPCs once on mount (D2: client-side filter, no ?q= param)
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    searchWorldNpcs(worldId).then((npcs) => {
+      if (!cancelled) {
+        setAllNpcs(npcs);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [worldId]);
+
+  // Focus input after load
+  useEffect(() => {
+    if (!loading) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  // Client-side name filter
+  const filtered = query.trim().length === 0
+    ? allNpcs
+    : allNpcs.filter((npc) => npc.name.toLowerCase().includes(query.trim().toLowerCase()));
+
+  const STATUS_LABELS: Record<WorldNpcHit['status'], string> = {
+    alive: 'Vivo',
+    dead: 'Muerto',
+    missing: 'Desaparecido',
+    unknown: 'Desconocido',
+  };
+
+  function handlePickNpc(npc: WorldNpcHit) {
+    setPicked(npc);
+    setQuery(npc.name);
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!picked) {
+      setError('Seleccioná un NPC de la lista.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      // refSource='world' LOCKED for UUID kinds (ADR-2, uuid-bridge-npc)
+      const result = await grantKnowledge(characterId, {
+        kind: 'npc',
+        refKey: picked.id,
+        refSource: 'world',
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* NPC search */}
+      <div>
+        <label htmlFor="npc-search" className="block text-sm font-medium text-ink mb-1">
+          Buscar NPC
+        </label>
+        <input
+          ref={inputRef}
+          id="npc-search"
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPicked(null);
+          }}
+          placeholder="Nombre del NPC…"
+          disabled={loading}
+          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+        />
+      </div>
+
+      {/* Results */}
+      {!picked && !loading && (
+        <div className="rounded-md border border-line bg-white overflow-hidden">
+          {filtered.length === 0 && (
+            <p className="px-4 py-3 text-sm text-ink-mute">
+              {allNpcs.length === 0 ? 'No hay NPCs en este mundo.' : 'Sin resultados.'}
+            </p>
+          )}
+          {filtered.length > 0 && (
+            <ul className="divide-y divide-line max-h-48 overflow-y-auto">
+              {filtered.map((npc) => (
+                <li key={npc.id}>
+                  <button
+                    type="button"
+                    onClick={() => handlePickNpc(npc)}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-paper-soft transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink">{npc.name}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                        {[npc.race, STATUS_LABELS[npc.status]]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <p className="text-sm text-ink-mute">Cargando NPCs…</p>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs font-medium text-red-600">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isPending || !picked}
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper transition-colors hover:bg-primary-deep disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isPending ? 'Otorgando…' : 'Revelar NPC'}
       </button>
     </form>
   );

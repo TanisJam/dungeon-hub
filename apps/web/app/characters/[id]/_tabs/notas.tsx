@@ -4,14 +4,15 @@
  * Two segmented sub-views: Conocidos | Páginas.
  * Sub-view selected via ?sub= search param (SSR, Server-Component-first).
  *
- * SSR-fetches:
- *   - Known monsters: GET /characters/:id/knowledge/monsters (gated by character_knowledge)
+ * SSR-fetches (parallel, best-effort):
+ *   - Known monsters: GET /characters/:id/knowledge/monsters
+ *   - Known NPCs:     GET /characters/:id/knowledge/npcs (uuid-bridge-npc B-3)
  *   - Bitácora pages: GET /characters/:id/bitacora/pages
  *
  * Hands SSR data to client sub-view components (ConocidosView, PaginasView).
  *
- * bitacora-personal SDD spec #1974 REQ-BP-WEB-01 / REQ-BP-WEB-02 / REQ-BP-WEB-03,
- * design #1975 §ADR-4 / §ADR-5.
+ * bitacora-personal SDD spec #1974 REQ-BP-WEB-01 / REQ-BP-WEB-02 / REQ-BP-WEB-03.
+ * uuid-bridge-npc spec #2002 REQ-UBN-CONOCIDOS / REQ-UBN-BITACORA.
  * No PHB rule — anti-metagaming design principle.
  */
 
@@ -19,7 +20,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { ConocidosView, type KnownMonsterHit } from './_components/conocidos-view';
 import { PaginasView, type BitacoraPageItem } from './_components/paginas-view';
-import type { KnownMonster } from './_components/bitacora-composer';
+import type { KnownMonster, KnownNpc } from './_components/bitacora-composer';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +28,23 @@ import type { KnownMonster } from './_components/bitacora-composer';
 
 interface KnowledgeMonstersResponse {
   rows: KnownMonsterHit[];
+  total: number;
+  knownCount: number;
+}
+
+/** NPC row shape from GET /characters/:id/knowledge/npcs (CodexNpcRow — no dmNotes). */
+export interface CodexNpcRowSSR {
+  id: string;
+  name: string;
+  race: string | null;
+  status: 'alive' | 'dead' | 'missing' | 'unknown';
+  description: string | null;
+  known: boolean;
+  // NO dmNotes — CodexNpcRow structurally excludes it (ADR-6, REQ-UBN-SECURITY)
+}
+
+interface KnowledgeNpcsResponse {
+  rows: CodexNpcRowSSR[];
   total: number;
   knownCount: number;
 }
@@ -55,10 +73,15 @@ export async function NotasTab({
   callerRole: _callerRole,
   sub,
 }: NotasTabProps) {
-  // SSR-fetch both data sets in parallel (best-effort — on failure show empty state)
-  const [monstersResult, pagesResult] = await Promise.allSettled([
+  // SSR-fetch all data sets in parallel (best-effort — on failure show empty state)
+  // uuid-bridge-npc B-3: added NPC knowledge fetch alongside monsters.
+  const [monstersResult, npcsResult, pagesResult] = await Promise.allSettled([
     api.get<KnowledgeMonstersResponse>(
       `/characters/${characterId}/knowledge/monsters`,
+      accessToken,
+    ),
+    api.get<KnowledgeNpcsResponse>(
+      `/characters/${characterId}/knowledge/npcs`,
       accessToken,
     ),
     api.get<BitacoraPagesResponse>(
@@ -74,6 +97,12 @@ export async function NotasTab({
   // Filter to known-only for Conocidos display — avoids showing ungranted monsters.
   const knownOnly: KnownMonsterHit[] = knownMonsters.filter((m) => m.known !== false);
 
+  // NPC knowledge — player sees only known NPCs (known !== false).
+  // CodexNpcRow has NO dmNotes field; web props carry only safe fields (ADR-6 rule).
+  const allNpcRows: CodexNpcRowSSR[] =
+    npcsResult.status === 'fulfilled' ? npcsResult.value.rows : [];
+  const knownNpcs: CodexNpcRowSSR[] = allNpcRows.filter((n) => n.known !== false);
+
   const pages: BitacoraPageItem[] =
     pagesResult.status === 'fulfilled' ? pagesResult.value.pages : [];
 
@@ -82,6 +111,12 @@ export async function NotasTab({
     slug: m.slug,
     source: m.source,
     name: m.name,
+  }));
+
+  // Known NPCs for the composer ref picker — project to {id, name} only (ADR-6 rule).
+  const knownNpcsForComposer: KnownNpc[] = knownNpcs.map((n) => ({
+    id: n.id,
+    name: n.name,
   }));
 
   const activeConocidos = sub !== 'paginas';
@@ -124,6 +159,7 @@ export async function NotasTab({
         <ConocidosView
           characterId={characterId}
           monsters={knownOnly}
+          npcs={knownNpcs}
           pages={pages}
           worldId={worldId}
           accessToken={accessToken}
@@ -133,6 +169,7 @@ export async function NotasTab({
           characterId={characterId}
           pages={pages}
           knownMonsters={knownMonstersForComposer}
+          knownNpcs={knownNpcsForComposer}
           worldId={worldId}
           accessToken={accessToken}
         />

@@ -5,13 +5,14 @@
  *
  * Reuses V3Sheet bottom-sheet pattern (tap-outside-to-close, mobile-first 375px).
  * Fields: optional title, required body textarea, tag multi-select (KNOWLEDGE_TAGS pills),
- * optional monster ref picker (from known monsters — known-only for discoverability).
+ * optional ref picker with kind switch (Monstruo | NPC — uuid-bridge-npc B-3).
  *
- * NOTE: The monster ref picker sources from the player's KNOWN monsters only (Conocidos
+ * NOTE: The ref picker sources from the player's KNOWN entities only (Conocidos
  * gate) — this is a UI discoverability decision. The API and domain do NOT restrict refs
- * to known monsters; a page referencing an unknown monster is valid at the API layer.
+ * to known entities; a page referencing an unknown entity is valid at the API layer.
  *
  * bitacora-personal SDD spec #1974 REQ-BP-WEB-04, design #1975 §ADR-5.
+ * uuid-bridge-npc spec #2002 REQ-UBN-BITACORA, design #2003 ADR-5.
  * No PHB rule — anti-metagaming design principle.
  */
 
@@ -30,6 +31,16 @@ export interface KnownMonster {
   name: string;
 }
 
+/**
+ * Known NPC for the ref picker — projects to {id, name} only.
+ * NO dmNotes — ADR-6 rule: web props for npcs carry ONLY safe fields.
+ * uuid-bridge-npc B-3, REQ-UBN-BITACORA.
+ */
+export interface KnownNpc {
+  id: string;    // UUID — used as refKey
+  name: string;
+}
+
 export interface BitacoraPageRef {
   kind: string;
   refKey: string;
@@ -44,12 +55,17 @@ export interface BitacoraPageData {
   refs: BitacoraPageRef[];
 }
 
+/** Ref kind for the picker switch. uuid-bridge-npc adds 'npc'. */
+type RefKindSwitch = 'monster' | 'npc';
+
 interface BitacoraComposerProps {
   characterId: string;
   knownMonsters: KnownMonster[];
+  /** Known NPCs for the ref picker. uuid-bridge-npc B-3. NO dmNotes. */
+  knownNpcs?: KnownNpc[];
   // When provided, composer opens in edit mode
   editPage?: BitacoraPageData;
-  // Pre-populate with a monster ref (from Conocidos detail shortcut)
+  // Pre-populate with a ref (from Conocidos detail shortcut)
   prefilledRef?: { kind: string; refKey: string; refSource: string };
   onClose: () => void;
   open: boolean;
@@ -62,6 +78,7 @@ interface BitacoraComposerProps {
 export function BitacoraComposer({
   characterId,
   knownMonsters,
+  knownNpcs = [],
   editPage,
   prefilledRef,
   onClose,
@@ -75,6 +92,13 @@ export function BitacoraComposer({
   const [selectedRef, setSelectedRef] = useState<BitacoraPageRef | null>(
     editPage?.refs[0] ?? prefilledRef ?? null,
   );
+
+  // Kind switch: which entity type is the ref picker showing?
+  // Defaults to 'npc' if the prefilled ref is an npc, otherwise 'monster'.
+  const initialKindSwitch: RefKindSwitch =
+    (editPage?.refs[0]?.kind ?? prefilledRef?.kind) === 'npc' ? 'npc' : 'monster';
+  const [refKindSwitch, setRefKindSwitch] = useState<RefKindSwitch>(initialKindSwitch);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -85,7 +109,8 @@ export function BitacoraComposer({
     );
   }
 
-  function handleRefChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  /** Monster ref picker handler (unchanged from original). */
+  function handleMonsterRefChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value;
     if (!val) {
       setSelectedRef(null);
@@ -95,6 +120,26 @@ export function BitacoraComposer({
     if (refKey && refSource) {
       setSelectedRef({ kind: 'monster', refKey, refSource });
     }
+  }
+
+  /**
+   * NPC ref picker handler — uuid-bridge-npc B-3.
+   * refSource='world' LOCKED for UUID kinds (ADR-2).
+   */
+  function handleNpcRefChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    if (!val) {
+      setSelectedRef(null);
+      return;
+    }
+    // NPC value encodes just the UUID; refSource is always 'world'
+    setSelectedRef({ kind: 'npc', refKey: val, refSource: 'world' });
+  }
+
+  function handleKindSwitch(newKind: RefKindSwitch) {
+    setRefKindSwitch(newKind);
+    // Clear ref when switching kinds
+    setSelectedRef(null);
   }
 
   function handleClose() {
@@ -158,6 +203,10 @@ export function BitacoraComposer({
       setError(generalError);
     }
   }
+
+  const hasMonsters = knownMonsters.length > 0;
+  const hasNpcs = knownNpcs.length > 0;
+  const hasAnyRef = hasMonsters || hasNpcs;
 
   const title_label = isEditMode ? 'Editar página' : 'Nueva página';
   const submitLabel = submitting ? 'Guardando…' : isEditMode ? 'Guardar cambios' : 'Crear página';
@@ -243,30 +292,81 @@ export function BitacoraComposer({
           )}
         </div>
 
-        {/* Monster ref picker — known monsters only (discoverability gate)
-            NOTE: API/domain accept refs to any monster; UI restricts to known for UX. */}
-        {knownMonsters.length > 0 && (
+        {/* Ref picker — kind switch (Monstruo | NPC) + entity list.
+            uuid-bridge-npc B-3: added NPC kind switch above the select.
+            NOTE: API/domain accept refs to any known entity; UI restricts to known for UX. */}
+        {hasAnyRef && (
           <div>
-            <label
-              htmlFor="bp-ref"
-              className="block text-xs font-semibold uppercase tracking-wide text-ink-mute mb-1"
-            >
-              Monstruo relacionado{' '}
+            <p className="block text-xs font-semibold uppercase tracking-wide text-ink-mute mb-2">
+              Entidad relacionada{' '}
               <span className="text-ink-soft font-normal normal-case">(opcional)</span>
-            </label>
-            <select
-              id="bp-ref"
-              value={selectedRef ? `${selectedRef.refKey}|${selectedRef.refSource}` : ''}
-              onChange={handleRefChange}
-              className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
-            >
-              <option value="">Sin monstruo</option>
-              {knownMonsters.map((m) => (
-                <option key={`${m.slug}|${m.source}`} value={`${m.slug}|${m.source}`}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+            </p>
+
+            {/* Kind switch pills — only show if both kinds have entries */}
+            {hasMonsters && hasNpcs && (
+              <div className="flex gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => handleKindSwitch('monster')}
+                  className={[
+                    'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                    refKindSwitch === 'monster'
+                      ? 'bg-ink text-paper border-ink'
+                      : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                  ].join(' ')}
+                  aria-pressed={refKindSwitch === 'monster'}
+                >
+                  Monstruo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleKindSwitch('npc')}
+                  className={[
+                    'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                    refKindSwitch === 'npc'
+                      ? 'bg-ink text-paper border-ink'
+                      : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
+                  ].join(' ')}
+                  aria-pressed={refKindSwitch === 'npc'}
+                >
+                  NPC
+                </button>
+              </div>
+            )}
+
+            {/* Monster ref picker (unchanged from original) */}
+            {(refKindSwitch === 'monster' || !hasNpcs) && hasMonsters && (
+              <select
+                id="bp-ref"
+                value={selectedRef?.kind === 'monster' ? `${selectedRef.refKey}|${selectedRef.refSource}` : ''}
+                onChange={handleMonsterRefChange}
+                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+              >
+                <option value="">Sin monstruo</option>
+                {knownMonsters.map((m) => (
+                  <option key={`${m.slug}|${m.source}`} value={`${m.slug}|${m.source}`}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* NPC ref picker — uuid-bridge-npc B-3. refSource='world' LOCKED (ADR-2). */}
+            {(refKindSwitch === 'npc' || !hasMonsters) && hasNpcs && (
+              <select
+                id="bp-ref-npc"
+                value={selectedRef?.kind === 'npc' ? selectedRef.refKey : ''}
+                onChange={handleNpcRefChange}
+                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+              >
+                <option value="">Sin NPC</option>
+                {knownNpcs.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
 

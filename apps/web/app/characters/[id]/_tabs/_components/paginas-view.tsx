@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
-import { BitacoraComposer, type KnownMonster, type BitacoraPageRef } from './bitacora-composer';
+import { BitacoraComposer, type KnownMonster, type KnownNpc, type BitacoraPageRef } from './bitacora-composer';
 import { deleteBitacoraPage } from '../../actions';
 
 export interface BitacoraPageItem {
@@ -29,15 +29,24 @@ export interface BitacoraPageItem {
   updatedAt: string;
 }
 
+const NPC_STATUS_LABELS: Record<string, string> = {
+  alive: 'Vivo',
+  dead: 'Muerto',
+  missing: 'Desaparecido',
+  unknown: 'Desconocido',
+};
+
 interface PaginasViewProps {
   characterId: string;
   pages: BitacoraPageItem[];
   knownMonsters: KnownMonster[];
+  /** Known NPCs for the ref picker and NPC linked-entity card. uuid-bridge-npc B-3. */
+  knownNpcs?: KnownNpc[];
   worldId: string;
   accessToken: string;
 }
 
-export function PaginasView({ characterId, pages, knownMonsters, worldId, accessToken }: PaginasViewProps) {
+export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [], worldId, accessToken }: PaginasViewProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [editPage, setEditPage] = useState<BitacoraPageItem | null>(null);
@@ -89,6 +98,12 @@ export function PaginasView({ characterId, pages, knownMonsters, worldId, access
       detailPage.refs.some((r) => r.kind === 'monster' && r.refKey === m.slug && r.refSource === m.source),
     );
 
+    // NPC linked entity — uuid-bridge-npc B-3 (ADR-5, REQ-UBN-BITACORA linked-entity scenario).
+    // Resolved from knownNpcs (sourced from sanitized codex/npcs — NO dmNotes, ADR-6 path #5).
+    const linkedNpc = knownNpcs.find((n) =>
+      detailPage.refs.some((r) => r.kind === 'npc' && r.refKey === n.id && r.refSource === 'world'),
+    );
+
     return (
       <div className="flex flex-col gap-4">
         <button
@@ -113,6 +128,14 @@ export function PaginasView({ characterId, pages, knownMonsters, worldId, access
             >
               Monstruo: <span className="text-accent">{monster.name}</span> →
             </button>
+          )}
+          {/* NPC linked-entity inline card (NOT statblock, ADR-5 D3, ADR-6 path #5). */}
+          {linkedNpc && (
+            <div className="rounded-md border border-line bg-paper-soft px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute mb-1">NPC</p>
+              <p className="text-sm font-medium text-ink">{linkedNpc.name}</p>
+              {/* dmNotes intentionally absent — KnownNpc carries only {id, name} (ADR-6) */}
+            </div>
           )}
           <p className="text-sm text-ink whitespace-pre-wrap">{detailPage.body}</p>
           {detailPage.tags.length > 0 && (
@@ -163,6 +186,7 @@ export function PaginasView({ characterId, pages, knownMonsters, worldId, access
         <BitacoraComposer
           characterId={characterId}
           knownMonsters={knownMonsters}
+          knownNpcs={knownNpcs}
           editPage={editPage ?? undefined}
           open={composerOpen}
           onClose={handleComposerClose}
@@ -268,6 +292,7 @@ export function PaginasView({ characterId, pages, knownMonsters, worldId, access
       <BitacoraComposer
         characterId={characterId}
         knownMonsters={knownMonsters}
+        knownNpcs={knownNpcs}
         editPage={editPage ?? undefined}
         open={composerOpen}
         onClose={handleComposerClose}
