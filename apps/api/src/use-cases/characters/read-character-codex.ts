@@ -3,6 +3,8 @@ import { db } from '../../infra/db/client.js';
 import { characterKnowledge, compendiumMonsters } from '../../infra/db/schema.js';
 import { seesEntry, isMonsterKnownByDefault } from '@dungeon-hub/domain/character/knowledge';
 import { listNpcsInWorld, sanitizeNpcForRole, type NpcStatus } from '../world/load-npc.js';
+import { listFactionsInWorld, sanitizeFactionForRole, type FactionState } from '../world/load-faction.js';
+import { listPoisInWorld, sanitizePoiForRole, stripParentHexStatus, type PoiStatus } from '../map/load-poi.js';
 
 export type EffectiveView = 'dm' | 'player';
 
@@ -76,7 +78,41 @@ export interface CodexNpcRow {
   // NO dmNotes field — structurally impossible to leak (ADR-6, REQ-UBN-SECURITY)
 }
 
-export type CodexRow = CodexMonsterRow | CodexNpcRow;
+/**
+ * Codex Faction row shape — NO dmNotes field (ADR-1, ADR-6 uuid-bridge-factions-pois).
+ * dmNotes is stripped both by sanitizeFactionForRole and by structural exclusion here.
+ * Defense-in-depth: even if sanitize is bypassed, the field cannot appear in this type.
+ *
+ * refKey = faction.id (UUID); refSource = 'world' (LOCKED convention, ADR-2).
+ */
+export interface CodexFactionRow {
+  id: string;             // UUID — the refKey used in character_knowledge
+  name: string;
+  state: FactionState;    // active|dormant|destroyed|disbanded
+  description: string | null;
+  known: boolean;
+  // NO dmNotes field — structurally impossible to leak (ADR-6, REQ-UBFP-SECURITY)
+}
+
+/**
+ * Codex Location (POI) row shape — NO dmNotes, NO parentHexStatus, NO hexId field.
+ * Triple guard: sanitizePoiForRole strips dmNotes + stripParentHexStatus strips parentHexStatus
+ * + this type structurally excludes both fields.
+ *
+ * refKey = poi.id (UUID); refSource = 'world' (LOCKED convention, ADR-2).
+ */
+export interface CodexLocationRow {
+  id: string;            // UUID — the refKey used in character_knowledge
+  name: string;
+  status: PoiStatus;     // unknown|discovered|cleared
+  description: string | null;
+  known: boolean;
+  // NO dmNotes field — structurally impossible to leak (ADR-6, REQ-UBFP-SECURITY)
+  // NO parentHexStatus — MUST NOT reach the wire (ADR-1b, C10, REQ-UBFP-READ-LOCATION)
+  // NO hexId — not needed on the codex read path
+}
+
+export type CodexRow = CodexMonsterRow | CodexNpcRow | CodexFactionRow | CodexLocationRow;
 
 export interface ReadCharacterCodexResult {
   rows: CodexRow[];
@@ -268,19 +304,191 @@ async function readNpcsKind(
 }
 
 // ---------------------------------------------------------------------------
+// Faction resolver — uuid-bridge-factions-pois Wave 5b (ADR-1 delta, ADR-6 delta)
+//
+// Mirrors readNpcsKind: loads all world factions, intersects with
+// character_knowledge(kind='faction'), gates by effectiveView, ALWAYS runs
+// sanitizeFactionForRole (player='player', DM='gm') on every row.
+//
+// Security: dmNotes stripped by sanitize AND by CodexFactionRow type (double guard).
+// refSource='world' is LOCKED for UUID kinds (ADR-2). Match key = faction.id (UUID).
+// Orphaned UUIDs (deleted faction) silently dropped — knownSet references missing ids.
+// Access type: WorldAccess ('player'|'gm') — NOT MapAccess (C12).
+// ---------------------------------------------------------------------------
+
+async function readFactionsKind(
+  characterId: string,
+  worldId: string,
+  effectiveView: EffectiveView,
+  opts: CodexQueryOpts = {},
+): Promise<{ rows: CodexFactionRow[]; total: number; knownCount: number }> {
+  // 1. Load all world factions (small list — client-side filter, ADR-3 D2)
+  const allFactions = await listFactionsInWorld(worldId);
+
+  // 2. Load the character's known faction set (DB kind='faction')
+  const knownRows = await db
+    .select({ refKey: characterKnowledge.refKey })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        // DB enum 'faction' — matches KIND_TO_DB_KIND['factions']
+        eq(characterKnowledge.kind, 'faction'),
+      ),
+    );
+
+  // 3. Build a fast UUID lookup set (refSource is constant 'world' for UUID kinds)
+  const knownSet = new Set(knownRows.map((r) => r.refKey));
+
+  // 4. Optional name filter (client-side; world faction lists are small)
+  const q = opts.q?.trim().toLowerCase();
+
+  // 5. Map WorldAccess for sanitize (C12: sanitizeFactionForRole takes WorldAccess)
+  const access = effectiveView === 'dm' ? ('gm' as const) : ('player' as const);
+
+  let knownCount = 0;
+  const rows: CodexFactionRow[] = [];
+
+  for (const faction of allFactions) {
+    // Apply optional name filter
+    if (q && !faction.name.toLowerCase().includes(q)) continue;
+
+    const knows = knownSet.has(faction.id);
+    if (knows) knownCount++;
+
+    // DM: all rows + known flag; player: known-only
+    if (effectiveView !== 'dm' && !knows) continue;
+
+    // SECURITY: sanitize on every row (ADR-6). dmNotes dropped for player access.
+    const sanitized = sanitizeFactionForRole(faction, access);
+
+    rows.push({
+      id: sanitized.id,
+      name: sanitized.name,
+      state: sanitized.state,
+      description: sanitized.description,
+      known: knows,
+      // NO dmNotes — CodexFactionRow type enforces structural absence (ADR-6)
+    });
+  }
+
+  // total = ALL world factions (unfiltered by effectiveView, filtered by optional name query).
+  const totalFactionsInUniverse = allFactions.filter(
+    (f) => !q || f.name.toLowerCase().includes(q),
+  ).length;
+
+  // Paginate gated rows
+  const offset = opts.offset ?? 0;
+  const paged =
+    opts.limit === undefined && offset === 0
+      ? rows
+      : rows.slice(offset, opts.limit === undefined ? undefined : offset + opts.limit);
+
+  return { rows: paged, total: totalFactionsInUniverse, knownCount };
+}
+
+// ---------------------------------------------------------------------------
+// Location (POI) resolver — uuid-bridge-factions-pois Wave 5b (ADR-1b delta, ADR-6 delta)
+//
+// Mirrors readNpcsKind but for POIs. CRITICAL: does NOT call filterWorldPoisForPlayer.
+// The known-UUID set is the sole visibility gate (ADR-1b). A granted POI on an
+// unexplored hex MUST appear (DM grant overrides hex cascade).
+//
+// parentHexStatus: stripped before shaping each row (never on the wire — C10, ADR-1b).
+// Security: dmNotes stripped by sanitizePoiForRole AND by CodexLocationRow type (double guard).
+// Access type: MapAccess ('player'|'gm') — NOT WorldAccess (C12: different type alias).
+// ---------------------------------------------------------------------------
+
+async function readLocationsKind(
+  characterId: string,
+  worldId: string,
+  effectiveView: EffectiveView,
+  opts: CodexQueryOpts = {},
+): Promise<{ rows: CodexLocationRow[]; total: number; knownCount: number }> {
+  // 1. Load all world POIs via listPoisInWorld({ worldId }) — object arg, NOT bare string (C9)
+  const allPois = await listPoisInWorld({ worldId });
+
+  // 2. Load the character's known location set (DB kind='location')
+  const knownRows = await db
+    .select({ refKey: characterKnowledge.refKey })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        // DB enum 'location' — matches KIND_TO_DB_KIND['locations']
+        eq(characterKnowledge.kind, 'location'),
+      ),
+    );
+
+  // 3. Build a fast UUID lookup set
+  const knownSet = new Set(knownRows.map((r) => r.refKey));
+
+  // 4. Optional name filter
+  const q = opts.q?.trim().toLowerCase();
+
+  // 5. Map MapAccess for sanitize (C12: sanitizePoiForRole takes MapAccess = 'gm'|'player'|'none')
+  const access = effectiveView === 'dm' ? ('gm' as const) : ('player' as const);
+
+  let knownCount = 0;
+  const rows: CodexLocationRow[] = [];
+
+  for (const poi of allPois) {
+    // Apply optional name filter
+    if (q && !poi.name.toLowerCase().includes(q)) continue;
+
+    const knows = knownSet.has(poi.id);
+    if (knows) knownCount++;
+
+    // DM: all rows + known flag; player: known-only (known-set is the sole gate — ADR-1b)
+    // DO NOT call filterWorldPoisForPlayer — that hides granted POIs on unexplored hexes
+    if (effectiveView !== 'dm' && !knows) continue;
+
+    // Strip parentHexStatus BEFORE shaping the row (MUST NOT reach the wire — C10)
+    const stripped = stripParentHexStatus(poi);
+
+    // SECURITY: sanitize on every row (ADR-6). dmNotes dropped for player access.
+    const sanitized = sanitizePoiForRole(stripped, access);
+
+    rows.push({
+      id: sanitized.id,
+      name: sanitized.name,
+      status: sanitized.status,
+      description: sanitized.description,
+      known: knows,
+      // NO dmNotes — CodexLocationRow type enforces structural absence (ADR-6)
+      // NO parentHexStatus — already stripped above (C10, ADR-1b)
+    });
+  }
+
+  // total = ALL world POIs (unfiltered by effectiveView, filtered by optional name query)
+  const totalPoisInUniverse = allPois.filter(
+    (p) => !q || p.name.toLowerCase().includes(q),
+  ).length;
+
+  // Paginate gated rows
+  const offset = opts.offset ?? 0;
+  const paged =
+    opts.limit === undefined && offset === 0
+      ? rows
+      : rows.slice(offset, opts.limit === undefined ? undefined : offset + opts.limit);
+
+  return { rows: paged, total: totalPoisInUniverse, knownCount };
+}
+
+// ---------------------------------------------------------------------------
 // Gated-empty stub helpers (ADR-2 Option A, codex-knowledge #1946)
 //
-// factions/locations/lore: these world-knowledge kinds have UUID-keyed
-// entities. The read-side bridge is deferred for these kinds.
+// lore: has no backing table, remains deferred.
 // npcs: RESOLVED in uuid-bridge-npc Wave 5a (readNpcsKind above).
+// factions/locations: RESOLVED in uuid-bridge-factions-pois Wave 5b (above).
 // Slice 1 closes the metagaming leak for ALL 5 categories by routing them to
-// the gated endpoint — monsters + npcs fully wired, others return empty.
+// the gated endpoint — monsters/npcs/factions/locations fully wired, lore returns empty.
 // ---------------------------------------------------------------------------
 
 function readGatedEmptyKind(): { rows: never[]; total: number; knownCount: number } {
   // ADR-2 Option A: return empty gated result.
   // Metagaming leak is closed (no data leaks through), resolver deferred.
-  // TODO: wire UUID-based resolver for factions/locations/lore in follow-up slices.
+  // TODO: wire UUID-based resolver for lore when a lore-entity SDD lands.
   return { rows: [], total: 0, knownCount: 0 };
 }
 
@@ -293,14 +501,17 @@ function readGatedEmptyKind(): { rows: never[]; total: number; knownCount: numbe
  *
  * URL kind → DB kind mapping (KIND_TO_DB_KIND above).
  *
- * monsters: full catalog + known flags (ADR-2 Option A, real round-trip).
- * npcs:     UUID-based resolver — readNpcsKind (uuid-bridge-npc Wave 5a).
- * factions/locations/lore: gated-EMPTY (ADR-2 Option A, deferred).
+ * monsters:   full catalog + known flags (ADR-2 Option A, real round-trip).
+ * npcs:        UUID-based resolver — readNpcsKind (uuid-bridge-npc Wave 5a).
+ * factions:    UUID-based resolver — readFactionsKind (uuid-bridge-factions-pois Wave 5b).
+ * locations:   UUID-based resolver — readLocationsKind (uuid-bridge-factions-pois Wave 5b).
+ *              CRITICAL: does NOT call filterWorldPoisForPlayer — known-set is sole gate (ADR-1b).
+ * lore:        gated-EMPTY (no lore table yet, deferred).
  *
  * For DM/devMode effectiveView='dm': all entries + known flag.
  * For player effectiveView='player': ONLY known entries (seesEntry gate).
  *
- * opts.worldId is required for the 'npcs' kind (D4: caller derives it from loadCharacter).
+ * opts.worldId is required for uuid-based kinds (D4: caller derives it from loadCharacter).
  *
  * REQ-CCB-API-01, REQ-CK-GATE-03, GATE-04, codex-knowledge SDD design #1948.
  * REQ-UBN-READ, uuid-bridge-npc SDD design #2003.
@@ -326,11 +537,22 @@ export async function readCharacterCodexCategory(
       const { rows, total, knownCount } = await readNpcsKind(characterId, worldId, effectiveView, opts);
       return { rows, total, knownCount, effectiveView };
     }
-    case 'factions':
-    case 'locations':
+    case 'factions': {
+      // uuid-bridge-factions-pois Wave 5b: real faction resolver replacing gated-empty.
+      // opts.worldId is derived from character.worldId by the route handler (D4).
+      const worldId = opts.worldId ?? '';
+      const { rows, total, knownCount } = await readFactionsKind(characterId, worldId, effectiveView, opts);
+      return { rows, total, knownCount, effectiveView };
+    }
+    case 'locations': {
+      // uuid-bridge-factions-pois Wave 5b: real location resolver replacing gated-empty.
+      // CRITICAL: uses known-UUID-set gate only — does NOT call filterWorldPoisForPlayer (ADR-1b).
+      const worldId = opts.worldId ?? '';
+      const { rows, total, knownCount } = await readLocationsKind(characterId, worldId, effectiveView, opts);
+      return { rows, total, knownCount, effectiveView };
+    }
     case 'lore': {
-      // ADR-2 Option A: gated-empty. Metagaming leak closed for remaining categories.
-      // TODO: wire UUID-based resolver for factions/locations/lore in follow-up slices.
+      // ADR-2 Option A: gated-empty. No lore backing table yet (lore-entity SDD pending).
       const { rows, total, knownCount } = readGatedEmptyKind();
       return { rows, total, knownCount, effectiveView };
     }

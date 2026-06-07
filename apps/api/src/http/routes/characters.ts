@@ -288,7 +288,7 @@ const BitacoraListQuery = z.object({
   tag: z.string().optional(),
   // REQ-BP-API-02: filter pages by entity reference (monster-detail "this monster's pages" view)
   refKey: z.string().min(1).optional(),
-  refKind: z.enum(['monster', 'npc']).optional(), // uuid-bridge-npc B-2: added 'npc' (ADR-5)
+  refKind: z.enum(['monster', 'npc', 'faction', 'location']).optional(), // uuid-bridge-factions-pois B-2: added 'faction','location' (ADR-5 delta)
 });
 
 const ParamsWithIdAndPageId = z.object({

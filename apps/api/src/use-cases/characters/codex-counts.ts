@@ -1,11 +1,15 @@
 import { and, count, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { characterKnowledge, compendiumMonsters, npcs } from '../../infra/db/schema.js';
+import { characterKnowledge, compendiumMonsters, factions, npcs, pois } from '../../infra/db/schema.js';
 
 export interface CodexCounts {
   monsters: { known: number; total: number };
   /** NPC counts — uuid-bridge-npc Wave 5a (REQ-UBN-COUNTS). */
   npc: { known: number; total: number };
+  /** Faction counts — uuid-bridge-factions-pois Wave 5b (REQ-UBFP-COUNTS). */
+  faction: { known: number; total: number };
+  /** Location (POI) counts — uuid-bridge-factions-pois Wave 5b (REQ-UBFP-COUNTS). */
+  location: { known: number; total: number };
 }
 
 /**
@@ -74,8 +78,56 @@ export async function getCodexCounts(characterId: string, worldId: string): Prom
 
   const knownNpcs = knownNpcsRow?.value ?? 0;
 
+  // ── Factions (uuid-bridge-factions-pois Wave 5b) ────────────────────────────
+
+  // Total factions in this world
+  const [totalFactionsRow] = await db
+    .select({ value: count() })
+    .from(factions)
+    .where(eq(factions.worldId, worldId));
+
+  const totalFactions = totalFactionsRow?.value ?? 0;
+
+  // Known factions for this character (DB kind = 'faction')
+  const [knownFactionsRow] = await db
+    .select({ value: count() })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        eq(characterKnowledge.kind, 'faction'),
+      ),
+    );
+
+  const knownFactions = knownFactionsRow?.value ?? 0;
+
+  // ── Locations / POIs (uuid-bridge-factions-pois Wave 5b) ────────────────────
+
+  // Total POIs in this world
+  const [totalPoisRow] = await db
+    .select({ value: count() })
+    .from(pois)
+    .where(eq(pois.worldId, worldId));
+
+  const totalPois = totalPoisRow?.value ?? 0;
+
+  // Known locations for this character (DB kind = 'location')
+  const [knownLocationsRow] = await db
+    .select({ value: count() })
+    .from(characterKnowledge)
+    .where(
+      and(
+        eq(characterKnowledge.characterId, characterId),
+        eq(characterKnowledge.kind, 'location'),
+      ),
+    );
+
+  const knownLocations = knownLocationsRow?.value ?? 0;
+
   return {
     monsters: { known: knownMonsters, total: totalMonsters },
     npc: { known: knownNpcs, total: totalNpcs },
+    faction: { known: knownFactions, total: totalFactions },
+    location: { known: knownLocations, total: totalPois },
   };
 }
