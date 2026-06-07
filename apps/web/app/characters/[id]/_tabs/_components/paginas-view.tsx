@@ -38,8 +38,9 @@ const NPC_STATUS_LABELS: Record<string, string> = {
 
 const FACTION_STATE_LABELS: Record<string, string> = {
   active: 'Activa',
+  dormant: 'Durmiente',
+  destroyed: 'Destruida',
   disbanded: 'Disuelta',
-  unknown: 'Desconocida',
 };
 
 const POI_STATUS_LABELS: Record<string, string> = {

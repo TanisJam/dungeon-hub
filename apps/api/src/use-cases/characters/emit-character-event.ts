@@ -74,8 +74,7 @@ function resolveKind(
     case 'npc_discovered': return 'npc';
     case 'faction_encountered': return 'faction';
     // uuid-bridge-factions-pois B-2: DM grant sends type='faction_discovered' (mirrors npc_discovered convention).
-    // Both aliases produce the same knowledge row kind='faction'.
-    // location_discovered already maps correctly at L76 (no change needed).
+    // Both aliases produce the same knowledge row kind='faction'. location_discovered is handled just below.
     case 'faction_discovered': return 'faction';
     case 'location_discovered': return 'location';
     case 'lore_learned': return 'lore';
