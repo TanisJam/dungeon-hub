@@ -629,26 +629,41 @@ describe('engine-stunning-strike — POST /encounters/:id/actions/attack/apply (
       // Miss → no ki spent. No stunningStrike block in response.
       // NOTE: NPC guard requires targetNpcSaveMod even for miss tests (guard fires PRE-ROLL before
       // rollToHit — without it, we get 400 NO_TARGET_SAVE before we can even roll a miss).
+      //
+      // PHB p.194: nat-20 = auto-hit regardless of AC (5% chance). Retry with fresh encounters
+      // until we get a genuine miss (expected to succeed within 1-2 attempts for AC=30).
       const app = await getTestApp();
       await setKiUsed(monkCharId, 0);
 
-      // High AC goblin (AC=30) to force a miss (quarterstaff +5 to hit cannot reach 30).
-      const { encounterId, monkCombatantId, npcCombatantId, version } =
-        await makeFreshMonkEncounter(app, 'SS-T5 miss ki not spent', { npcAc: 30, npcHp: 30 });
+      let missBody: Record<string, unknown> | null = null;
 
-      // Keep retrying until a miss (AC=30 ensures miss with quarterstaff).
-      const { statusCode, body } = await doAttack(
-        encounterId, monkCombatantId, npcCombatantId,
-        quarterstaffInstanceId, version,
-        { stunningStrikeSpend: true },
-        0,   // targetNpcSaveMod required for NPC — guard fires pre-roll; ki not spent on miss anyway
-      );
+      for (let attempt = 0; attempt < 20; attempt++) {
+        // High AC goblin (AC=30) to force a miss — only nat-20 can hit AC=30 with quarterstaff.
+        const fresh = await makeFreshMonkEncounter(app, `SS-T5 miss ki not spent attempt-${attempt}`, { npcAc: 30, npcHp: 30 });
 
-      expect(statusCode).toBe(200);
-      expect(body.hit).toBe(false); // guaranteed miss (AC=30, max to-hit ~+9 with crit)
+        const { statusCode, body } = await doAttack(
+          fresh.encounterId, fresh.monkCombatantId, fresh.npcCombatantId,
+          quarterstaffInstanceId, fresh.version,
+          { stunningStrikeSpend: true },
+          0,   // targetNpcSaveMod required for NPC — guard fires pre-roll; ki not spent on miss anyway
+        );
+
+        expect(statusCode).toBe(200);
+
+        if ((body as Record<string, unknown>)['hit'] === false) {
+          missBody = body as Record<string, unknown>;
+          break;
+        }
+        // nat-20 auto-hit — reset ki (not spent on a miss, but a hit DID spend ki here) and retry.
+        await setKiUsed(monkCharId, 0);
+      }
+
+      if (!missBody) throw new Error('SS-T5: Failed to get a miss after 20 attempts (nat-20 streak)');
+
+      expect(missBody['hit']).toBe(false);
 
       // No stunningStrike key (miss path).
-      expect(body.stunningStrike).toBeUndefined();
+      expect(missBody['stunningStrike']).toBeUndefined();
 
       // Ki NOT spent on miss.
       const ki = await getKiUsed(monkCharId);

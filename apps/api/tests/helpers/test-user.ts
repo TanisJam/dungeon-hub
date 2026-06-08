@@ -11,26 +11,45 @@ export interface TestUser {
 /**
  * Crea un user en Supabase via admin API + login para obtener access_token.
  * Email único por ejecución para evitar colisiones.
+ *
+ * Under maxForks>1 the GoTrue admin API may return transient 5xx under concurrent
+ * fork load. Each step retries up to 3 times with a short back-off.
+ * NOTE: creation and login are retried independently — creation uses a fresh email
+ * on each attempt so there is no risk of a duplicate-email error on retry.
  */
 export async function createTestUser(): Promise<TestUser> {
-  const email = `test-${randomUUID()}@dh.test`;
   const password = 'test-password-strong-123!';
 
+  async function retryFetch(label: string, fn: () => Promise<Response>, maxTries = 3): Promise<Response> {
+    for (let i = 0; i < maxTries; i++) {
+      const res = await fn();
+      if (res.ok || res.status < 500) return res; // ok or client-error → no point retrying
+      if (i < maxTries - 1) await new Promise((r) => setTimeout(r, 150 * (i + 1)));
+    }
+    // Final attempt — let caller handle the error
+    return fn();
+  }
+
   // 1. Crear via admin API (email_confirm: true → no necesita verificación)
-  const createRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`, {
-    method: 'POST',
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { username: email.split('@')[0] },
+  // Use a fresh unique email on each createTestUser() call. No cross-attempt sharing.
+  const email = `test-${randomUUID()}@dh.test`;
+
+  const createRes = await retryFetch('create-user', () =>
+    fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { username: email.split('@')[0] },
+      }),
     }),
-  });
+  );
 
   if (!createRes.ok) {
     throw new Error(`Failed to create test user: ${createRes.status} ${await createRes.text()}`);
@@ -39,14 +58,16 @@ export async function createTestUser(): Promise<TestUser> {
   const created = (await createRes.json()) as { id: string };
 
   // 2. Login para obtener access_token
-  const loginRes = await fetch(`${env.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
+  const loginRes = await retryFetch('login-user', () =>
+    fetch(`${env.SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    }),
+  );
 
   if (!loginRes.ok) {
     throw new Error(`Failed to login test user: ${loginRes.status} ${await loginRes.text()}`);

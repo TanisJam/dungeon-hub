@@ -11,12 +11,6 @@ describe('PUT /characters/:id/race', () => {
   let campaignId: string;
 
   beforeAll(async () => {
-    // Guard against stale additionalSpellsNormalized from a prior Batch 6 run.
-    await db
-      .update(compendiumRaces)
-      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
-      .where(eq(compendiumRaces.slug, 'elf--high'));
-
     const app = await getTestApp();
     user = await createTestUser();
 
@@ -927,13 +921,6 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
   let characterId: string;
 
   beforeAll(async () => {
-    // Guard against stale additionalSpellsNormalized in elf--high from a prior Batch 6 run.
-    // Without this, the RACE_CANTRIP_REQUIRED gate fires on High Elf PUT tests in this suite.
-    await db
-      .update(compendiumRaces)
-      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
-      .where(eq(compendiumRaces.slug, 'elf--high'));
-
     const app = await getTestApp();
     user = await createTestUser();
 
@@ -1109,35 +1096,95 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
 // Spec: engram #607 REQ-A-PROJECT-01, REQ-A-SAVE-RACE-01, REQ-A-VALIDATION-01.
 // Tests A-1 through A-5 per tasks #609 Phase C.
 //
-// PREREQUISITE: The compendium DB must have elf--high and tiefling rows with
-// additionalSpellsNormalized seeded. This is done via seedRacialSpells() below
-// (idempotent upsert), mirroring the Dragonborn ancestry seed pattern.
-// In production, this data comes from `pnpm import:5etools` after Phase A deploy.
+// PARALLEL-SAFETY NOTE: This suite uses DEDICATED TEST-ONLY compendium rows
+// (elf--high--t6 / tiefling--t6) instead of mutating the shared elf--high /
+// tiefling rows. This prevents torn reads when other describes in this file
+// run concurrently in a parallel fork. The test-only rows are inserted in
+// beforeAll and deleted in afterAll (no shared state mutation).
+//
+// In production, additionalSpellsNormalized is written by `pnpm import:5etools`.
+
+// Test-only slugs — scoped to Batch 6 to avoid touching shared compendium rows.
+const T6_HIGH_ELF_SLUG = 'elf--high--t6';
+const T6_TIEFLING_SLUG = 'tiefling--t6';
 
 /**
- * Seeds test compendium rows for races with additionalSpells (Batch 6).
- * Uses upsert on (slug, source) — idempotent. PHB citations inline.
+ * Inserts dedicated test-only compendium rows for Batch 6.
+ * Uses upsert on (slug, source) — idempotent. Rows are cleaned up in afterAll.
+ * These rows are structurally identical to elf--high / tiefling but use private
+ * slugs so mutations never touch the shared production-seed rows.
  */
-async function seedRacialSpells(): Promise<void> {
-  // Update elf--high subrace to include additionalSpellsNormalized
-  // PHB p.23: High Elf Cantrip trait — player chooses 1 wizard cantrip
+async function insertBatch6TestRows(): Promise<void> {
+  // Test-only High Elf subrace row (mirrors elf--high structure, PHB p.23).
+  // Includes languageProficiencies:[{anyStandard:1}] matching the real elf--high row so
+  // that languageChoices validation passes in the test assertions.
   await db
-    .update(compendiumRaces)
-    .set({
-      data: sql`data || '{"additionalSpellsNormalized": [{"slug": "__choose__", "source": "", "characterLevelAvailable": 1, "frequency": "at-will", "ability": "int", "isPlayerChoice": true, "fromClass": "wizard"}]}'::jsonb`,
-      updatedAt: new Date(),
+    .insert(compendiumRaces)
+    .values({
+      slug: T6_HIGH_ELF_SLUG,
+      source: 'PHB',
+      name: 'High (t6)',
+      data: {
+        ability: [{ int: 1 }],
+        languageProficiencies: [{ anyStandard: 1 }],
+        additionalSpellsNormalized: [
+          {
+            slug: '__choose__',
+            source: '',
+            characterLevelAvailable: 1,
+            frequency: 'at-will',
+            ability: 'int',
+            isPlayerChoice: true,
+            fromClass: 'wizard',
+          },
+        ],
+      },
+      reprintedAs: null,
+      isSubrace: true,
+      parentSlug: 'elf',
+      parentSource: 'PHB',
     })
-    .where(eq(compendiumRaces.slug, 'elf--high'));
+    .onConflictDoUpdate({
+      target: [compendiumRaces.slug, compendiumRaces.source],
+      set: {
+        data: sql`excluded.data`,
+        name: sql`excluded.name`,
+        isSubrace: sql`excluded.is_subrace`,
+        parentSlug: sql`excluded.parent_slug`,
+        parentSource: sql`excluded.parent_source`,
+      },
+    });
 
-  // Update tiefling base race to include additionalSpellsNormalized
-  // PHB p.42-43: Infernal Legacy trait — 3 fixed spells
+  // Test-only Tiefling base race row (mirrors tiefling structure, PHB p.42-43).
   await db
-    .update(compendiumRaces)
-    .set({
-      data: sql`data || '{"additionalSpellsNormalized": [{"slug": "thaumaturgy", "source": "phb", "characterLevelAvailable": 1, "frequency": "at-will", "ability": "cha"}, {"slug": "hellish-rebuke", "source": "phb", "characterLevelAvailable": 3, "frequency": "daily-1", "ability": "cha", "castLevel": 2}, {"slug": "darkness", "source": "phb", "characterLevelAvailable": 5, "frequency": "daily-1", "ability": "cha"}]}'::jsonb`,
-      updatedAt: new Date(),
+    .insert(compendiumRaces)
+    .values({
+      slug: T6_TIEFLING_SLUG,
+      source: 'PHB',
+      name: 'Tiefling (t6)',
+      data: {
+        ability: [{ int: 1, cha: 2 }],
+        additionalSpellsNormalized: [
+          { slug: 'thaumaturgy', source: 'phb', characterLevelAvailable: 1, frequency: 'at-will', ability: 'cha' },
+          { slug: 'hellish-rebuke', source: 'phb', characterLevelAvailable: 3, frequency: 'daily-1', ability: 'cha', castLevel: 2 },
+          { slug: 'darkness', source: 'phb', characterLevelAvailable: 5, frequency: 'daily-1', ability: 'cha' },
+        ],
+      },
+      reprintedAs: null,
+      isSubrace: false,
+      parentSlug: null,
+      parentSource: null,
     })
-    .where(eq(compendiumRaces.slug, 'tiefling'));
+    .onConflictDoUpdate({
+      target: [compendiumRaces.slug, compendiumRaces.source],
+      set: {
+        data: sql`excluded.data`,
+        name: sql`excluded.name`,
+        isSubrace: sql`excluded.is_subrace`,
+        parentSlug: sql`excluded.parent_slug`,
+        parentSource: sql`excluded.parent_source`,
+      },
+    });
 }
 
 describe('Racial additional spells — Batch 6 (race-additional-spells)', () => {
@@ -1146,19 +1193,8 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
   let campaignId: string;
 
   beforeAll(async () => {
-    // Ensure compendium rows start clean (removes any stale additionalSpellsNormalized from
-    // prior test runs that may not have completed cleanup). Then seed fresh.
-    await db
-      .update(compendiumRaces)
-      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
-      .where(eq(compendiumRaces.slug, 'elf--high'));
-    await db
-      .update(compendiumRaces)
-      .set({ data: sql`data - 'additionalSpellsNormalized'`, updatedAt: new Date() })
-      .where(eq(compendiumRaces.slug, 'tiefling'));
-
-    // Seed additionalSpellsNormalized into test compendium rows (idempotent)
-    await seedRacialSpells();
+    // Insert dedicated test-only rows so we never mutate the shared elf--high / tiefling rows.
+    await insertBatch6TestRows();
 
     const app = await getTestApp();
     user = await createTestUser();
@@ -1185,22 +1221,9 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
   });
 
   afterAll(async () => {
-    // Clean up additionalSpellsNormalized from compendium rows to avoid cross-test contamination.
-    // Without this, subsequent test runs would find the seeded data and break pre-Batch-6 tests.
-    await db
-      .update(compendiumRaces)
-      .set({
-        data: sql`data - 'additionalSpellsNormalized'`,
-        updatedAt: new Date(),
-      })
-      .where(eq(compendiumRaces.slug, 'elf--high'));
-    await db
-      .update(compendiumRaces)
-      .set({
-        data: sql`data - 'additionalSpellsNormalized'`,
-        updatedAt: new Date(),
-      })
-      .where(eq(compendiumRaces.slug, 'tiefling'));
+    // Remove the test-only rows — no impact on shared compendium data.
+    await db.delete(compendiumRaces).where(eq(compendiumRaces.slug, T6_HIGH_ELF_SLUG));
+    await db.delete(compendiumRaces).where(eq(compendiumRaces.slug, T6_TIEFLING_SLUG));
 
     if (user) await deleteTestUser(user.id);
     await closeTestApp();
@@ -1208,6 +1231,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
 
   // A-1: PUT High Elf without raceCantrip → 400 RACE_CANTRIP_REQUIRED
   // REQ-A-VALIDATION-01, REQ-D-GATE-01. PHB p.23.
+  // Uses test-only subrace (T6_HIGH_ELF_SLUG) to avoid mutating shared elf--high row.
   it('A-1: PUT race High Elf without raceCantrip → 400 RACE_CANTRIP_REQUIRED', async () => {
     const app = await getTestApp();
     const res = await app.inject({
@@ -1216,7 +1240,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
       headers: { authorization: `Bearer ${user.accessToken}` },
       payload: {
         race: { slug: 'elf', source: 'PHB' },
-        subrace: { slug: 'elf--high', source: 'PHB' },
+        subrace: { slug: T6_HIGH_ELF_SLUG, source: 'PHB' },
         languageChoices: ['dwarvish'],
         // NO raceCantrip field
       },
@@ -1241,7 +1265,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
       headers: { authorization: `Bearer ${user.accessToken}` },
       payload: {
         race: { slug: 'elf', source: 'PHB' },
-        subrace: { slug: 'elf--high', source: 'PHB' },
+        subrace: { slug: T6_HIGH_ELF_SLUG, source: 'PHB' },
         languageChoices: ['dwarvish'],
         raceCantrip: { slug: 'fire-bolt', source: 'phb' },
       },
@@ -1282,7 +1306,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
       headers: { authorization: `Bearer ${user.accessToken}` },
       payload: {
         race: { slug: 'elf', source: 'PHB' },
-        subrace: { slug: 'elf--high', source: 'PHB' },
+        subrace: { slug: T6_HIGH_ELF_SLUG, source: 'PHB' },
         languageChoices: ['dwarvish'],
         raceCantrip: { slug: 'fireball', source: 'phb' }, // fireball is 3rd-level, not a cantrip
       },
@@ -1298,15 +1322,16 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
 
   // A-4: GET /sheet Tiefling level 1 → body.racialSpells has all 3 entries
   // REQ-A-PROJECT-01. PHB p.42-43: Infernal Legacy gives all 3 spells (rendered dims by level).
+  // Uses test-only race (T6_TIEFLING_SLUG) to avoid mutating shared tiefling row.
   it('A-4: GET /sheet Tiefling → racialSpells has all 3 entries with correct frequencies', async () => {
     const app = await getTestApp();
 
-    // Seed tiefling character directly
+    // Seed test-only tiefling character directly
     await db
       .update(characters)
       .set({
         data: {
-          race: { slug: 'tiefling', source: 'PHB' },
+          race: { slug: T6_TIEFLING_SLUG, source: 'PHB' },
           subrace: null,
           asisApplied: [
             { ability: 'int', bonus: 1, source: 'race' },
@@ -1341,6 +1366,8 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
 
   // A-5: GET /sheet legacy High Elf (no raceCantrip in data) → 200, racialSpells=[]
   // REQ-A-PROJECT-01, CLAUDE.md §11 read-path tolerance.
+  // Uses test-only subrace (T6_HIGH_ELF_SLUG) — the row has additionalSpellsNormalized but
+  // the character data has no raceCantrip, which is the pre-Batch-6 legacy state.
   it('A-5: GET /sheet legacy High Elf (no raceCantrip) → 200, racialSpells=[]', async () => {
     const app = await getTestApp();
 
@@ -1350,7 +1377,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
       .set({
         data: {
           race: { slug: 'elf', source: 'PHB' },
-          subrace: { slug: 'elf--high', source: 'PHB' },
+          subrace: { slug: T6_HIGH_ELF_SLUG, source: 'PHB' },
           asisApplied: [
             { ability: 'dex', bonus: 2, source: 'race' },
             { ability: 'int', bonus: 1, source: 'subrace' },

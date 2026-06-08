@@ -201,80 +201,100 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
     'APPLY-T1: fresh version → 200 with hit:true; HP drops; encounters.version bumps (REQ-ATK-VERSION-01.1, REQ-ROUTE-BODY-03)',
     async () => {
       // PHB p.196: damage reduces HP. REQ-ATK-VERSION-01.1: version becomes version+1.
-      // Use a fresh encounter so we know the exact version and hp.
-      // The longsword attack rolls to-hit against AC=13; with STR+2+PB+2 = +4 to hit,
-      // a roll of 9+ hits. If it misses, loop until a hit is confirmed (or test the shape).
-      // We test the shape regardless of hit/miss — version only bumps on hit (REQ-APPLY-FLOW-02).
+      // PHB p.194: nat-1 = auto-miss, even against AC=1. To test the hit:true path
+      // deterministically we loop (up to 20 attempts) until a hit is confirmed — same
+      // pattern as APPLY-T11. Each attempt uses a fresh encounter so state is clean.
       const app = await getTestApp();
 
-      const freshEnc = await app
-        .inject({
-          method: 'POST',
-          url: '/api/v1/encounters',
-          headers: { authorization: `Bearer ${gm.accessToken}` },
-          payload: {
-            campaignId,
-            name: 'APPLY-T1 fresh version test',
-            combatants: [
-              { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
-              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 50, hpMax: 50, ac: 1 },
-            ],
-          },
-        })
-        .then((r) => r.json());
-
-      const attackerId: string = freshEnc.currentCombatantId;
-      const targetId: string = freshEnc.combatants.find(
-        (c: { id: string }) => c.id !== attackerId,
-      )?.id ?? '';
-      const versionBefore: number = freshEnc.version;
+      let hitBody: Record<string, unknown> | null = null;
+      let hitEncId: string | null = null;
+      let hitTargetId: string | null = null;
+      let hitVersionBefore = 0;
       const targetHpBefore = 50;
+      let attempts = 0;
 
-      // Use ac=1 to guarantee a hit (any roll + toHitBonus >= 1).
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        // REQ-ROUTE-BODY-01: no crit field — server derives crit.
-        payload: {
-          attackerId,
-          targetId,
-          weaponInstanceId: longswordInstanceId,
-          version: versionBefore,
-        },
-      });
+      while (!hitBody && attempts < 20) {
+        attempts++;
 
-      expect(res.statusCode).toBe(200);
-      const body = res.json();
+        const freshEnc = await app
+          .inject({
+            method: 'POST',
+            url: '/api/v1/encounters',
+            headers: { authorization: `Bearer ${gm.accessToken}` },
+            payload: {
+              campaignId,
+              name: `APPLY-T1 fresh version test attempt ${attempts}`,
+              combatants: [
+                { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
+                // ac=1 — any non-nat-1 roll with +4 bonus hits. Loop handles the nat-1 case.
+                { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: targetHpBefore, hpMax: targetHpBefore, ac: 1 },
+              ],
+            },
+          })
+          .then((r) => r.json());
+
+        const attackerId: string = freshEnc.currentCombatantId;
+        const targetId: string = freshEnc.combatants.find(
+          (c: { id: string }) => c.id !== attackerId,
+        )?.id ?? '';
+        const versionBefore: number = freshEnc.version;
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          // REQ-ROUTE-BODY-01: no crit field — server derives crit.
+          payload: {
+            attackerId,
+            targetId,
+            weaponInstanceId: longswordInstanceId,
+            version: versionBefore,
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as Record<string, unknown>;
+        if (body.hit === true) {
+          hitBody = body;
+          hitEncId = freshEnc.id;
+          hitTargetId = targetId;
+          hitVersionBefore = versionBefore;
+        }
+        // else: nat-1 auto-miss — try again with a fresh encounter
+      }
+
+      // Confirm we got a hit within the allowed attempts
+      expect(hitBody).not.toBeNull();
+      if (!hitBody || !hitEncId || !hitTargetId) return; // type guard (covered by above expect)
 
       // REQ-ROUTE-BODY-03: hit response shape when hit=true.
-      expect(body.hit).toBe(true);
-      expect(typeof body.crit).toBe('boolean');
-      expect(typeof body.d20).toBe('number');
-      expect(Array.isArray(body.d20All)).toBe(true);
-      expect(body.d20All.length).toBe(1); // normal roll mode
-      expect(typeof body.total).toBe('number');
-      expect(typeof body.toHitBonus).toBe('number');
-      expect(body.targetAc).toBe(1);
-      expect(typeof body.rolledDamage).toBe('number');
-      expect(body.rolledDamage).toBeGreaterThanOrEqual(1);
-      expect(Array.isArray(body.perDie)).toBe(true);
-      expect(body.perDie.length).toBeGreaterThan(0);
-      expect(typeof body.newHp).toBe('number');
+      expect(hitBody.hit).toBe(true);
+      expect(typeof hitBody.crit).toBe('boolean');
+      expect(typeof hitBody.d20).toBe('number');
+      expect(Array.isArray(hitBody.d20All)).toBe(true);
+      expect((hitBody.d20All as unknown[]).length).toBe(1); // normal roll mode
+      expect(typeof hitBody.total).toBe('number');
+      expect(typeof hitBody.toHitBonus).toBe('number');
+      expect(hitBody.targetAc).toBe(1);
+      expect(typeof hitBody.rolledDamage).toBe('number');
+      expect(hitBody.rolledDamage as number).toBeGreaterThanOrEqual(1);
+      expect(Array.isArray(hitBody.perDie)).toBe(true);
+      expect((hitBody.perDie as unknown[]).length).toBeGreaterThan(0);
+      expect(typeof hitBody.newHp).toBe('number');
 
       // HP must have dropped by rolledDamage (or clamped to 0)
-      const expectedNewHp = Math.max(0, targetHpBefore - body.rolledDamage);
-      expect(body.newHp).toBe(expectedNewHp);
+      const expectedNewHp = Math.max(0, targetHpBefore - (hitBody.rolledDamage as number));
+      expect(hitBody.newHp).toBe(expectedNewHp);
 
       // Verify HP persisted in DB
-      const afterEnc = await getEncounter(freshEnc.id);
+      const afterEnc = await getEncounter(hitEncId);
       const goblinAfter = afterEnc.combatants.find(
-        (c: { id: string }) => c.id === targetId,
+        (c: { id: string }) => c.id === hitTargetId,
       );
       expect(goblinAfter?.hpCurrent).toBe(expectedNewHp);
 
       // REQ-ATK-VERSION-01.1: version bumped by +2 on hit (budget tx + damage tx — ADR-4 engine-action-economy).
-      expect(afterEnc.version).toBe(versionBefore + 2);
+      expect(afterEnc.version).toBe(hitVersionBefore + 2);
     },
   );
 
@@ -464,59 +484,81 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
     'APPLY-T7: NPC target (characterId null) → HP updated without char-sheet query (REQ-ATK-NPC-01.1)',
     async () => {
       // REQ-ATK-NPC-01.1: NPC target handled by updating encounter_combatants directly.
-      // The test proves HP changes (=request succeeded) for an NPC target.
+      // PHB p.194: nat-1 = auto-miss even against AC=1. Loop until a hit (same pattern as T1/T11).
       const app = await getTestApp();
 
-      const freshEnc = await app
-        .inject({
+      let hitBody: Record<string, unknown> | null = null;
+      let hitNpcId: string | null = null;
+      let hitEncId: string | null = null;
+      let hitVersionBefore = 0;
+      let attempts = 0;
+      let npcCharIdConfirmed = false;
+
+      while (!hitBody && attempts < 20) {
+        attempts++;
+
+        const freshEnc = await app
+          .inject({
+            method: 'POST',
+            url: '/api/v1/encounters',
+            headers: { authorization: `Bearer ${gm.accessToken}` },
+            payload: {
+              campaignId,
+              name: `APPLY-T7 NPC target test attempt ${attempts}`,
+              combatants: [
+                { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
+                { name: 'Goblin (NPC, no char)', kind: 'npc', initiative: 5, hpCurrent: 30, hpMax: 30, ac: 1 },
+              ],
+            },
+          })
+          .then((r) => r.json());
+
+        const attackerId: string = freshEnc.currentCombatantId;
+        const npcId: string = freshEnc.combatants.find(
+          (c: { id: string }) => c.id !== attackerId,
+        )?.id ?? '';
+
+        // Confirm NPC has no characterId (only need to check once)
+        if (!npcCharIdConfirmed) {
+          const npcCombatant = freshEnc.combatants.find((c: { id: string }) => c.id === npcId);
+          expect(npcCombatant?.characterId).toBeNull();
+          npcCharIdConfirmed = true;
+        }
+
+        const res = await app.inject({
           method: 'POST',
-          url: '/api/v1/encounters',
+          url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: {
-            campaignId,
-            name: 'APPLY-T7 NPC target test',
-            combatants: [
-              { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
-              { name: 'Goblin (NPC, no char)', kind: 'npc', initiative: 5, hpCurrent: 30, hpMax: 30, ac: 1 },
-            ],
+            attackerId,
+            targetId: npcId,
+            weaponInstanceId: longswordInstanceId,
+            version: freshEnc.version,
           },
-        })
-        .then((r) => r.json());
+        });
 
-      const attackerId: string = freshEnc.currentCombatantId;
-      const npcId: string = freshEnc.combatants.find(
-        (c: { id: string }) => c.id !== attackerId,
-      )?.id ?? '';
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as Record<string, unknown>;
+        if (body.hit === true) {
+          hitBody = body;
+          hitNpcId = npcId;
+          hitEncId = freshEnc.id;
+          hitVersionBefore = freshEnc.version;
+        }
+      }
 
-      // Verify the NPC has no characterId
-      const npcCombatant = freshEnc.combatants.find((c: { id: string }) => c.id === npcId);
-      expect(npcCombatant?.characterId).toBeNull();
+      // REQ-ATK-NPC-01.1: confirm we got a hit
+      expect(hitBody).not.toBeNull();
+      if (!hitBody || !hitNpcId || !hitEncId) return;
 
-      // Use ac=1 to guarantee a hit.
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: {
-          attackerId,
-          targetId: npcId,
-          weaponInstanceId: longswordInstanceId,
-          version: freshEnc.version,
-        },
-      });
-
-      expect(res.statusCode).toBe(200);
-      const body = res.json();
-
-      // REQ-ROUTE-BODY-03: hit response (ac=1 guarantees hit)
-      expect(body.hit).toBe(true);
+      expect(hitBody.hit).toBe(true);
 
       // NPC HP updated in DB
-      const afterEnc = await getEncounter(freshEnc.id);
-      const npcAfter = afterEnc.combatants.find((c: { id: string }) => c.id === npcId);
-      expect(npcAfter?.hpCurrent).toBe(body.newHp);
+      const afterEnc = await getEncounter(hitEncId);
+      const npcAfter = afterEnc.combatants.find((c: { id: string }) => c.id === hitNpcId);
+      expect(npcAfter?.hpCurrent).toBe(hitBody.newHp);
       // version bumped by +2 (budget tx + HP tx — ADR-4 engine-action-economy)
-      expect(afterEnc.version).toBe(freshEnc.version + 2);
+      expect(afterEnc.version).toBe(hitVersionBefore + 2);
     },
   );
 
@@ -602,54 +644,73 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
     'APPLY-T9: damage exceeds hpCurrent → newHp === 0 (REQ-ATK-APPLY-01.2, PHB p.197)',
     async () => {
       // PHB p.197: "Hit points can't go below 0." Overkill damage is discarded.
+      // PHB p.194: nat-1 = auto-miss even against AC=1. Loop until hit (same pattern as T1/T7).
+      // hp=1 so any damage from longsword (min 1d8+2=3) overkills it.
       const app = await getTestApp();
 
-      const freshEnc = await app
-        .inject({
+      let hitBody: Record<string, unknown> | null = null;
+      let hitTargetId: string | null = null;
+      let hitEncId: string | null = null;
+      let attempts = 0;
+
+      while (!hitBody && attempts < 20) {
+        attempts++;
+
+        const freshEnc = await app
+          .inject({
+            method: 'POST',
+            url: '/api/v1/encounters',
+            headers: { authorization: `Bearer ${gm.accessToken}` },
+            payload: {
+              campaignId,
+              name: `APPLY-T9 overkill test attempt ${attempts}`,
+              combatants: [
+                { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
+                // hp=1, ac=1. Any non-nat-1 hit with longsword (min 1d8+2=3) kills it.
+                { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 1, hpMax: 7, ac: 1 },
+              ],
+            },
+          })
+          .then((r) => r.json());
+
+        const attackerId: string = freshEnc.currentCombatantId;
+        const targetId: string = freshEnc.combatants.find(
+          (c: { id: string }) => c.id !== attackerId,
+        )?.id ?? '';
+
+        const res = await app.inject({
           method: 'POST',
-          url: '/api/v1/encounters',
+          url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
           headers: { authorization: `Bearer ${gm.accessToken}` },
           payload: {
-            campaignId,
-            name: 'APPLY-T9 overkill test',
-            combatants: [
-              { name: 'Aldric', kind: 'pc', characterId: fighterCharId, initiative: 20, hpCurrent: 12, hpMax: 12 },
-              // hp=1, ac=1 ensures a hit. Any damage kills it (min longsword = 1d8+2 = 3 min).
-              { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 1, hpMax: 7, ac: 1 },
-            ],
+            attackerId,
+            targetId,
+            weaponInstanceId: longswordInstanceId,
+            version: freshEnc.version,
           },
-        })
-        .then((r) => r.json());
+        });
 
-      const attackerId: string = freshEnc.currentCombatantId;
-      const targetId: string = freshEnc.combatants.find(
-        (c: { id: string }) => c.id !== attackerId,
-      )?.id ?? '';
+        expect(res.statusCode).toBe(200);
+        const body = res.json() as Record<string, unknown>;
+        if (body.hit === true) {
+          hitBody = body;
+          hitTargetId = targetId;
+          hitEncId = freshEnc.id;
+        }
+      }
 
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/v1/encounters/${freshEnc.id}/actions/attack/apply`,
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: {
-          attackerId,
-          targetId,
-          weaponInstanceId: longswordInstanceId,
-          version: freshEnc.version,
-        },
-      });
+      // PHB p.197: newHp must be 0 (not negative) after overkill damage.
+      expect(hitBody).not.toBeNull();
+      if (!hitBody || !hitTargetId || !hitEncId) return;
 
-      expect(res.statusCode).toBe(200);
-      const body = res.json();
-
-      // PHB p.197: newHp must be 0 (not negative); ac=1 ensures hit.
-      expect(body.hit).toBe(true);
-      expect(body.newHp).toBe(0);
-      expect(body.newHp).toBeGreaterThanOrEqual(0);
+      expect(hitBody.hit).toBe(true);
+      expect(hitBody.newHp).toBe(0);
+      expect(hitBody.newHp as number).toBeGreaterThanOrEqual(0);
 
       // Verify persisted in DB
-      const afterEnc = await getEncounter(freshEnc.id);
+      const afterEnc = await getEncounter(hitEncId);
       const goblinAfter = afterEnc.combatants.find(
-        (c: { id: string }) => c.id === targetId,
+        (c: { id: string }) => c.id === hitTargetId,
       );
       expect(goblinAfter?.hpCurrent).toBe(0);
     },

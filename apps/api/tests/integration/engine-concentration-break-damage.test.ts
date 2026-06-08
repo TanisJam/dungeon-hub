@@ -765,6 +765,10 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
 
     // CBW-02: concentrating target + save success → broke=false, registry intact.
     it('CBW-02: concentrating target + save success → broke=false, row intact (REQ-CB-03)', async () => {
+      // hpCurrent=1000: longsword deals at most 10 per hit (d8=8+STR+2=10).
+      // 80 direct hits × 10 = 800 max total damage < 1000 — wizard never reaches 0 HP.
+      // Without this, the wizard dies in ~5 hits; once at 0 HP every hit fires the
+      // incapacitated-0hp outright break path (broke=true always), and sawSuccess never flips.
       const enc2 = await (await getTestApp())
         .inject({
           method: 'POST',
@@ -787,8 +791,8 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
                 kind: 'pc',
                 characterId: casterCharId,
                 initiative: 5,
-                hpCurrent: 30,
-                hpMax: 30,
+                hpCurrent: 1000,
+                hpMax: 1000,
               },
             ],
           },
@@ -934,54 +938,69 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
     // Test approach: trust the unit test BCB-02 for zero-damage guard.
     // For integration: test that a MISS returns concentrationSave:absent.
     it('CBW-04: miss → no concentrationSave in response (REQ-CB-08 analogous)', async () => {
-      // Use a very high AC target (AC=50) to force a miss.
-      const enc2 = await (await getTestApp())
-        .inject({
-          method: 'POST',
-          url: '/api/v1/encounters',
-          headers: { authorization: `Bearer ${gm.accessToken}` },
-          payload: {
-            campaignId,
-            name: `CBW-04 (${randomUUID().slice(0, 8)})`,
-            combatants: [
-              {
-                name: 'Fighter',
-                kind: 'pc',
-                characterId: fighterCharId,
-                initiative: 20,
-                hpCurrent: 30,
-                hpMax: 30,
-              },
-              {
-                name: 'NPC fortified',
-                kind: 'npc',
-                initiative: 5,
-                hpCurrent: 200,
-                hpMax: 200,
-                ac: 30,  // AC=30: fighter to-hit +4 → needs d20≥26, impossible. Always miss.
-              },
-            ],
-          },
-        })
-        .then((r) => r.json());
-
-      const attackerCombId = enc2.currentCombatantId as string;
-      const targetCombId = enc2.combatants.find((c: { id: string }) => c.id !== attackerCombId)?.id as string;
-
-      const version = await getEncounterVersion(enc2.id, gm.accessToken);
+      // Use a very high AC target (AC=30) to force a miss.
+      // PHB p.194: nat-20 = auto-hit regardless of AC (5% chance). Retry with fresh encounters
+      // until we get a genuine miss (non-nat-20). Expected to succeed within 1-2 attempts.
       const app = await getTestApp();
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/v1/encounters/${enc2.id}/actions/attack/apply`,
-        headers: { authorization: `Bearer ${gm.accessToken}` },
-        payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
-      });
+      let missBody: Record<string, unknown> | null = null;
 
-      expect(res.statusCode).toBe(200);
-      const body = res.json<Record<string, unknown>>();
-      expect(body['hit']).toBe(false);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const enc2 = await app
+          .inject({
+            method: 'POST',
+            url: '/api/v1/encounters',
+            headers: { authorization: `Bearer ${gm.accessToken}` },
+            payload: {
+              campaignId,
+              name: `CBW-04 attempt-${attempt} (${randomUUID().slice(0, 8)})`,
+              combatants: [
+                {
+                  name: 'Fighter',
+                  kind: 'pc',
+                  characterId: fighterCharId,
+                  initiative: 20,
+                  hpCurrent: 30,
+                  hpMax: 30,
+                },
+                {
+                  name: 'NPC fortified',
+                  kind: 'npc',
+                  initiative: 5,
+                  hpCurrent: 200,
+                  hpMax: 200,
+                  ac: 30,  // AC=30: fighter to-hit+4 → needs d20≥26, only nat-20 can hit.
+                },
+              ],
+            },
+          })
+          .then((r) => r.json());
+
+        const attackerCombId = enc2.currentCombatantId as string;
+        const targetCombId = enc2.combatants.find((c: { id: string }) => c.id !== attackerCombId)?.id as string;
+        const version = await getEncounterVersion(enc2.id, gm.accessToken);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${enc2.id}/actions/attack/apply`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: { attackerId: attackerCombId, targetId: targetCombId, weaponInstanceId: longswordInstanceId, version },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json<Record<string, unknown>>();
+
+        if (body['hit'] === false) {
+          missBody = body;
+          break;
+        }
+        // nat-20 auto-hit — retry with fresh encounter.
+      }
+
+      if (!missBody) throw new Error('CBW-04: Failed to get a miss after 20 attempts (nat-20 streak)');
+
+      expect(missBody['hit']).toBe(false);
       // Miss → no concentrationSave key.
-      expect(body).not.toHaveProperty('concentrationSave');
+      expect(missBody).not.toHaveProperty('concentrationSave');
     });
 
     // CBW-05: non-concentrating PC target → concentrationSave absent (REQ-CB-09).
