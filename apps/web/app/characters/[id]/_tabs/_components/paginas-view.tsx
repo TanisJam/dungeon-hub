@@ -12,7 +12,7 @@
  * bitacora-personal SDD spec #1974 REQ-BP-WEB-03, design #1975 §ADR-5.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
@@ -77,6 +77,12 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
   const [editPage, setEditPage] = useState<BitacoraPageItem | null>(null);
   const [detailPage, setDetailPage] = useState<BitacoraPageItem | null>(null);
   const [localPages, setLocalPages] = useState<BitacoraPageItem[]>(pages);
+  // Re-sync from the server prop after revalidatePath (e.g. a newly created page).
+  // Optimistic edits (delete/share) update localPages directly; revalidation then
+  // converges this mirror to the server's truth.
+  useEffect(() => {
+    setLocalPages(pages);
+  }, [pages]);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [statblockOpen, setStatblockOpen] = useState(false);
   // Share flow state — mobile-first confirm panel (REQ-SHARE-10 ADR-7)
@@ -422,6 +428,8 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
         characterId={characterId}
         knownMonsters={knownMonsters}
         knownNpcs={knownNpcs}
+        knownFactions={knownFactions}
+        knownLocations={knownLocations}
         editPage={editPage ?? undefined}
         open={composerOpen}
         onClose={handleComposerClose}
