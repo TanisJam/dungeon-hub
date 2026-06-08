@@ -1411,6 +1411,23 @@ export const guildContributions = pgTable(
      * Backfilled from ref_entity_kind on migration 0042 (bitacora-gremio W4).
      */
     tags: text('tags').array().notNull().default(sql`'{}'`),
+    /**
+     * Optional title — carried from the source bitácora page at share time.
+     * NULL for non-share contributions (legacy rows) and untitled pages.
+     * bitacora-personal-share SDD spec #2035 REQ-SHARE-02, ADR-3.
+     */
+    title: text('title'),
+    /**
+     * Back-link FK to the source bitacora_pages row when this contribution
+     * was created via the personal-share path. NULL for non-share rows.
+     * ON DELETE SET NULL — preserves the contribution (append-only) when the
+     * source page is deleted; feed card degrades to plain "Gremio" badge (ADR-1).
+     * bitacora-personal-share SDD spec #2035 REQ-SHARE-12, ADR-1/ADR-2.
+     */
+    sourceBitacoraPageId: uuid('source_bitacora_page_id').references(
+      (): AnyPgColumn => bitacoraPages.id,
+      { onDelete: 'set null' },
+    ),
   },
   (t) => [
     // Feed query: most recent contributions for a world
@@ -1423,6 +1440,8 @@ export const guildContributions = pgTable(
     index('idx_gc_author').on(t.authorUserId),
     // Tag filter — GIN for ?tag= + cronica-feed tag aggregation (bitacora-gremio W4)
     index('idx_gc_tags').using('gin', t.tags),
+    // Dedup index: idempotency SELECT on share path hits this (ADR-2, bitacora-personal-share)
+    index('idx_gc_source_page').on(t.sourceBitacoraPageId),
   ],
 );
 
