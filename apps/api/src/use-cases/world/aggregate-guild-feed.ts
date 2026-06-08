@@ -36,6 +36,7 @@ import {
   filterWorldEventsByAccess,
   type LoadedWorldEvent,
 } from './load-world-event.js';
+import { resolveFeedEntityNames } from './resolve-feed-entity-names.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +55,19 @@ export interface FeedItem {
   visibility: string;
   refEntityKind?: string | null;
   refEntityId?: string | null;
+  /**
+   * Entity source — book identifier for bestiary (e.g. 'MM', 'PHB') or 'world' for
+   * UUID kinds (npc/faction/location). Null for legacy rows without a ref.
+   * guild-feed-linked-entity-refs REQ-GFLE-04, design ADR-7.
+   */
+  refEntitySource?: string | null;
+  /**
+   * Sanitized display name resolved by resolveFeedEntityNames.
+   * Null when the entity cannot be resolved (deleted/unknown).
+   * NEVER contains dmNotes or parentHexStatus — ADR-6.
+   * guild-feed-linked-entity-refs REQ-GFLE-05, design ADR-4.
+   */
+  refEntityName?: string | null;
   authorUserId?: string | null;
   /**
    * Back-link to the source bitácora page when this contribution was created
@@ -93,6 +107,7 @@ function normalizeContribution(
     title: string | null;
     refEntityKind: string | null;
     refEntityId: string | null;
+    refEntitySource?: string | null;
     sealedStatus: string | null;
     visibility: string;
     occurredAt: Date;
@@ -114,6 +129,9 @@ function normalizeContribution(
     visibility: row.visibility,
     refEntityKind: row.refEntityKind,
     refEntityId: row.refEntityId,
+    // guild-feed-linked-entity-refs: carry refEntitySource for monster disambiguation (ADR-7).
+    // Legacy rows have refEntitySource=NULL — graceful read-path tolerance.
+    refEntitySource: row.refEntitySource ?? null,
     authorUserId: row.authorUserId,
     // ADR-7: thread sourceBitacoraPageId for badge differentiation in feed-card.
     sourceBitacoraPageId: row.sourceBitacoraPageId ?? null,
@@ -235,5 +253,31 @@ export async function aggregateGuildFeed(
   const pageCount = sliced.length;
   const nextOffset = hasMore ? offset + limit : null;
 
-  return { rows: sliced, pageCount, nextOffset };
+  // ── Entity name resolution (guild-feed-linked-entity-refs) ────────────────
+  // Resolve (refEntityKind, refEntityId, refEntitySource) → sanitized name for the sliced page.
+  // Only resolve sliced rows (bounded N), not the full fetched set.
+  // ADR-4: batch resolver — one query per kind, not per-item. ADR-6: dmNotes/parentHexStatus stripped.
+  const refsToResolve = sliced
+    .filter((item) => item.refEntityKind && item.refEntityId && item.refEntitySource)
+    .map((item) => ({
+      kind: item.refEntityKind!,
+      id: item.refEntityId!,
+      source: item.refEntitySource!,
+    }));
+
+  let nameMap = new Map<string, string | null>();
+  if (refsToResolve.length > 0) {
+    nameMap = await resolveFeedEntityNames(worldId, refsToResolve);
+  }
+
+  // Attach refEntityName to each sliced FeedItem
+  const rows = sliced.map((item) => {
+    if (item.refEntityKind && item.refEntityId && item.refEntitySource) {
+      const key = `${item.refEntityKind}|${item.refEntityId}|${item.refEntitySource}`;
+      return { ...item, refEntityName: nameMap.get(key) ?? null };
+    }
+    return { ...item, refEntityName: null };
+  });
+
+  return { rows, pageCount, nextOffset };
 }
