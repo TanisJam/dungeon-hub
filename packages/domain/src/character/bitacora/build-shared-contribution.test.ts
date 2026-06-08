@@ -133,12 +133,70 @@ describe('buildSharedContribution — sourceBitacoraPageId', () => {
 describe('buildSharedContribution — ref fields null', () => {
   it('(h) refEntityKind is null (structured refs not copied v1 — deferred to UUID bridge #1946)', () => {
     // REQ-SHARE-08: refs array NOT copied; refEntityKind/refEntityId remain null.
-    const payload = buildSharedContribution(basePage);
+    // NOTE: This test now passes refs:[] explicitly — the new behavior should still
+    // return null for all ref fields when refs is empty.
+    const payload = buildSharedContribution({ ...basePage, refs: [] });
     expect(payload.refEntityKind).toBeNull();
   });
 
-  it('(h2) refEntityId is null', () => {
-    const payload = buildSharedContribution(basePage);
+  it('(h2) refEntityId is null when refs empty', () => {
+    const payload = buildSharedContribution({ ...basePage, refs: [] });
     expect(payload.refEntityId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// guild-feed-linked-entity-refs — REQ-GFLE-02/03 (TDD RED — written first)
+// ---------------------------------------------------------------------------
+
+describe('buildSharedContribution — refs[0] carry (guild-feed-linked-entity-refs)', () => {
+  // D-1 [RED] monster ref → normalized to bestiary + correct id + source
+  it('(i) monster ref normalizes to bestiary with refEntityId and refEntitySource', () => {
+    // REQ-GFLE-02: monster → bestiary at write boundary.
+    // REQ-GFLE-03: refs[0] carried into all three ref fields.
+    // ADR-2: KIND_TO_DB_KIND-style normalizer at write boundary only.
+    const payload = buildSharedContribution({
+      ...basePage,
+      refs: [{ kind: 'monster', refKey: 'goblin', refSource: 'MM' }],
+    });
+    expect(payload.refEntityKind).toBe('bestiary');
+    expect(payload.refEntityId).toBe('goblin');
+    expect(payload.refEntitySource).toBe('MM');
+  });
+
+  // D-2 [RED] npc ref passes through with kind='npc', refSource='world'
+  it('(j) npc ref passes through with refEntityKind=npc and refEntitySource=world', () => {
+    // REQ-GFLE-02: npc passes through unchanged.
+    const payload = buildSharedContribution({
+      ...basePage,
+      refs: [{ kind: 'npc', refKey: 'uuid-npc-001', refSource: 'world' }],
+    });
+    expect(payload.refEntityKind).toBe('npc');
+    expect(payload.refEntityId).toBe('uuid-npc-001');
+    expect(payload.refEntitySource).toBe('world');
+  });
+
+  // D-3 [RED] empty refs → all three fields null
+  it('(k) empty refs → refEntityKind, refEntityId, refEntitySource all null', () => {
+    // REQ-GFLE-03: empty refs path — all three null.
+    const payload = buildSharedContribution({ ...basePage, refs: [] });
+    expect(payload.refEntityKind).toBeNull();
+    expect(payload.refEntityId).toBeNull();
+    expect(payload.refEntitySource).toBeNull();
+  });
+
+  // D-4 [RED] multiple refs → only refs[0] carried (single-ref policy)
+  it('(l) multiple refs → only refs[0] carried (npc wins, faction at index 1 ignored)', () => {
+    // REQ-GFLE-03 single-ref policy: only refs[0] is carried; index 1+ are ignored.
+    const payload = buildSharedContribution({
+      ...basePage,
+      refs: [
+        { kind: 'npc', refKey: 'uuid-a', refSource: 'world' },
+        { kind: 'faction', refKey: 'uuid-b', refSource: 'world' },
+      ],
+    });
+    expect(payload.refEntityKind).toBe('npc');
+    expect(payload.refEntityId).toBe('uuid-a');
+    expect(payload.refEntitySource).toBe('world');
   });
 });
