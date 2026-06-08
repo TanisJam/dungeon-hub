@@ -1,16 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * world-nav — 4-tab world navigation E2E (REQ-NAV-01, REQ-NAV-02).
- * Biblioteca W1 — updated from 5-tab to 4-tab; Mesa removed; Codex→Biblioteca.
+ * world-nav — 5-tab world navigation E2E (REQ-NAV-01, REQ-NAV-02).
+ * Biblioteca W1 removed Mesa + renamed Codex→Biblioteca; Mercado W3 added the
+ * Mercado tab; barrido-final renamed the Bitácora tab href /cronica → /bitacora.
  *
  * Verifies:
- *   (a) Authenticated user lands on /inicio with 4 tabs rendered.
- *   (b) Each tab label is visible and non-empty (Inicio, Mapa, Biblioteca, Bitácora).
- *   (c) Stub routes (Mapa, Crónica) render without error.
+ *   (a) Authenticated user lands on /inicio with 5 tabs rendered.
+ *   (b) Each tab label is visible and non-empty (Inicio, Mapa, Biblioteca, Mercado, Bitácora).
+ *   (c) Stub routes (Mapa) render without error.
  *   (d) Biblioteca tab navigates to /compendium.
  *   (e) No Mesa tab visible.
- *   (f) Bitácora tab renders /cronica unified feed (no redirect — bitacora-gremio W4 ADR-4).
+ *   (f) Bitácora tab renders /bitacora unified feed (no redirect — bitacora-gremio W4 ADR-4).
  *
  * Mobile-first: runs at 375px viewport (iPhone SE) per project convention.
  */
@@ -19,26 +20,26 @@ const MOBILE = { width: 375, height: 812 };
 
 test.use({ viewport: MOBILE });
 
-test('4 tabs render on /inicio (Biblioteca W1 — Mesa removed)', async ({ page }) => {
+test('5 tabs render on /inicio (Mesa removed, Mercado added)', async ({ page }) => {
   await page.goto('/inicio', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
-  // TabBar should have exactly 4 links in a grid-cols-4 nav
+  // TabBar should have exactly 5 links (Inicio, Mapa, Biblioteca, Mercado, Bitácora)
   const nav = page.locator('nav[aria-label="Navegación principal"]');
   await expect(nav).toBeVisible({ timeout: 10_000 });
 
   const tabLinks = nav.locator('a');
-  await expect(tabLinks).toHaveCount(4, { timeout: 5_000 });
+  await expect(tabLinks).toHaveCount(5, { timeout: 5_000 });
 });
 
-test('each tab label is visible — Inicio, Mapa, Biblioteca, Bitácora (no Mesa, no Codex)', async ({ page }) => {
+test('each tab label is visible — Inicio, Mapa, Biblioteca, Mercado, Bitácora (no Mesa, no Codex)', async ({ page }) => {
   await page.goto('/inicio', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
   const nav = page.locator('nav[aria-label="Navegación principal"]');
   await expect(nav).toBeVisible({ timeout: 10_000 });
 
-  const expectedLabels = ['Inicio', 'Mapa', 'Biblioteca', 'Bitácora'];
+  const expectedLabels = ['Inicio', 'Mapa', 'Biblioteca', 'Mercado', 'Bitácora'];
   for (const label of expectedLabels) {
     await expect(nav.getByText(label, { exact: true })).toBeVisible({ timeout: 5_000 });
   }
