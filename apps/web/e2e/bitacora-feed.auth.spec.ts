@@ -129,3 +129,42 @@ test('Tag round-trip: select lore → filtered, deselect → all restored (REQ-G
   // Lore chip deselected
   await expect(loreChip).toHaveAttribute('aria-pressed', 'false', { timeout: 5_000 });
 });
+
+/**
+ * REQ-TEST-FILTER-01: selectOption on guild feed source filter.
+ *
+ * Uses selectOption with exact string (NOT label regex — pitfall §11).
+ * The source select element (data-testid="source-select") passes ?source= to the
+ * API and filters the result set to one source type only.
+ *
+ * NOTE: This test targets the source <select> facet on the /bitacora page.
+ * When the source select UI lands, this spec is ready to run as-is.
+ */
+test('selectOption source filter: select "gremio" → feed shows only Gremio entries (REQ-TEST-FILTER-01)', async ({ page }) => {
+  await page.goto('/bitacora', { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/bitacora$/, { timeout: 10_000 });
+
+  // The source select facet — uses selectOption with exact value string, NOT label regex
+  // (pitfall §11: selectOption({ label: regex }) does NOT exist in Playwright)
+  const sourceSelect = page.locator('[data-testid="source-select"]');
+  await expect(sourceSelect).toBeVisible({ timeout: 10_000 });
+
+  // Select 'gremio' source using exact value string (REQ-TEST-FILTER-01, pitfall §11)
+  await sourceSelect.selectOption('gremio');
+
+  // After source filter, all visible feed cards must show the Gremio badge
+  const feedCards = page.locator('article');
+  await expect(feedCards.first()).toBeVisible({ timeout: 10_000 });
+
+  // Verify each visible card has the "Gremio" source badge
+  const gremioCards = feedCards.filter({ hasText: 'Gremio' });
+  const allCards = await feedCards.count();
+  const gremioCount = await gremioCards.count();
+  expect(gremioCount).toBe(allCards);
+
+  // Reset to show all sources — select the empty/all option
+  await sourceSelect.selectOption('');
+
+  // After reset, feed should have more entries (or at least not only gremio)
+  await expect(feedCards.first()).toBeVisible({ timeout: 10_000 });
+});
