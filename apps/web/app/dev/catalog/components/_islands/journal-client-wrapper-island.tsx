@@ -13,7 +13,7 @@
 
 import { JournalClientWrapper } from '@/components/world/journal/journal-client-wrapper';
 import type { JournalWrapperActions } from '@/components/world/journal/journal-client-wrapper';
-import type { JournalRow, JournalSearchResult } from '@/app/cronica/actions';
+import type { JournalRow, JournalSearchResult } from '@/app/bitacora/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

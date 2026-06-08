@@ -3,7 +3,7 @@
 
 import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
-import type { EventRow as EventRowData, EventVisibility } from '@/app/cronica/actions';
+import type { EventRow as EventRowData, EventVisibility } from '@/app/bitacora/actions';
 
 interface EventRowProps {
   row: EventRowData;

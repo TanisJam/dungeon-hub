@@ -5,7 +5,7 @@
 import { Pill } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import type { JournalRow, JournalVisibility } from '@/app/cronica/actions';
+import type { JournalRow, JournalVisibility } from '@/app/bitacora/actions';
 
 interface JournalDetailProps {
   detail: JournalRow;

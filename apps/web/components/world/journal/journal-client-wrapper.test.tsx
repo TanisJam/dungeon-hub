@@ -24,7 +24,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { JournalClientWrapper } from './journal-client-wrapper';
-import type { JournalRow } from '@/app/cronica/actions';
+import type { JournalRow } from '@/app/bitacora/actions';
 
 // WorldEntityShell calls useRouter().refresh() after mutations; useRouter().push() for tag nav
 vi.mock('next/navigation', () => ({
@@ -34,7 +34,7 @@ vi.mock('next/navigation', () => ({
 // ─── Mock Server Actions ─────────────────────────────────────────────────────
 // IMPORTANT: vi.mock is hoisted — do NOT reference outer variables inside the factory.
 
-vi.mock('@/app/cronica/actions', () => ({
+vi.mock('@/app/bitacora/actions', () => ({
   listEvents: vi.fn(),
   getEventDetail: vi.fn(),
   createEvent: vi.fn(),
@@ -75,7 +75,7 @@ function renderWrapper(effectiveView: 'dm' | 'player', entries: JournalRow[] = [
 }
 
 // Import the mocked module to set .mockResolvedValue in beforeEach
-import * as actions from '@/app/cronica/actions';
+import * as actions from '@/app/bitacora/actions';
 
 // ─── DM view tests ───────────────────────────────────────────────────────────
 

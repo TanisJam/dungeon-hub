@@ -6,7 +6,7 @@
 import { Pill } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
-import type { EventRow, EventVisibility } from '@/app/cronica/actions';
+import type { EventRow, EventVisibility } from '@/app/bitacora/actions';
 
 interface EventDetailProps {
   detail: EventRow;

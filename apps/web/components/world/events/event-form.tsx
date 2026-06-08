@@ -7,7 +7,7 @@
 // B1 refactor: replaced inline inputClass/labelClass/error/submit with ui/ primitives.
 
 import { useState } from 'react';
-import type { EventRow, EventBody, EventVisibility } from '@/app/cronica/actions';
+import type { EventRow, EventBody, EventVisibility } from '@/app/bitacora/actions';
 import { FormLabel } from '@/components/ui/form-label';
 import { FormInput } from '@/components/ui/form-input';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';

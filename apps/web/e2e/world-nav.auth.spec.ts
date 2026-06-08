@@ -77,11 +77,11 @@ test('Biblioteca tab navigates to /compendium and renders content', async ({ pag
   await expect(title).toBeVisible({ timeout: 10_000 });
 });
 
-test('Bitácora tab renders /cronica unified feed (no longer redirects — bitacora-gremio W4)', async ({ page }) => {
-  await page.goto('/cronica', { waitUntil: 'domcontentloaded' });
-  // bitacora-gremio W4 ADR-4: /cronica is now the unified feed, NOT a redirect to /cronica/eventos.
-  // The URL stays at /cronica (unified feed).
-  await expect(page).toHaveURL(/\/cronica$/, { timeout: 10_000 });
+test('Bitácora tab renders /bitacora unified feed (REQ-RENAME-01, barrido-final — ADR-4)', async ({ page }) => {
+  await page.goto('/bitacora', { waitUntil: 'domcontentloaded' });
+  // barrido-final REQ-RENAME-01: route moved from /cronica → /bitacora.
+  // The URL stays at /bitacora (unified feed — no redirect).
+  await expect(page).toHaveURL(/\/bitacora$/, { timeout: 10_000 });
   // Page renders without 404 — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });

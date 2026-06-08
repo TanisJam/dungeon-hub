@@ -92,21 +92,21 @@ describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
     expect(activeLink?.getAttribute('href')).toBe('/compendium');
   });
 
-  // Bitácora tab still uses /cronica href (route rename deferred)
-  it('Bitácora tab link with href /cronica (route rename deferred)', () => {
+  // Bitácora tab uses /bitacora href (REQ-RENAME-01, REQ-RENAME-02 — barrido-final)
+  it('Bitácora tab link with href /bitacora (REQ-RENAME-01)', () => {
     render(<TabBar />);
     const link = screen.getByRole('link', { name: /bitácora/i });
     expect(link).toBeTruthy();
-    expect(link.getAttribute('href')).toBe('/cronica');
+    expect(link.getAttribute('href')).toBe('/bitacora');
     expect(screen.queryByText('Crónica')).toBeNull();
   });
 
-  it('Bitácora tab has aria-current="page" when pathname is /cronica', () => {
-    mockUsePathname.mockReturnValue('/cronica');
+  it('Bitácora tab has aria-current="page" when pathname is /bitacora (REQ-RENAME-02)', () => {
+    mockUsePathname.mockReturnValue('/bitacora');
     const { container } = render(<TabBar />);
     const activeLink = container.querySelector('[aria-current="page"]');
     expect(activeLink).toBeTruthy();
-    expect(activeLink?.getAttribute('href')).toBe('/cronica');
+    expect(activeLink?.getAttribute('href')).toBe('/bitacora');
     expect(activeLink?.textContent).toContain('Bitácora');
   });
 
@@ -135,11 +135,11 @@ describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
     expect(nav?.className).not.toContain('grid-cols-4');
   });
 
-  // Tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora (REQ-MERC-NAV-01)
+  // Tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora (REQ-MERC-NAV-01, REQ-RENAME-02)
   it('tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora', () => {
     render(<TabBar />);
     const links = screen.getAllByRole('link');
     const hrefs = links.map((l) => l.getAttribute('href'));
-    expect(hrefs).toEqual(['/inicio', '/mapa', '/compendium', '/mercado', '/cronica']);
+    expect(hrefs).toEqual(['/inicio', '/mapa', '/compendium', '/mercado', '/bitacora']);
   });
 });

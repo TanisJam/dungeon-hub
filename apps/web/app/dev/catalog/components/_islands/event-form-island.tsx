@@ -14,7 +14,7 @@
 
 import { useState } from 'react';
 import { EventForm } from '@/components/world/events/event-form';
-import type { EventBody } from '@/app/cronica/actions';
+import type { EventBody } from '@/app/bitacora/actions';
 
 export function EventFormIsland({ mode }: { mode?: 'create' | 'edit' }) {
   const [lastAction, setLastAction] = useState<string | null>(null);

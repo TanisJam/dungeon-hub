@@ -3,7 +3,7 @@
 
 import { Pill, ListRow } from '@/components/ui';
 import type { PillTone } from '@/components/ui';
-import type { JournalRow as JournalRowData, JournalVisibility } from '@/app/cronica/actions';
+import type { JournalRow as JournalRowData, JournalVisibility } from '@/app/bitacora/actions';
 
 interface JournalRowProps {
   row: JournalRowData;

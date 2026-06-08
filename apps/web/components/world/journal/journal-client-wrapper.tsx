@@ -26,8 +26,8 @@ import {
   createJournalEntry,
   updateJournalEntry,
   deleteJournalEntry,
-} from '@/app/cronica/actions';
-import type { JournalRow, JournalBody } from '@/app/cronica/actions';
+} from '@/app/bitacora/actions';
+import type { JournalRow, JournalBody } from '@/app/bitacora/actions';
 
 // ---------------------------------------------------------------------------
 // Dependency injection bundle
@@ -95,7 +95,7 @@ export function JournalClientWrapper({
   function handleTagClick(tag: string) {
     const next = activeTag === tag ? undefined : tag;
     setActiveTag(next);
-    const url = next ? `/cronica/notas?tag=${encodeURIComponent(next)}` : '/cronica/notas';
+    const url = next ? `/bitacora/notas?tag=${encodeURIComponent(next)}` : '/bitacora/notas';
     router.push(url);
   }
 

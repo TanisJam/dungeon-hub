@@ -24,7 +24,7 @@ import { useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { V3Sheet } from '@/components/ui';
 import { createContribution } from '@/app/herramientas/actions';
-import type { FeedItem } from '@/app/cronica/actions';
+import type { FeedItem } from '@/app/bitacora/actions';
 
 // ---------------------------------------------------------------------------
 // Props

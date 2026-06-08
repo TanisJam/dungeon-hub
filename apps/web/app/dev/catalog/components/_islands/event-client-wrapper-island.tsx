@@ -13,7 +13,7 @@
 
 import { EventClientWrapper } from '@/components/world/events/event-client-wrapper';
 import type { EventWrapperActions } from '@/components/world/events/event-client-wrapper';
-import type { EventRow, EventSearchResult } from '@/app/cronica/actions';
+import type { EventRow, EventSearchResult } from '@/app/bitacora/actions';
 
 // ---------------------------------------------------------------------------
 // Fixtures

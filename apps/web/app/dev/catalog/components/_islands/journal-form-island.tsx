@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { JournalForm } from '@/components/world/journal/journal-form';
-import type { JournalBody } from '@/app/cronica/actions';
+import type { JournalBody } from '@/app/bitacora/actions';
 
 export function JournalFormIsland({ mode }: { mode?: 'create' | 'edit' }) {
   const [lastAction, setLastAction] = useState<string | null>(null);

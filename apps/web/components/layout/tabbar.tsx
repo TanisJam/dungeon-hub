@@ -19,7 +19,7 @@ const WORLD_TABS: Tab[] = [
   { key: 'mapa',      label: 'Mapa',      icon: 'feather', href: '/mapa' },
   { key: 'biblioteca', label: 'Biblioteca', icon: 'book',  href: '/compendium' },
   { key: 'mercado',   label: 'Mercado',   icon: 'bag',    href: '/mercado' },
-  { key: 'cronica',   label: 'Bitácora',  icon: 'scroll', href: '/cronica' },
+  { key: 'bitacora',  label: 'Bitácora',  icon: 'scroll', href: '/bitacora' },
 ];
 
 export function TabBar() {

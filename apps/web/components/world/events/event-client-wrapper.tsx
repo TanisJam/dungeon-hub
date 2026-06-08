@@ -26,8 +26,8 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
-} from '@/app/cronica/actions';
-import type { EventRow, EventBody } from '@/app/cronica/actions';
+} from '@/app/bitacora/actions';
+import type { EventRow, EventBody } from '@/app/bitacora/actions';
 
 // ---------------------------------------------------------------------------
 // Dependency injection bundle
@@ -97,7 +97,7 @@ export function EventClientWrapper({
     const next = activeTag === tag ? undefined : tag;
     setActiveTag(next);
     // Update URL so SSR re-fetches the filtered list on next navigation
-    const url = next ? `/cronica/eventos?tag=${encodeURIComponent(next)}` : '/cronica/eventos';
+    const url = next ? `/bitacora/eventos?tag=${encodeURIComponent(next)}` : '/bitacora/eventos';
     router.push(url);
   }
 
