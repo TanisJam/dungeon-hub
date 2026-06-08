@@ -22,6 +22,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 import { createWorldWithGm } from '../helpers/create-world-with-gm.js';
 import { addWorldMember } from '../helpers/add-world-member.js';
 import { resolveFeedEntityNames } from '../../src/use-cases/world/resolve-feed-entity-names.js';
+import { listPoisInWorld } from '../../src/use-cases/map/load-poi.js';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Sentinels
@@ -29,6 +30,9 @@ import { resolveFeedEntityNames } from '../../src/use-cases/world/resolve-feed-e
 
 /** MUST NOT appear in resolver output — security-critical. */
 const DM_NOTES_SENTINEL = 'GFLE-DMNOTES-MUST-NOT-LEAK-resolver-test';
+
+/** Faction dmNotes sentinel — MUST NOT appear in resolver output (S-1 symmetry with NPC). */
+const FACTION_DM_NOTES_SENTINEL = 'GFLE-FACTION-DMNOTES-MUST-NOT-LEAK';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Fixtures
@@ -74,7 +78,7 @@ describe('resolveFeedEntityNames — world-level sanitized batch resolver', () =
     expect(npcRes.statusCode).toBe(201);
     npcId = npcRes.json<{ id: string }>().id;
 
-    // Create Faction with dmNotes sentinel
+    // Create Faction with its own dmNotes sentinel (S-1: symmetry with NPC)
     factionName = `Test Faction Resolver ${Date.now()}`;
     const factionRes = await app.inject({
       method: 'POST',
@@ -83,17 +87,29 @@ describe('resolveFeedEntityNames — world-level sanitized batch resolver', () =
       payload: {
         name: factionName,
         description: 'Test faction for feed resolver.',
-        dmNotes: DM_NOTES_SENTINEL,
+        dmNotes: FACTION_DM_NOTES_SENTINEL,
         state: 'active',
       },
     });
     expect(factionRes.statusCode).toBe(201);
     factionId = factionRes.json<{ id: string }>().id;
 
-    // Create POI (free-floating, no hex)
+    // Create a hex so the POI can be attached to it — this makes listPoisInWorld
+    // return a NON-NULL parentHexStatus for the POI row (new hexes default to 'unexplored').
+    // Without a parent hex the LEFT JOIN yields null, making R-3 trivially vacuous.
+    const hexRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/worlds/${worldId}/hexes`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { q: 1, r: 1, terrain: 'forest' },
+    });
+    expect(hexRes.statusCode).toBe(201);
+    const hexId = hexRes.json<{ id: string }>().id;
+
+    // Create POI attached to the hex — parentHexStatus will be 'unexplored' in the raw row
     const poiRes = await app.inject({
       method: 'POST',
-      url: `/api/v1/worlds/${worldId}/pois`,
+      url: `/api/v1/hexes/${hexId}/pois`,
       headers: { authorization: `Bearer ${gm.accessToken}` },
       payload: {
         name: 'Test POI Resolver',
@@ -139,17 +155,57 @@ describe('resolveFeedEntityNames — world-level sanitized batch resolver', () =
   });
 
   // ---------------------------------------------------------------------------
+  // R-2b [RED]: faction dmNotes MUST NOT appear in resolver output (S-1)
+  // ---------------------------------------------------------------------------
+
+  it('(R-2b) Faction with dmNotes sentinel — dmNotes structurally absent from resolver output', async () => {
+    // REQ-GFLE-05: strip dmNotes unconditionally for factions too. ADR-6.
+    // Mirrors the NPC sentinel assertion in R-2 (symmetry across all entity kinds).
+    const map = await resolveFeedEntityNames(worldId, [
+      { kind: 'faction', id: factionId, source: 'world' },
+    ]);
+
+    const entry = map.get(`faction|${factionId}|world`);
+    // Should return the faction name (not null)
+    expect(entry).toBeDefined();
+    expect(entry).not.toBeNull();
+    expect(typeof entry).toBe('string');
+    expect(entry).toBe(factionName);
+
+    // CRITICAL: sentinel MUST NOT appear anywhere in the resolver output
+    const mapJson = JSON.stringify(Object.fromEntries(map));
+    expect(mapJson).not.toContain(FACTION_DM_NOTES_SENTINEL);
+  });
+
+  // ---------------------------------------------------------------------------
   // R-3 [RED]: parentHexStatus MUST NOT appear in resolver output
   // ---------------------------------------------------------------------------
 
-  it('(R-3) POI — parentHexStatus structurally absent from resolver output', async () => {
+  it('(R-3) POI on hex — stripParentHexStatus is exercised: raw row is non-null, resolver output omits it', async () => {
     // REQ-GFLE-05: strip parentHexStatus unconditionally. ADR-6.
+    //
+    // The POI was created attached to a hex (status='unexplored'), so the LEFT JOIN in
+    // listPoisInWorld returns parentHexStatus='unexplored' (non-null) for this row.
+    // Step 1 — verify the raw listPoisInWorld row DOES carry a non-null parentHexStatus.
+    //   This ensures we are testing the STRIP operation, not the absence of data.
+    // Step 2 — call the resolver and assert the field (and its value) are gone from output.
+    const rawRows = await listPoisInWorld({ worldId });
+    const rawPoi = rawRows.find((r) => r.id === poiId);
+    expect(rawPoi).toBeDefined();
+    // parentHexStatus must be non-null here — the strip is what removes it below.
+    expect(rawPoi!.parentHexStatus).not.toBeNull();
+
+    // Now run the resolver — it must call stripParentHexStatus before returning
     const map = await resolveFeedEntityNames(worldId, [
       { kind: 'location', id: poiId, source: 'world' },
     ]);
 
     const mapJson = JSON.stringify(Object.fromEntries(map));
+    // The key must never appear (structural absence)
     expect(mapJson).not.toContain('parentHexStatus');
+    // The raw parentHexStatus VALUE must never appear either
+    expect(mapJson).not.toContain(rawPoi!.parentHexStatus as string);
+    // dmNotes sentinel also absent (belt-and-suspenders)
     expect(mapJson).not.toContain(DM_NOTES_SENTINEL);
   });
 
