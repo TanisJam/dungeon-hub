@@ -7,8 +7,11 @@ import { resolveAccessToken } from './helpers/resolve-access-token';
  * SDD character-codex-browser (Slice 1'):
  *   REQ-CCB-WEB-01: grid page shows "N de M descubiertos" per category.
  *   REQ-CCB-WEB-02: /codex/monsters player view — known monsters in CodexList.
- *   REQ-CCB-MIG-01: /codex/bestiario redirects (not 404).
  *   REQ-CCB-MIG-02: E2E updated same slice as bespoke page removal.
+ *
+ * NOTE: REQ-CCB-MIG-01 (/codex/bestiario redirect) test was REMOVED — the whole
+ * /characters/[id]/codex tree was deleted by design in codex-ia-reframe W1
+ * (commit b892e74, delete-at-replace). The route 404s intentionally; no redirect.
  *
  * HOUSE RULE: Bestiary statblock gating — no RAW basis (PHB p.177-179).
  * DM grants a monster → player sees it. Ungranted monsters NOT in player DOM.
@@ -164,37 +167,6 @@ test.describe('Character Codex Browser @ 375px', () => {
         expect(count, 'Ungranted tarrasque must not appear in Conocidos').toBe(0);
       }
       // If user knows the tarrasque — test is N/A (skip assertion)
-    },
-  );
-
-  test(
-    'REQ-CCB-MIG-01: /codex/bestiario redirects to /codex or /codex/monsters (no 404)',
-    async ({ page }) => {
-      // QUARANTINED: route does not redirect (likely a stale test — the codex grid
-      // was removed in codex-ia-reframe W1). Triage: confirm gone-by-design → delete.
-      // See engram ticket e2e/quarantined-auth-spec-failures (#2045).
-      test.fixme(true, 'codex/bestiario redirect missing — stale test? see #2045');
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-
-      // Resolve the access token from the @supabase/ssr auth cookie.
-      const accessToken = await resolveAccessToken(page);
-
-      if (!accessToken) {
-        test.skip(true, 'Could not resolve access token');
-        return;
-      }
-
-      // Use a known UUID format — we don't need an actual valid character ID for the redirect test.
-      // The redirect page.tsx redirects before any DB access.
-      // Use a fake UUID to trigger the redirect without DB dependencies.
-      const fakeCharId = '00000000-0000-0000-0000-000000000099';
-      await page.goto(`/characters/${fakeCharId}/codex/bestiario`, { waitUntil: 'networkidle', timeout: 30_000 });
-
-      // Must redirect (URL must not contain /bestiario after redirect settles)
-      // The page may 404 on the redirect target (fake character) — that's OK.
-      // What we assert is that /bestiario is NOT the final URL (redirect happened).
-      const finalUrl = page.url();
-      expect(finalUrl, 'bestiario URL must redirect — not stay on /bestiario').not.toMatch(/\/codex\/bestiario/);
     },
   );
 });

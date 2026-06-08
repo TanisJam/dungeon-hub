@@ -205,10 +205,6 @@ test(
 test(
   'Spec C — player creates bitácora page with NPC ref → reload → NPC card visible, dmNotes absent',
   async ({ page, request }) => {
-    // QUARANTINED: composer sheet does not dismiss after "Crear página" at 375px
-    // (body + select both match the NPC name). Triage with factions Spec C (#1946).
-    // See engram ticket e2e/quarantined-auth-spec-failures (#2045).
-    test.fixme(true, 'composer npc-ref sheet not dismissed at 375px — see #2045');
     const accessToken = await getAccessToken(page);
     if (!accessToken) {
       test.skip(true, 'Could not resolve access token');
@@ -247,16 +243,18 @@ test(
     // Open the composer
     await page.getByRole('button', { name: 'Nueva página' }).click();
 
-    // Wait for composer sheet to open
-    await expect(page.getByText('Nueva página').last()).toBeVisible({ timeout: 5_000 });
+    // Wait for composer sheet to open — scoped to dialog to avoid matching the FAB label
+    const composerDialog = page.getByRole('dialog', { name: 'Nueva página' });
+    await expect(composerDialog).toBeVisible({ timeout: 5_000 });
 
     // Fill body
     const pageBody = `Notas sobre el NPC ${roundTripNpcName}`;
-    await page.getByRole('textbox', { name: /Notas/i }).fill(pageBody);
+    await composerDialog.getByRole('textbox', { name: /Notas/i }).fill(pageBody);
 
-    // The NPC kind switch — if both monsters and npcs are available, switch to NPC
-    const npcPill = page.getByRole('button', { name: 'NPC', exact: true });
+    // The NPC kind switch — scope to dialog to avoid matching page-list card buttons
+    const npcPill = composerDialog.getByRole('button', { name: 'NPC', exact: true });
     if (await npcPill.count() > 0) {
+      await npcPill.scrollIntoViewIfNeeded();
       await npcPill.click();
     }
 
@@ -267,19 +265,28 @@ test(
     }
 
     // Submit
-    await page.getByRole('button', { name: 'Crear página' }).click();
+    await composerDialog.getByRole('button', { name: 'Crear página' }).click();
 
-    // Wait for page reload (Server Action revalidates)
-    await page.waitForLoadState('networkidle', { timeout: 30_000 });
+    // Wait for the composer to dismiss — Server Action returns ok:true → handleClose().
+    // React processes state update asynchronously after networkidle fires; waiting for
+    // the dialog to disappear is more reliable than waitForLoadState alone.
+    await expect(composerDialog).not.toBeVisible({ timeout: 30_000 });
 
-    // The created page should appear in the list
-    await expect(page.getByText(pageBody.slice(0, 30))).toBeVisible({ timeout: 10_000 });
+    // Wait for the RSC revalidation (triggered by revalidatePath in the Server Action)
+    // to fully complete and update the page list.
+    await page.waitForLoadState('networkidle', { timeout: 15_000 });
+
+    // The created page should appear in the list — use full pageBody (includes timestamp)
+    // to avoid strict-mode violations from accumulated pages across test runs.
+    await expect(page.getByRole('button', { name: pageBody })).toBeVisible({ timeout: 10_000 });
 
     // Open the page detail
-    await page.getByText(pageBody.slice(0, 30)).click();
+    await page.getByRole('button', { name: pageBody }).click();
 
-    // NPC name card must be visible in detail view (ADR-5 linked-entity scenario)
-    await expect(page.getByText(roundTripNpcName)).toBeVisible({ timeout: 5_000 });
+    // NPC name card must be visible in detail view (ADR-5 linked-entity scenario).
+    // exact:true scopes to the linked-entity card <p>name</p>, not the page body
+    // ("Notas sobre el NPC {name}") which also contains the name.
+    await expect(page.getByText(roundTripNpcName, { exact: true })).toBeVisible({ timeout: 5_000 });
 
     // SECURITY: dmNotes sentinel absent from page detail DOM
     await expect(page.locator('body')).not.toContainText(DM_NOTES_SENTINEL);

@@ -230,10 +230,6 @@ test(
 test(
   'Spec C — player creates bitácora page with faction ref → reload → faction card visible, dmNotes absent',
   async ({ page, request }) => {
-    // QUARANTINED: Facción kind-pill click intercepted by the V3Sheet dialog overlay
-    // at 375px. Triage: real mobile bottom-sheet bug vs brittle test-flow (#1946).
-    // See engram ticket e2e/quarantined-auth-spec-failures (#2045).
-    test.fixme(true, 'composer faction-ref pill intercepted at 375px — see #2045');
     const accessToken = await getAccessToken(page);
     if (!accessToken) {
       test.skip(true, 'Could not resolve access token');
@@ -279,8 +275,9 @@ test(
     const pageBody = `Notas sobre la facción ${roundTripFactionName}`;
     await page.getByRole('textbox', { name: /Notas/i }).fill(pageBody);
 
-    // Switch to Facción kind pill
-    const factionPill = page.getByRole('button', { name: 'Facción' });
+    // Switch to Facción kind pill. exact:true scopes to the <button>Facción</button>
+    // pill, not page-list cards whose body ("Notas sobre la facción ...") also matches.
+    const factionPill = page.getByRole('button', { name: 'Facción', exact: true });
     if (await factionPill.count() > 0) {
       await factionPill.click();
     }
@@ -297,14 +294,17 @@ test(
     // Wait for page reload (Server Action revalidates)
     await page.waitForLoadState('networkidle', { timeout: 30_000 });
 
-    // The created page should appear in the list
-    await expect(page.getByText(pageBody.slice(0, 30))).toBeVisible({ timeout: 10_000 });
+    // The created page should appear in the list — full pageBody (includes timestamp)
+    // avoids strict-mode violations from pages accumulated across runs.
+    await expect(page.getByRole('button', { name: pageBody })).toBeVisible({ timeout: 10_000 });
 
     // Open the page detail
-    await page.getByText(pageBody.slice(0, 30)).click();
+    await page.getByRole('button', { name: pageBody }).click();
 
-    // Faction name card must be visible in detail view
-    await expect(page.getByText(roundTripFactionName)).toBeVisible({ timeout: 5_000 });
+    // Faction name card must be visible in detail view.
+    // exact:true scopes to the linked-entity card <p>name</p>, not the page body
+    // ("Notas sobre la facción {name}") which also contains the name.
+    await expect(page.getByText(roundTripFactionName, { exact: true })).toBeVisible({ timeout: 5_000 });
 
     // SECURITY: dmNotes sentinel absent from page detail DOM
     await expect(page.locator('body')).not.toContainText(FACTION_DM_NOTES_SENTINEL);
