@@ -78,7 +78,10 @@ export async function shareBitacoraPage(
     return { ok: true, contributionId: existing.id, alreadyShared: true };
   }
 
-  // Build the insert payload from the pure domain mapper
+  // Build the insert payload from the pure domain mapper.
+  // Pass refs from the page so refs[0] is carried into refEntityKind/refEntityId/refEntitySource.
+  // guild-feed-linked-entity-refs REQ-GFLE-03/04, design ADR-3.
+  const pageRefs = (page.refs as Array<{ kind: string; refKey: string; refSource: string }> | null | undefined) ?? [];
   const payload = buildSharedContribution({
     id: page.id,
     title: page.title ?? null,
@@ -86,6 +89,7 @@ export async function shareBitacoraPage(
     tags: page.tags ?? [],
     worldId: page.worldId,
     authorUserId: userId,
+    refs: pageRefs,
   });
 
   // INSERT (append-only — never PATCH or DELETE)
@@ -101,6 +105,8 @@ export async function shareBitacoraPage(
       sourceBitacoraPageId: payload.sourceBitacoraPageId,
       refEntityKind: payload.refEntityKind,
       refEntityId: payload.refEntityId,
+      // Thread refEntitySource for monster source round-trip (REQ-GFLE-04, ADR-7).
+      refEntitySource: payload.refEntitySource,
       visibility: payload.visibility,
     })
     .returning({ id: guildContributions.id });
