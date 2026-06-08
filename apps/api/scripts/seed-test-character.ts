@@ -112,20 +112,28 @@ async function main(): Promise<void> {
     scores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
   });
 
-  console.log(`[seed] PUT race (human, +2 STR / +1 CON — convención MPMM/2024)…`);
+  console.log(`[seed] PUT race (human PHB, +1 to all six abilities)…`);
   await call('PUT', `/api/v1/characters/${created.id}/race`, jwt, {
     race: { slug: 'human', source: 'PHB' },
     appliedAsis: [
-      { ability: 'str', bonus: 2, source: 'race' },
+      { ability: 'str', bonus: 1, source: 'race' },
+      { ability: 'dex', bonus: 1, source: 'race' },
       { ability: 'con', bonus: 1, source: 'race' },
+      { ability: 'int', bonus: 1, source: 'race' },
+      { ability: 'wis', bonus: 1, source: 'race' },
+      { ability: 'cha', bonus: 1, source: 'race' },
     ],
+    // PHB human grants 1 language of choice (RACE_LANGUAGE_COUNT_MISMATCH gate).
+    languageChoices: ['elvish'],
   });
 
-  console.log(`[seed] PUT class (Fighter L1, skills: athletics + intimidation)…`);
+  console.log(`[seed] PUT class (Fighter L1, skills: perception + survival)…`);
   await call('PUT', `/api/v1/characters/${created.id}/class`, jwt, {
     class: { slug: 'fighter', source: 'PHB' },
     level: 1,
-    skillChoices: ['athletics', 'intimidation'],
+    // Soldier background grants Athletics + Intimidation (fixed) — class must not
+    // duplicate them (SKILL_DUPLICATE_WITH_CLASS gate).
+    skillChoices: ['perception', 'survival'],
   });
 
   console.log(`[seed] PUT background (soldier PHB, gaming set: dice-set)…`);
@@ -160,6 +168,16 @@ async function main(): Promise<void> {
     }),
   });
   console.log(`[seed] Quest item seeded (instanceId: ${questInstanceId})`);
+
+  // Activate: submit for approval, then self-approve (the seeding user is the GM
+  // of the Dev World, so owner + DM are the same token). Reaches status='active'.
+  console.log(`[seed] PATCH status=pending_approval…`);
+  await call('PATCH', `/api/v1/characters/${created.id}`, jwt, {
+    status: 'pending_approval',
+  });
+  console.log(`[seed] POST approve (self-approve as world GM)…`);
+  await call('POST', `/api/v1/characters/${created.id}/approve`, jwt, {});
+  console.log(`[seed] Character is now active.`);
 
   console.log(`\n✓ Done. Character created with id: ${created.id}`);
   console.log(`  Probá: /character show name:${CHARACTER_NAME} en Discord.`);
