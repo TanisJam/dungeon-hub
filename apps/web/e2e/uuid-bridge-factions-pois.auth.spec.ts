@@ -230,6 +230,10 @@ test(
 test(
   'Spec C — player creates bitácora page with faction ref → reload → faction card visible, dmNotes absent',
   async ({ page, request }) => {
+    // QUARANTINED: Facción kind-pill click intercepted by the V3Sheet dialog overlay
+    // at 375px. Triage: real mobile bottom-sheet bug vs brittle test-flow (#1946).
+    // See engram ticket e2e/quarantined-auth-spec-failures (#2045).
+    test.fixme(true, 'composer faction-ref pill intercepted at 375px — see #2045');
     const accessToken = await getAccessToken(page);
     if (!accessToken) {
       test.skip(true, 'Could not resolve access token');

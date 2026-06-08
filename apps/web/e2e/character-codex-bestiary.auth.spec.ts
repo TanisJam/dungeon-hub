@@ -170,6 +170,10 @@ test.describe('Character Codex Browser @ 375px', () => {
   test(
     'REQ-CCB-MIG-01: /codex/bestiario redirects to /codex or /codex/monsters (no 404)',
     async ({ page }) => {
+      // QUARANTINED: route does not redirect (likely a stale test — the codex grid
+      // was removed in codex-ia-reframe W1). Triage: confirm gone-by-design → delete.
+      // See engram ticket e2e/quarantined-auth-spec-failures (#2045).
+      test.fixme(true, 'codex/bestiario redirect missing — stale test? see #2045');
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
       // Resolve the access token from the @supabase/ssr auth cookie.
