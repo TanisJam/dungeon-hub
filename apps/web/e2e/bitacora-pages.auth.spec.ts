@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { resolveAccessToken } from './helpers/resolve-access-token';
 
 /**
  * E2E — Bitácora Pages @ 375px (iPhone SE) — Round-trip spec
@@ -31,8 +32,8 @@ async function resolveCharacterId(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { characters?: Array<{ id: string; status: string }> };
-  const active = (data.characters ?? []).find((c) => c.status === 'active');
+  const data = await res.json() as { data?: Array<{ id: string; status: string }> };
+  const active = (data.data ?? []).find((c) => c.status === 'active');
   return active?.id ?? null;
 }
 
@@ -42,17 +43,7 @@ test.describe('Bitácora Pages @ 375px', () => {
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token — ensure auth.setup.ts ran first');
@@ -93,10 +84,12 @@ test.describe('Bitácora Pages @ 375px', () => {
       await expect(page).toHaveURL(/tab=notas/, { timeout: 15_000 });
 
       // 3. Páginas sub-view renders — assert the page appears with body snippet (REQ-BP-TEST-02)
-      await expect(page.getByText('Test round-trip')).toBeVisible({ timeout: 10_000 });
+      // Use the card button that contains both snippet and tag to scope assertions.
+      const pageCard = page.getByRole('button', { name: /Test round-trip/ }).first();
+      await expect(pageCard).toBeVisible({ timeout: 10_000 });
 
-      // 4. Tag chip "monsters" is visible (REQ-BP-TEST-02)
-      await expect(page.getByText('monsters')).toBeVisible({ timeout: 10_000 });
+      // 4. Tag chip "monsters" is visible inside the card (REQ-BP-TEST-02)
+      await expect(pageCard.getByText('monsters')).toBeVisible({ timeout: 10_000 });
 
       // 5. No horizontal overflow at 375px (REQ-BP-WEB-01)
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -117,17 +110,7 @@ test.describe('Bitácora Pages @ 375px', () => {
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token');

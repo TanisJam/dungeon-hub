@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { resolveAccessToken } from './helpers/resolve-access-token';
 
 /**
  * E2E — uuid-bridge-factions-pois Wave 5b auth spec @ 375px (iPhone SE)
@@ -36,17 +37,7 @@ test.use({ viewport: MOBILE });
 
 async function getAccessToken(page: import('@playwright/test').Page): Promise<string | null> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  return page.evaluate(() => {
-    for (const key of Object.keys(localStorage)) {
-      if (key.includes('supabase') && key.includes('token')) {
-        try {
-          const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-          return val.access_token ?? val.currentSession?.access_token ?? null;
-        } catch { return null; }
-      }
-    }
-    return null;
-  });
+  return resolveAccessToken(page);
 }
 
 async function resolveCharacterId(
@@ -57,8 +48,8 @@ async function resolveCharacterId(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { characters?: Array<{ id: string; status: string; worldId: string }> };
-  const active = (data.characters ?? []).find((c) => c.status === 'active');
+  const data = await res.json() as { data?: Array<{ id: string; status: string; worldId: string }> };
+  const active = (data.data ?? []).find((c) => c.status === 'active');
   if (!active) return null;
   return { characterId: active.id, worldId: active.worldId };
 }
@@ -93,7 +84,7 @@ async function createTestPoi(
     data: {
       name: opts.name,
       description: `Test POI: ${opts.name}`,
-      status: 'hidden',
+      status: 'unknown',
       ...(opts.dmNotes ? { dmNotes: opts.dmNotes } : {}),
     },
   });

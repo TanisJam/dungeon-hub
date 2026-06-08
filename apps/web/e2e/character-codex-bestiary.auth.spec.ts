@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { resolveAccessToken } from './helpers/resolve-access-token';
 
 /**
  * E2E — Character Codex Browser @ 375px (iPhone SE) — UPDATED for Slice 1'
@@ -45,8 +46,8 @@ async function resolveCharacterId(request: import('@playwright/test').APIRequest
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { characters?: Array<{ id: string; status: string }> };
-  const active = (data.characters ?? []).find((c) => c.status === 'active');
+  const data = await res.json() as { data?: Array<{ id: string; status: string }> };
+  const active = (data.data ?? []).find((c) => c.status === 'active');
   return active?.id ?? null;
 }
 
@@ -71,18 +72,8 @@ test.describe('Character Codex Browser @ 375px', () => {
       // Navigate to home first to capture the session token
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      // Get the auth token from the page (via localStorage/cookie)
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      // Get the auth token from the @supabase/ssr auth cookie.
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token — ensure auth.setup.ts ran first');
@@ -138,17 +129,7 @@ test.describe('Character Codex Browser @ 375px', () => {
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token');
@@ -191,18 +172,8 @@ test.describe('Character Codex Browser @ 375px', () => {
     async ({ page }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      // Resolve a character ID via page cookies
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      // Resolve the access token from the @supabase/ssr auth cookie.
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token');
