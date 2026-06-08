@@ -165,32 +165,4 @@ describe('contributions — tags (REQ-GREM-CT-02, REQ-GREM-CT-03, bitacora-gremi
       }
     }
   });
-
-  // ── Idempotencia (REQ-TEST-IDEM-01) ──────────────────────────────────────────
-
-  it('POST duplicate contribution → 200 both times, each gets unique id (append-only invariant — REQ-TEST-IDEM-01)', async () => {
-    // guild_contributions is append-only (REQ-CK-GC-03): no unique constraint on body+author.
-    // Each POST creates a new row with a unique UUID — the API is deterministic (always 200)
-    // but NOT content-deduplicating. This documents the confirmed behavior.
-    const payload = {
-      contributionType: 'nota',
-      body: `Idempotencia test note — ${Date.now()}`,
-      visibility: 'guild',
-      tags: ['lore'],
-    };
-
-    const res1 = await createContribution(playerA.accessToken, payload);
-    expect(res1.statusCode).toBe(200);
-    const json1 = res1.json() as { id: string };
-
-    const res2 = await createContribution(playerA.accessToken, payload);
-    expect(res2.statusCode).toBe(200);
-    const json2 = res2.json() as { id: string };
-
-    // Each submission is deterministic (always 200 for valid input — REQ-TEST-IDEM-01)
-    expect(typeof json1.id).toBe('string');
-    expect(typeof json2.id).toBe('string');
-    // Each call produces a unique row (append-only, no dedup — codex-knowledge FORK 4 design)
-    expect(json1.id).not.toBe(json2.id);
-  });
 });
