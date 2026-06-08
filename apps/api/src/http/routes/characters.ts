@@ -108,6 +108,7 @@ import { listBitacoraPages } from '../../use-cases/characters/list-bitacora-page
 import { getBitacoraPage } from '../../use-cases/characters/get-bitacora-page.js';
 import { updateBitacoraPage } from '../../use-cases/characters/update-bitacora-page.js';
 import { deleteBitacoraPage } from '../../use-cases/characters/delete-bitacora-page.js';
+import { shareBitacoraPage } from '../../use-cases/characters/share-bitacora-page.js';
 import {
   createInMemoryRegistry,
   resolveStat,
@@ -5192,6 +5193,48 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       }
 
       return reply.code(204).send();
+    },
+  );
+
+  // ── POST /characters/:id/bitacora/pages/:pageId/share ────────────────────────
+  // Owner-only: share a personal bitácora page to the guild feed.
+  // Idempotency: re-sharing a non-sealed page returns the existing contribution (no-op, 200).
+  // Append-only: INSERT only, never mutates existing rows.
+  // REQ-SHARE-01..09, bitacora-personal-share SDD spec #2035.
+  app.post(
+    '/characters/:id/bitacora/pages/:pageId/share',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const paramsResult = ParamsWithIdAndPageId.safeParse(request.params);
+      if (!paramsResult.success) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: paramsResult.error.issues,
+        });
+      }
+      const { id, pageId } = paramsResult.data;
+      const userId = request.user!.sub;
+
+      const result = await shareBitacoraPage({ characterId: id, pageId, userId });
+
+      if (!result.ok && 'notFound' in result) {
+        return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
+      if (!result.ok && 'forbidden' in result) {
+        return reply.code(403).send({
+          error: 'FORBIDDEN',
+          issues: [{ code: 'BITACORA_OWNER_REQUIRED', characterId: id, userId }],
+        });
+      }
+      if (!result.ok) {
+        // Unreachable — TypeScript exhaustiveness guard
+        return reply.code(500).send({ error: 'INTERNAL_ERROR' });
+      }
+
+      return reply.code(200).send({
+        contributionId: result.contributionId,
+        alreadyShared: result.alreadyShared,
+      });
     },
   );
 };

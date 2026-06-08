@@ -33,6 +33,12 @@ export interface BitacoraPageRow {
   visibility: string;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * ISO string of when this page was first shared to the guild (non-sealed copy).
+   * Derived via EXISTS subquery on guild_contributions (ADR-8, REQ-SHARE-10).
+   * null when the page has never been shared (or the only share was sealed).
+   */
+  sharedAt?: string | null;
 }
 
 export type CreateBitacoraPageResult =

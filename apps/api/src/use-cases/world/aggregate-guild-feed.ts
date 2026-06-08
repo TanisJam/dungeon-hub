@@ -55,6 +55,12 @@ export interface FeedItem {
   refEntityKind?: string | null;
   refEntityId?: string | null;
   authorUserId?: string | null;
+  /**
+   * Back-link to the source bitácora page when this contribution was created
+   * via the personal-share path. null for non-share contributions.
+   * Used by feed-card to show "Bitácora" badge (ADR-7, REQ-SHARE-07).
+   */
+  sourceBitacoraPageId?: string | null;
 }
 
 export interface AggregateGuildFeedOptions {
@@ -84,6 +90,7 @@ function normalizeContribution(
     authorUserId: string;
     contributionType: string;
     body: string;
+    title: string | null;
     refEntityKind: string | null;
     refEntityId: string | null;
     sealedStatus: string | null;
@@ -91,12 +98,15 @@ function normalizeContribution(
     occurredAt: Date;
     createdAt: Date;
     tags: string[];
+    sourceBitacoraPageId?: string | null;
   },
 ): FeedItem {
   return {
     id: row.id,
     source: 'gremio',
-    title: null, // guild_contributions have no title
+    // ADR-3 (bitacora-personal-share): carry title from guild_contributions row.
+    // Legacy rows have title=NULL (pre-migration), which normalizes to null — no regression.
+    title: row.title ?? null,
     body: row.body,
     tags: row.tags ?? [],
     sortAt: row.occurredAt.toISOString(),
@@ -105,6 +115,8 @@ function normalizeContribution(
     refEntityKind: row.refEntityKind,
     refEntityId: row.refEntityId,
     authorUserId: row.authorUserId,
+    // ADR-7: thread sourceBitacoraPageId for badge differentiation in feed-card.
+    sourceBitacoraPageId: row.sourceBitacoraPageId ?? null,
   };
 }
 

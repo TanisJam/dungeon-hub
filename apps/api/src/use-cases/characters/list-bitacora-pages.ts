@@ -6,7 +6,12 @@
  * (used by the monster-detail "this monster's pages" view — REQ-BP-API-02 §CRITICAL-2 fix).
  * Returns { pages, total }.
  *
+ * Each page includes a derived `sharedAt` field (ADR-8, REQ-SHARE-10):
+ * the createdAt of the earliest non-sealed guild_contributions row back-linking
+ * to the page. null when the page has never been shared (or all shares sealed).
+ *
  * REQ-BP-API-02, bitacora-personal SDD design #1975 §ADR-3.
+ * REQ-SHARE-10 ADR-8: derived sharedAt for "Compartido" indicator.
  */
 
 import { and, eq, sql } from 'drizzle-orm';
@@ -49,13 +54,35 @@ export async function listBitacoraPages(
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: bitacoraPages.id,
+      characterId: bitacoraPages.characterId,
+      worldId: bitacoraPages.worldId,
+      title: bitacoraPages.title,
+      body: bitacoraPages.body,
+      refs: bitacoraPages.refs,
+      tags: bitacoraPages.tags,
+      visibility: bitacoraPages.visibility,
+      createdAt: bitacoraPages.createdAt,
+      updatedAt: bitacoraPages.updatedAt,
+      sharedAt: sql<string | null>`(
+        SELECT MIN(gc.created_at)::text
+        FROM guild_contributions gc
+        WHERE gc.source_bitacora_page_id = "bitacora_pages"."id"
+          AND gc.sealed_status IS NULL
+      )`.as('shared_at'),
+    })
     .from(bitacoraPages)
     .where(and(...conditions))
     .orderBy(sql`${bitacoraPages.createdAt} DESC`);
 
+  const pages = rows.map((row) => ({
+    ...row,
+    sharedAt: row.sharedAt ?? null,
+  })) as unknown as BitacoraPageRow[];
+
   return {
-    pages: rows as unknown as BitacoraPageRow[],
-    total: rows.length,
+    pages,
+    total: pages.length,
   };
 }
