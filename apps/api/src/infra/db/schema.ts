@@ -1388,6 +1388,13 @@ export const guildContributions = pgTable(
      */
     refEntityId: text('ref_entity_id'),
     /**
+     * Entity source at share time. For bestiary refs: book identifier (e.g. 'MM', 'PHB').
+     * For UUID kinds (npc/faction/location): 'world'. NULL for legacy rows without a ref.
+     * Used by the feed resolver to disambiguate monster slugs across books (ADR-7).
+     * guild-feed-linked-entity-refs SDD spec REQ-GFLE-01/04, design ADR-1.
+     */
+    refEntitySource: text('ref_entity_source'),
+    /**
      * CLOSED enum: null=rumor (unsealed), 'confirmed', 'debunked'.
      * Only sealed_* columns mutate (D3 audit).
      */

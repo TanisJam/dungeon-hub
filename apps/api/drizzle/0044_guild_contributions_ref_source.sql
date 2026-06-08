@@ -1,0 +1,17 @@
+-- guild-feed-linked-entity-refs: add ref_entity_source to guild_contributions.
+--
+-- ref_entity_source: nullable text — carries the entity source at share time.
+--   For bestiary (monster) refs: book identifier (e.g. 'MM', 'PHB').
+--   For UUID kinds (npc/faction/location): 'world'.
+--   NULL for legacy rows (pre-migration) and contributions without a ref.
+--   READ-PATH TOLERANCE: existing rows get NULL by default — no regression.
+--
+-- No index added: existing idx_gc_ref on (ref_entity_kind, ref_entity_id) is a
+-- reverse-lookup index. The feed resolver reads source off already-fetched rows
+-- and dispatches per-kind — no benefit from indexing source.
+--
+-- APPEND-ONLY INVARIANT: unchanged. No UPDATE/DELETE paths introduced.
+--
+-- guild-feed-linked-entity-refs SDD spec REQ-GFLE-01, design ADR-1.
+--> statement-breakpoint
+ALTER TABLE "guild_contributions" ADD COLUMN "ref_entity_source" text;

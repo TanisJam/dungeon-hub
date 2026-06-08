@@ -302,6 +302,13 @@
       "when": 1781100000000,
       "tag": "0043_bitacora_personal_share",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781200000000,
+      "tag": "0044_guild_contributions_ref_source",
+      "breakpoints": true
     }
   ]
 }
