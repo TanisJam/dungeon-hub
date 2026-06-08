@@ -32,8 +32,9 @@ async function resolveCharacterId(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { characters?: Array<{ id: string; status: string }> };
-  const active = (data.characters ?? []).find((c) => c.status === 'active');
+  // GET /characters returns { data: [...] }, not { characters: [...] }.
+  const data = await res.json() as { data?: Array<{ id: string; status: string }> };
+  const active = (data.data ?? []).find((c) => c.status === 'active');
   return active?.id ?? null;
 }
 
@@ -47,8 +48,37 @@ async function resolveWorldId(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { character?: { worldId?: string } };
-  return data.character?.worldId ?? null;
+  // GET /characters/:id returns the row directly with worldId at the root.
+  const data = await res.json() as { worldId?: string };
+  return data.worldId ?? null;
+}
+
+/**
+ * Resolve the Supabase access token from the @supabase/ssr auth cookie.
+ *
+ * @supabase/ssr stores the session in the `sb-<ref>-auth-token` cookie (value is
+ * `base64-<base64(JSON)>`, optionally chunked into `.0`/`.1`), NOT in localStorage.
+ * The earlier localStorage lookup never matched, so these tests silently skipped.
+ */
+async function resolveAccessToken(
+  page: import('@playwright/test').Page,
+): Promise<string | null> {
+  const cookies = await page.context().cookies();
+  const authCookies = cookies
+    .filter((c) => /^sb-.*-auth-token(\.\d+)?$/.test(c.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (authCookies.length === 0) return null;
+
+  let raw = authCookies.map((c) => c.value).join('');
+  if (raw.startsWith('base64-')) {
+    raw = Buffer.from(raw.slice('base64-'.length), 'base64').toString('utf8');
+  }
+  try {
+    const session = JSON.parse(raw) as { access_token?: string };
+    return session.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 test.describe('Bitácora Personal Share @ 375px', () => {
@@ -62,18 +92,8 @@ test.describe('Bitácora Personal Share @ 375px', () => {
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      // Resolve access token from localStorage (same pattern as bitacora-pages.auth.spec.ts)
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      // Resolve access token from the @supabase/ssr auth cookie (NOT localStorage).
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token — ensure auth.setup.ts ran first');
@@ -189,17 +209,7 @@ test.describe('Bitácora Personal Share @ 375px', () => {
     async ({ page, request }) => {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-      const accessToken = await page.evaluate(() => {
-        for (const key of Object.keys(localStorage)) {
-          if (key.includes('supabase') && key.includes('token')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key) ?? '{}');
-              return val.access_token ?? val.currentSession?.access_token ?? null;
-            } catch { return null; }
-          }
-        }
-        return null;
-      });
+      const accessToken = await resolveAccessToken(page);
 
       if (!accessToken) {
         test.skip(true, 'Could not resolve access token');
