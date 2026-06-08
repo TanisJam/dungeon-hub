@@ -329,20 +329,22 @@ describe('bitácora share route (REQ-SHARE-01..09)', () => {
     });
     expect(contribRes.statusCode).toBe(200);
 
-    // Fetch the feed — should not crash
+    // Fetch the feed filtered to gremio source only — guarantees the row is in the result
+    // regardless of how many journal/event entries are in the shared test DB.
+    // limit=200 (max) ensures even a busy CI world won't paginate the contribution off the page.
     const feedRes = await app.inject({
       method: 'GET',
-      url: `/api/v1/worlds/${worldId}/cronica-feed`,
+      url: `/api/v1/worlds/${worldId}/cronica-feed?source=gremio&limit=200`,
       headers: { authorization: `Bearer ${player.accessToken}` },
     });
     expect(feedRes.statusCode).toBe(200);
     const feedData = feedRes.json<{ rows: Array<{ id: string; title: string | null }> }>();
 
     // Find the legacy contribution in the feed and assert title is null (not crash)
-    const legacyRow = feedData.rows.find((r) => r.id === contribRes.json<{ contribution: { id: string } }>().contribution?.id);
-    if (legacyRow) {
-      expect(legacyRow.title).toBeNull();
-    }
+    // POST /worlds/:worldId/contributions returns the flat created row (not { contribution: { id } })
+    const legacyRow = feedData.rows.find((r) => r.id === contribRes.json<{ id: string }>().id);
+    expect(legacyRow).toBeDefined();
+    expect(legacyRow!.title).toBeNull();
     // The feed itself must return successfully with no crash (status 200 is the key assertion)
   });
 

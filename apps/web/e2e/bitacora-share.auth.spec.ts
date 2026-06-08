@@ -167,7 +167,7 @@ test.describe('Bitácora Personal Share @ 375px', () => {
         await expect(titleLocator).toBeVisible({ timeout: 20_000 });
 
         // Find the feed-card article containing the page title
-        const feedCard = titleLocator.locator('..').locator('..').locator('..');
+        const feedCard = page.locator('article').filter({ hasText: pageTitle });
         await expect(feedCard.getByText('Bitácora')).toBeVisible({ timeout: 10_000 });
 
       } finally {
