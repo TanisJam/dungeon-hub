@@ -14,3 +14,6 @@ export type {
 } from './page.js';
 
 export { validateBitacoraPage, BitacoraPageInputSchema } from './page.js';
+
+export type { BitacoraPageSnapshot, SharedContributionPayload } from './build-shared-contribution.js';
+export { buildSharedContribution } from './build-shared-contribution.js';
