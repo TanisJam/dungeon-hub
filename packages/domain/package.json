@@ -40,7 +40,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:changed": "vitest run --changed",
+    "test:related": "vitest related --run"
   },
   "dependencies": {
     "zod": "^3.24.1"

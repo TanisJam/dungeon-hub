@@ -145,6 +145,16 @@ Do NOT batch test + impl in one edit. Do NOT write production code without a fai
 | Typecheck | `pnpm --filter <pkg> typecheck` or `pnpm typecheck` |
 | Build gate | `pnpm typecheck` (NEVER `pnpm build` for verification) |
 
+### Fast feedback loop (don't run the full suite while iterating)
+
+The full `api` suite is ~84s (real Supabase+Postgres, `singleFork: true` sequential — see below); the full `web` suite is ~20s; `domain` ~3.5s. Running everything on every edit is the "tests take an eternity" trap. Scope to what you're touching:
+
+- **domain / web** (fine-grained import graphs): `pnpm --filter <pkg> test:watch` (reruns affected-on-save), `pnpm --filter <pkg> test:changed` (tests hit by your uncommitted diff), or `pnpm --filter <pkg> test:related <src-file>`. domain-on-one-file ≈ 0.8s, web-on-one-component ≈ 2.3s.
+- **api** is a special case: every integration test boots the whole Fastify app, so the import graph is fully connected — `test:changed`/`related` over-match to the ENTIRE suite and are intentionally NOT defined for api. Instead run **by file name**: `pnpm --filter @dungeon-hub/api test <filename-substring>` (e.g. `test bitacora-share` ≈ 2.6s for one file), or `test:watch <substring>` to watch it.
+- Run the full per-package suite only before committing that layer; run `pnpm test` only as the final gate.
+
+**Why api is sequential**: integration tests share ONE local Supabase and create isolated (but un-cleaned) data; they do NOT truncate. Naive parallelism (`singleFork: false`, `maxForks>1`) was measured at ~50s but FLAKES — concurrent forks collide on shared rows (proven: `npc_factions` PK dup-key, cross-test encounter state). A real parallel speedup needs per-worker DB isolation (schema-per-fork) — tracked as a separate infra change, not a config flip.
+
 ### Test layers
 
 - **Unit** — Vitest in domain + compendium-import (pure functions)
