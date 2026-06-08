@@ -139,7 +139,7 @@ describe('cronica-feed — unified feed + visibility leak (REQ-GREM-FD-01, ADR-3
 
     const feedRes = await getFeed(dm.accessToken);
     expect(feedRes.statusCode).toBe(200);
-    const feed = feedRes.json() as { rows: Array<{ source: string }>; total: number };
+    const feed = feedRes.json() as { rows: Array<{ source: string }>; pageCount: number };
 
     const sources = new Set(feed.rows.map((r) => r.source));
     expect(sources.has('gremio')).toBe(true);
@@ -160,7 +160,7 @@ describe('cronica-feed — unified feed + visibility leak (REQ-GREM-FD-01, ADR-3
 
     const feedRes = await getFeed(playerA.accessToken, { tag: 'lore' });
     expect(feedRes.statusCode).toBe(200);
-    const feed = feedRes.json() as { rows: Array<{ tags: string[] }>; total: number };
+    const feed = feedRes.json() as { rows: Array<{ tags: string[] }>; pageCount: number };
     for (const row of feed.rows) {
       expect(row.tags).toContain('lore');
     }
@@ -216,7 +216,7 @@ describe('cronica-feed — unified feed + visibility leak (REQ-GREM-FD-01, ADR-3
 
   // ── Empty state ─────────────────────────────────────────────────────────────
 
-  it('empty state: world with no entries → { rows: [], total: 0, nextOffset: null }', async () => {
+  it('empty state: world with no entries → { rows: [], pageCount: 0, nextOffset: null }', async () => {
     // Create a fresh world with just the DM (no entries)
     const emptyDm = await createTestUser();
     const { worldId: emptyWorldId } = await createWorldWithGm(emptyDm.id);
@@ -224,9 +224,9 @@ describe('cronica-feed — unified feed + visibility leak (REQ-GREM-FD-01, ADR-3
     try {
       const feedRes = await getFeed(emptyDm.accessToken, {}, emptyWorldId);
       expect(feedRes.statusCode).toBe(200);
-      const feed = feedRes.json() as { rows: unknown[]; total: number; nextOffset: unknown };
+      const feed = feedRes.json() as { rows: unknown[]; pageCount: number; nextOffset: unknown };
       expect(feed.rows).toEqual([]);
-      expect(feed.total).toBe(0);
+      expect(feed.pageCount).toBe(0);
       expect(feed.nextOffset).toBeNull();
     } finally {
       await deleteTestUser(emptyDm.id);

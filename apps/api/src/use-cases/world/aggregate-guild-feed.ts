@@ -69,7 +69,7 @@ export interface AggregateGuildFeedOptions {
 
 export interface AggregateGuildFeedResult {
   rows: FeedItem[];
-  total: number;
+  pageCount: number;
   nextOffset: number | null;
 }
 
@@ -219,9 +219,9 @@ export async function aggregateGuildFeed(
   // hasMore: if merged has MORE rows than offset+limit, there's a next page.
   const hasMore = merged.length > offset + limit;
   const sliced = merged.slice(offset, offset + limit);
-  // total = rows on THIS page (not including sentinel)
-  const total = sliced.length;
+  // pageCount = rows on THIS page (not the aggregate total — semantics clarified REQ-FEED-01)
+  const pageCount = sliced.length;
   const nextOffset = hasMore ? offset + limit : null;
 
-  return { rows: sliced, total, nextOffset };
+  return { rows: sliced, pageCount, nextOffset };
 }
