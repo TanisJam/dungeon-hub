@@ -749,3 +749,47 @@ export async function deleteBitacoraPage(
   revalidatePath(`/characters/${characterId}`);
   return { ok: true };
 }
+
+// ── bitacora-personal-share: share a personal page to the guild ───────────────
+
+export type ShareBitacoraPageState =
+  | { ok: false; error: string }
+  | { ok: true; contributionId: string; alreadyShared: boolean };
+
+/**
+ * Share a personal bitácora page to the guild feed.
+ *
+ * Idempotent: re-sharing a non-sealed page returns the existing contribution (no-op).
+ * On success, revalidates the guild feed (/bitacora) and the character page.
+ *
+ * REQ-SHARE-07/10 bitacora-personal-share SDD spec #2035.
+ */
+export async function shareBitacoraPage(
+  characterId: string,
+  pageId: string,
+): Promise<ShareBitacoraPageState> {
+  if (!UUID_RE.test(characterId) || !UUID_RE.test(pageId)) {
+    return { ok: false, error: 'ID inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { ok: false, error: 'No autenticado.' };
+
+  try {
+    const res = await api.post<{ contributionId: string; alreadyShared: boolean }>(
+      `/characters/${characterId}/bitacora/pages/${pageId}/share`,
+      {},
+      session.access_token,
+    );
+    revalidatePath('/bitacora');
+    revalidatePath(`/characters/${characterId}`, 'layout');
+    return { ok: true, contributionId: res.contributionId, alreadyShared: res.alreadyShared };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      const body = err.body as { error?: string } | null;
+      return { ok: false, error: body?.error ?? `API ${err.status}` };
+    }
+    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+  }
+}

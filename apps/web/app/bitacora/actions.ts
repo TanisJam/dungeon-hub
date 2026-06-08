@@ -347,6 +347,13 @@ export interface FeedItem {
   refEntityKind?: string | null;
   refEntityId?: string | null;
   authorUserId?: string | null;
+  /**
+   * Back-link to the source bitácora page when this contribution was created
+   * via the personal-share path. null for non-share contributions.
+   * Used by feed-card to show "Bitácora" badge (ADR-7, REQ-SHARE-07).
+   * bitacora-personal-share SDD spec #2035.
+   */
+  sourceBitacoraPageId?: string | null;
 }
 
 /** REQ-FEED-01: pageCount = rows on current page (NOT aggregate total). */

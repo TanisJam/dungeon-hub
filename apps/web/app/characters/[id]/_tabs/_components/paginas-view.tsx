@@ -17,7 +17,7 @@ import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
 import { BitacoraComposer, type KnownMonster, type KnownNpc, type KnownFaction, type KnownLocation, type BitacoraPageRef } from './bitacora-composer';
-import { deleteBitacoraPage } from '../../actions';
+import { deleteBitacoraPage, shareBitacoraPage } from '../../actions';
 
 export interface BitacoraPageItem {
   id: string;
@@ -27,6 +27,13 @@ export interface BitacoraPageItem {
   refs: BitacoraPageRef[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * ISO string of when this page was first shared to the guild (non-sealed copy).
+   * Derived server-side via EXISTS subquery on guild_contributions (ADR-8).
+   * null when the page has never been shared (or the only share was sealed).
+   * bitacora-personal-share REQ-SHARE-10.
+   */
+  sharedAt?: string | null;
 }
 
 const NPC_STATUS_LABELS: Record<string, string> = {
@@ -72,6 +79,10 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
   const [localPages, setLocalPages] = useState<BitacoraPageItem[]>(pages);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [statblockOpen, setStatblockOpen] = useState(false);
+  // Share flow state — mobile-first confirm panel (REQ-SHARE-10 ADR-7)
+  const [confirmShare, setConfirmShare] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const filteredPages = activeTag
     ? localPages.filter((p) => p.tags.includes(activeTag))
@@ -86,6 +97,8 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
     setDetailPage(null);
     setEditPage(page);
     setComposerOpen(true);
+    setConfirmShare(false);
+    setShareError(null);
   }
 
   function handleComposerClose() {
@@ -102,6 +115,24 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
     if (result.ok) {
       setLocalPages((prev) => prev.filter((p) => p.id !== pageId));
       setDetailPage(null);
+    }
+  }
+
+  async function handleShare(page: BitacoraPageItem) {
+    if (sharing) return;
+    setSharing(true);
+    setShareError(null);
+    const result = await shareBitacoraPage(characterId, page.id);
+    setSharing(false);
+    if (result.ok) {
+      // Update localPages: mark page as shared with current timestamp
+      const now = new Date().toISOString();
+      const updated = { ...page, sharedAt: now };
+      setLocalPages((prev) => prev.map((p) => (p.id === page.id ? updated : p)));
+      setDetailPage(updated);
+      setConfirmShare(false);
+    } else {
+      setShareError(result.error);
     }
   }
 
@@ -138,7 +169,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
       <div className="flex flex-col gap-4">
         <button
           type="button"
-          onClick={() => setDetailPage(null)}
+          onClick={() => { setDetailPage(null); setConfirmShare(false); setShareError(null); }}
           className="flex items-center gap-1 text-sm text-ink-mute hover:text-ink transition-colors min-h-[44px]"
         >
           <span aria-hidden="true">←</span>
@@ -219,6 +250,50 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
               {deleting === detailPage.id ? 'Eliminando…' : 'Eliminar'}
             </button>
           </div>
+
+          {/* Share affordance — mobile-first 375px (REQ-SHARE-10 ADR-7) */}
+          {detailPage.sharedAt != null ? (
+            // Already shared: show read-only Compartido badge (no re-share button)
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+              <span className="text-green-600 text-sm" aria-label="Página compartida con el gremio">✓</span>
+              <span className="text-sm text-green-700 font-medium">Compartido con el gremio</span>
+            </div>
+          ) : confirmShare ? (
+            // Confirm panel — inline, no navigation away (REQ-SHARE-10)
+            <div className="mt-2 flex flex-col gap-2 rounded-md border border-line bg-paper-soft p-3">
+              <p className="text-sm text-ink">¿Compartir esta página con el gremio?</p>
+              {shareError && (
+                <p className="text-xs text-red-600">{shareError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={sharing}
+                  onClick={() => handleShare(detailPage)}
+                  className="flex-1 min-h-[44px] rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors disabled:opacity-50"
+                >
+                  {sharing ? 'Compartiendo…' : 'Compartir'}
+                </button>
+                <button
+                  type="button"
+                  disabled={sharing}
+                  onClick={() => { setConfirmShare(false); setShareError(null); }}
+                  className="flex-1 min-h-[44px] rounded-md border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Share button — full width below Editar/Eliminar row
+            <button
+              type="button"
+              onClick={() => setConfirmShare(true)}
+              className="mt-2 w-full min-h-[44px] rounded-md border border-line bg-paper-soft px-4 py-2 text-sm font-medium text-ink hover:bg-paper transition-colors"
+            >
+              Compartir con el gremio
+            </button>
+          )}
         </div>
 
         {/* Linked monster statblock — reuses the compendium DetailSheet (Bug #3). */}

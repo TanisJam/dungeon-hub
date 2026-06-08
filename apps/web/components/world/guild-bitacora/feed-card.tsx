@@ -67,9 +67,16 @@ export function FeedCard({ item }: FeedCardProps) {
     <article className="relative w-full rounded-lg border border-line bg-paper px-4 py-3 flex flex-col gap-2 min-h-[44px]">
       {/* Header row: source badge + seal badge + date */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Pill tone={SOURCE_TONE[item.source]} fill="soft" size="sm">
-          {SOURCE_LABEL[item.source]}
-        </Pill>
+        {/* Source badge: show "Bitácora" when gremio + sourceBitacoraPageId present (ADR-7 REQ-SHARE-07) */}
+        {item.source === 'gremio' && item.sourceBitacoraPageId ? (
+          <Pill tone="primary" fill="soft" size="sm">
+            Bitácora
+          </Pill>
+        ) : (
+          <Pill tone={SOURCE_TONE[item.source]} fill="soft" size="sm">
+            {SOURCE_LABEL[item.source]}
+          </Pill>
+        )}
 
         {isConfirmed && (
           <Pill tone="success" fill="soft" size="sm">
