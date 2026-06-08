@@ -135,8 +135,10 @@ export function GuildBitacoraFeed({
       )}
 
       {/* "Aportar" entry point — opens ContributionComposer for general guild notes */}
-      {/* Accessible from /bitacora (player write path, REQ-GREM-FD-05) */}
-      <div className="fixed bottom-6 right-4 z-20">
+      {/* Accessible from /bitacora (player write path, REQ-GREM-FD-05). */}
+      {/* Sits ABOVE the bottom TabBar (z-40): the FAB must clear the nav band (bottom-20)
+          and outrank it (z-50), otherwise the rightmost tab intercepts the tap at 375px. */}
+      <div className="fixed bottom-20 right-4 z-50">
         <button
           type="button"
           onClick={() => setComposerOpen(true)}
