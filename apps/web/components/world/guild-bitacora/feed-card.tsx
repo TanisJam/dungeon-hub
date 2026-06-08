@@ -24,6 +24,17 @@ const SOURCE_LABEL: Record<FeedSource, string> = {
   evento: 'Evento',
 };
 
+// ---------------------------------------------------------------------------
+// Entity kind → display label map (guild-feed-linked-entity-refs ADR-5)
+// ---------------------------------------------------------------------------
+
+const ENTITY_KIND_LABEL: Record<string, string> = {
+  bestiary: 'Bestiario',
+  npc: 'NPC',
+  faction: 'Facción',
+  location: 'Lugar',
+};
+
 const SOURCE_TONE: Record<FeedSource, 'primary' | 'accent' | 'secondary'> = {
   gremio: 'primary',
   dm: 'accent',
@@ -118,6 +129,24 @@ export function FeedCard({ item }: FeedCardProps) {
           ))}
         </div>
       )}
+
+      {/* Linked-entity card — v1 non-interactive display (guild-feed-linked-entity-refs REQ-GFLE-06, ADR-5)
+          Renders ONLY when refEntityName is present (null/undefined = no card, no regression).
+          Mobile-first 375px: full-width, min-h-[44px] tap target (iOS HIG).
+          SECURITY: name only — dmNotes and parentHexStatus NEVER rendered here (ADR-6). */}
+      {item.refEntityName ? (
+        <div
+          data-testid="entity-card"
+          className="flex w-full items-center gap-2 rounded-md border border-line bg-paper-soft px-3 min-h-[44px]"
+        >
+          {item.refEntityKind && ENTITY_KIND_LABEL[item.refEntityKind] ? (
+            <span className="shrink-0 rounded-pill bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              {ENTITY_KIND_LABEL[item.refEntityKind]}
+            </span>
+          ) : null}
+          <span className="truncate text-sm font-medium text-ink">{item.refEntityName}</span>
+        </div>
+      ) : null}
     </article>
   );
 }

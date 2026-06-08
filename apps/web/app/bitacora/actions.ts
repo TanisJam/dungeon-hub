@@ -346,6 +346,19 @@ export interface FeedItem {
   visibility: string;
   refEntityKind?: string | null;
   refEntityId?: string | null;
+  /**
+   * Entity source — book identifier for bestiary (e.g. 'MM', 'PHB') or 'world' for
+   * UUID kinds (npc/faction/location). Null for legacy rows without a ref.
+   * guild-feed-linked-entity-refs REQ-GFLE-04.
+   */
+  refEntitySource?: string | null;
+  /**
+   * Sanitized display name resolved by the feed entity resolver.
+   * Null when the entity cannot be resolved (deleted/unknown).
+   * NEVER contains dmNotes or parentHexStatus — ADR-6.
+   * guild-feed-linked-entity-refs REQ-GFLE-05.
+   */
+  refEntityName?: string | null;
   authorUserId?: string | null;
   /**
    * Back-link to the source bitácora page when this contribution was created
