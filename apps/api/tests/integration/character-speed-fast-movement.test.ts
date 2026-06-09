@@ -203,25 +203,18 @@ describe('GET /characters/:id/sheet — REQ-SPEED-02: Barbarian 5 + heavy armor 
     await setHuman(app, user, characterId);
     await setBarbarian(app, user, characterId, 5);
 
-    // Add chain mail (MA — medium armor) as control, then plate (HA — heavy)
-    // Actually we just need a HA item. Use chain-mail first to get barb class set,
-    // then add a heavy armor item via inventory endpoint.
-    // Add plate armor to inventory and equip it.
+    // Equip plate armor (HA — heavy). Payload shape per inventory route contract:
+    // item: { slug, source } (see character-inventory.test.ts).
     const addRes = await app.inject({
       method: 'POST',
       url: `/api/v1/characters/${characterId}/inventory`,
       headers: { authorization: `Bearer ${user.accessToken}` },
       payload: {
-        itemSlug: 'plate-armor',
-        itemSource: 'PHB',
-        quantity: 1,
+        item: { slug: 'plate-armor', source: 'PHB' },
         state: 'equipped',
       },
     });
-    // 201 or 200 — if item not in compendium, skip armor gate test
-    if (addRes.statusCode !== 200 && addRes.statusCode !== 201) {
-      console.warn('plate-armor not found in compendium — armor gate test will assert base 30 anyway');
-    }
+    expect(addRes.statusCode).toBe(201);
   });
 
   afterAll(async () => {
@@ -230,15 +223,10 @@ describe('GET /characters/:id/sheet — REQ-SPEED-02: Barbarian 5 + heavy armor 
   });
 
   it('sheet.speed.walk = 30 when heavy armor is equipped (PHB p.49)', async () => {
-    // PHB p.49: "while you aren't wearing heavy armor" — HA disqualifies.
-    // Even if plate-armor is not in the test DB, the base path returns 30 (level gate passes
-    // but if no HA found, +10 IS applied). This test is meaningful only if plate-armor
-    // is available in the compendium. The test is marked as a best-effort check.
+    // PHB p.49: "while you aren't wearing heavy armor" — HA disqualifies the +10.
     const app = await getTestApp();
     const sheet = await getSheet(app, user, characterId);
-    // With heavy armor equipped: 30 (no +10). Without it (item not in compendium): 40.
-    // We accept either 30 (correct behavior) or note that HA check didn't fire.
-    expect([30, 40]).toContain(sheet.speed.walk);
+    expect(sheet.speed.walk).toBe(30);
   });
 });
 
