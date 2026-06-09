@@ -15,6 +15,7 @@ import {
   type DarkvisionView,
   type RacialSpellView,
 } from './types.js';
+import { exhaustionEffectsFor } from './speed.js';
 import type { RaceInnateSpell } from '../race/types.js';
 import {
   buildWeightLookup,
@@ -31,64 +32,9 @@ import {
   computeSpellLimits,
   SPELLCASTING_ABILITY,
 } from '../spellcasting/index.js';
-import type { ClassSpellSummary, ExhaustionEffect, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
+import type { ClassSpellSummary, ExhaustionView, SpellSheetRef, SpellSlotsView } from './types.js';
 import { deriveClassResources } from '../class-resources/derive.js';
 // REQ-AC-GATEB-01: computeArmorClass deleted; AC block removed from compute.ts.
-
-/**
- * Calcula los efectos activos para un nivel de exhaustion (acumulativos).
- * PHB p.291.
- */
-function exhaustionEffectsFor(level: number): ExhaustionEffect[] {
-  const out: ExhaustionEffect[] = [];
-  if (level >= 1) out.push('disadvantage-ability-checks');
-  if (level >= 2) out.push('speed-halved');
-  if (level >= 3) out.push('disadvantage-attacks-and-saves');
-  if (level >= 4) out.push('hp-max-halved');
-  if (level >= 5) out.push('speed-zero');
-  if (level >= 6) out.push('dead');
-  return out;
-}
-
-/**
- * Resta `penalty` pies a cada componente de speed, sin bajar de 0.
- * Usado para encumbrance variant (encumbered -10, heavily -20).
- */
-function applySpeedPenalty(
-  speed: { walk: number; fly?: number; swim?: number; climb?: number },
-  penalty: number,
-): { walk: number; fly?: number; swim?: number; climb?: number } {
-  if (penalty <= 0) return speed;
-  const sub = (v: number) => Math.max(0, v - penalty);
-  const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: sub(speed.walk) };
-  if (speed.fly !== undefined) out.fly = sub(speed.fly);
-  if (speed.swim !== undefined) out.swim = sub(speed.swim);
-  if (speed.climb !== undefined) out.climb = sub(speed.climb);
-  return out;
-}
-
-/** Aplica los efectos de exhaustion que mutan números (speed + HP max). */
-function applyExhaustionToSpeed(
-  speed: { walk: number; fly?: number; swim?: number; climb?: number },
-  effects: ExhaustionEffect[],
-): { walk: number; fly?: number; swim?: number; climb?: number } {
-  if (effects.includes('speed-zero')) {
-    const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: 0 };
-    if (speed.fly !== undefined) out.fly = 0;
-    if (speed.swim !== undefined) out.swim = 0;
-    if (speed.climb !== undefined) out.climb = 0;
-    return out;
-  }
-  if (effects.includes('speed-halved')) {
-    const half = (v: number) => Math.floor(v / 2);
-    const out: { walk: number; fly?: number; swim?: number; climb?: number } = { walk: half(speed.walk) };
-    if (speed.fly !== undefined) out.fly = half(speed.fly);
-    if (speed.swim !== undefined) out.swim = half(speed.swim);
-    if (speed.climb !== undefined) out.climb = half(speed.climb);
-    return out;
-  }
-  return speed;
-}
 
 /** PB por nivel total — PHB p.15. */
 export function proficiencyBonus(totalLevel: number): number {
@@ -110,20 +56,6 @@ const HIT_DIE_AVG: Record<string, number> = {
 
 /** Tamaño default si no podemos resolverlo desde race data. */
 const DEFAULT_SIZE = 'M';
-
-/** Normaliza el campo `speed` de 5etools (puede ser number o objeto). */
-function normalizeSpeed(s: RaceSheetData['speed']): CharacterSheet['speed'] {
-  if (typeof s === 'number') return { walk: s };
-  if (s && typeof s === 'object') {
-    return {
-      walk: typeof s['walk'] === 'number' ? s['walk'] : 30,
-      ...(typeof s['fly'] === 'number' ? { fly: s['fly'] } : {}),
-      ...(typeof s['swim'] === 'number' ? { swim: s['swim'] } : {}),
-      ...(typeof s['climb'] === 'number' ? { climb: s['climb'] } : {}),
-    };
-  }
-  return { walk: 30 };
-}
 
 /** Extrae el set de idiomas raciales (solo keys con value true). */
 function extractRaceLanguages(race: RaceSheetData): string[] {
@@ -321,7 +253,8 @@ function buildEffectiveFromInjected(injected: Record<AbilityKey, AbilityScoreVie
 // REQ-LEGACY-04: computeCharacterSheet no longer emits passivePerception.
 // The route assembles sheet.passivePerception = 10 + engineSkills.perception.modifier (PHB p.177).
 // REQ-AC-GATEB-01: 'armorClass' and 'warnings' omitted — route assembles them from engine path.
-export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative' | 'skills' | 'passivePerception' | 'armorClass' | 'warnings'> {
+// REQ-SPEED-06: 'speed' omitted — route assembles from engine-authoritative resolveStat('speed') path.
+export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet, 'savingThrows' | 'initiative' | 'skills' | 'passivePerception' | 'armorClass' | 'warnings' | 'speed'> {
   const { character } = input;
   const raceData = input.raceData ?? null;
 
@@ -454,8 +387,8 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     }
   }
 
-  // ---- Speed + size desde race ------------------------------------------
-  const speed = raceData?.speed ? normalizeSpeed(raceData.speed) : { walk: 30 };
+  // ---- Size desde race --------------------------------------------------
+  // REQ-SPEED-06: speed omitted — route assembles from engine-authoritative resolveStat('speed') path.
   const size = raceData?.size?.[0] ?? DEFAULT_SIZE;
 
   // ---- Breath weapon (Dragonborn ancestries — PHB p.34) -----------------
@@ -491,13 +424,6 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
     coinWeightLb,
   );
 
-  // ---- Speed final: aplicar penalty de encumbrance, después exhaustion ---
-  const speedAfterEncumbrance = applySpeedPenalty(speed, encumbranceView.speedPenalty);
-  const speedFinal = applyExhaustionToSpeed(
-    speedAfterEncumbrance,
-    exhaustionEffectsFor(character.exhaustion ?? 0),
-  );
-
   return {
     identity: {
       name: character.name,
@@ -528,7 +454,6 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
       return { max: hpMax, formula: hpFormula };
     })(),
     hitDice: hitDiceTotal,
-    speed: speedFinal,
     size,
     carryingCapacity: effective.str * 15,
     proficiencies: {
