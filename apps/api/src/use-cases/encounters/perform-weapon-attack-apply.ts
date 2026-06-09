@@ -31,10 +31,13 @@ import {
   computeDivineSmiteDice,
   isShieldableHit,
   extraAttacksPerAction,
+  compileRule,
+  recklessAttackRuleDoc,
   type RngFn,
   type RollResult,
   type Source,
   type DiceExpr,
+  type EntityId,
 } from '@dungeon-hub/domain/engine';
 import { consumeSpellSlot, computeSpellSlots } from '@dungeon-hub/domain/character/spellcasting';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
@@ -65,6 +68,13 @@ const cryptoRng: RngFn = (sides: number): number => {
   globalThis.crypto.getRandomValues(buf);
   return (buf[0]! % sides) + 1;
 };
+
+// ── Module-scope compiled rules (ADR-3 pattern — compile once, .build() per request) ──
+
+// PHB p.48 — recklessAttackRuleDoc: grant (self STR melee) + impose (attackers-of).
+// Compiled here (parallel to build-attack-context.ts) because the pre-roll condition
+// INSERT + registry patch must happen in perform-weapon-attack-apply before resolveWeaponAttack.
+const compiledRecklessForApply = compileRule(recklessAttackRuleDoc);
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -489,6 +499,69 @@ export async function performWeaponAttackApply(
     nextSlotsUsed = slotResult.slotsUsed;
   }
 
+  // ── Step 6d: Reckless Attack pre-roll condition insert (C1 fix — PHB p.48) ─────
+  // PHB p.48: "When you make your first attack on your turn, you can decide to attack
+  //   recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength
+  //   during this turn." Advantage applies from the moment of DECLARATION — including the
+  //   declaring attack itself, and regardless of whether that attack hits or misses.
+  //
+  // Fix for C1 (verify-report #2104): the original insert was inside the HIT CAS tx (Step 12e),
+  // which meant (a) the declaring attack never saw the condition at buildAttackContext time
+  // and therefore never received advantage, and (b) a miss left no condition row at all.
+  //
+  // Placement: BEFORE resolveWeaponAttack (Step 7). resolveWeaponAttack queries the registry
+  // to compute rollMode — the reckless grant must be in the registry BEFORE that call.
+  // buildAttackContext (Step 6) loads conditions from DB before the insert happens, so
+  // attackerIsReckless is false for the declaring attack. We fix this by:
+  //   1. Inserting the condition row here in its own transaction (outcome-independent).
+  //   2. Patching ctx.self.conditions, ctx.attacker.conditions, ctx.activeConditions to
+  //      include { name: 'RecklessAttacking' } so resolveWeaponAttack sees it.
+  //   3. Registering compiledRecklessForApply into the registry so the grant emit fires
+  //      and rollMode resolves to 'advantage' for this attack.
+  //
+  // SELECT-exists idempotency guard: preserved from the original implementation.
+  // Own transaction: if this tx commits and a downstream error occurs, the condition row
+  //   persists (by design — PHB says declaration is irrevocable once made). This mirrors
+  //   how the budget tx (Step 8b) is also outcome-independent of the eventual roll.
+  //
+  // The Step 12e block (old HIT-only insert) is now REMOVED from the HIT CAS tx.
+  if (input.reckless === true) {
+    const existingReckless = await db
+      .select({ id: encounterCombatantConditions.id })
+      .from(encounterCombatantConditions)
+      .where(
+        and(
+          eq(encounterCombatantConditions.combatantId, attackerId),
+          eq(encounterCombatantConditions.conditionName, 'RecklessAttacking'),
+        ),
+      )
+      .limit(1);
+
+    if (existingReckless.length === 0) {
+      await db.insert(encounterCombatantConditions).values({
+        conditionName: 'RecklessAttacking',
+        combatantId: attackerId,
+        appliedByCombatantId: attackerId,
+        turnAnchorEntityId: attackerId,
+        turnAnchorBoundary: 'start',
+        turnsRemaining: 1,
+      });
+
+      // Patch ctx so resolveWeaponAttack (Step 7) sees the condition this attack.
+      // ctx.self and ctx.attacker share the same conditions array reference from
+      // buildAttackContext; push once covers both.
+      ctx.self.conditions.push({ name: 'RecklessAttacking' });
+      ctx.activeConditions.push({ name: 'RecklessAttacking' });
+      // ctx.attacker.conditions is the same array as ctx.self.conditions (same reference
+      // from build-attack-context.ts line 302/305), so the push above already covers it.
+      // Register compiledRecklessForApply so rollMode resolves to 'advantage'.
+      const recklessInstances = compiledRecklessForApply.build({ recklessId: charId as EntityId });
+      for (const inst of recklessInstances) {
+        registry.register(inst);
+      }
+    }
+  }
+
   // ── Step 7: resolveWeaponAttack → damage expression + toHit + rollMode ────────
   // REQ-ATK-APPLY-02: server derives authoritative DiceExpr — client never supplies it.
   // resolveWeaponAttack is PURE (REQ-ATK-PURE-01); deterministic given same inputs.
@@ -775,34 +848,8 @@ export async function performWeaponAttackApply(
   // REQ-CID-04: RESOLVE runs INSIDE the tx closure, after the CAS guard.
   // breakConcentration receives the same tx → covered by rollback (saga closed).
   const txResult = await db.transaction(async (tx) => {
-    // ── Step 12e: Reckless Attack condition insert (REQ-API-02, SCENARIO-12/13) ──
-    // PHB p.48: "attack rolls against you have advantage until the start of your next turn"
-    // SELECT-exists idempotency: no UNIQUE constraint on the conditions table; guard prevents
-    // duplicate rows on multi-attack turns when reckless is declared on each attack.
-    // INSIDE the CAS tx: if the version bump fails (CAS conflict → return false),
-    // the condition insert rolls back too (SCENARIO-14 — atomicity guarantee).
-    if (input.reckless === true) {
-      const existing = await tx
-        .select({ id: encounterCombatantConditions.id })
-        .from(encounterCombatantConditions)
-        .where(
-          and(
-            eq(encounterCombatantConditions.combatantId, attackerId),
-            eq(encounterCombatantConditions.conditionName, 'RecklessAttacking'),
-          ),
-        )
-        .limit(1);
-      if (existing.length === 0) {
-        await tx.insert(encounterCombatantConditions).values({
-          conditionName: 'RecklessAttacking',
-          combatantId: attackerId,
-          appliedByCombatantId: attackerId,
-          turnAnchorEntityId: attackerId,
-          turnAnchorBoundary: 'start',
-          turnsRemaining: 1,
-        });
-      }
-    }
+    // Note: the RecklessAttacking condition INSERT was moved from here (Step 12e — on-hit only)
+    // to a pre-roll block in Step 6d above, so it fires regardless of hit/miss outcome (C1 fix).
 
     // Build the HP update set — may also include raged_took_damage (B-11).
     // B-11: set raged_took_damage=true on the TARGET when finalDamage > 0 (REQ-RAGE-09).

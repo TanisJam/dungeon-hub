@@ -12,12 +12,15 @@
  *   RECK-T3 (SCENARIO-14): reckless:true + stale version (CAS conflict) → condition NOT inserted
  *   RECK-T4: reckless absent → no condition row inserted
  *   RECK-T5: reckless:false → no condition row inserted
- *
- * Implementation note: the condition insert is INSIDE the CAS tx (on-hit path only).
- * A miss does not invoke the transaction (REQ-APPLY-FLOW-02: no mutation on miss).
+ *   RECK-T6 (S2 — C1 fix): reckless:true STR-melee DECLARING attack itself rolls with advantage
+ *            (d20All.length === 2 proves two dice were rolled — PHB p.48 advantage from declaration)
+ *   RECK-T7 (S2 — C1 fix): reckless:true + MISS (ac=30) → RecklessAttacking condition row EXISTS
+ *            (PHB p.48: advantage and condition apply from the declaration, regardless of hit/miss)
  *
  * PHB p.48 is the rule source for all assertions in this file.
  * REQ-API-02: server inserts RecklessAttacking condition inside the CAS tx (SELECT-before-INSERT idempotency).
+ * C1 fix (engine-barbarian-dsl-2 verify-report): moved condition INSERT to pre-roll block so the
+ *   DECLARING attack itself receives advantage, and miss path also persists the condition row.
  * engine-barbarian-dsl-2 Batch 2.
  */
 
@@ -231,111 +234,99 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
     await closeTestApp();
   });
 
-  // ── RECK-T1: reckless:true on a hit → RecklessAttacking inserted ────────────────
+  // ── RECK-T1: reckless:true → RecklessAttacking inserted (C1 fix: pre-roll, outcome-independent) ─
 
-  it('RECK-T1 (SCENARIO-12): reckless:true on a successful hit → RecklessAttacking condition row inserted (PHB p.48)', async () => {
+  it('RECK-T1 (SCENARIO-12): reckless:true → RecklessAttacking condition row inserted (PHB p.48, C1 fix: pre-roll)', async () => {
     // PHB p.48: "attack rolls against you have advantage until the start of your next turn"
-    // When player declares reckless on a hit, RecklessAttacking condition must be persisted.
-    // Implementation: condition insert is inside the CAS tx (on-hit path). ac=1 → near-certain hit.
+    // C1 fix: condition is now inserted in the pre-roll block (Step 6d), BEFORE resolveWeaponAttack.
+    // The insert is outcome-independent: fires on reckless:true regardless of hit or miss.
+    // Strategy: fire one attack with reckless:true. Budget tx fires (action consumed).
+    // Condition must exist after any single reckless:true call (even on nat-1 miss).
     const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T1', { npcAc: 1 });
 
-    let hit = false;
-    while (!hit) {
-      const current = await getVersion(encounterId);
-      const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, current, { reckless: true });
-      if (res.statusCode === 200 && res.body.hit === true) {
-        hit = true;
-      } else if (res.statusCode === 200 && res.body.hit === false) {
-        // nat-1 miss — retry with fresh version (no mutation, so version unchanged)
-        continue;
-      }
-    }
+    const v = await getVersion(encounterId);
+    const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v, { reckless: true });
+    expect(res.statusCode, 'RECK-T1: attack must return 200').toBe(200);
 
-    // RecklessAttacking must be present after a reckless hit.
+    // RecklessAttacking must be present after any reckless:true call (pre-roll insert, C1 fix).
     const rows = await countRecklessRows(barbarianCombatantId);
-    expect(rows, 'SCENARIO-12: RecklessAttacking condition must exist after reckless hit').toBe(1);
+    expect(rows, 'SCENARIO-12: RecklessAttacking condition must exist after reckless:true (C1 fix: pre-roll)').toBe(1);
   });
 
   // ── RECK-T2: reckless:true twice → only 1 row (idempotency) ───────────────────
 
-  it('RECK-T2 (SCENARIO-13): reckless:true on two attacks in the same turn → only 1 RecklessAttacking row (idempotency)', async () => {
-    // PHB p.48: Extra Attack (Fighter L5) or action surge allows multiple attacks per turn.
-    // The reckless declaration applies once per turn; the condition must not be duplicated
-    // by repeated attack/apply calls with reckless:true.
-    // SELECT-before-INSERT guard prevents duplicate rows.
+  it('RECK-T2 (SCENARIO-13): reckless:true twice in the same turn → only 1 RecklessAttacking row (idempotency)', async () => {
+    // PHB p.48: The reckless declaration applies once per turn; the condition must not be
+    // duplicated by repeated reckless:true calls.
+    // SELECT-exists guard prevents duplicate rows (no UNIQUE constraint on conditions table).
+    //
+    // C1 fix: condition is now inserted in the pre-roll block. The idempotency SELECT-exists
+    // guard still prevents a second INSERT even across multiple reckless:true calls.
+    // Strategy: first call inserts the row. Second call (on fresh version, from turn allowance
+    //   or on stale version after action is consumed) must NOT insert a second row.
     const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T2', { npcHp: 100, npcAc: 1 });
 
-    // First reckless hit — retry until confirmed hit.
-    let firstHit = false;
-    while (!firstHit) {
-      const v1 = await getVersion(encounterId);
-      const res1 = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v1, { reckless: true });
-      if (res1.statusCode === 200 && res1.body.hit === true) {
-        firstHit = true;
-      } else if (res1.statusCode === 200 && res1.body.hit === false) {
-        // nat-1 miss — retry
-        continue;
-      } else if (res1.statusCode === 409) {
-        // CAS conflict — retry
-        continue;
-      }
-    }
+    // First reckless attack (any outcome: hit or miss). Condition inserted in pre-roll block.
+    const v1 = await getVersion(encounterId);
+    const res1 = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v1, { reckless: true });
+    expect(res1.statusCode, 'RECK-T2: first attack must return 200').toBe(200);
 
     const afterFirst = await countRecklessRows(barbarianCombatantId);
-    expect(afterFirst, 'first reckless hit inserts exactly 1 row').toBe(1);
+    expect(afterFirst, 'first reckless call inserts exactly 1 row').toBe(1);
 
-    // Second reckless attack — the idempotency guard must prevent a second INSERT.
-    // The action economy (ACTION_ALREADY_USED) may prevent the attack, but even if it goes through
-    // on a hit, the condition row count must remain 1.
-    let done2 = false;
-    while (!done2) {
-      const v2 = await getVersion(encounterId);
-      const res2 = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2, { reckless: true });
-      if (res2.statusCode === 200 && res2.body.hit === true) {
-        done2 = true; // second hit succeeded — idempotency guard must have prevented a second row
-      } else if (res2.statusCode === 200 && res2.body.hit === false) {
-        // miss (no tx, no insert) — still done for this test
-        done2 = true;
-      } else if (res2.statusCode === 409) {
-        // action already used or CAS conflict — done (no mutation happened)
-        done2 = true;
-      } else if (res2.statusCode === 400) {
-        // ACTION_ALREADY_USED — budget exhausted; no insertion possible
-        done2 = true;
-      }
-    }
+    // Second reckless attack attempt — may return VERSION_CONFLICT, ACTION_ALREADY_USED, or 200.
+    // In all cases: the SELECT-exists guard must prevent a second INSERT.
+    // (Budget consumed by first call, so next attempt likely gets ACTION_ALREADY_USED or 409.)
+    const v2 = await getVersion(encounterId);
+    await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2, { reckless: true });
+    // (result doesn't matter — we only care about condition row count)
 
     // SCENARIO-13: still exactly 1 row — no duplicate.
     const afterSecond = await countRecklessRows(barbarianCombatantId);
     expect(afterSecond, 'SCENARIO-13: idempotency — second reckless call must not add a second row').toBe(1);
   });
 
-  // ── RECK-T3: CAS conflict → condition NOT inserted (SCENARIO-14) ──────────────
+  // ── RECK-T3: genuine version mismatch → early VERSION_CONFLICT + no condition row ─
 
-  it('RECK-T3 (SCENARIO-14): reckless:true with stale version (CAS conflict) → VERSION_CONFLICT 409 + no condition row inserted', async () => {
-    // SCENARIO-14: CAS conflict (WHERE version=X fails because version already bumped).
-    // The condition INSERT must roll back with the transaction — no orphaned row.
+  it('RECK-T3 (SCENARIO-14): reckless:true with stale encounter version → 409 VERSION_CONFLICT + no condition row inserted', async () => {
+    // SCENARIO-14: the encounter-version pre-check (Step 1, line 321) fires BEFORE the
+    // pre-roll condition INSERT block (Step 6d). A genuine version mismatch (client sends
+    // a version that no longer matches encounters.version in the DB) returns VERSION_CONFLICT
+    // immediately, before the condition INSERT can run. The condition row is NOT inserted.
+    //
+    // This is distinct from the budget-CAS race (two concurrent requests with matching initial
+    // version): in the race case, the version pre-check passes, the pre-roll INSERT fires,
+    // and then the budget CAS fails → condition IS persisted (PHB: declaration is irrevocable).
+    // RECK-T3 tests the simpler "obviously stale version" path where the pre-check gates first.
+    //
+    // PHB p.48 rule source: no rule change here — the server rejected the request before any
+    // game-state declaration was accepted. The player never "made" the attack.
     const { encounterId, barbarianCombatantId, npcCombatantId, version: v0 } = await makeFreshEncounter('RECK-T3', { npcAc: 1 });
 
-    // Perform a real attack first (no reckless) to bump version (so v0 is now stale).
+    // Perform a real attack (no reckless) to bump the encounter version past v0.
+    // Use a fresh version on each attempt to avoid ACTION_ALREADY_USED on miss-then-retry.
+    // Break after any 200 response (hit or miss both bump version via budget tx).
     let bumped = false;
     while (!bumped) {
       const current = await getVersion(encounterId);
+      if (current > v0) { bumped = true; break; }
       const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, current);
-      if (res.statusCode === 200 && res.body.hit === true) {
+      if (res.statusCode === 200) {
+        bumped = true; // hit or miss — budget tx bumped version in either case
+      } else if (res.statusCode === 400) {
+        // ACTION_ALREADY_USED — budget consumed by a prior attempt (miss bumps budget tx too)
         bumped = true;
-      } else if (res.statusCode === 200 && res.body.hit === false) {
-        // miss — version not bumped, retry
-        continue;
       }
+      // 409 → retry with fresh version
     }
 
     // Verify version has been bumped past v0.
     const vAfter = await getVersion(encounterId);
     expect(vAfter, 'version must be bumped after first attack').toBeGreaterThan(v0);
 
-    // Now POST with the STALE version v0 + reckless:true → must return 409.
-    // The condition INSERT is inside the tx; tx rolls back → no condition row.
+    // Now POST with STALE version v0 + reckless:true.
+    // Step 1 version pre-check fires: encounterRow.version !== v0 → VERSION_CONFLICT (409).
+    // The condition INSERT (Step 6d) never runs. Condition row remains absent.
     const staleRes = await doAttackApply(
       encounterId,
       barbarianCombatantId,
@@ -347,25 +338,24 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
     expect(staleRes.statusCode, 'SCENARIO-14: stale version must return 409').toBe(409);
     expect(staleRes.body.error, 'SCENARIO-14: error code must be VERSION_CONFLICT').toBe('VERSION_CONFLICT');
 
-    // After the rollback, count RecklessAttacking rows — must be 0 (the first attack did not pass reckless:true).
+    // The first non-reckless attack had no reckless:true, so no condition was inserted.
+    // The stale reckless attack returned early (version pre-check gate) before Step 6d.
     const rows = await countRecklessRows(barbarianCombatantId);
-    expect(rows, 'SCENARIO-14: no RecklessAttacking row must exist after CAS rollback').toBe(0);
+    expect(rows, 'SCENARIO-14: no RecklessAttacking row after VERSION_CONFLICT early-return').toBe(0);
   });
 
   // ── RECK-T4: reckless absent → no condition ────────────────────────────────────
 
   it('RECK-T4: reckless field absent → no RecklessAttacking condition inserted', async () => {
     // PHB p.48: reckless attack is a CHOICE, not automatic. Omitting the field = no declaration.
+    // Strategy: fire the first attack without reckless flag. Budget tx fires regardless (action consumed).
+    // Any 200 response (hit or miss) or ACTION_ALREADY_USED (400) confirms the attack was processed.
     const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T4', { npcAc: 1 });
 
-    // Attack without reckless (field omitted) — retry until hit (no mutation on miss).
-    let done = false;
-    while (!done) {
-      const v = await getVersion(encounterId);
-      const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v);
-      if (res.statusCode === 200 && res.body.hit === true) done = true;
-      // miss → retry
-    }
+    const v = await getVersion(encounterId);
+    const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v);
+    // Any non-error response confirms the attack was processed without reckless.
+    expect(res.statusCode, 'RECK-T4: attack must return 200').toBe(200);
 
     const rows = await countRecklessRows(barbarianCombatantId);
     expect(rows, 'no reckless declaration → no RecklessAttacking condition').toBe(0);
@@ -375,17 +365,73 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
 
   it('RECK-T5: reckless:false → no RecklessAttacking condition inserted', async () => {
     // Explicit false = player chose NOT to attack recklessly.
+    // Strategy: fire the first attack with reckless:false. Budget tx fires (action consumed).
+    // Any 200 response (hit or miss) confirms the attack was processed with reckless:false.
     const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T5', { npcAc: 1 });
 
-    let done = false;
-    while (!done) {
-      const v = await getVersion(encounterId);
-      const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v, { reckless: false });
-      if (res.statusCode === 200 && res.body.hit === true) done = true;
-      // miss → retry
-    }
+    const v = await getVersion(encounterId);
+    const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v, { reckless: false });
+    expect(res.statusCode, 'RECK-T5: attack must return 200').toBe(200);
 
     const rows = await countRecklessRows(barbarianCombatantId);
     expect(rows, 'reckless:false → no RecklessAttacking condition').toBe(0);
+  });
+
+  // ── RECK-T6 (C1 fix, S2): declaring reckless attack itself rolls with advantage ─
+
+  it('RECK-T6 (C1/S2): reckless:true STR-melee DECLARING attack rolls with advantage (d20All.length===2, PHB p.48)', async () => {
+    // PHB p.48: "you can decide to attack recklessly. Doing so gives you advantage on
+    //   melee weapon attack rolls using Strength during this turn"
+    // The DECLARING attack itself must receive advantage — not just subsequent attacks.
+    // d20All.length === 2 proves two dice were rolled (advantage semantics — PHB p.173).
+    // Barbarian has STR 16 (+3), longsword is non-finesse → abilityUsed:'str' always.
+    // Strategy: fire the FIRST attack with reckless:true. The budget tx will bump version on
+    //   the first call regardless of hit/miss. Capture d20All from the FIRST response and assert
+    //   it has 2 elements — no retry needed (advantage is always-or-never for a given attack).
+    // Note: after the first call (whether hit or miss), the action is consumed; a second attempt
+    //   would return ACTION_ALREADY_USED. We only need the first response.
+    const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T6', { npcAc: 1 });
+
+    const v = await getVersion(encounterId);
+    const res = await doAttackApply(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v, { reckless: true });
+
+    // Must be a valid attack response (hit or miss, not an error).
+    expect(res.statusCode, 'RECK-T6: attack must return 200').toBe(200);
+    expect(typeof res.body.hit, 'RECK-T6: hit field must be boolean').toBe('boolean');
+
+    // C1 assertion: the declaring attack rolled with advantage (2 dice in d20All).
+    // PHB p.48 — advantage applies "during this turn", starting from declaration.
+    const d20All = res.body.d20All as number[];
+    expect(d20All, 'RECK-T6: d20All must exist').toBeDefined();
+    expect(d20All.length, 'RECK-T6: advantage → 2 dice rolled (PHB p.48 advantage from declaration)').toBe(2);
+  });
+
+  // ── RECK-T7 (C1 fix, S2): reckless MISS → condition row still persisted ───────
+
+  it('RECK-T7 (C1/S2): reckless:true + MISS (ac=30) → RecklessAttacking condition row EXISTS (PHB p.48)', async () => {
+    // PHB p.48: advantage and the condition apply from the moment of declaration,
+    //   regardless of whether the attack hits or misses.
+    // The condition INSERT must be outcome-independent (pre-roll, not inside the HIT-only CAS tx).
+    // ac=30 → near-certain miss (nat-20 crit still hits at any AC — PHB p.194).
+    // Strategy: fire the first attack with reckless:true regardless of outcome.
+    //   On confirmed miss → assert condition exists (primary assertion).
+    //   On nat-20 crit hit → condition still exists (secondary assertion — still correct).
+    //   Either way, the condition MUST be in the DB after the first reckless:true call.
+    const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T7', { npcAc: 30 });
+
+    // Loop until confirmed miss (nat-20 crit would still hit at ac=30; re-create encounter and retry).
+    let done = false;
+    while (!done) {
+      const enc = await makeFreshEncounter('RECK-T7-retry', { npcAc: 30 });
+      const v = await getVersion(enc.encounterId);
+      const res = await doAttackApply(enc.encounterId, enc.barbarianCombatantId, enc.npcCombatantId, longswordInstanceId, v, { reckless: true });
+      if (res.statusCode === 200 && res.body.hit === false) {
+        // Confirmed miss — assert condition exists for this combatant.
+        const rows = await countRecklessRows(enc.barbarianCombatantId);
+        expect(rows, 'RECK-T7: RecklessAttacking condition must exist after a reckless miss (PHB p.48)').toBe(1);
+        done = true;
+      }
+      // nat-20 crit hit → retry with a fresh encounter to get a confirmed miss
+    }
   });
 });
