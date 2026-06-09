@@ -275,7 +275,10 @@ describe('campaigns', () => {
         const app = await getTestApp();
         const { db } = await import('../../src/infra/db/client.js');
         const { worlds } = await import('../../src/infra/db/schema.js');
-        const worldsBefore = await db.select().from(worlds);
+        const { eq } = await import('drizzle-orm');
+        // Count only gmUser's worlds to avoid counting worlds created by other concurrent
+        // test forks (maxForks:4 parallelism — the global count races under parallel execution).
+        const worldsBefore = await db.select().from(worlds).where(eq(worlds.ownerUserId, gmUser.id));
 
         const res = await app.inject({
           method: 'POST',
@@ -291,8 +294,8 @@ describe('campaigns', () => {
         // Must be under the EXISTING world, not a new one
         expect(body.worldId).toBe(existingWorldId);
 
-        // No new world row must have been inserted
-        const worldsAfter = await db.select().from(worlds);
+        // No new world row must have been inserted for this user
+        const worldsAfter = await db.select().from(worlds).where(eq(worlds.ownerUserId, gmUser.id));
         expect(worldsAfter.length).toBe(worldsBefore.length);
       });
 

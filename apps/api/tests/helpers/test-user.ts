@@ -75,6 +75,21 @@ export async function createTestUser(): Promise<TestUser> {
 
   const session = (await loginRes.json()) as { access_token: string };
 
+  // 3. Wait for the auth.users → public.users mirror trigger to land before returning.
+  // GoTrue's admin create returns as soon as auth.users is written, but public.users
+  // (populated by 0001-auth-mirror-trigger.sql) may lag under concurrent fork load.
+  // Tests immediately create worlds/campaigns that FK-reference public.users, so a
+  // missing mirror row surfaces as a downstream "worldId undefined" failure. Poll until
+  // the mirror row exists (≤ ~2s) to make user creation collision-safe under maxForks>1.
+  const { db } = await import('../../src/infra/db/client.js');
+  const { users } = await import('../../src/infra/db/schema.js');
+  const { eq } = await import('drizzle-orm');
+  for (let i = 0; i < 40; i++) {
+    const rows = await db.select({ id: users.id }).from(users).where(eq(users.id, created.id)).limit(1);
+    if (rows.length > 0) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+
   return { id: created.id, email, password, accessToken: session.access_token };
 }
 

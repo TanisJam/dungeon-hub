@@ -147,19 +147,21 @@ Do NOT batch test + impl in one edit. Do NOT write production code without a fai
 
 ### Fast feedback loop (don't run the full suite while iterating)
 
-The full `api` suite is ~100s (real Supabase+Postgres, `maxForks:2` bounded parallel — see below); the full `web` suite is ~20s; `domain` ~3.5s. Running everything on every edit is the "tests take an eternity" trap. Scope to what you're touching:
+The full `api` suite is ~51s (real Supabase+Postgres, `maxForks:4` bounded parallel — see below); the full `web` suite is ~20s; `domain` ~3.5s. Running everything on every edit is the "tests take an eternity" trap. Scope to what you're touching:
 
 - **domain / web** (fine-grained import graphs): `pnpm --filter <pkg> test:watch` (reruns affected-on-save), `pnpm --filter <pkg> test:changed` (tests hit by your uncommitted diff), or `pnpm --filter <pkg> test:related <src-file>`. domain-on-one-file ≈ 0.8s, web-on-one-component ≈ 2.3s.
 - **api** is a special case: every integration test boots the whole Fastify app, so the import graph is fully connected — `test:changed`/`related` over-match to the ENTIRE suite and are intentionally NOT defined for api. Instead run **by file name**: `pnpm --filter @dungeon-hub/api test <filename-substring>` (e.g. `test bitacora-share` ≈ 2.6s for one file), or `test:watch <substring>` to watch it.
 - Run the full per-package suite only before committing that layer; run `pnpm test` only as the final gate.
 
-**api parallelism is bounded at `maxForks:2`**: integration tests share ONE local Supabase. All fixtures use unique UUIDs. Shared global-table mutations in `character-race.test.ts` were moved to test-only compendium rows (elf--high--t6, tiefling--t6) so they no longer collide. Dice-roll flakes (nat-1/nat-20 PHB p.194) are guarded by per-test retry loops. Do NOT raise to `maxForks:4` — GoTrue admin API concurrency breaks at higher fork counts (exploration #2057). The `characters.test.ts` GoTrue mirror-trigger race (worldId: undefined) is pre-existing and appears intermittently independent of parallelism.
+**api parallelism is at `maxForks:4`** (measured ~90s sequential → ~51s at 4 forks; maxForks:2 was actually SLOWER than sequential due to startup overhead not amortizing). Integration tests share ONE local Supabase. All fixtures use unique UUIDs. GoTrue user-creation races are safe because `createTestUser` polls for the `auth.users→public.users` mirror trigger. Do NOT raise above `maxForks:4` — GoTrue admin API concurrency breaks at higher fork counts (exploration #2057).
+
+**Engine attack tests use RNG retry loops** (PHB p.194: nat-1 = auto-miss, nat-20 = auto-crit regardless of AC). Any engine integration test that asserts an on-hit invariant MUST loop `while (!hit)` with a fresh encounter (ac=1) per attempt; any test asserting a miss invariant MUST use ac=30 and loop `while (!miss)`. The `crit` field is ONLY present in hit responses (REQ-ROUTE-BODY-03) — miss responses (REQ-ROUTE-BODY-02) omit it. Empirically flaky files confirmed: `engine-weapon-attack-apply.test.ts` (APPLY-T8: crit assertion on miss body). All other engine files pass reliably at maxForks:4.
 
 ### Test layers
 
 - **Unit** — Vitest in domain + compendium-import (pure functions)
 - **Component** — Vitest + @testing-library/react in `apps/web` (`components/**/*.test.{ts,tsx}`, `lib/**/*.test.{ts,tsx}`, plus colocated `_picker.test.tsx` etc.)
-- **Integration** — Vitest in `apps/api` (real Supabase + Postgres, maxForks:2 bounded parallel, 30s timeout)
+- **Integration** — Vitest in `apps/api` (real Supabase + Postgres, maxForks:4 bounded parallel, 30s timeout, ~51s wall-clock)
 - **E2E** — Playwright in `apps/web/e2e/` (`*.setup.ts`, `*.public.spec.ts`, `*.auth.spec.ts`)
 
 ### Conventions
