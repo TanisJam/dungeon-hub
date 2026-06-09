@@ -12,7 +12,7 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 | Priority | Arc / Work | 1-line scope | Closes definition.md item |
 |---|---|---|---|
 | 1 | **JSON import/export (remaining)** | Character EXPORT ✅ shipped. Remaining: character RE-IMPORT (reuses the `schemaVersion:1` envelope; aligns slug algorithms first — see follow-up), then config/NPC/world export. Referential integrity on re-import is the hard part. | #3.9 Import/export |
-| 2 | **West Marches write-path** (`wm-knowledge-layer`, paused at #1808) | Player contribution to Bitácora: sightings, rumors, waypoints, session recaps. Sealing/debunking by DM. Bitácora→codex link. `NovedadesFeed` backend hookup. | #3.10 WM knowledge |
+| 2 | **West Marches write-path — remaining** (`wm-knowledge-layer`, substantially delivered via codex-ia-reframe) | Delivered: guild contributions + tags + unified feed + share-personal-page-to-guild + entity refs/Conocidos (monsters/NPCs/factions/locations). **Remaining**: `NovedadesFeed` backend hookup; rumor/adventure-board entity; sealing/debunking UI completeness; feed entity tap-to-open. Mercado deferred as separate arc (per #1960). | #3.10 WM knowledge |
 | 3 | **Custom content via JSON upload** (DEC-1, locked 2026-06-04) | DM-accessible import surface: upload a JSON pack, enable per-world via `rulesProfile`. Reuses existing `compendium-import` pipeline. Visual authoring is post-MVP. | #3.8 Custom content |
 | 4 | **Codex cross-category search** (P4b) | Landing-page search across all categories. Item type filter ✅ shipped. Remaining: a search modal that fans out N parallel `searchCompendium` calls (no aggregate endpoint exists) + per-landing scope resolution (`/compendium`=campaign, `/codex`=world). Medium-large — warrants its own exploration. | #3.4 Codex nav/search |
 | 5 | **Map mobile zoom buttons + waypoint visibility model** | Explicitly enable `zoomControl` (or add custom +/– buttons) on CRS.Simple map. Lock down shared-vs-private waypoint visibility design. | #3.5 Map |
@@ -36,6 +36,8 @@ Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable u
 > ✅ **`dm-player-play-model` Slice A — decouple role from character-control** (FOUNDATION) — SHIPPED 2026-06-05 (engram archive #1908; arc proposal #1901). Fixes the "DM can't bring their character to their own table" bug + the WM model mismatch (role = authority, character-control independent). Commits `8e9c7ce` (api: session create/list gates OR-accept world-GM, scoped to the campaign's world, cross-world denial tested), `87c93d4` (web: GM invite CTA replaces dead-end + RoleSwitcher gated on /campanas/[id] + /characters/new), `5d34ba2` (api: world-GM treated as alreadyMember incl co-GM). NO schema migration. Slices B (session play-loop UI), C (world-scoped lens), D (IA tune) pending — see P0 above. Serves #3.6 + WM playability.
 >
 > ✅ **Quests** (MVP #3.7 world content) — SHIPPED 2026-06-05 via SDD `quests` (engram archive #1895). World-scoped CRUD cloning the `journal_entries` stack: `quests` table + migration `0038` (status/visibility = text+CHECK), `GET/POST /worlds/:worldId/quests` + `GET/PATCH/DELETE /quests/:questId` (GM-only write, members read public, `dmNotes` stripped per-field server-side via `projectQuestForAccess`), `/codex/quests` page + components + codex SubNav tab, and `/inicio` DM dashboard wiring (live `QuestsSinTocarList` + `pendingQuests` count). 15 integration tests + 12 component tests. No `packages/domain` change (pure CRUD content). Deferred post-MVP: `giverNpcId`, `hexId`, `reward`, `tags`. Closes #3.7.
+>
+> ✅ **codex-ia-reframe arc — SUBSTANTIALLY DELIVERS #3.10** (8 waves, 2026-06-06 – 2026-06-08). Knowledge IA reframed into 3 surfaces: Biblioteca (always-visible reference, archive #1971), Bitácora personal (archive #1980, `bitacora_pages` migration 0041, Conocidos + Páginas + tags), guild Bitácora/feed (archive #1998, `guild_contributions.tags` migration 0042, unified `aggregateGuildFeed` use-case, Aportar composer). uuid-bridge W5a (NPCs, spec #2002) + W5b (factions + locations, spec #2011) extended `SUPPORTED_REF_KINDS` and Conocidos sections. barrido-final (archive #2028): route `/cronica`→`/bitacora`, dead code removal, `total`→`pageCount`, FAB 375px fix. bitacora-personal-share (archive #2041): share personal page → guild (migration 0043, immutable snapshot, "Bitácora" feed badge). guild-feed-linked-entity-refs (archive #2055): feed linked-entity card at 375px, migration 0044 `ref_entity_source`, world-level sanitized batch resolver. Infra (not part of arc): E2E auth-harness fix (#2042), api test gate 90s→52s (#2056). **Remaining #3.10**: NovedadesFeed backend hookup, rumor/adventure-board entity, sealing/debunking UI, feed entity tap-to-open, Mercado (separate arc, deferred per #1960).
 
 ---
 
@@ -104,6 +106,34 @@ All archived SDD changes, ordered by archive date. For full artifact content: `m
 | `poi-map-list` | #1727 | #3.5 map (map-overlay POI list + fly-to) | 2026-06-03 |
 | `poi-world-create` | #1737 | #3.5 map (DM tap-to-create, edit, move, place-on-map) | 2026-06-03 |
 
+### Post-MVP gap-close (2026-06-05)
+
+| Arc | Engram archive ID | MVP area served | Archive date |
+|---|---|---|---|
+| `campaign-invite-flow` | #1877 | #3.6 DM campaigns (invite-link, atomic dual-write) | 2026-06-05 |
+| `character-json-export` | #1885 | #3.9 export (owner-only versioned envelope) | 2026-06-05 |
+| Feats + Conditions browser (direct wiring) | — | #3.3 codex coverage (8/8 categories) | 2026-06-05 |
+| Item type filter (`78ee0c8`) | — | #3.4 codex nav/search (P4a) | 2026-06-05 |
+| `campaign-archive` | #1938 | campaigns close/reopen | 2026-06-05 |
+| `dm-player-play-model` Slice A | #1908 | #3.6 (role decouple) | 2026-06-05 |
+| `dm-player-play-model` Slice B | #1916 | #3.6 (session play-loop UI) | 2026-06-05 |
+| `dm-player-play-model` Slice C | #1922 | #3.6 (world-scoped lens) | 2026-06-05 |
+| `dm-player-play-model` Slice D (arc close #1929) | #1928 | #3.6 (IA tune, Crónica→Bitácora rename) | 2026-06-05 |
+| `quests` | #1895 | #3.7 world content | 2026-06-05 |
+
+### codex-ia-reframe arc (2026-06-06 – 2026-06-08)
+
+| Arc | Engram archive ID | MVP area served | Archive date |
+|---|---|---|---|
+| W1 `biblioteca` | #1971 | #3.10 WM knowledge (Biblioteca framing, reference CATEGORY_FAMILY) | 2026-06-06 |
+| W2 `bitacora-personal` | #1980 | #3.10 WM knowledge (`bitacora_pages` migration 0041, CRUD, Conocidos + Páginas tabs) | 2026-06-06 |
+| `bitacora-gremio` | #1998 | #3.10 WM knowledge (`guild_contributions.tags` migration 0042, unified feed, Aportar composer) | 2026-06-06 |
+| W5a `uuid-bridge-npc` | archive in engram (spec #2002, design #2003, tasks #2004) | #3.10 WM knowledge (NPC ref kind, grant tab, Conocidos NPC section) | 2026-06-07 |
+| W5b `uuid-bridge-factions-pois` | archive in engram (spec #2011, design #2012, tasks #2013) | #3.10 WM knowledge (faction + location ref kinds, Conocidos Facciones/Lugares) | 2026-06-07 |
+| `barrido-final` | #2028 | #3.10 WM knowledge (route `/cronica`→`/bitacora`, dead code removal, feed `total`→`pageCount`, FAB 375px fix) | 2026-06-07 |
+| `bitacora-personal-share` | #2041 | #3.10 WM knowledge (share personal page → guild, migration 0043, immutable snapshot, "Bitácora" feed badge) | 2026-06-08 |
+| `guild-feed-linked-entity-refs` | #2055 | #3.10 WM knowledge (feed linked-entity card 375px, migration 0044 `ref_entity_source`, batch resolver) | 2026-06-08 |
+
 ### Web combat surface (2026-06-03 – 2026-06-04) — see §3 for freeze status
 
 | Arc | Engram archive ID | What | Archive date |
@@ -137,6 +167,6 @@ Per `definition.md §5.1` (decision 2026-06-04): the combat engine and web comba
 
 **What resumes after MVP**: the remaining web slices (healing, conditions UI, DM controls), the full encounter management surface.
 
-### 3.2 WM knowledge layer (`wm-knowledge-layer`) — PAUSED
+### 3.2 WM knowledge layer (`wm-knowledge-layer`) — SUBSTANTIALLY DELIVERED
 
-The Bitácora/knowledge-layer SDD (#1808) is paused pending completion of this doc round and is item #3 in §1 above. Not lost — all design decisions are locked in engram (#1804 vision, #1806 decisions, #1808 proposal).
+The codex-ia-reframe arc (2026-06-06 – 2026-06-08) delivered the player write-path and knowledge IA in 8 waves. What was item #2 in §1 is now narrowed to the remaining feed-completeness work (see §1 row 2 updated scope). The original paused SDD (#1808, engram #1804 vision / #1806 decisions) informed the arc; the arc superseded it as the implementation vehicle.
