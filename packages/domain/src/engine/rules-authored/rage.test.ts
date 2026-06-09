@@ -195,6 +195,37 @@ describe('rageRuleDoc — NumMod emit (REQ-RAGE-DOC-04, REQ-RAGE-COMPILE-04)', (
     const num = instances.find((i) => i.def.kind === 'num')!;
     expect(num.scope.target.axis).toBe('self');
   });
+
+  it('S-11a: NumMod scope.trigger is on-damage (W-01 / REQ-RAGE-DOC-04)', () => {
+    // PHB p.48 — rage damage bonus applies to the DAMAGE ROLL of a melee weapon
+    // attack, not the attack roll itself. Design (ADR-4, Emit 6) overrides
+    // REQ-RAGE-DOC-04 trigger:'on-attack-roll' with trigger:'on-damage' because
+    // the bonus resolves at damage resolution time, not at the attack roll step.
+    // This assertion locks that design decision.
+    const instances = buildRage(RAGER_ID, 2, 2);
+    const num = instances.find((i) => i.def.kind === 'num')!;
+    expect(num.scope.trigger).toBe('on-damage');
+  });
+
+  it('S-15a: NumMod value parity at L1 — bonus:2 (W-02 / REQ-PARITY-06)', () => {
+    // PHB p.48: L1–8 rage damage bonus is +2.
+    // R-COERCE: {rageBonus} compiles to the STRING '2' (compile.ts:67 String(value));
+    // Number()-coerce the compiled value before comparing to the legacy NUMBER 2.
+    const level = 1;
+    const bonus = levelToBonus(level); // → 2
+    const legacy = buildRageModifiers(level, RAGER_ID);
+    if (!legacy.ok) throw new Error('legacy build failed');
+    const compiled = buildRage(RAGER_ID, bonus, levelToCount(level));
+
+    const compiledNum = compiled.find((i) => i.def.kind === 'num')!;
+    expect(compiledNum).toBeDefined();
+
+    if (compiledNum.def.kind === 'num') {
+      // R-COERCE: coerce both sides to compare numerically
+      expect(Number(compiledNum.def.value)).toBe(legacy.numMod.value);
+      expect(Number(compiledNum.def.value)).toBe(2);
+    }
+  });
 });
 
 // ── S-10: ResistMods (REQ-RAGE-DOC-05, REQ-RAGE-COMPILE-05) ─────────────────
