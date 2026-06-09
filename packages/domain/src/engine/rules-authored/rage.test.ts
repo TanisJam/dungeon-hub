@@ -25,7 +25,6 @@ import { describe, it, expect } from 'vitest';
 import { RuleDocSchema } from '../authoring/schema.js';
 import { compileRule } from '../authoring/compile.js';
 import { rageRuleDoc } from './rage.js';
-import { buildRageModifiers } from '../rules/rage.js';
 import type { EntityId } from '../types.js';
 import type { ModifierInstance } from '../registry/types.js';
 
@@ -33,17 +32,9 @@ import type { ModifierInstance } from '../registry/types.js';
 
 const RAGER_ID = 'char-001' as EntityId;
 
-// PHB p.48 rage bonus table (mirrors legacy rageBonus helper in rules/rage.ts)
+// PHB p.48 rage bonus table
+// L1-8: +2, L9-15: +3, L16+: +4
 function levelToBonus(level: number): 2 | 3 | 4 {
-  if (level >= 16) return 4;
-  if (level >= 9) return 3;
-  return 2;
-}
-
-// PHB p.48 rages per long rest table (L1-8: 2, L9-11: 3, L12-15: 4, L16-19: 5/6, L20: unlimited)
-// For parity purposes use the same count boundaries as the bonus table:
-//   L1-8: 2 rages, L9-15: 3 rages, L16+: 4 rages (simplified for shape-only test)
-function levelToCount(level: number): number {
   if (level >= 16) return 4;
   if (level >= 9) return 3;
   return 2;
@@ -207,22 +198,17 @@ describe('rageRuleDoc — NumMod emit (REQ-RAGE-DOC-04, REQ-RAGE-COMPILE-04)', (
     expect(num.scope.trigger).toBe('on-damage');
   });
 
-  it('S-15a: NumMod value parity at L1 — bonus:2 (W-02 / REQ-PARITY-06)', () => {
+  it('S-15a: NumMod value at L1 — bonus:2 (REQ-CHAR-01a, PHB p.48)', () => {
     // PHB p.48: L1–8 rage damage bonus is +2.
     // R-COERCE: {rageBonus} compiles to the STRING '2' (compile.ts:67 String(value));
-    // Number()-coerce the compiled value before comparing to the legacy NUMBER 2.
-    const level = 1;
-    const bonus = levelToBonus(level); // → 2
-    const legacy = buildRageModifiers(level, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
-    const compiled = buildRage(RAGER_ID, bonus, levelToCount(level));
+    // Number()-coerce the compiled value for comparison.
+    const compiled = buildRage(RAGER_ID, levelToBonus(1), 2); // bonus:2 for L1
 
     const compiledNum = compiled.find((i) => i.def.kind === 'num')!;
     expect(compiledNum).toBeDefined();
 
     if (compiledNum.def.kind === 'num') {
-      // R-COERCE: coerce both sides to compare numerically
-      expect(Number(compiledNum.def.value)).toBe(legacy.numMod.value);
+      // R-COERCE: coerce to number
       expect(Number(compiledNum.def.value)).toBe(2);
     }
   });
@@ -282,177 +268,101 @@ describe('rageRuleDoc — UsageMod emit (REQ-RAGE-DOC-06, REQ-RAGE-COMPILE-06)',
   });
 });
 
-// ── T-11 / T-12: Parity tests (REQ-PARITY-01..06) ────────────────────────────
+// ── REQ-CHAR-* characterization tests (converted from REQ-PARITY-*, REQ-PARITY-CONV-01) ────
 
-describe('rageRuleDoc — parity vs buildRageModifiers (REQ-PARITY-01..06)', () => {
-  // PHB p.48 restricts advantage to STR checks/saves; both old and new share this
-  // divergence (usesAbility WorldQuery absent) — see TODO inline in rageRuleDoc.
-  // S-17: document the shared divergence explicitly.
-
-  it('S-13: AdvantageMod channel parity at L1 — count, def, owner (REQ-PARITY-01, REQ-PARITY-02)', () => {
-    // REQ-PARITY-02: parity is BEHAVIORAL on target (axis:'self' vs entities:[ragerId]).
-    // query.ts:67: axis:'self' resolves as owner===self; under owner=ragerId both
-    // collapse to the same entity set {ragerId}. Do NOT byte-compare target.
-    // PHB p.48 — advantage on Strength checks and saves.
-    const legacy = buildRageModifiers(1, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
-    const compiled = buildRage(RAGER_ID, 2, 2);
-
-    const legacyAdv = legacy.instances;
-    const compiledAdv = compiled.filter((i) => i.def.kind === 'advantage');
-
-    // Count parity
-    expect(compiledAdv).toHaveLength(legacyAdv.length);
-    expect(compiledAdv).toHaveLength(2);
-
-    // def kind/mode parity
-    for (const legInst of legacyAdv) {
-      const matchCompiled = compiledAdv.find(
-        (ci) =>
-          ci.def.kind === legInst.def.kind &&
-          ci.def.kind === 'advantage' &&
-          legInst.def.kind === 'advantage' &&
-          ci.def.rollType === legInst.def.rollType,
-      );
-      expect(matchCompiled, `No matching compiled AdvantageMod for rollType:${legInst.def.kind === 'advantage' ? legInst.def.rollType : '?'}`).toBeDefined();
-    }
-
-    // rollType set parity: {check, save}
-    const compiledRollTypes = new Set(
-      compiledAdv.map((i) => (i.def.kind === 'advantage' ? i.def.rollType : '')),
-    );
-    const legacyRollTypes = new Set(
-      legacyAdv.map((i) => (i.def.kind === 'advantage' ? i.def.rollType : '')),
-    );
-    expect(compiledRollTypes).toEqual(legacyRollTypes);
-
-    // Owner parity
-    for (const inst of compiledAdv) {
-      expect(inst.scope.owner).toBe(RAGER_ID);
-    }
-
-    // Target normalization (REQ-PARITY-02, R-TARGET-NORM):
-    // authored uses axis:'self', legacy uses axis:'entities', ids:[ragerId].
-    // Both resolve to entity set {ragerId} under owner=ragerId (query.ts:67).
-    // Normalize and compare:
-    function normalizeTargetToEntitySet(inst: ModifierInstance, ownerId: EntityId): Set<string> {
-      const target = inst.scope.target;
-      if (target.axis === 'self') {
-        // axis:'self' resolves as owner===self at query time (query.ts:67)
-        return new Set([inst.scope.owner as string]);
-      }
-      if (target.axis === 'entities') {
-        return new Set(target.ids.map(String));
-      }
-      return new Set([ownerId as string]);
-    }
-
-    for (let i = 0; i < compiledAdv.length; i++) {
-      const compTarget = normalizeTargetToEntitySet(compiledAdv[i]!, RAGER_ID);
-      const legTarget = normalizeTargetToEntitySet(legacyAdv[i]!, RAGER_ID);
-      expect(compTarget).toEqual(legTarget);
+describe('rageRuleDoc — REQ-CHAR-01: NumMod value at level tiers (PHB p.48)', () => {
+  // PHB p.48 — Rage Damage column: +2 (L1-8), +3 (L9-15), +4 (L16+)
+  it('REQ-CHAR-01a: rageBonus:2 → exactly 1 NumMod with value===2 (L1-8 tier)', () => {
+    // PHB p.48 — Rage Damage column: +2 (L1-8), +3 (L9-15), +4 (L16+)
+    const compiled = buildRage(RAGER_ID, levelToBonus(1), 2);
+    const nums = compiled.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage');
+    expect(nums).toHaveLength(1);
+    const num = nums[0]!;
+    if (num.def.kind === 'num') {
+      expect(Number(num.def.value)).toBe(2);
     }
   });
 
-  it('S-14: ResistMod channel parity at L1 — count + damageType set + mode (REQ-PARITY-04)', () => {
-    // PHB p.48 — bludgeoning/piercing/slashing resistance (level-independent).
-    // Parity is on the def payload (kind/damageType/mode), NOT the envelope
-    // (authored adds self-scope+predicate; legacy resistMods are bare).
-    const legacy = buildRageModifiers(1, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
+  it('REQ-CHAR-01b: rageBonus:3 → exactly 1 NumMod with value===3 (L9-15 tier)', () => {
+    // PHB p.48 — Rage Damage column: +2 (L1-8), +3 (L9-15), +4 (L16+)
+    const compiled = buildRage(RAGER_ID, levelToBonus(9), 2);
+    const nums = compiled.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage');
+    expect(nums).toHaveLength(1);
+    const num = nums[0]!;
+    if (num.def.kind === 'num') {
+      expect(Number(num.def.value)).toBe(3);
+    }
+  });
+
+  it('REQ-CHAR-01c: rageBonus:4 → exactly 1 NumMod with value===4 (L16+ tier)', () => {
+    // PHB p.48 — Rage Damage column: +2 (L1-8), +3 (L9-15), +4 (L16+)
+    const compiled = buildRage(RAGER_ID, levelToBonus(16), 2);
+    const nums = compiled.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage');
+    expect(nums).toHaveLength(1);
+    const num = nums[0]!;
+    if (num.def.kind === 'num') {
+      expect(Number(num.def.value)).toBe(4);
+    }
+  });
+});
+
+describe('rageRuleDoc — REQ-CHAR-02: ResistMods (PHB p.48)', () => {
+  it('REQ-CHAR-02: exactly 3 ResistMods with mode:half covering bludgeoning/piercing/slashing, target:self', () => {
+    // PHB p.48 — While raging you have resistance to bludgeoning, piercing, and slashing damage
     const compiled = buildRage(RAGER_ID, 2, 2);
-
-    const legacyResist = legacy.resistMods;
-    const compiledResist = compiled.filter((i) => i.def.kind === 'resist');
-
-    // Count parity
-    expect(compiledResist).toHaveLength(legacyResist.length);
-    expect(compiledResist).toHaveLength(3);
-
-    // damageType set equality (order-independent)
-    const compiledDmgTypes = new Set(
-      compiledResist.map((i) => (i.def.kind === 'resist' ? i.def.damageType : '')),
+    const resist = compiled.filter((i) => i.def.kind === 'resist');
+    expect(resist).toHaveLength(3);
+    const damageTypes = new Set(
+      resist.map((i) => (i.def.kind === 'resist' ? i.def.damageType : '')),
     );
-    const legacyDmgTypes = new Set(legacyResist.map((r) => r.damageType));
-    expect(compiledDmgTypes).toEqual(legacyDmgTypes);
-
-    // mode equality: all half
-    for (const inst of compiledResist) {
+    expect(damageTypes).toEqual(new Set(['bludgeoning', 'piercing', 'slashing']));
+    for (const inst of resist) {
       if (inst.def.kind === 'resist') {
         expect(inst.def.mode).toBe('half');
       }
-    }
-    for (const r of legacyResist) {
-      expect(r.mode).toBe('half');
+      expect(inst.scope.target.axis).toBe('self');
     }
   });
+});
 
-  it('S-15: NumMod value parity at L9 — bonus:3 (REQ-PARITY-03, REQ-PARITY-06)', () => {
-    // PHB p.48: L9–15 bonus is +3.
-    // R-COERCE: compiled def.value is STRING '3'; legacy numMod.value is NUMBER 3.
-    // Parity assertion MUST Number()-coerce the compiled value.
-    const level = 9;
-    const bonus = levelToBonus(level);
-    const legacy = buildRageModifiers(level, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
-    const compiled = buildRage(RAGER_ID, bonus, levelToCount(level));
-
-    const compiledNum = compiled.find((i) => i.def.kind === 'num')!;
-    expect(compiledNum).toBeDefined();
-
-    if (compiledNum.def.kind === 'num') {
-      // R-COERCE: coerce both sides to compare numerically
-      expect(Number(compiledNum.def.value)).toBe(legacy.numMod.value);
-      expect(compiledNum.def.stat).toBe(legacy.numMod.stat);
-      expect(compiledNum.def.op).toBe(legacy.numMod.op);
-    }
-
-    // NumMod predicate asymmetry (REQ-PARITY-03, documented difference):
-    // legacy numMod is BARE (no predicate — use-case wraps it with MELEE+STR predicate)
-    // authored embeds weaponKind:melee + hasCondition:Raging predicate (DSL improvement)
-    expect(legacy.numMod).not.toHaveProperty('predicate');
-    expect(compiledNum.predicate).toBeDefined();
-  });
-
-  it('S-16: NumMod value parity at L16 — bonus:4 (REQ-PARITY-06)', () => {
-    // PHB p.48: L16+ bonus is +4.
-    const level = 16;
-    const bonus = levelToBonus(level);
-    const legacy = buildRageModifiers(level, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
-    const compiled = buildRage(RAGER_ID, bonus, levelToCount(level));
-
-    const compiledNum = compiled.find((i) => i.def.kind === 'num')!;
-    if (compiledNum.def.kind === 'num') {
-      expect(Number(compiledNum.def.value)).toBe(legacy.numMod.value);
-      expect(Number(compiledNum.def.value)).toBe(4);
-    }
-  });
-
-  it('S-17: inherited STR-divergence — both lack usesAbility filter (REQ-PARITY-05)', () => {
-    // PHB p.48 restricts advantage to STR checks/saves; both old and new share this
-    // divergence (usesAbility WorldQuery absent) — see TODO inline in rageRuleDoc.
-    const legacy = buildRageModifiers(1, RAGER_ID);
-    if (!legacy.ok) throw new Error('legacy build failed');
+describe('rageRuleDoc — REQ-CHAR-03: AdvantageMods (PHB p.48)', () => {
+  it('REQ-CHAR-03: exactly 2 AdvantageMods with rollTypes check+save, target:self', () => {
+    // PHB p.48 — While raging you have advantage on Strength checks and Strength saving throws
     const compiled = buildRage(RAGER_ID, 2, 2);
-
-    const legacyAdv = legacy.instances;
-    const compiledAdv = compiled.filter((i) => i.def.kind === 'advantage');
-
-    // Neither should have a usesAbility filter (both share the STR-divergence)
-    for (const inst of legacyAdv) {
-      // Legacy advantage instances have no predicate at all
-      expect(inst.predicate).toBeUndefined();
+    const adv = compiled.filter((i) => i.def.kind === 'advantage');
+    expect(adv).toHaveLength(2);
+    const rollTypes = new Set(
+      adv.map((i) => (i.def.kind === 'advantage' ? i.def.rollType : '')),
+    );
+    expect(rollTypes).toEqual(new Set(['check', 'save']));
+    for (const inst of adv) {
+      expect(inst.scope.target.axis).toBe('self');
     }
+  });
+});
 
-    // Compiled instances DO have a hasCondition:Raging predicate (DSL improvement)
-    // but NOT a usesAbility filter (shared divergence)
+describe('rageRuleDoc — REQ-CHAR-04: all emits carry target:{axis:self} (PHB p.48)', () => {
+  it('REQ-CHAR-04: every modifier instance in build output has target:{axis:self}', () => {
+    // PHB p.48 — rage bonus, resistance, and advantage apply to the rager (self)
+    const compiled = buildRage(RAGER_ID, 2, 2);
+    for (const inst of compiled) {
+      expect(inst.scope.target.axis).toBe('self');
+    }
+  });
+});
+
+describe('rageRuleDoc — REQ-CHAR-DIVERGENCE: STR-divergence documented (ADR-5)', () => {
+  it('REQ-CHAR-DIVERGENCE: advantage predicate is hasCondition (NOT usesAbility) — STR fix deferred to Batch 2', () => {
+    // PHB p.48 restricts advantage to STR checks/saves; the DSL lacks usesAbility WorldQuery.
+    // This documents the shared divergence (STR fix deferred to Batch 2).
+    const compiled = buildRage(RAGER_ID, 2, 2);
+    const compiledAdv = compiled.filter((i) => i.def.kind === 'advantage');
     for (const inst of compiledAdv) {
       const pred = inst.predicate as { op?: string; q?: { kind?: string } } | undefined;
-      // The predicate is hasCondition, NOT usesAbility
       if (pred?.op === 'query') {
         expect(pred.q?.kind).not.toBe('usesAbility');
       }
     }
   });
 });
+

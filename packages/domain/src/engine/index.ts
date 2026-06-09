@@ -274,9 +274,8 @@ export type { BuildBlindedResult } from './rules/blinded.js';
 export { buildPetrifiedModifiers } from './rules/petrified.js';
 export type { BuildPetrifiedResult } from './rules/petrified.js';
 
-// engine-rage — buildRageModifiers rule builder (REQ-RAGE-03..05, PHB p.48)
-export { buildRageModifiers } from './rules/rage.js';
-export type { BuildRageResult } from './rules/rage.js';
+// engine-rage — DSL-authored rage rule (REQ-CHAR-01..04, PHB p.48)
+export { rageRuleDoc } from './rules-authored/rage.js';
 
 export { buildInvisibleModifiers } from './rules/invisible.js';
 export type { BuildInvisibleResult } from './rules/invisible.js';
