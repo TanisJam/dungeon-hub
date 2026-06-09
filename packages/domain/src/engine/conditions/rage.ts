@@ -14,7 +14,7 @@
  * Implementation notes:
  * - 'Raging' is an open-string condition, NOT a ConditionDefinition (ADR-2:
  *   RAGING_CONDITION_DEF is intentionally skipped — Rage has no outgoing attackers-of
- *   mod that needs a def; all mods are emitted directly by buildRageModifiers).
+ *   mod that needs a def; all mods are emitted by rageRuleDoc via compileRule).
  * - isRaging: pure gate predicate matching literal 'Raging' (case-sensitive).
  *   Mirrors isIncapacitated in packages/domain/src/engine/conditions/incapacitated.ts.
  * - Action-economy gate (can't cast while raging) is enforced at the use-case layer

@@ -11,13 +11,15 @@
  *   "You have resistance to bludgeoning, piercing, and slashing damage."
  *   Rages per long rest: 2/3/4/5/6/unlimited (PHB p.48 table).
  *
- * Parity oracle: buildRageModifiers (legacy hardcoded builder — IMMUTABLE, never touched).
+ * These are CHARACTERIZATION tests for rageRuleDoc. The legacy buildRageModifiers
+ * builder and engine/rules/rage.ts were deleted in Batch 1b. rageRuleDoc is the
+ * sole runtime source; these tests document its established behavior directly.
  *
- * RED→GREEN cycles:
- *   T-07: schema-valid + compile (RED — file doesn't exist yet)
- *   T-08: 7-emit count + per-kind assertions (GREEN — implement rageRuleDoc)
- *   T-11: parity assertions (RED — write exhaustive parity tests)
- *   T-12: verify parity passes (GREEN — rageRuleDoc IS the implementation)
+ * RED→GREEN cycles (historical):
+ *   T-07: schema-valid + compile (RED — file didn't exist yet)
+ *   T-08: 7-emit count + per-kind assertions (GREEN — implemented rageRuleDoc)
+ *   T-11: characterization assertions (RED — wrote exhaustive tests)
+ *   T-12: characterization passes (GREEN — rageRuleDoc IS the implementation)
  *
  * REQ-RAGE-DOC-01..08, REQ-RAGE-COMPILE-01..06, REQ-PARITY-01..06, REQ-LEGACY-01..03
  */

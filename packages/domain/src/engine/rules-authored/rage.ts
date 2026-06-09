@@ -11,10 +11,11 @@
  *   "You have resistance to bludgeoning, piercing, and slashing damage."
  *   Rages per long rest: 2 (L1-8) / 3 (L9+) / etc. — see PHB p.48 table.
  *
- * Design: Batch 1 dual-shadow authoring. The legacy buildRageModifiers() builder
- * in engine/rules/rage.ts remains the runtime path. This document proves DSL parity.
+ * Design: Batch 1b runtime cutover. The legacy buildRageModifiers() builder and
+ * engine/rules/rage.ts have been DELETED. rageRuleDoc is now the sole runtime source.
  *
- * Parity oracle: engine/rules/rage.ts:buildRageModifiers (IMMUTABLE — do NOT modify).
+ * These are CHARACTERIZATION tests — they document the established behavior of
+ * rageRuleDoc itself, not parity against a removed reference implementation.
  *
  * 7 emits total:
  *   1. AdvantageMod — STR check advantage (trigger:always, hasCondition:Raging)
@@ -37,10 +38,10 @@
  * For Rage, owner===ragerId always holds — axis:'self' and legacy entities:[ragerId]
  * are RUNTIME-EQUIVALENT (both collapse to {ragerId}).
  *
- * STR-divergence (ADR-5, shared with legacy):
+ * STR-divergence (ADR-5):
  * PHB p.48 restricts advantage to STRENGTH checks/saves. The DSL currently lacks
- * a usesAbility WorldQuery leaf. Both rageRuleDoc and buildRageModifiers emit
- * UNCONSTRAINED AdvantageMods. The STR fix is OUT OF SCOPE for Batch 1.
+ * a usesAbility WorldQuery leaf. rageRuleDoc emits UNCONSTRAINED AdvantageMods.
+ * The STR fix is OUT OF SCOPE for Batch 1.
  *
  * UsageMod (shape-only, Batch 1):
  * The runtime UsageMod type only has pool:'tiered'. The pool:'count' + count fields
@@ -69,7 +70,7 @@ export const rageRuleDoc: RuleDoc = {
     // ── EMIT 1: AdvantageMod — STR check advantage (PHB p.48) ──────────────
     // PHB p.48: "advantage on Strength checks"
     // TODO: usesAbility WorldQuery — advantage should be STR-only (PHB p.48) but predicate
-    //       primitive absent; inheriting same divergence as buildRageModifiers.
+    //       primitive absent; STR-only divergence deferred (ADR-5).
     {
       def: {
         kind: 'advantage',
@@ -91,7 +92,7 @@ export const rageRuleDoc: RuleDoc = {
     // ── EMIT 2: AdvantageMod — STR save advantage (PHB p.48) ───────────────
     // PHB p.48: "advantage on Strength saving throws"
     // TODO: usesAbility WorldQuery — advantage should be STR-only (PHB p.48) but predicate
-    //       primitive absent; inheriting same divergence as buildRageModifiers.
+    //       primitive absent; STR-only divergence deferred (ADR-5).
     {
       def: {
         kind: 'advantage',
@@ -176,8 +177,8 @@ export const rageRuleDoc: RuleDoc = {
     // R-COERCE trap: parity assertions must Number()-coerce compiled def.value.
     // AND predicate: weaponKind:melee + hasCondition:Raging
     // TODO: usesAbility WorldQuery — PHB p.48 says "using Strength"; no usesAbility primitive;
-    //       inheriting same divergence as buildRageModifiers (weaponKind:melee is the
-    //       expressible half; STR-usage half deferred to Batch 2).
+    //       STR-usage divergence deferred (ADR-5); weaponKind:melee is the
+    //       expressible half; STR-usage predicate deferred to Batch 2.
     {
       def: {
         kind: 'num',
