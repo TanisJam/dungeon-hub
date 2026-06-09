@@ -139,6 +139,13 @@ const AttackApplyBody = z
      * engine-divine-smite — REQ-DS-UNDEAD-01.
      */
     divineSmiteUndead: z.boolean().optional(),
+    /**
+     * PHB p.48 — Reckless Attack declaration (Barbarian).
+     * true = player declared reckless on this attack; server inserts RecklessAttacking
+     * condition inside the CAS tx (idempotency-guarded SELECT-before-INSERT).
+     * engine-barbarian-dsl-2 — REQ-API-02.
+     */
+    reckless: z.boolean().optional(),
     /** Client's known encounter version — must match DB version for CAS. */
     version: z.number().int().nonnegative(),
   })
@@ -337,6 +344,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         targetNpcSaveMod,
         divineSmiteSlotLevel,
         divineSmiteUndead,
+        reckless,
         version,
       } = bodyResult.data;
       const userId = request.user!.sub;
@@ -368,6 +376,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         ...(targetNpcSaveMod !== undefined ? { targetNpcSaveMod } : {}),
         ...(divineSmiteSlotLevel !== undefined ? { divineSmiteSlotLevel } : {}),
         ...(divineSmiteUndead !== undefined ? { divineSmiteUndead } : {}),
+        ...(reckless !== undefined ? { reckless } : {}),
         version,
       });
 

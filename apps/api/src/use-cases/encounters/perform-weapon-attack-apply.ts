@@ -106,6 +106,13 @@ export interface PerformWeaponAttackApplyInput {
   divineSmiteUndead?: boolean;
   /** Client's known version — must match encounters.version for CAS. */
   version: number;
+  /**
+   * Whether the attacker is declaring Reckless Attack on this attack (PHB p.48).
+   * Absent/false = no reckless declaration; true = insert RecklessAttacking condition
+   * inside the CAS transaction if not already present (idempotency: SELECT-exists check).
+   * REQ-API-01, REQ-API-02, SCENARIO-10..14.
+   */
+  reckless?: boolean;
 }
 
 /**
@@ -768,6 +775,35 @@ export async function performWeaponAttackApply(
   // REQ-CID-04: RESOLVE runs INSIDE the tx closure, after the CAS guard.
   // breakConcentration receives the same tx → covered by rollback (saga closed).
   const txResult = await db.transaction(async (tx) => {
+    // ── Step 12e: Reckless Attack condition insert (REQ-API-02, SCENARIO-12/13) ──
+    // PHB p.48: "attack rolls against you have advantage until the start of your next turn"
+    // SELECT-exists idempotency: no UNIQUE constraint on the conditions table; guard prevents
+    // duplicate rows on multi-attack turns when reckless is declared on each attack.
+    // INSIDE the CAS tx: if the version bump fails (CAS conflict → return false),
+    // the condition insert rolls back too (SCENARIO-14 — atomicity guarantee).
+    if (input.reckless === true) {
+      const existing = await tx
+        .select({ id: encounterCombatantConditions.id })
+        .from(encounterCombatantConditions)
+        .where(
+          and(
+            eq(encounterCombatantConditions.combatantId, attackerId),
+            eq(encounterCombatantConditions.conditionName, 'RecklessAttacking'),
+          ),
+        )
+        .limit(1);
+      if (existing.length === 0) {
+        await tx.insert(encounterCombatantConditions).values({
+          conditionName: 'RecklessAttacking',
+          combatantId: attackerId,
+          appliedByCombatantId: attackerId,
+          turnAnchorEntityId: attackerId,
+          turnAnchorBoundary: 'start',
+          turnsRemaining: 1,
+        });
+      }
+    }
+
     // Build the HP update set — may also include raged_took_damage (B-11).
     // B-11: set raged_took_damage=true on the TARGET when finalDamage > 0 (REQ-RAGE-09).
     // Write unconditionally on target row alongside hpCurrent UPDATE — no extra query.
