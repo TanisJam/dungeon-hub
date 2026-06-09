@@ -748,6 +748,80 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     expect(rageSource!.flat).toBe(2);
   });
 
+  // ── RAGE-R4: Finesse DEX-wins → rage bonus ABSENT (Scenario R4) ─────────────
+  //
+  // PHB p.48: "+[rage damage] to melee weapon attacks using Strength."
+  // When DEX > STR and the weapon is finesse, selectAttackAbility picks DEX →
+  // attackUsesStr is false → the rage NumMod is NOT registered →
+  // the damage breakdown must NOT contain a rage-bonus entry.
+  // Closes the coverage gap identified in verify report #2078.
+
+  it('RAGE-R4: finesse rapier + DEX>STR while Raging — rage bonus ABSENT in damage breakdown (REQ-RAGE-05, Scenario R4)', async () => {
+    // PHB p.48: rage bonus applies to "melee weapon attacks using Strength" only.
+    // Finesse rule (PHB p.147): can use STR or DEX; when DEX mod > STR mod, DEX is chosen.
+    // With DEX > STR, attackUsesStr = false → NumMod not registered → no rage entry in perDie.
+    const { db } = await import('../../src/infra/db/client.js');
+    const { characters } = await import('../../src/infra/db/schema.js');
+    const { eq } = await import('drizzle-orm');
+
+    // Read current character data so we can restore it after the test.
+    const [origRow] = await db.select().from(characters).where(eq(characters.id, barbarianCharId)).limit(1);
+    if (!origRow) throw new Error('Barbarian character not found');
+    const origData = origRow.data as Record<string, unknown>;
+
+    // Temporarily swap stats: DEX 15 (mod+2) > STR 10 (mod+0).
+    // PHB p.13: ability modifier = floor((score - 10) / 2).
+    // selectAttackAbility for rapier (finesse): max(strMod, dexMod) → picks DEX.
+    await db.update(characters).set({
+      data: {
+        ...origData,
+        baseStats: { str: 10, dex: 15, con: 14, int: 8, wis: 12, cha: 13 },
+      },
+      updatedAt: new Date(),
+    }).where(eq(characters.id, barbarianCharId));
+
+    try {
+      await setRageUsed(barbarianCharId, 0);
+
+      let hit = false;
+      let attackRes: { statusCode: number; body: Record<string, unknown> } = { statusCode: 0, body: {} };
+
+      // RNG retry loop — CLAUDE.md §5: while(!hit) with ac=1 for on-hit invariants.
+      while (!hit) {
+        const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+          await makeFreshEncounter('RAGE-R4', { npcAc: 1, npcHp: 200 });
+
+        await setRageUsed(barbarianCharId, 0);
+        const activateRes = await doActivateRage(encounterId, barbarianCombatantId, version);
+        expect(activateRes.statusCode).toBe(200);
+        const v2 = await getVersion(encounterId);
+
+        attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, rapierInstanceId, v2);
+        expect(attackRes.statusCode).toBe(200);
+
+        if (attackRes.body.hit === true) {
+          hit = true;
+        }
+      }
+
+      // Confirmed hit. The rage bonus must NOT appear in perDie.
+      // PHB p.48: rage damage only applies "using Strength" — DEX-finesse attacks are excluded.
+      // build-attack-context.ts:548 — attackUsesStr = false when dexMod > strMod on finesse.
+      const perDie = attackRes.body.perDie as Array<{ label: string; flat?: number; rolls?: number[] }> | undefined;
+      const rageSource = perDie?.find((e) => e.label === 'Raging');
+      expect(
+        rageSource,
+        'perDie must NOT contain a Raging entry when DEX>STR on a finesse weapon (PHB p.48 — using Strength only)',
+      ).toBeUndefined();
+    } finally {
+      // Restore original stats so subsequent tests use the expected STR 15 / DEX 10 values.
+      await db.update(characters).set({
+        data: origData,
+        updatedAt: new Date(),
+      }).where(eq(characters.id, barbarianCharId));
+    }
+  });
+
   // ── RAGE-T8: Finesse weapon attack while Raging ───────────────────────────────
 
   it('RAGE-T8: finesse rapier attack while Raging — route succeeds and Raging persists (REQ-RAGE-05)', async () => {
