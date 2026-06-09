@@ -120,9 +120,8 @@ describe('computeCharacterSheet — High Elf Wizard 1', () => {
     );
   });
 
-  it('speed walk = 30 desde raceData', () => {
-    expect(sheet.speed.walk).toBe(30);
-  });
+  // REQ-SPEED-06: speed omitted from computeCharacterSheet — route assembles via resolveStat('speed').
+  // Speed pipeline behavior is covered by packages/domain/src/character/sheet/speed.test.ts.
 });
 
 describe('computeCharacterSheet — Barbarian Unarmored Defense', () => {
@@ -321,7 +320,7 @@ describe('sheet: inventory views (1.6c)', () => {
     });
     expect(sheet.encumbrance.status).toBe('ok');
     expect(sheet.encumbrance.speedPenalty).toBe(0);
-    expect(sheet.speed.walk).toBe(30);
+    // REQ-SPEED-06: sheet.speed no longer emitted by computeCharacterSheet; route assembles it.
   });
 
   it('encumbrance variant: weight > STR×5 → encumbered, speed -10', () => {
@@ -340,7 +339,7 @@ describe('sheet: inventory views (1.6c)', () => {
     });
     expect(sheet.encumbrance.status).toBe('encumbered');
     expect(sheet.encumbrance.speedPenalty).toBe(10);
-    expect(sheet.speed.walk).toBe(20); // 30 - 10
+    // REQ-SPEED-06: speed assembled in route. Speed pipeline assertions in speed.test.ts.
   });
 
   it('encumbrance variant: weight > STR×10 → heavily, speed -20', () => {
@@ -357,7 +356,8 @@ describe('sheet: inventory views (1.6c)', () => {
       encumbranceVariant: true,
     });
     expect(sheet.encumbrance.status).toBe('heavily-encumbered');
-    expect(sheet.speed.walk).toBe(10); // 30 - 20
+    // REQ-SPEED-06: speed assembled in route. speedPenalty=20 confirmed via encumbranceView.
+    expect(sheet.encumbrance.speedPenalty).toBe(20);
   });
 
   it('sin variant: weight grande pero < STR×15 → ok, sin penalty', () => {
@@ -374,7 +374,7 @@ describe('sheet: inventory views (1.6c)', () => {
       encumbranceVariant: false,
     });
     expect(sheet.encumbrance.status).toBe('ok');
-    expect(sheet.speed.walk).toBe(30);
+    // REQ-SPEED-06: speed assembled in route.
   });
 
   it('encumbrance variant + exhaustion: penalties stackean (encumbered -10 + halved)', () => {
@@ -391,8 +391,9 @@ describe('sheet: inventory views (1.6c)', () => {
       itemWeights: [{ slug: 'plate-armor', source: 'PHB', name: 'Plate', type: 'HA', weight: 65 }],
       encumbranceVariant: true,
     });
-    // (30 - 10) / 2 = 10
-    expect(sheet.speed.walk).toBe(10);
+    // REQ-SPEED-06: speed assembled in route. encumbrance.speedPenalty is still asserted.
+    expect(sheet.encumbrance.speedPenalty).toBe(10);
+    expect(sheet.exhaustion.effects).toContain('speed-halved');
   });
 
   // ---- Coin weight (PHB p.143: 50 coins = 1 lb, all denominations equal) ---
@@ -435,7 +436,7 @@ describe('sheet: inventory views (1.6c)', () => {
       },
     });
     expect(sheet.exhaustion).toEqual({ level: 0, effects: [] });
-    expect(sheet.speed.walk).toBe(30);
+    // REQ-SPEED-06: speed assembled in route. exhaustion.effects covers the flag assertions.
   });
 
   it('exhaustion 1: disadvantage ability checks (flag, sin mutar números)', () => {
@@ -454,8 +455,8 @@ describe('sheet: inventory views (1.6c)', () => {
       },
     });
     expect(sheet.exhaustion.effects).toContain('disadvantage-ability-checks');
-    expect(sheet.speed.walk).toBe(30);
     expect(sheet.hitPoints.max).toBeGreaterThan(0);
+    // REQ-SPEED-06: speed assembled in route; speed-halved effect confirmed via exhaustion.effects.
   });
 
   it('exhaustion 2: speed halved', () => {
@@ -474,7 +475,7 @@ describe('sheet: inventory views (1.6c)', () => {
       },
     });
     expect(sheet.exhaustion.effects).toContain('speed-halved');
-    expect(sheet.speed.walk).toBe(15);
+    // REQ-SPEED-06: speed assembled in route. Numeric speed value covered by speed.test.ts.
   });
 
   it('exhaustion 4: HP max halved (round down)', () => {
@@ -497,7 +498,7 @@ describe('sheet: inventory views (1.6c)', () => {
     expect(sheet.exhaustion.effects).toContain('hp-max-halved');
     // 4 incluye 1, 2, 3, 4
     expect(sheet.exhaustion.effects).toContain('speed-halved');
-    expect(sheet.speed.walk).toBe(15);
+    // REQ-SPEED-06: speed assembled in route; numeric speed value covered by speed.test.ts.
   });
 
   it('exhaustion 5: speed forzado a 0', () => {
@@ -515,7 +516,7 @@ describe('sheet: inventory views (1.6c)', () => {
         exhaustion: 5,
       },
     });
-    expect(sheet.speed.walk).toBe(0);
+    // REQ-SPEED-06: speed assembled in route; numeric value covered by speed.test.ts.
     expect(sheet.exhaustion.effects).toContain('speed-zero');
   });
 
