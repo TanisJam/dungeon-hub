@@ -11,7 +11,7 @@
  * Issue codes (spec §6 naming convention — single-value mismatches use expected/got;
  * count mismatches use expectedCount/gotCount):
  *   MISSING_PHB_SOURCE    — source field absent or empty
- *   UNKNOWN_PRIMITIVE_KIND — kind not in the 10-kind union
+ *   UNKNOWN_PRIMITIVE_KIND — kind not in the 11-kind union
  *   INVALID_STAT_KEY      — stat value not a valid StatKey
  *   INVALID_PREDICATE_AST — malformed predicate node
  */
@@ -33,6 +33,10 @@ export type ParseResult = ParseOk | ParseFail;
 
 // ── Valid primitive kinds (for UNKNOWN_PRIMITIVE_KIND issue) ─────────────────
 
+// REQ-PARSE-RESIST-01: 'resist' added as the 11th entry.
+// BOTH the schema arm (schema.ts discriminatedUnion) AND this VALID_KINDS entry
+// are required for parseRule to succeed AND to correctly classify errors
+// for bad-shape resist emits (REQ-PARSE-RESIST-04).
 const VALID_KINDS = [
   'num',
   'advantage',
@@ -44,6 +48,7 @@ const VALID_KINDS = [
   'gmRuling',
   'noop',
   'proficiency',
+  'resist',
 ] as const;
 
 // ── Helper: detect specific issue categories from Zod errors ─────────────────

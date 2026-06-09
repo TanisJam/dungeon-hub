@@ -5,7 +5,7 @@
  *
  * This file provides:
  *   - ProficiencyModSchema — 10th modifier kind Zod schema (§REQ-PROF-01).
- *   - ModifierDefSchema — discriminatedUnion over ALL 10 kinds (§3.4 closed guard).
+ *   - ModifierDefSchema — discriminatedUnion over ALL 11 kinds (§3.4 closed guard).
  *   - StatKeySchema — valid stat keys (abilities, skills, saves, etc.).
  *   - PredicateSchema — recursive Zod (z.lazy) for the Predicate AST.
  *   - RuleEmitSchema — one emit declaration in a rule.
@@ -107,7 +107,7 @@ export const PredicateSchema: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
-// ── ModifierDefSchema — discriminatedUnion over 10 kinds (§3.4 closed guard) ─
+// ── ModifierDefSchema — discriminatedUnion over 11 kinds (§3.4 closed guard) ─
 
 export const ModifierDefSchema = z.discriminatedUnion('kind', [
   // 1. num
@@ -152,9 +152,12 @@ export const ModifierDefSchema = z.discriminatedUnion('kind', [
     }),
   }),
   // 6. usage
+  // count: z.union([z.number(), z.string()]).optional() — MUST accept string template
+  // slots like {rageCount} (R-COUNT-SCHEMA trap: z.number() alone rejects template strings).
   z.object({
     kind: z.literal('usage'),
-    pool: z.literal('tiered'),
+    pool: z.enum(['tiered', 'count']),
+    count: z.union([z.number(), z.string()]).optional(),
     resetOn: z.enum(['short-rest', 'long-rest', 'dawn', 'turn-start']),
   }),
   // 7. replace
@@ -180,6 +183,14 @@ export const ModifierDefSchema = z.discriminatedUnion('kind', [
   }),
   // 10. proficiency
   ProficiencyModSchema,
+  // 11. resist
+  // damageType: z.string() (plain, no .min(1)) to match runtime ResistMod.damageType.
+  // 'all' is a valid special value (PHB p.291 Petrified); closed enum would break it.
+  z.object({
+    kind: z.literal('resist'),
+    damageType: z.string(),
+    mode: z.enum(['half', 'immune']),
+  }),
 ]);
 
 // ── TargetScopeSchema ─────────────────────────────────────────────────────────
