@@ -32,12 +32,10 @@ import {
   POISONED_CONDITION_DEF,
   buildPetrifiedModifiers,
   PETRIFIED_CONDITION_DEF,
-  buildRageModifiers,
-  weaponKind,
+  compileRule,
+  rageRuleDoc,
   type ModifierRegistry,
   type EvaluationContext,
-  type ModifierInstance,
-  type ModifierInstanceId,
 } from '@dungeon-hub/domain/engine';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { isWeaponProficient } from '@dungeon-hub/domain/character/inventory';
@@ -51,6 +49,12 @@ import { loadPersistedModifiers } from '../characters/load-persisted-modifiers.j
 import { loadModifierDefinitions } from '../characters/load-modifier-definitions.js';
 import { loadItemDataDetailMany } from '../characters/load-item-data.js';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
+
+// ── Module-scope compiled rules ────────────────────────────────────────────────
+
+// Compiled once at module scope — pure/no-IO. .build() called per request (ADR-3).
+// PHB p.48 — rageRuleDoc encodes the full Rage modifier set (7 emits).
+const compiledRage = compileRule(rageRuleDoc);
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -519,45 +523,39 @@ export async function buildAttackContext(
       .filter((c) => c.slug === 'barbarian')
       .reduce((sum, c) => sum + c.level, 0);
 
-    const rageResult = buildRageModifiers(barbarianLevel > 0 ? barbarianLevel : 1, charId);
-    if (rageResult.ok) {
-      // Register 2× self AdvantageMods (STR-check + STR-save). See ADR-6 comment:
-      // STR-save advantage for forced-check path is handled separately in performForcedCheck
-      // (ADR-6 Option A). Registering here makes them available for resolveRollMode on
-      // attack-adjacent STR checks (PHB p.48: "Strength checks").
-      for (const m of rageResult.instances) {
-        registry.register(m);
-      }
+    // Level → rage bonus table (PHB p.48): +2 L1-8, +3 L9-15, +4 L16+.
+    const level = barbarianLevel > 0 ? barbarianLevel : 1;
+    const bonus = level >= 16 ? 4 : level >= 9 ? 3 : 2;
 
-      // Rage damage NumMod: ONLY register when weapon is melee AND STR is the ability used.
-      // PHB p.48: "+[rage damage] to melee weapon attacks using Strength."
-      // selectAttackAbility returns the MODIFIER VALUE (number), not a string.
-      // To determine if STR was selected: check if the resolved mod equals strMod AND
-      // the weapon is not finesse-DEX. More precisely: the attack is STR-based when
-      //   • weapon is melee AND has no finesse property
-      //   • OR weapon is melee+finesse AND strMod >= dexMod (player-favorable pick defaults to max)
-      // This mirrors the same logic as selectAttackAbility (PHB p.147/p.194).
-      const weaponIsMelee = weaponDetail.type !== 'R';
-      const hasFinesse = normalizedProperties.includes('finesse') || normalizedProperties.includes('F');
-      // STR is used when: melee + (no finesse OR strMod >= dexMod when finesse).
-      const attackUsesStr = weaponIsMelee && (!hasFinesse || strMod >= dexMod);
-      if (attackUsesStr) {
-        // Wrap bare numMod into ModifierInstance with weaponKind('melee') predicate
-        // (for registry correctness) + on-hit scope on the attacker's charId.
-        const rageNumModInstance: ModifierInstance = {
-          id: `rage-damage-${charId}` as ModifierInstanceId,
-          label: 'Raging',
-          def: rageResult.numMod,
-          scope: {
-            owner: charId,
-            target: { axis: 'entities', ids: [charId] },
-            trigger: 'on-hit',
-          },
-          predicate: weaponKind('melee'),
-        };
-        registry.register(rageNumModInstance);
+    // Build compiled rage instances. rageCount:1 is a documented dummy — UsageMod
+    // evaluator not yet wired (Batch 2). compiledRage is module-scope (ADR-3).
+    const rageInstances = compiledRage.build({ ragerId: charId as import('@dungeon-hub/domain/engine').EntityId, rageBonus: bonus, rageCount: 1 });
+
+    // Register 2× self AdvantageMods (STR-check + STR-save). See ADR-6 comment:
+    // STR-save advantage for forced-check path is handled separately in performForcedCheck.
+    // Registering here makes them available for resolveRollMode on STR checks (PHB p.48).
+    for (const i of rageInstances.filter((i) => i.def.kind === 'advantage')) {
+      registry.register(i);
+    }
+
+    // Rage damage NumMod: ONLY register when weapon is melee AND STR is the ability used.
+    // PHB p.48: "+[rage damage] to melee weapon attacks using Strength."
+    // The attack is STR-based when: melee + (no finesse OR strMod >= dexMod when finesse).
+    // This mirrors the same logic as selectAttackAbility (PHB p.147/p.194).
+    const weaponIsMelee = weaponDetail.type !== 'R';
+    const hasFinesse = normalizedProperties.includes('finesse') || normalizedProperties.includes('F');
+    // STR is used when: melee + (no finesse OR strMod >= dexMod when finesse).
+    const attackUsesStr = weaponIsMelee && (!hasFinesse || strMod >= dexMod);
+    if (attackUsesStr) {
+      // Register the compiled NumMod instance VERBATIM — no trigger override.
+      // The compiled instance already carries trigger:'on-damage', target:{axis:'self'},
+      // owner:charId, and predicate AND[weaponKind:melee, hasCondition:Raging].
+      // The on-damage gather in resolveWeaponAttack (REQ-PHASE-01) will pick it up.
+      for (const i of rageInstances.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage')) {
+        registry.register(i);
       }
     }
+    // kind==='resist' and kind==='usage' instances are NOT registered in the attack registry.
   }
 
   // ── Step 13: Weapon shape for resolveWeaponAttack ────────────────────────────

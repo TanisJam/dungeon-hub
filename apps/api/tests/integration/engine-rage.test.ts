@@ -612,6 +612,142 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     expect([200]).toContain(attackRes.statusCode);
   });
 
+  // ── RAGE-R1: Hard assertion — rage bonus exactly +2 in damage breakdown ────────
+  //
+  // PHB p.48 — Rage Damage column tier 1: +2 (levels 1-8)
+  // Scenario R1: Barbarian L1, melee, STR, Raging. Hard toBe(2) assertion.
+  // Uses RNG retry loop while (!hit) with ac=1 per CLAUDE.md §5.
+
+  it('RAGE-R1: melee-STR Raging L1 — damage.breakdown contains exactly rage-bonus +2 (REQ-PHASE-01, Scenario R1)', async () => {
+    // PHB p.48 — Rage Damage column tier 1: +2 (levels 1-8)
+    // HARD assertion: toBe(2) — NOT toBeGreaterThanOrEqual.
+    await setRageUsed(barbarianCharId, 0);
+
+    let hit = false;
+    let attackRes: { statusCode: number; body: Record<string, unknown> } = { statusCode: 0, body: {} };
+
+    // RNG retry loop — CLAUDE.md §5: while(!hit) with ac=1 for on-hit invariants.
+    while (!hit) {
+      const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+        await makeFreshEncounter('RAGE-R1', { npcAc: 1, npcHp: 200 });
+
+      await setRageUsed(barbarianCharId, 0);
+      const activateRes = await doActivateRage(encounterId, barbarianCombatantId, version);
+      expect(activateRes.statusCode).toBe(200);
+      const v2 = await getVersion(encounterId);
+
+      attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2);
+      expect(attackRes.statusCode).toBe(200);
+
+      if (attackRes.body.hit === true) {
+        hit = true;
+      }
+    }
+
+    // Now we have a confirmed hit. Assert the rage bonus appears in perDie.
+    // The API sends `perDie` at the top level (REQ-ROUTE-BODY-03).
+    // perDie entries: { label: string, flat?: number, rolls?: number[] }.
+    // After R-COERCE fix (roll.ts), numeric strings are coerced to flat integers.
+    const perDie = attackRes.body.perDie as Array<{ label: string; flat?: number; rolls?: number[] }> | undefined;
+    const rageSource = perDie?.find(
+      (e) => e.label === 'Raging' && e.flat === 2,
+    );
+    expect(
+      rageSource,
+      'perDie must contain a flat entry with label:Raging and flat:2 (rage bonus, PHB p.48 tier 1)',
+    ).toBeDefined();
+    // HARD assertion: exactly +2 flat (not doubled, not toBeGreaterThanOrEqual)
+    expect(rageSource!.flat).toBe(2);
+  });
+
+  // ── RAGE-R2: Miss — no rage bonus in response (Scenario R2) ──────────────────
+  //
+  // PHB p.196 — early-return on miss; damage phase NOT reached.
+
+  it('RAGE-R2: melee-STR Raging L1 — miss does not apply damage bonus (Scenario R2)', async () => {
+    // PHB p.196 — on a miss, the damage resolution path is not reached.
+    // Miss path: perform-weapon-attack-apply early-returns before damage roll.
+    await setRageUsed(barbarianCharId, 0);
+
+    let miss = false;
+    let attackRes: { statusCode: number; body: Record<string, unknown> } = { statusCode: 0, body: {} };
+
+    // RNG retry loop — CLAUDE.md §5: while(!miss) with ac=30.
+    while (!miss) {
+      const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+        await makeFreshEncounter('RAGE-R2', { npcAc: 30, npcHp: 200 });
+
+      await setRageUsed(barbarianCharId, 0);
+      const activateRes = await doActivateRage(encounterId, barbarianCombatantId, version);
+      expect(activateRes.statusCode).toBe(200);
+      const v2 = await getVersion(encounterId);
+
+      attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2);
+      expect(attackRes.statusCode).toBe(200);
+
+      if (attackRes.body.hit === false) {
+        miss = true;
+      }
+    }
+
+    // Confirmed miss. perDie is absent on miss (REQ-ROUTE-BODY-02 — no damage fields).
+    // PHB p.196: on a miss, the damage resolution path is not reached.
+    const perDie = attackRes.body.perDie as Array<{ label: string; flat?: number }> | undefined;
+    const rageSource = perDie?.find(
+      (e) => e.label === 'Raging' && e.flat === 2,
+    );
+    expect(
+      rageSource,
+      'perDie must NOT contain rage bonus on a miss (PHB p.196 early-return)',
+    ).toBeUndefined();
+  });
+
+  // ── RAGE-R3: Crit — flat rage bonus NOT doubled (Scenario R3) ────────────────
+  //
+  // PHB p.196 — on a crit, roll extra dice; flat modifiers are NOT doubled.
+
+  it('RAGE-R3: melee-STR Raging L1 critical hit — rage bonus stays exactly +2 (NOT doubled, Scenario R3)', async () => {
+    // PHB p.196 — on a crit, roll extra damage dice; flat modifiers are NOT doubled.
+    // dice/roll.ts:114 doubles only DiceExpr portions — the flat rage bonus (+2) stays +2.
+    await setRageUsed(barbarianCharId, 0);
+
+    let crit = false;
+    let attackRes: { statusCode: number; body: Record<string, unknown> } = { statusCode: 0, body: {} };
+
+    // RNG retry loop — while(!crit) with ac=1.
+    while (!crit) {
+      const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+        await makeFreshEncounter('RAGE-R3', { npcAc: 1, npcHp: 200 });
+
+      await setRageUsed(barbarianCharId, 0);
+      const activateRes = await doActivateRage(encounterId, barbarianCombatantId, version);
+      expect(activateRes.statusCode).toBe(200);
+      const v2 = await getVersion(encounterId);
+
+      attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2);
+      expect(attackRes.statusCode).toBe(200);
+
+      // crit field is ONLY present on hit bodies (CLAUDE.md §5).
+      if (attackRes.body.hit === true && attackRes.body.crit === true) {
+        crit = true;
+      }
+    }
+
+    // Confirmed crit. Assert rage bonus in perDie is still exactly flat:2 (not flat:4).
+    // PHB p.196: flat modifiers are NOT doubled on crit — only dice are doubled.
+    // After R-COERCE fix (roll.ts), numeric string '2' is coerced to flat integer 2.
+    const perDie = attackRes.body.perDie as Array<{ label: string; flat?: number; rolls?: number[] }> | undefined;
+    const rageSource = perDie?.find(
+      (e) => e.label === 'Raging',
+    );
+    expect(
+      rageSource,
+      'perDie must contain a rage entry on crit (PHB p.48)',
+    ).toBeDefined();
+    // HARD assertion: flat:2 NOT flat:4 — flat mods are never doubled (PHB p.196).
+    expect(rageSource!.flat).toBe(2);
+  });
+
   // ── RAGE-T8: Finesse weapon attack while Raging ───────────────────────────────
 
   it('RAGE-T8: finesse rapier attack while Raging — route succeeds and Raging persists (REQ-RAGE-05)', async () => {

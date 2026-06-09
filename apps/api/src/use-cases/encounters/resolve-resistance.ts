@@ -31,10 +31,15 @@ import {
   applyDamageWithResist,
   buildPetrifiedModifiers,
   PETRIFIED_CONDITION_DEF,
-  buildRageModifiers,
+  compileRule,
+  rageRuleDoc,
   type ResistMod,
 } from '@dungeon-hub/domain/engine';
 import type { EntityId } from '@dungeon-hub/domain/engine';
+
+// Compiled once at module scope — pure/no-IO. .build() called per request (ADR-3).
+// PHB p.48 — rageRuleDoc encodes the full Rage modifier set (7 emits).
+const compiledRage = compileRule(rageRuleDoc);
 
 // ── loadTargetResistMods ───────────────────────────────────────────────────────
 
@@ -69,12 +74,14 @@ export async function loadTargetResistMods(targetCombatantId: string): Promise<R
       }
     }
     // engine-rage: Raging barbarian has resistance to bludgeoning, piercing, slashing (PHB p.48).
-    // resistMods are level-independent — pass barbarianLevel=1 (constant; numMod ignored here).
-    // REQ-RAGE-03.
+    // resistMods are level-independent (PHB p.48 — resistance is not level-gated).
+    // rageBonus:2 and rageCount:1 are documented dummies — ResistMods ignore these params.
+    // REQ-RAGE-03, REQ-WIRE-02.
     if (conditionName === 'Raging') {
-      const result = buildRageModifiers(1, targetCombatantId as EntityId);
-      if (result.ok) {
-        resistMods.push(...result.resistMods);
+      const rageInstances = compiledRage.build({ ragerId: targetCombatantId as EntityId, rageBonus: 2, rageCount: 1 });
+      const resistInstances = rageInstances.filter((i) => i.def.kind === 'resist');
+      for (const i of resistInstances) {
+        resistMods.push(i.def as ResistMod); // push .def (ResistMod), NOT the ModifierInstance
       }
     }
   }

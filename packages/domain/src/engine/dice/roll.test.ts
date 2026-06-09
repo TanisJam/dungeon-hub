@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { rollDamageBreakdown } from './roll.js';
 import type { RngFn } from './roll.js';
 import type { Source } from '../provenance.js';
+import type { DiceExpr } from '../types.js';
 
 // ── Shared test fixtures ───────────────────────────────────────────────────────
 
@@ -268,6 +269,65 @@ describe('rollDamageBreakdown', () => {
       expect(() => rollDamageBreakdown('2d' as never, [], false, rng)).toThrow(
         /unrecognized DiceExpr/i,
       );
+    },
+  );
+
+  // ── REQ-NUMERIC-STRING-01 — numeric string in Source.amount treated as flat ───
+  // R-COERCE: compileRule substituteString converts {rageBonus:2} → '2' (string) via String(value).
+  // applyStacking passes def.value as-is to Source.amount, so amount='2' (DiceExpr).
+  // rollDamageBreakdown MUST treat a string that parses to a finite integer as a flat integer,
+  // NOT as a DiceExpr pattern (would fail NdM regex and throw).
+  // PHB p.48 — rage bonus is a flat integer, not dice.
+
+  it(
+    'numeric_string_treated_as_flat: Source.amount="2" (numeric string) adds flat 2 without RNG call',
+    () => {
+      // GIVEN breakdown with a Source whose amount is the STRING '2' (not number 2)
+      // (simulates compileRule-produced NumMod with def.value = '2')
+      // WHEN rollDamageBreakdown is called
+      // THEN total includes +2 flat (same as if amount === 2)
+      // AND rng is called exactly once (weapon '1d8' only — not for numeric string source)
+      // AND perDie entry has flat: 2
+      const rng = vi.fn<RngFn>(() => 1);
+      const breakdown: Source[] = [
+        {
+          label: 'Raging',
+          amount: '2' as DiceExpr, // string '2' from template substitution
+          type: 'untyped',
+          origin: { id: 'attacker-1' as never, conditions: [] },
+        },
+      ];
+      const result = rollDamageBreakdown('1d8', breakdown, false, rng);
+
+      // weapon 1d8=1, rage flat '2'→2 → total = 3
+      expect(result.total).toBe(3);
+      // rng called once for weapon, NOT for numeric string source
+      expect(rng).toHaveBeenCalledTimes(1);
+      // perDie entry carries flat: 2 (treated as flat, not dice)
+      const rageEntry = result.perDie.find((e) => e.label === 'Raging');
+      expect(rageEntry).toBeDefined();
+      expect(rageEntry!.flat).toBe(2);
+      expect(rageEntry!.rolls).toBeUndefined();
+    },
+  );
+
+  it(
+    'numeric_string_crit_not_doubled: Source.amount="2" (numeric string) stays flat on crit (PHB p.196)',
+    () => {
+      // PHB p.196: modifiers apply once — flat values are never doubled on crit.
+      // A numeric string '2' must behave identically to flat number 2 under crit.
+      const rng: RngFn = (s) => s; // ceiling rng
+      const breakdown: Source[] = [
+        {
+          label: 'Raging',
+          amount: '2' as DiceExpr,
+          type: 'untyped',
+          origin: { id: 'attacker-1' as never, conditions: [] },
+        },
+      ];
+      const result = rollDamageBreakdown('1d8', breakdown, true, rng);
+      // crit: 1d8 → 2d8 = 16, rage flat '2'→2 (not doubled) → total = 18
+      expect(result.total).toBe(18);
     },
   );
 });
