@@ -266,9 +266,30 @@ export function resolveWeaponAttack(input: WeaponAttackInput): WeaponAttackResul
   const [_damageBase, ...damageDeltas] = damageStatResult.breakdown;
   void _damageBase;
 
-  // Fold breakdown: ability-mod + on-hit riders + always-trigger damage deltas.
-  // On-hit Sources carry DiceExpr amounts (e.g. '1d6') — not rolled (ADR-6).
-  const damageBreakdown: Source[] = [...damageFlatMods, ...onHitSources, ...damageDeltas];
+  // ── ON_DAMAGE gather (parallel to ON_HIT gather at :234) ─────────────────────
+  //
+  // PHB p.48 — rage damage bonus resolves at the DAMAGE phase (trigger:'on-damage').
+  // This gather is ADDITIVE: zero runtime modifiers used trigger:'on-damage' before
+  // this SDD — blast-radius is rage only. The 'always' contract of resolveStat is
+  // left UNTOUCHED (design ADR-1; widening resolveStat would affect ALL stats).
+  //
+  // enrichedCtx (not ctx) — carries resolvedRollMode so future on-damage predicates
+  // using hasRollMode (e.g. conditional flat bonuses) evaluate correctly. REQ-PHASE-02.
+  //
+  // ADR stat-filter (identical to ON_HIT at :236): filter to def.stat==='damage' so an
+  // on-damage NumMod with a different stat cannot leak into the damage breakdown.
+  const onDamageInstances = registry.query({ stat: 'damage', trigger: 'on-damage', self, ctx: enrichedCtx });
+  const onDamageNumInstances = onDamageInstances.filter(
+    (inst) => inst.def.kind === 'num' && inst.def.stat === 'damage',
+  );
+  // Reuse applyStacking: base=0, drop synthetic base Source (amount=0) — mirrors ON_HIT pattern.
+  const [_onDamageBase, ...onDamageSources] = applyStacking(onDamageNumInstances, 0, selfRef).breakdown;
+  void _onDamageBase;
+
+  // Fold breakdown: ability-mod + on-hit riders + on-damage riders + always-trigger damage deltas.
+  // on-damage Sources (e.g. rage +2) appear once — the fold appends onDamageSources EXACTLY ONCE.
+  // On-hit and on-damage Sources carry numeric amounts — not rolled (ADR-6).
+  const damageBreakdown: Source[] = [...damageFlatMods, ...onHitSources, ...onDamageSources, ...damageDeltas];
   const damage = {
     dice: weapon.damageDice,
     flatMods: damageFlatMods,

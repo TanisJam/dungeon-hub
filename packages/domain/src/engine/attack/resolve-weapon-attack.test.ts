@@ -11,7 +11,9 @@ import { resolveWeaponAttack, type WeaponAttackInput } from './resolve-weapon-at
 import { createInMemoryRegistry } from '../registry/query.js';
 import { buildBlessModifiers } from '../rules/bless.js';
 import { buildOnHitDamageRider } from '../rules/on-hit-damage-rider.js';
-import { hasRollMode } from '../predicate/ast.js';
+import { hasRollMode, and, query, weaponKind, hasCondition } from '../predicate/ast.js';
+import { compileRule } from '../authoring/compile.js';
+import { rageRuleDoc } from '../rules-authored/rage.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
 import type { EvaluationContext } from '../context.js';
 import type { EntityId } from '../types.js';
@@ -818,6 +820,125 @@ describe('resolveWeaponAttack — Scenario SA-CTX-02: original_ctx_not_mutated',
 
       // ctx must NOT have resolvedRollMode after the call
       expect('resolvedRollMode' in ctx).toBe(false);
+    },
+  );
+});
+
+// ── REQ-PHASE-01 (A-1): on-damage NumMod lands in damage breakdown ─────────────
+//
+// PHB p.48 — rage damage bonus resolves at the DAMAGE phase (trigger:'on-damage').
+// This test registers a NumMod with trigger:'on-damage', stat:'damage', value:2
+// and asserts it is included in the resolved damage breakdown.
+//
+// RED step: must FAIL before the on-damage gather is implemented in A-3.
+
+describe('resolveWeaponAttack — REQ-PHASE-01: on-damage NumMod lands in damage breakdown', () => {
+  it(
+    'A-1: on-damage NumMod with stat:damage value:2 appears in damage.breakdown with amount===2 (PHB p.48)',
+    () => {
+      // PHB p.48 — rage damage bonus resolves at the DAMAGE phase (trigger:'on-damage').
+      // Register a compiled rage-like NumMod with trigger:'on-damage' to verify the gather.
+      const BARBARIAN_ID = eid('barbarian-test-01');
+      const registry = makeEmptyRegistry();
+
+      // Build a rage instance and register the NumMod (melee, raging barbarian scenario).
+      const compiledRage = compileRule(rageRuleDoc);
+      const rageInstances = compiledRage.build({ ragerId: BARBARIAN_ID, rageBonus: 2, rageCount: 1 });
+      // Register only the num instance (on-damage, stat:damage).
+      const numInst = rageInstances.find((i) => i.def.kind === 'num' && i.def.stat === 'damage');
+      expect(numInst, 'NumMod instance must exist in compiled rageRuleDoc').toBeDefined();
+      if (numInst) registry.register(numInst);
+
+      // Build ctx with Raging condition active and weaponInUse:melee so the AND predicate fires.
+      // The compiled rage NumMod has AND[weaponKind:melee, hasCondition:Raging] predicate.
+      const ctx: EvaluationContext = {
+        ...makeCtx(BARBARIAN_ID, [{ name: 'Raging' }]),
+        weaponInUse: { kind: 'melee', properties: [] },
+      };
+      const input: WeaponAttackInput = {
+        self: BARBARIAN_ID,
+        ctx,
+        registry,
+        strMod: 3,
+        dexMod: 0,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD, // melee — satisfies weaponKind:melee predicate
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // The on-damage NumMod (rage +2) MUST appear in damage.breakdown.
+      // HARD assertion: toBe(2) — not toBeGreaterThanOrEqual.
+      // R-COERCE: compiled rage NumMod def.value is the string '2' (template slot).
+      // applyStacking converts it to a Source with amount=Number('2')=2.
+      const rageSource = result.damage.breakdown.find(
+        (s) => s.label === 'Raging' && Number(s.amount) === 2,
+      );
+      expect(rageSource, 'on-damage NumMod (rage +2) must appear in damage.breakdown').toBeDefined();
+      expect(Number(rageSource?.amount)).toBe(2);
+    },
+  );
+});
+
+// ── REQ-PHASE-02 (A-2): enrichedCtx reaches on-damage predicate evaluation ─────
+//
+// PHB p.48 — structural correctness: on-damage predicate must receive enrichedCtx.
+// A hypothetical on-damage modifier with hasRollMode predicate must evaluate
+// against the resolved roll mode, not silently return false due to missing context.
+//
+// RED step: must FAIL before A-3 passes enrichedCtx to the on-damage gather.
+
+describe('resolveWeaponAttack — REQ-PHASE-02: enrichedCtx reaches on-damage predicate evaluation', () => {
+  it(
+    'A-2: on-damage NumMod with hasRollMode:normal predicate evaluates truthy when resolvedRollMode is normal',
+    () => {
+      // PHB p.48 — structural: the on-damage gather MUST pass enrichedCtx (with resolvedRollMode)
+      // so future on-damage rules with hasRollMode predicates can evaluate correctly.
+      const ARCHER_ID2 = eid('archer-test-enriched-01');
+      const registry = makeEmptyRegistry();
+
+      // Register an on-damage NumMod whose predicate checks hasRollMode:'normal'.
+      // If the gather uses plain ctx (missing resolvedRollMode), evaluate.ts returns false
+      // → this mod would be silently ignored. With enrichedCtx it evaluates to true.
+      const onDamageWithRollModePred: ModifierInstance = {
+        id: iid('test-on-damage-rollmode-01'),
+        label: 'TestOnDamageRollMode',
+        def: { kind: 'num', op: 'add', value: 5, stat: 'damage', category: 'untyped' },
+        scope: {
+          owner: ARCHER_ID2,
+          target: { axis: 'self' },
+          trigger: 'on-damage',
+        },
+        predicate: hasRollMode('normal'),
+      };
+      registry.register(onDamageWithRollModePred);
+
+      const ctx = makeCtx(ARCHER_ID2);
+      // No advantage/disadvantage mods → resolvedRollMode will be 'normal'.
+      const input: WeaponAttackInput = {
+        self: ARCHER_ID2,
+        ctx,
+        registry,
+        strMod: 2,
+        dexMod: 0,
+        proficiencyBonus: 2,
+        isProficient: true,
+        weapon: LONGSWORD,
+      };
+
+      const result = resolveWeaponAttack(input);
+
+      // The hasRollMode:'normal' on-damage mod (value:5) MUST appear in the breakdown
+      // because enrichedCtx carries resolvedRollMode:'normal'.
+      const rollModeSource = result.damage.breakdown.find(
+        (s) => typeof s.amount === 'number' && s.amount === 5 && s.label === 'TestOnDamageRollMode',
+      );
+      expect(
+        rollModeSource,
+        'on-damage mod with hasRollMode:normal predicate must appear in breakdown when roll mode is normal (enrichedCtx required)',
+      ).toBeDefined();
+      expect(rollModeSource?.amount).toBe(5);
     },
   );
 });
