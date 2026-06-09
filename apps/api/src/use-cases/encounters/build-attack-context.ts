@@ -34,9 +34,11 @@ import {
   PETRIFIED_CONDITION_DEF,
   compileRule,
   rageRuleDoc,
+  recklessAttackRuleDoc,
   type ModifierRegistry,
   type EvaluationContext,
 } from '@dungeon-hub/domain/engine';
+import { selectAttackAbilityKind } from '@dungeon-hub/domain/character/weapon';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { isWeaponProficient } from '@dungeon-hub/domain/character/inventory';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
@@ -55,6 +57,10 @@ import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 // Compiled once at module scope — pure/no-IO. .build() called per request (ADR-3).
 // PHB p.48 — rageRuleDoc encodes the full Rage modifier set (7 emits).
 const compiledRage = compileRule(rageRuleDoc);
+
+// PHB p.48 — recklessAttackRuleDoc: grant (self STR melee) + impose (attackers-of).
+// Registered when attacker has 'RecklessAttacking' condition (REQ-RECKLESS-01/02).
+const compiledReckless = compileRule(recklessAttackRuleDoc);
 
 // ── Input / Output ─────────────────────────────────────────────────────────────
 
@@ -470,12 +476,11 @@ export async function buildAttackContext(
   // PHB p.48: "You have advantage on Strength checks and Strength saving throws."
   //           "+[rage damage] to melee weapon attacks using Strength."
   // instances[] → 2× self AdvantageMod (STR-check + STR-save) → registry (pre-roll).
-  // numMod → rage damage bonus, wrapped into ModifierInstance with weaponKind('melee')
-  //          predicate AND STR-ability-used gate (ADR-5 — IO-adjacent decision).
-  // ADR-5: STR vs DEX decision via selectAttackAbility (computed below after strMod/dexMod).
-  // We defer the rage NumMod registration to after Step 12 (strMod/dexMod are needed first).
-  // Store a flag for the deferred registration.
+  // numMod → rage damage bonus; STR-usage now gated via usesAbility:str predicate (Batch 2).
+  // ADR-5 resolved: attackUsesStr guard removed; predicate path gates at evaluation time.
+  // Deferred to after Step 12 because strMod/dexMod are needed for abilityUsed threading.
   const attackerIsRaging = attackerConditions.some((c) => c.name === 'Raging');
+  const attackerIsReckless = attackerConditions.some((c) => c.name === 'RecklessAttacking');
 
   // ── Step 12: Resolve ability mods ─────────────────────────────────────────────
   const strScore = sheet.abilityScores.str?.score ?? 10;
@@ -484,6 +489,17 @@ export async function buildAttackContext(
   const strMod = abilityModifier(strScore);
   const dexMod = abilityModifier(dexScore);
   const wisMod = abilityModifier(wisScore);
+
+  // ── Step 12a: Thread abilityUsed into ctx.weaponInUse (REQ-CTX-01) ──────────
+  // selectAttackAbilityKind is the single source of truth for the finesse/thrown rule.
+  // Must run AFTER strMod/dexMod (Step 12). Result is threaded into ctx.weaponInUse
+  // via conditional object spread (exactOptionalPropertyTypes — never assign undefined).
+  // The usesAbility WorldQuery predicate evaluator reads this field.
+  // PHB p.147/194 — finesse: player picks; Slice B uses dexMod > strMod as favorable default.
+  const weaponKindForAbility = (weaponDetail.type === 'R' ? 'ranged' : 'melee') as 'melee' | 'ranged';
+  const abilityKind = selectAttackAbilityKind(strMod, dexMod, weaponKindForAbility, normalizedProperties);
+  // exactOptionalPropertyTypes: use object spread to add abilityUsed; omit never undefined.
+  ctx.weaponInUse = { ...ctx.weaponInUse!, abilityUsed: abilityKind };
 
   // ── Step 12b: Monk-specific context (Slice 3b-ii — ADR-1) ────────────────────
   // monkLevel: mirrors rogueLevel pattern (L243-245). 0 for non-Monks.
@@ -514,10 +530,14 @@ export async function buildAttackContext(
   const attackerSlotsUsed: readonly number[] =
     (charData['spellSlotsUsed'] as number[] | undefined) ?? [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-  // ── Step 12d: Raging attacker modifier registration (engine-rage — ADR-5) ──────
-  // Deferred here because strMod/dexMod are required for selectAttackAbility.
+  // ── Step 12d: Raging attacker modifier registration (engine-rage) ─────────────
+  // Deferred here because strMod/dexMod are required for abilityUsed threading (Step 12a).
   // REQ-RAGE-04: STR-check + STR-save advantage self mods.
-  // REQ-RAGE-05: rage damage bonus on melee-STR attacks (NOT finesse-DEX, NOT ranged).
+  // REQ-RAGE-05: rage damage bonus on melee-STR attacks.
+  // REQ-RAGE-RETROFIT-01: STR-usage gate is now predicate-time (usesAbility:str on emit 6)
+  //   instead of registration-time. The imperative attackUsesStr guard is DELETED.
+  //   NumMod is registered UNCONDITIONALLY — the predicate on emit 6 blocks it for finesse-DEX.
+  //   RAGE-R4 still passes via the predicate path (verified in T5.4).
   if (attackerIsRaging) {
     const barbarianLevel = ((charData['classes'] as AppliedClass[] | undefined) ?? [])
       .filter((c) => c.slug === 'barbarian')
@@ -538,24 +558,26 @@ export async function buildAttackContext(
       registry.register(i);
     }
 
-    // Rage damage NumMod: ONLY register when weapon is melee AND STR is the ability used.
-    // PHB p.48: "+[rage damage] to melee weapon attacks using Strength."
-    // The attack is STR-based when: melee + (no finesse OR strMod >= dexMod when finesse).
-    // This mirrors the same logic as selectAttackAbility (PHB p.147/p.194).
-    const weaponIsMelee = weaponDetail.type !== 'R';
-    const hasFinesse = normalizedProperties.includes('finesse') || normalizedProperties.includes('F');
-    // STR is used when: melee + (no finesse OR strMod >= dexMod when finesse).
-    const attackUsesStr = weaponIsMelee && (!hasFinesse || strMod >= dexMod);
-    if (attackUsesStr) {
-      // Register the compiled NumMod instance VERBATIM — no trigger override.
-      // The compiled instance already carries trigger:'on-damage', target:{axis:'self'},
-      // owner:charId, and predicate AND[weaponKind:melee, hasCondition:Raging].
-      // The on-damage gather in resolveWeaponAttack (REQ-PHASE-01) will pick it up.
-      for (const i of rageInstances.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage')) {
-        registry.register(i);
-      }
-    }
+    // Rage damage NumMod: register UNCONDITIONALLY.
+    // PHB p.48: "+[rage bonus] to melee weapon attacks using Strength."
+    // The usesAbility:str predicate on emit 6 gates at evaluation time — no registration guard.
+    // ctx.weaponInUse.abilityUsed is now populated (Step 12a), so the predicate can evaluate.
     // kind==='resist' and kind==='usage' instances are NOT registered in the attack registry.
+    for (const i of rageInstances.filter((i) => i.def.kind === 'num' && i.def.stat === 'damage')) {
+      registry.register(i);
+    }
+  }
+
+  // ── Step 12e: Reckless Attack registration (REQ-RECKLESS-01/02, PHB p.48) ─────
+  // Register when attacker has 'RecklessAttacking' condition (CAS-inserted in perform-apply).
+  // grant (self, STR melee) + impose (attackers-of, any ability) — no ctx.weaponInUse check here;
+  // usesAbility:str predicate on the grant emit gates correctly at resolution time.
+  // compiledReckless is module-scope (ADR-3 pattern — compiled once, .build() per request).
+  if (attackerIsReckless) {
+    const recklessInstances = compiledReckless.build({ recklessId: charId as import('@dungeon-hub/domain/engine').EntityId });
+    for (const i of recklessInstances) {
+      registry.register(i);
+    }
   }
 
   // ── Step 13: Weapon shape for resolveWeaponAttack ────────────────────────────
