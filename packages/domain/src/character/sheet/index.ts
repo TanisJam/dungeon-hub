@@ -4,3 +4,10 @@ export {
   type ArmorClassWarningCode,
   formulaFromBreakdown,
 } from './armor-class.js';
+export {
+  normalizeSpeed,
+  applySpeedPenalty,
+  applyExhaustionToSpeed,
+  exhaustionEffectsFor,
+  type SpeedShape,
+} from './speed.js';

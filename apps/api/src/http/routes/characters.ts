@@ -13,7 +13,19 @@ import {
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
-import { computeCharacterSheet, formulaFromBreakdown, type SpellSheetRef, type AbilityScoreView, ALL_SKILLS, SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
+import {
+  computeCharacterSheet,
+  formulaFromBreakdown,
+  normalizeSpeed,
+  applySpeedPenalty,
+  applyExhaustionToSpeed,
+  exhaustionEffectsFor,
+  type SpellSheetRef,
+  type AbilityScoreView,
+  ALL_SKILLS,
+  SKILL_TO_ABILITY,
+} from '@dungeon-hub/domain/character/sheet';
+import { deriveSpeedModifiers } from '@dungeon-hub/domain/engine';
 import {
   addItemToInventory,
   consumeInventoryItem,
@@ -1088,6 +1100,27 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
     // REQ-AC-NATIVE-01: base = 0, NOT sheet.armorClass.value (no legacy seeding).
     const engineAc = resolveStat(charId, 'ac', 0, ctx, registry);
+
+    // REQ-SPEED-06: engine-authoritative speed — Fast Movement PHB p.49.
+    // D4 (design): composition order — +10 applied to base BEFORE encumbrance/exhaustion penalties.
+    // T-C3-01 (R3 guard): normalizeSpeed(raceData?.speed ?? null) returns {walk:30} when raceData is null.
+    const { mods: speedMods } = deriveSpeedModifiers(
+      { inventory, itemLites, classes: classesForAc },
+      charId,
+    );
+    for (const m of speedMods) registry.register(m);
+    const baseSpeedObj = normalizeSpeed(raceData?.speed ?? null); // R3: null → {walk:30} default
+    const baseWalk = baseSpeedObj.walk;
+    const boostedWalk = resolveStat(charId, 'speed', baseWalk, ctx, registry).value;
+    const speedAfterEnc = applySpeedPenalty(
+      { ...baseSpeedObj, walk: boostedWalk },
+      sheet.encumbrance.speedPenalty,
+    );
+    const finalSpeed = applyExhaustionToSpeed(
+      speedAfterEnc,
+      exhaustionEffectsFor((data['exhaustion'] as number | undefined) ?? 0),
+    );
+
     // engineStats: new in Slice 5 — attack-roll only. savingThrow flat field REMOVED
     // (REQ-SERVE-02). Per-ability array below replaces it.
     // Roll-value contract: value = numeric subtotal (dice contributions stay 0 in .value;
@@ -1180,6 +1213,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     // REQ-AC-NATIVE-01: sheet.armorClass is engine-authoritative (Gate B).
     // REQ-AC-FORMULA-01: formula derived from engine breakdown via formulaFromBreakdown.
     // REQ-AC-WARN-01: warnings include STR-min warning if applicable (from adapter).
+    // REQ-SPEED-06: sheet.speed is engine-authoritative (Fast Movement, PHB p.49).
     const fullSheet = {
       ...sheet,
       savingThrows: engineSavingThrows.map(({ ability, modifier, proficient }) => ({ ability, modifier, proficient })),
@@ -1188,6 +1222,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       passivePerception: enginePassivePerception,
       armorClass: { value: engineAc.value, formula: formulaFromBreakdown(engineAc.breakdown) },
       warnings: engineAcWarnings,
+      speed: finalSpeed,
     };
 
     const engineStats = {

@@ -360,3 +360,8 @@ export { deriveSavingThrowProficiencies } from './adapter/derive-saving-throw-pr
 
 export { deriveSkillProficiencies } from './adapter/derive-skill-proficiencies.js';
 export type { SkillProficiencyInput } from './adapter/derive-skill-proficiencies.js';
+
+// ── Speed adapter (engine-barbarian-dsl-3 — Fast Movement PHB p.49) ──────────
+
+export { deriveSpeedModifiers } from './adapter/derive-speed-modifiers.js';
+export type { SpeedModifierInput, SpeedModifierResult } from './adapter/derive-speed-modifiers.js';
