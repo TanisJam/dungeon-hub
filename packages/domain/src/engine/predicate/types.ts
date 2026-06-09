@@ -6,6 +6,7 @@
  *
  * Design ref: sdd/resolution-engine/design — Predicate AST section.
  */
+import type { Ability } from '../types.js';
 
 // ── WorldQuery leaves ─────────────────────────────────────────────────────────
 
@@ -47,7 +48,14 @@ export type WorldQuery =
    * Compares effect.sourceCombatantId against ctx.attackerCombatantId (COMBATANT UUID).
    * REQ-CEF-02: PHB p.251 — Hex caster-sourced; PHB p.203 — concentration.
    */
-  | { kind: 'hasEffectFromSelf'; effectName: string };
+  | { kind: 'hasEffectFromSelf'; effectName: string }
+  /**
+   * Does the current weapon attack use the specified ability?
+   * Returns false (NOT throws) when ctx.weaponInUse is absent or abilityUsed is undefined.
+   * Fail-closed: safe in non-attack resolutions (save/check paths) — REQ-PRED-01.
+   * PHB p.48: "melee weapon attack rolls using Strength" (rage damage + reckless STR gate).
+   */
+  | { kind: 'usesAbility'; ability: Ability };
 
 // ── Predicate AST ─────────────────────────────────────────────────────────────
 

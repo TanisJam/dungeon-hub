@@ -143,6 +143,14 @@ export interface WeaponInUse {
   rangeFt?: number;
   /** PHB property strings: 'finesse', 'heavy', 'thrown', etc. */
   properties: string[];
+  /**
+   * The ability used for this weapon attack (str or dex).
+   * Populated by buildAttackContext after Step 12 (strMod/dexMod computed).
+   * Used by the usesAbility WorldQuery leaf — REQ-PRED-01, REQ-CTX-01.
+   * exactOptionalPropertyTypes: declared as optional (never assigned undefined).
+   * PHB p.147 — finesse; PHB p.194 — melee uses STR, ranged uses DEX.
+   */
+  abilityUsed?: import('./types.js').Ability;
 }
 
 // ── Helper: distance to attacker ─────────────────────────────────────────────

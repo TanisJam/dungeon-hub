@@ -153,6 +153,13 @@ function evaluateWorldQuery(q: WorldQuery, ctx: EvaluationContext): boolean {
       );
     }
 
+    case 'usesAbility': {
+      // Returns false (NOT throws) when weaponInUse absent or abilityUsed undefined.
+      // Fail-closed semantics — safe in save/check contexts — REQ-PRED-01.
+      // PHB p.48: "melee weapon attack rolls using Strength" (rage damage + reckless STR gate).
+      return ctx.weaponInUse?.abilityUsed === q.ability;
+    }
+
     default: {
       // Exhaustiveness guard — future WorldQuery leaves added without a case
       // will cause a compile-time error here. REQ-SA-WQ-01.4.

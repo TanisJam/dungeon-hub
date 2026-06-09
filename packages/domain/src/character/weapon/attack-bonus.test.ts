@@ -14,7 +14,7 @@
  *    → Slice B default: max(STR, DEX) is the favorable choice.
  */
 import { describe, it, expect } from 'vitest';
-import { computeWeaponAttackBonus } from './attack-bonus.js';
+import { computeWeaponAttackBonus, selectAttackAbilityKind } from './attack-bonus.js';
 
 describe('computeWeaponAttackBonus — CWAB-FORMULA-01: ability modifier selection', () => {
   it('melee non-finesse weapon uses STR modifier (PHB p.194)', () => {
@@ -122,5 +122,35 @@ describe('computeWeaponAttackBonus — CWAB-FORMULA-02: proficiency and magic bo
     });
     // abilityMod=3, prof=2, magic=1 → result=6
     expect(result).toBe(6);
+  });
+});
+
+// ── selectAttackAbilityKind — SCENARIO-04, SCENARIO-05 ───────────────────────
+
+describe('selectAttackAbilityKind — SCENARIO-04/05: ability kind selection (REQ-CTX-01)', () => {
+  it('SCENARIO-04: melee non-finesse, STR > DEX → returns str (PHB p.194)', () => {
+    // PHB p.194: melee weapon attack uses STR by default.
+    expect(selectAttackAbilityKind(3, 1, 'melee', [])).toBe('str');
+  });
+
+  it('SCENARIO-05: finesse weapon, DEX > STR → returns dex (PHB p.147)', () => {
+    // PHB p.147: finesse weapon, player picks favorable mod; DEX wins here.
+    expect(selectAttackAbilityKind(1, 4, 'melee', ['finesse'])).toBe('dex');
+  });
+
+  it('finesse weapon, STR > DEX → returns str (PHB p.147)', () => {
+    // STR wins when strMod > dexMod.
+    expect(selectAttackAbilityKind(3, 1, 'melee', ['finesse'])).toBe('str');
+  });
+
+  it('finesse weapon, STR === DEX → returns str (tie-break: STR wins)', () => {
+    // PHB p.147: player chooses; Slice B uses dexMod > strMod ? dex : str — equal → str.
+    // CRITICAL: SCENARIO-02 + RAGE-R4 depend on STR winning ties.
+    expect(selectAttackAbilityKind(2, 2, 'melee', ['finesse'])).toBe('str');
+  });
+
+  it('ranged weapon, no finesse → returns dex (PHB p.194)', () => {
+    // PHB p.194: ranged weapon attack uses DEX.
+    expect(selectAttackAbilityKind(3, 2, 'ranged', [])).toBe('dex');
   });
 });

@@ -1,1 +1,1 @@
-export { computeWeaponAttackBonus, selectAttackAbility, type WeaponAttackBonusInput } from './attack-bonus.js';
+export { computeWeaponAttackBonus, selectAttackAbility, selectAttackAbilityKind, type WeaponAttackBonusInput } from './attack-bonus.js';

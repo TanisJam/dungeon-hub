@@ -77,3 +77,41 @@ export function computeWeaponAttackBonus(input: WeaponAttackBonusInput): number 
 
   return abilityMod + (isProficient ? proficiencyBonus : 0) + magicBonus;
 }
+
+/**
+ * Returns the ability key ('str' | 'dex') used for a weapon attack.
+ *
+ * Single source of truth for the finesse/thrown ability-selection rule.
+ * Mirrors selectAttackAbility but returns the key string instead of the modifier value.
+ * Used to populate WeaponInUse.abilityUsed so the usesAbility WorldQuery leaf can evaluate.
+ *
+ * Tie-break semantics: `dexMod > strMod ? 'dex' : 'str'`
+ * STR wins on equal mods — CRITICAL for SCENARIO-02 and RAGE-R4 correctness.
+ *
+ * PHB p.194 — melee uses STR, ranged uses DEX.
+ * PHB p.147 — Finesse: player picks; Slice B uses dexMod > strMod as the favorable default.
+ * PHB p.195 — Thrown: treated as melee default (STR) when not finesse.
+ *
+ * REQ-CTX-01, SCENARIO-04, SCENARIO-05.
+ */
+export function selectAttackAbilityKind(
+  strMod: number,
+  dexMod: number,
+  kind: 'melee' | 'ranged',
+  properties: ReadonlyArray<string>,
+): 'str' | 'dex' {
+  const hasFinesse = properties.includes('finesse') || properties.includes('F');
+  const hasThrown = properties.includes('thrown') || properties.includes('T');
+
+  if (hasFinesse || hasThrown) {
+    // PHB p.147: player picks; Slice B defaults to favorable max.
+    // Tie-break: STR wins (dexMod > strMod ? 'dex' : 'str' — strict >, not >=).
+    return dexMod > strMod ? 'dex' : 'str';
+  }
+  if (kind === 'ranged') {
+    // PHB p.194: ranged attack uses DEX.
+    return 'dex';
+  }
+  // PHB p.194: melee attack uses STR by default.
+  return 'str';
+}

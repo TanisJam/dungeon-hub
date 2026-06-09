@@ -100,6 +100,8 @@ export {
   alwaysTrue,
   // engine-combatant-effects Slice A — caster-sourced effect predicate (REQ-CEF-02)
   hasEffectFromSelf,
+  // engine-barbarian-dsl-2 — usesAbility leaf (REQ-PRED-01, PHB p.48)
+  usesAbility,
 } from './predicate/ast.js';
 
 // Evaluator

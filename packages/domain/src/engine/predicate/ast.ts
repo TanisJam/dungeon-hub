@@ -7,6 +7,7 @@
  * Design ref: sdd/resolution-engine/design — Predicate AST section.
  */
 import type { Predicate, WorldQuery } from './types.js';
+import type { Ability } from '../types.js';
 
 // ── Composite node builders ───────────────────────────────────────────────────
 
@@ -106,6 +107,16 @@ export function hasWeaponProperty(property: string): Predicate {
  */
 export function hasEffectFromSelf(effectName: string): Predicate {
   return query({ kind: 'hasEffectFromSelf', effectName });
+}
+
+/**
+ * Does the current weapon attack use the specified ability?
+ * Returns false (NOT throws) when ctx.weaponInUse is absent or abilityUsed is undefined.
+ * Fail-closed: safe in non-attack contexts (save, check resolutions) — REQ-PRED-01.
+ * PHB p.48: "melee weapon attack rolls using Strength" — rage damage bonus + reckless STR gate.
+ */
+export function usesAbility(ability: Ability): Predicate {
+  return query({ kind: 'usesAbility', ability });
 }
 
 /**

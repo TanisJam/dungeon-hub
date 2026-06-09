@@ -332,6 +332,41 @@ describe('evaluatePredicate — hasEffectFromSelf leaf', () => {
   });
 });
 
+// ── usesAbility leaf — REQ-PRED-01 ────────────────────────────────────────────
+// PHB p.48: "melee weapon attack rolls using Strength"
+// REQ-PRED-01: usesAbility leaf evaluates ctx.weaponInUse?.abilityUsed.
+// Fail-closed: missing weaponInUse → false (no throw).
+
+describe('evaluatePredicate — usesAbility leaf (REQ-PRED-01)', () => {
+  it('SCENARIO-01: usesAbility:str returns true when abilityUsed is str', () => {
+    // PHB p.48: rage damage bonus applies "when you use Strength"
+    // REQ-PRED-01: abilityUsed:'str' matches query ability:'str' → true
+    const predicate = { op: 'query' as const, q: { kind: 'usesAbility' as const, ability: 'str' as const } };
+    const ctx = makeCtx({
+      weaponInUse: { kind: 'melee', properties: [], abilityUsed: 'str' },
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+
+  it('SCENARIO-02: usesAbility:str returns false when abilityUsed is dex (finesse DEX-wins)', () => {
+    // PHB p.48: rage damage bonus absent on finesse-DEX attack
+    // REQ-PRED-01: abilityUsed:'dex' does NOT match query ability:'str' → false
+    const predicate = { op: 'query' as const, q: { kind: 'usesAbility' as const, ability: 'str' as const } };
+    const ctx = makeCtx({
+      weaponInUse: { kind: 'melee', properties: ['finesse'], abilityUsed: 'dex' },
+    });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('SCENARIO-03: usesAbility:str returns false (not throws) when weaponInUse is absent', () => {
+    // REQ-PRED-01: fail-closed — non-attack context (save resolution) → false, NOT throw
+    const predicate = { op: 'query' as const, q: { kind: 'usesAbility' as const, ability: 'str' as const } };
+    const ctx = makeCtx({}); // no weaponInUse
+    expect(() => evaluatePredicate(predicate, ctx)).not.toThrow();
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+});
+
 // ── throw-safety via registry.query — REQ-SA-WQ-01 (CRITICAL) ────────────────
 
 describe('evaluatePredicate — throw_safety_via_query (REQ-SA-WQ-01 CRITICAL)', () => {

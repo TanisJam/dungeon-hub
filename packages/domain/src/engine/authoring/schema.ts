@@ -90,6 +90,12 @@ const WorldQuerySchema: z.ZodType<unknown> = z.union([
     of: z.literal('caster'),
   }),
   z.object({ kind: z.literal('spellLevelAtMost'), n: z.number() }),
+  // REQ-PRED-01: usesAbility leaf — PHB p.48 "using Strength" gate for rage damage + reckless.
+  // Fail-closed: missing ctx.weaponInUse → false (no throw). Safe in non-attack predicate paths.
+  z.object({
+    kind: z.literal('usesAbility'),
+    ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+  }),
 ]);
 
 // ── PredicateSchema (recursive via z.lazy) ─────────────────────────────────
