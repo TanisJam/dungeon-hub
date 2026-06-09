@@ -69,12 +69,32 @@ function substituteString(template: string, params: RuleParams): string {
 }
 
 /**
+ * Value-field substitution that PRESERVES native scalar type for a PURE single-slot.
+ * Pure slot: the field's ENTIRE value is one token (^\{(\w+)\}$) — the same shape
+ * detectFanOut uses at :111. When the resolved param is a NON-STRING, NON-ARRAY scalar,
+ * return it NATIVELY — do NOT String()-ify.
+ * Interpolated slot (token inside surrounding text, e.g. 'rage-damage-{ragerId}') OR
+ * a string param OR an array param → fall through to substituteString (unchanged).
+ * Arrays are left for fan-out by substituteString (its Array.isArray guard).
+ */
+function substituteValue(template: string, params: RuleParams): string | number {
+  const pure = template.match(/^\{(\w+)\}$/);
+  if (pure !== null) {
+    const value = params[pure[1]!];
+    if (value !== undefined && typeof value !== 'string' && !Array.isArray(value)) {
+      return value; // native scalar (number today; boolean for free if RuleParams ever adds it)
+    }
+  }
+  return substituteString(template, params);
+}
+
+/**
  * Deep-walk a plain object/array/string and substitute all string values.
  * Skips arrays (they are handled separately for fan-out).
  */
 function substituteDeep(value: unknown, params: RuleParams): unknown {
   if (typeof value === 'string') {
-    return substituteString(value, params);
+    return substituteValue(value, params);
   }
   if (Array.isArray(value)) {
     return value.map((item) => substituteDeep(item, params));

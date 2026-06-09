@@ -169,6 +169,75 @@ describe('compileRule — array-param fan-out (REQ-COMPILE-01 / Scenario: Array 
   });
 });
 
+// ── substituteValue — pure-slot scalar preservation ──────────────────────────
+// REQ-COMPILE-SCALAR-01/02/03 — tested via compileRule's public build() API.
+// A thin RuleDoc with emits[0].def.value = '{rageBonus}' exercises the full path:
+//   compileRule → build → buildSingleInstance → substituteDeep → substituteValue
+
+/** Minimal rule with a numeric-valued template field for SCENARIO-01/02/03 */
+function makeScalarRule(defValue: string) {
+  const parsed = parseRule({
+    id: 'scalar-test',
+    source: 'PHB 48',
+    params: [
+      { name: 'owner', type: 'EntityId' },
+      { name: 'rageBonus', type: 'number' },
+      { name: 'statKey', type: 'EntityId' },
+      { name: 'ragerId', type: 'EntityId' },
+    ],
+    emits: [
+      {
+        def: { kind: 'num', op: 'add', value: defValue, stat: 'damage', category: 'untyped' },
+        scope: { owner: '{owner}', target: { axis: 'self' }, trigger: 'on-damage' },
+        idTemplate: '{ruleId}-{owner}',
+      },
+    ],
+    testCases: [],
+  });
+  if (!parsed.ok) throw new Error('Test setup failed: ' + JSON.stringify(parsed.issues));
+  return parsed.rule;
+}
+
+describe('substituteValue — pure-slot scalar preservation', () => {
+  it('SCENARIO-01: pure-slot number param compiles to native number (REQ-COMPILE-SCALAR-01)', () => {
+    // PHB p.48 — rage damage bonus is integer +2; must compile to number, not string.
+    // A pure-slot template '{rageBonus}' with a numeric param MUST preserve native type.
+    const rule = makeScalarRule('{rageBonus}');
+    const instances = compileRule(rule).build({ owner: 'char-1', rageBonus: 2, statKey: 'dexterity', ragerId: 'char-1' });
+    const def = instances[0]!.def;
+    expect(def.kind).toBe('num');
+    if (def.kind === 'num') {
+      expect(def.value).toBe(2);
+      expect(typeof def.value).toBe('number');
+    }
+  });
+
+  it('SCENARIO-02: pure-slot string param remains a string (REQ-COMPILE-SCALAR-03)', () => {
+    // A pure-slot template '{statKey}' with a string param must remain a string unchanged.
+    const rule = makeScalarRule('{statKey}');
+    const instances = compileRule(rule).build({ owner: 'char-1', rageBonus: 2, statKey: 'dexterity', ragerId: 'char-1' });
+    const def = instances[0]!.def;
+    expect(def.kind).toBe('num');
+    if (def.kind === 'num') {
+      expect(def.value).toBe('dexterity');
+      expect(typeof def.value).toBe('string');
+    }
+  });
+
+  it('SCENARIO-03: interpolated template compiles to string (REQ-COMPILE-SCALAR-02)', () => {
+    // An interpolated template 'rage-damage-{ragerId}' must always remain a string
+    // regardless of param type — surrounding text forces string interpolation.
+    const rule = makeScalarRule('rage-damage-{ragerId}');
+    const instances = compileRule(rule).build({ owner: 'char-1', rageBonus: 2, statKey: 'dexterity', ragerId: 'barb-1' });
+    const def = instances[0]!.def;
+    expect(def.kind).toBe('num');
+    if (def.kind === 'num') {
+      expect(def.value).toBe('rage-damage-barb-1');
+      expect(typeof def.value).toBe('string');
+    }
+  });
+});
+
 // ── Scenario (d): escape-hatch rule ───────────────────────────────────────────
 
 describe('compileRule — escape hatch (REQ-COMPILE-01 / Scenario: Escape-hatch rule flagged + build throws)', () => {
