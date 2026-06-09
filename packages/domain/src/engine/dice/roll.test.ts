@@ -273,10 +273,9 @@ describe('rollDamageBreakdown', () => {
   );
 
   // ── REQ-NUMERIC-STRING-01 — numeric string in Source.amount treated as flat ───
-  // R-COERCE: compileRule substituteString converts {rageBonus:2} → '2' (string) via String(value).
-  // applyStacking passes def.value as-is to Source.amount, so amount='2' (DiceExpr).
-  // rollDamageBreakdown MUST treat a string that parses to a finite integer as a flat integer,
-  // NOT as a DiceExpr pattern (would fail NdM regex and throw).
+  // DEFENSE-IN-DEPTH / HISTORICAL: compile.ts now preserves scalar types
+  // (sdd/authoring-compile-preserve-scalar-types); these tests document the tolerance
+  // for any non-compile path yielding a numeric string in Source.amount.
   // PHB p.48 — rage bonus is a flat integer, not dice.
 
   it(

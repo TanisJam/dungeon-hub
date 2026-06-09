@@ -155,7 +155,8 @@ describe('rageRuleDoc — AdvantageMod emits (REQ-RAGE-DOC-03, REQ-RAGE-COMPILE-
 describe('rageRuleDoc — NumMod emit (REQ-RAGE-DOC-04, REQ-RAGE-COMPILE-04)', () => {
   it('S-11: produces exactly 1 NumMod with stat:damage, op:add, value:3 (rageBonus:3)', () => {
     // REQ-RAGE-COMPILE-04, PHB p.48 — damage bonus melee weapon attacks
-    // R-COERCE trap: {rageBonus} compiles to STRING '3'; Number() coercion required.
+    // compile.ts preserves native number type for pure-slot params
+    // (sdd/authoring-compile-preserve-scalar-types); no coercion needed.
     const instances = buildRage(RAGER_ID, 3, 3);
     const nums = instances.filter((i) => i.def.kind === 'num');
     expect(nums).toHaveLength(1);
@@ -164,8 +165,7 @@ describe('rageRuleDoc — NumMod emit (REQ-RAGE-DOC-04, REQ-RAGE-COMPILE-04)', (
     if (num.def.kind === 'num') {
       expect(num.def.stat).toBe('damage');
       expect(num.def.op).toBe('add');
-      // R-COERCE: compile.ts substituteString calls String(value), so '3' not 3.
-      expect(Number(num.def.value)).toBe(3);
+      expect(num.def.value).toBe(3);
       expect(num.def.category).toBe('untyped');
     }
   });
@@ -202,16 +202,15 @@ describe('rageRuleDoc — NumMod emit (REQ-RAGE-DOC-04, REQ-RAGE-COMPILE-04)', (
 
   it('S-15a: NumMod value at L1 — bonus:2 (REQ-CHAR-01a, PHB p.48)', () => {
     // PHB p.48: L1–8 rage damage bonus is +2.
-    // R-COERCE: {rageBonus} compiles to the STRING '2' (compile.ts:67 String(value));
-    // Number()-coerce the compiled value for comparison.
+    // compile.ts now returns number for pure-slot numeric params; value is natively 2
+    // (PHB p.48 — rage damage bonus +2 at L1-8).
     const compiled = buildRage(RAGER_ID, levelToBonus(1), 2); // bonus:2 for L1
 
     const compiledNum = compiled.find((i) => i.def.kind === 'num')!;
     expect(compiledNum).toBeDefined();
 
     if (compiledNum.def.kind === 'num') {
-      // R-COERCE: coerce to number
-      expect(Number(compiledNum.def.value)).toBe(2);
+      expect(compiledNum.def.value).toBe(2);
     }
   });
 });
@@ -255,7 +254,7 @@ describe('rageRuleDoc — ResistMod emits (REQ-RAGE-DOC-05, REQ-RAGE-COMPILE-05)
 describe('rageRuleDoc — UsageMod emit (REQ-RAGE-DOC-06, REQ-RAGE-COMPILE-06)', () => {
   it('S-12: produces exactly 1 UsageMod with pool:count, count:4, resetOn:long-rest', () => {
     // PHB p.48 — rages per long rest; shape-only (no evaluator in Batch 1)
-    // R-COERCE: {rageCount} compiles to STRING; Number() coercion required.
+    // compile.ts preserves native number type for pure-slot params; count is natively a number.
     const instances = buildRage(RAGER_ID, 2, 4);
     const usage = instances.filter((i) => i.def.kind === 'usage');
     expect(usage).toHaveLength(1);
@@ -263,8 +262,7 @@ describe('rageRuleDoc — UsageMod emit (REQ-RAGE-DOC-06, REQ-RAGE-COMPILE-06)',
     expect(u.def.kind).toBe('usage');
     if (u.def.kind === 'usage') {
       expect(u.def.pool).toBe('count');
-      // R-COERCE: count is the string '4' after template substitution
-      expect(Number((u.def as { pool: string; count?: unknown }).count)).toBe(4);
+      expect((u.def as { pool: string; count?: unknown }).count).toBe(4);
       expect(u.def.resetOn).toBe('long-rest');
     }
   });
@@ -281,7 +279,7 @@ describe('rageRuleDoc — REQ-CHAR-01: NumMod value at level tiers (PHB p.48)', 
     expect(nums).toHaveLength(1);
     const num = nums[0]!;
     if (num.def.kind === 'num') {
-      expect(Number(num.def.value)).toBe(2);
+      expect(num.def.value).toBe(2);
     }
   });
 
@@ -292,7 +290,7 @@ describe('rageRuleDoc — REQ-CHAR-01: NumMod value at level tiers (PHB p.48)', 
     expect(nums).toHaveLength(1);
     const num = nums[0]!;
     if (num.def.kind === 'num') {
-      expect(Number(num.def.value)).toBe(3);
+      expect(num.def.value).toBe(3);
     }
   });
 
@@ -303,7 +301,7 @@ describe('rageRuleDoc — REQ-CHAR-01: NumMod value at level tiers (PHB p.48)', 
     expect(nums).toHaveLength(1);
     const num = nums[0]!;
     if (num.def.kind === 'num') {
-      expect(Number(num.def.value)).toBe(4);
+      expect(num.def.value).toBe(4);
     }
   });
 });

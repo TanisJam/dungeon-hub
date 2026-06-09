@@ -118,10 +118,11 @@ export function rollDamageBreakdown(
       total += source.amount;
       perDie.push({ label: source.label, flat: source.amount });
     } else {
-      // R-COERCE: compileRule's substituteString converts numeric params to strings via
-      // String(value) (e.g. rageBonus:2 → '2'). A numeric string must be treated as a
-      // flat integer — NOT as a DiceExpr pattern — to avoid the NdM regex failing and
-      // throwing. PHB p.48: rage bonus is flat, not dice. PHB p.196: flat mods apply once.
+      // DEFENSE-IN-DEPTH / HISTORICAL: compile.ts now preserves scalar types for pure-slot
+      // params (sdd/authoring-compile-preserve-scalar-types). Rage bonus arrives as number 2
+      // and takes the typeof === 'number' branch above. This guard remains for any non-compile
+      // path that might yield a numeric string in Source.amount. Logic unchanged.
+      // PHB p.48: rage bonus is flat, not dice. PHB p.196: flat mods apply once.
       const coercedFlat = Number(source.amount);
       if (Number.isFinite(coercedFlat) && !Number.isNaN(coercedFlat)) {
         // Numeric string — treat as flat integer (same path as typeof number above).

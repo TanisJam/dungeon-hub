@@ -36,6 +36,55 @@ function makeNumMod(
 
 const SELF_REF: EntityRef = { id: 'char-a' as EntityId, conditions: [] };
 
+// ── applyStacking — numeric param from compileRule (scalar guard) ─────────────
+// REQ-STACKING-SCALAR-01, SCENARIO-04/05
+// These tests pin that applyStacking is correct with NUMERIC input.
+// If compile.ts ever regressed to emitting a string '2', these tests would fail
+// (typeof '2' !== 'number' → totalBonus stays 0 → value === base + 0, not base + 2).
+
+describe('applyStacking — numeric param from compileRule (scalar guard)', () => {
+  it('SCENARIO-04: NumMod value:2 (number) contributes +2 to stat total (PHB p.48)', () => {
+    // PHB p.48 — +2 rage damage must contribute to the scalar stat total.
+    // Base 5 + rage NumMod 2 → value must be 7.
+    const mod: ModifierInstance = {
+      id: 'rage-damage' as ModifierInstanceId,
+      def: { kind: 'num', op: 'add', value: 2, stat: 'damage', category: 'untyped' } as NumMod,
+      scope: {
+        owner: 'char-001' as EntityId,
+        target: { axis: 'self' },
+        trigger: 'on-damage',
+      },
+    };
+    const result = applyStacking([mod], 5, SELF_REF);
+    expect(result.value).toBe(7);
+    // breakdown must contain a source with numeric amount 2 (not string '2')
+    const rageSrc = result.breakdown.find((s) => s.label !== 'base');
+    expect(rageSrc).toBeDefined();
+    expect(rageSrc!.amount).toBe(2);
+    expect(typeof rageSrc!.amount).toBe('number');
+  });
+
+  it('SCENARIO-05: rageBonus:3 (L9-15) → value = base + 3 (PHB p.48)', () => {
+    // PHB p.48 — L9-15 tier +3 rage damage
+    const mod: ModifierInstance = {
+      id: 'rage-damage' as ModifierInstanceId,
+      def: { kind: 'num', op: 'add', value: 3, stat: 'damage', category: 'untyped' } as NumMod,
+      scope: { owner: 'char-001' as EntityId, target: { axis: 'self' }, trigger: 'on-damage' },
+    };
+    expect(applyStacking([mod], 5, SELF_REF).value).toBe(8);
+  });
+
+  it('SCENARIO-05: rageBonus:4 (L16+) → value = base + 4 (PHB p.48)', () => {
+    // PHB p.48 — L16+ tier +4 rage damage (PHB p.48 Rage Damage column)
+    const mod: ModifierInstance = {
+      id: 'rage-damage' as ModifierInstanceId,
+      def: { kind: 'num', op: 'add', value: 4, stat: 'damage', category: 'untyped' } as NumMod,
+      scope: { owner: 'char-001' as EntityId, target: { axis: 'self' }, trigger: 'on-damage' },
+    };
+    expect(applyStacking([mod], 5, SELF_REF).value).toBe(9);
+  });
+});
+
 describe('applyStacking', () => {
   it('two item NumMods (+3 and +5) → only +5 in output (keep-highest within type)', () => {
     const mods = [makeNumMod('i1', 3, 'item'), makeNumMod('i2', 5, 'item')];
