@@ -351,10 +351,13 @@ describe('rageRuleDoc — REQ-CHAR-04: all emits carry target:{axis:self} (PHB p
   });
 });
 
-describe('rageRuleDoc — REQ-CHAR-DIVERGENCE: STR-divergence documented (ADR-5)', () => {
-  it('REQ-CHAR-DIVERGENCE: advantage predicate is hasCondition (NOT usesAbility) — STR fix deferred to Batch 2', () => {
-    // PHB p.48 restricts advantage to STR checks/saves; the DSL lacks usesAbility WorldQuery.
-    // This documents the shared divergence (STR fix deferred to Batch 2).
+describe('rageRuleDoc — REQ-CHAR-DIVERGENCE: STR-divergence documented (ADR-5 → Batch 2)', () => {
+  it('SCENARIO-17: advantage emits (1+2) do NOT carry usesAbility — regression pin (SCENARIO-17)', () => {
+    // PHB p.48: advantage on Strength CHECKS and SAVING THROWS — emits 1/2 resolve through
+    // ability-check/forced-check paths where ctx.weaponInUse is absent.
+    // Adding usesAbility to them would cause fail-closed evaluator to return false (silent death).
+    // Emits 1/2 retain ONLY hasCondition:Raging — STR-restriction there is an accepted divergence.
+    // This assertion MUST remain GREEN per design D3 (REQ-CHAR-DIVERGENCE regression pin).
     const compiled = buildRage(RAGER_ID, 2, 2);
     const compiledAdv = compiled.filter((i) => i.def.kind === 'advantage');
     for (const inst of compiledAdv) {
@@ -363,6 +366,28 @@ describe('rageRuleDoc — REQ-CHAR-DIVERGENCE: STR-divergence documented (ADR-5)
         expect(pred.q?.kind).not.toBe('usesAbility');
       }
     }
+  });
+
+  it('SCENARIO-15: damage emit (emit 6) DOES carry usesAbility:str node (REQ-RAGE-RETROFIT-01)', () => {
+    // PHB p.48: "+[rage bonus] to MELEE weapon attacks USING STRENGTH"
+    // Batch 2: usesAbility primitive now exists — retrofit emit 6 to carry usesAbility:str.
+    // This test is RED until rage.ts emit 6 predicate is updated.
+    // After fix: AND[weaponKind:melee, hasCondition:Raging, usesAbility:str]
+    const compiled = buildRage(RAGER_ID, 2, 2);
+    const damageEmit = compiled.find((i) => i.def.kind === 'num' && i.def.stat === 'damage')!;
+    expect(damageEmit).toBeDefined();
+    expect(damageEmit.predicate).toBeDefined();
+
+    // Walk the predicate and find a usesAbility:str node anywhere in the tree
+    function hasUsesAbilityStr(pred: unknown): boolean {
+      const node = pred as { op?: string; q?: { kind?: string; ability?: string }; nodes?: unknown[]; node?: unknown };
+      if (node.op === 'query' && node.q?.kind === 'usesAbility' && node.q?.ability === 'str') return true;
+      if (node.op === 'and' && node.nodes) return node.nodes.some(hasUsesAbilityStr);
+      if (node.op === 'not' && node.node) return hasUsesAbilityStr(node.node);
+      return false;
+    }
+
+    expect(hasUsesAbilityStr(damageEmit.predicate)).toBe(true);
   });
 });
 

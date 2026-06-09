@@ -175,10 +175,12 @@ export const rageRuleDoc: RuleDoc = {
     // PHB p.48: "+[rageBonus] to melee weapon attack damage rolls using Strength"
     // value:'{rageBonus}' is a template slot → compiles to STRING (compile.ts:67 String(value)).
     // R-COERCE trap: parity assertions must Number()-coerce compiled def.value.
-    // AND predicate: weaponKind:melee + hasCondition:Raging
-    // TODO: usesAbility WorldQuery — PHB p.48 says "using Strength"; no usesAbility primitive;
-    //       STR-usage divergence deferred (ADR-5); weaponKind:melee is the
-    //       expressible half; STR-usage predicate deferred to Batch 2.
+    // AND predicate: weaponKind:melee + hasCondition:Raging + usesAbility:str
+    // Batch 2 (REQ-RAGE-RETROFIT-01): usesAbility:str added to emit 6 only.
+    // STR-gating moves from registration-time (build-attack-context.ts:548 imperative guard)
+    // to predicate-time — the build-attack-context guard is deleted in Commit 4.
+    // NOTE: emits 1/2 (advantage on STR checks/saves) do NOT get usesAbility — they resolve
+    // via ability-check/forced-check paths where ctx.weaponInUse is absent (fail-closed = silent death).
     {
       def: {
         kind: 'num',
@@ -197,6 +199,7 @@ export const rageRuleDoc: RuleDoc = {
         nodes: [
           { op: 'query', q: { kind: 'weaponKind', is: 'melee' } },
           { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+          { op: 'query', q: { kind: 'usesAbility', ability: 'str' } },
         ],
       },
       label: 'Raging',

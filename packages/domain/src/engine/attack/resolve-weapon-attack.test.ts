@@ -850,10 +850,11 @@ describe('resolveWeaponAttack — REQ-PHASE-01: on-damage NumMod lands in damage
       if (numInst) registry.register(numInst);
 
       // Build ctx with Raging condition active and weaponInUse:melee so the AND predicate fires.
-      // The compiled rage NumMod has AND[weaponKind:melee, hasCondition:Raging] predicate.
+      // Batch 2 (REQ-RAGE-RETROFIT-01): emit 6 now requires usesAbility:str in addition to
+      // weaponKind:melee + hasCondition:Raging. Supply abilityUsed:'str' so the predicate fires.
       const ctx: EvaluationContext = {
         ...makeCtx(BARBARIAN_ID, [{ name: 'Raging' }]),
-        weaponInUse: { kind: 'melee', properties: [] },
+        weaponInUse: { kind: 'melee', properties: [], abilityUsed: 'str' },
       };
       const input: WeaponAttackInput = {
         self: BARBARIAN_ID,
