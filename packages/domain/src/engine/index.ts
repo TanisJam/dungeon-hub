@@ -279,6 +279,10 @@ export type { BuildPetrifiedResult } from './rules/petrified.js';
 // engine-rage — DSL-authored rage rule (REQ-CHAR-01..04, PHB p.48)
 export { rageRuleDoc } from './rules-authored/rage.js';
 
+// engine-barbarian-dsl-2 — Reckless Attack + Danger Sense (PHB p.48)
+export { recklessAttackRuleDoc } from './rules-authored/reckless-attack.js';
+export { dangerSenseRuleDoc } from './rules-authored/danger-sense.js';
+
 export { buildInvisibleModifiers } from './rules/invisible.js';
 export type { BuildInvisibleResult } from './rules/invisible.js';
 
