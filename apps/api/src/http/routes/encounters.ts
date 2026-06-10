@@ -29,6 +29,8 @@ import { resolveCastReaction } from '../../use-cases/encounters/resolve-cast-rea
 import { activateRage } from '../../use-cases/encounters/activate-rage.js';
 import { deactivateRage } from '../../use-cases/encounters/deactivate-rage.js';
 import { passEncounterTurn } from '../../use-cases/encounters/pass-encounter-turn.js';
+import { performAbilityCheck } from '../../use-cases/encounters/perform-ability-check.js';
+import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
 
 const CreateBody = z.object({
   campaignId: z.string().uuid(),
@@ -1426,6 +1428,85 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       }
 
       return reply.code(200).send(result.encounter);
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/ability-check -------------------------
+  // Engine ability check (actor polarity). GM-only. Server-authoritative.
+  // B6 REQ-ROUTE-01..04: add check surface mirroring forced-check route pattern.
+  // PHB p.174: ability check = d20 + relevant ability modifier >= DC.
+  // PHB p.175: skill check = d20 + ability modifier + proficiency bonus (if proficient) >= DC.
+  // PHB p.48: Raging barbarian gets advantage on STR checks (checkAbility:'str' leaf).
+  const AbilityCheckBody = z.object({
+    actorCombatantId: z.string().uuid(),
+    ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+    dc: z.number().int().min(1).max(30),
+    // REQ-ROUTE-02: skill enum derived from ALL_SKILLS (not hand-maintained literal).
+    // PHB p.175: skills are a closed PHB list (18 skills).
+    skill: z.enum(ALL_SKILLS as [string, ...string[]]).optional(),
+    npcCheckMod: z.number().optional(),
+    rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
+  });
+
+  app.post(
+    '/encounters/:id/actions/ability-check',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod body validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = AbilityCheckBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { actorCombatantId, ability, dc, skill, npcCheckMod, rollMode } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for GM membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ROUTE-01 — mirrors forced-check :566-567 pattern).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await performAbilityCheck({
+        encounterId: id,
+        actorCombatantId,
+        ability,
+        dc,
+        ...(skill !== undefined ? { skill } : {}),
+        npcCheckMod: npcCheckMod ?? null,
+        rollMode,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          case 'NO_ACTOR_CHECK':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_ACTOR_CHECK' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // REQ-ROUTE-03: response shape — NO crit, NO applied[], NO autoFail.
+      return reply.code(200).send({
+        outcome: result.outcome,
+        check: result.check,
+      });
     },
   );
 
