@@ -117,14 +117,10 @@ describe('extraAttacksPerAction — Non-martial classes (always 1)', () => {
     expect(extraAttacksPerAction([cls('rogue', 20)])).toBe(1);
   });
 
-  it('Monk L5 → 1 attack (REQ-COMMENT-REG-01: Monk Extra Attack is a known compliance gap, DEFERRED — PHB p.79)', () => {
-    // PHB p.79: "Starting at 5th level, you can attack twice, instead of once."
-    // Monk Extra Attack IS granted at L5 per RAW, but is DEFERRED in this codebase.
-    // See engram sdd/engine-barbarian-dsl-4. This test LOCKS the deferred behavior:
-    // monk-5 still returns 1 until the compliance gap is resolved.
-    // REQ-COMMENT-REG-01: the comment fix at extra-attacks.ts MUST NOT accidentally
-    // enable the Monk code path. This regression guard proves it does not.
-    expect(extraAttacksPerAction([cls('monk', 5)])).toBe(1);
+  it('Monk L5 → 2 attacks (PHB p.79: Extra Attack at 5th level)', () => {
+    // PHB p.79: "Beginning at 5th level, you can attack twice, instead of once."
+    // Feature is now LIVE. Monk is included in MARTIAL_L5_SLUGS.
+    expect(extraAttacksPerAction([cls('monk', 5)])).toBe(2);
   });
 });
 
