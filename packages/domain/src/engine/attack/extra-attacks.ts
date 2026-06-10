@@ -86,7 +86,8 @@ function attacksForClass(slug: string, level: number): number {
     return level >= 5 ? 2 : 1;
   }
 
-  // All other classes (Wizard, Cleric, Rogue, Monk, etc.) do not grant Extra Attack.
+  // Monk Extra Attack (PHB p.79) IS granted at L5 — known compliance gap, DEFERRED.
+  // See engram sdd/engine-barbarian-dsl-4. Wizard/Cleric/Rogue genuinely do not grant it.
   return 1;
 }
 
