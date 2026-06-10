@@ -30,6 +30,7 @@ import { activateRage } from '../../use-cases/encounters/activate-rage.js';
 import { deactivateRage } from '../../use-cases/encounters/deactivate-rage.js';
 import { passEncounterTurn } from '../../use-cases/encounters/pass-encounter-turn.js';
 import { performAbilityCheck } from '../../use-cases/encounters/perform-ability-check.js';
+import { rollCombatantInitiative } from '../../use-cases/encounters/roll-combatant-initiative.js';
 import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
 
 const CreateBody = z.object({
@@ -1506,6 +1507,75 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       return reply.code(200).send({
         outcome: result.outcome,
         check: result.check,
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/roll-initiative -------------------------
+  // Server-side initiative roll (combatant polarity). GM-only. Server-authoritative.
+  // B7 REQ-ROUTE-01..06: add initiative surface mirroring ability-check route pattern.
+  // PHB p.189: initiative = d20 + DEX mod (ordering only, no DC, no success/fail).
+  // PHB p.50:  Feral Instinct — barbarian L7+ has advantage on initiative rolls.
+  const RollInitiativeBody = z.object({
+    combatantId: z.string().uuid(),
+    npcInitiativeMod: z.number().int().optional(),
+    rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional(),
+  });
+
+  app.post(
+    '/encounters/:id/actions/roll-initiative',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod body validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = RollInitiativeBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const { combatantId, npcInitiativeMod, rollMode } = bodyResult.data;
+      const userId = request.user!.sub;
+
+      // Load encounter for GM membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ROUTE-01 — mirrors ability-check :1476-1477 pattern).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const result = await rollCombatantInitiative({
+        encounterId: id,
+        combatantId,
+        ...(npcInitiativeMod !== undefined ? { npcInitiativeMod } : {}),
+        ...(rollMode !== undefined ? { rollMode } : {}),
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          case 'NO_ACTOR_INITIATIVE':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_ACTOR_INITIATIVE' }],
+            });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // REQ-ROUTE-03: response shape — NO success, NO dc, NO crit.
+      return reply.code(200).send({
+        initiative: result.initiative,
       });
     },
   );
