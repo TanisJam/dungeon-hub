@@ -11,7 +11,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import { deriveSpeedModifiers } from './derive-speed-modifiers.js';
+import { resolveStat } from '../resolve/stat.js';
+import { createInMemoryRegistry } from '../registry/query.js';
 import type { EntityId } from '../types.js';
+import type { EvaluationContext } from '../context.js';
 import type { InventoryItem, ItemCompendiumLite } from '../../character/inventory/types.js';
 
 function eid(s: string): EntityId {
@@ -84,9 +87,9 @@ describe('deriveSpeedModifiers — SCENARIO-01: barbarian 5, unarmored', () => {
     expect(mod.scope.owner).toBe(CHAR_ID);
     expect(mod.scope.target).toEqual({ axis: 'self' });
     expect(mod.scope.trigger).toBe('always');
-    expect(mod.label).toBeDefined();
-    expect(typeof mod.label).toBe('string');
-    expect((mod.label as string).length).toBeGreaterThan(0);
+    // PHB p.49: label must identify the feature by exact name for provenance clarity.
+    // REQ-SPEED-12: label must be non-empty and human-readable.
+    expect(mod.label).toBe('Fast Movement (+10)');
   });
 });
 
@@ -107,6 +110,7 @@ describe('deriveSpeedModifiers — SCENARIO-02: barbarian 5, light armor', () =>
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    expect(mod.def.kind).toBe('num');
     if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
   });
 });
@@ -128,6 +132,7 @@ describe('deriveSpeedModifiers — SCENARIO-03: barbarian 5, medium armor', () =
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    expect(mod.def.kind).toBe('num');
     if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
   });
 });
@@ -203,6 +208,7 @@ describe('deriveSpeedModifiers — SCENARIO-10: barbarian 5 / wizard 2, qualifie
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    expect(mod.def.kind).toBe('num');
     if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
   });
 });
@@ -246,6 +252,7 @@ describe('deriveSpeedModifiers — SCENARIO-12: two barbarian entries summing to
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    expect(mod.def.kind).toBe('num');
     if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
   });
 });
@@ -314,6 +321,7 @@ describe('deriveSpeedModifiers — SCENARIO-18: barbarian 10', () => {
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    expect(mod.def.kind).toBe('num');
     if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
   });
 });
@@ -334,5 +342,48 @@ describe('deriveSpeedModifiers — SCENARIO-19: barbarian 5, heavy armor unequip
       CHAR_ID,
     );
     expect(result.mods).toHaveLength(1);
+  });
+});
+
+// ── SCENARIO-16 — resolveStat provenance: barbarian-5 unarmored speed = 40 ──
+
+describe('deriveSpeedModifiers — SCENARIO-16: resolveStat provenance (REQ-SPEED-13)', () => {
+  it('resolveStat("speed", 30, …) = 40 and breakdown has exactly 1 entry with label "Fast Movement (+10)" (PHB p.49)', () => {
+    // PHB p.49: "Starting at 5th level, your speed increases by 10 feet while
+    // you aren't wearing heavy armor." Base walk 30 → resolved 40.
+    // REQ-SPEED-13 (provenance): SCENARIO-16 sub-requirement — breakdown must
+    // include exactly 1 entry whose label contains 'Fast Movement' so that the
+    // route can surface the modifier source to the client.
+    const registry = createInMemoryRegistry();
+    const ctx: EvaluationContext = {
+      self: { id: CHAR_ID, conditions: [] },
+      activeConditions: [],
+    };
+
+    // Derive and register Fast Movement modifier for a qualifying barbarian-5.
+    const { mods } = deriveSpeedModifiers(
+      {
+        classes: [{ classSlug: 'barbarian', level: 5 }],
+        inventory: [],
+        itemLites: {},
+      },
+      CHAR_ID,
+    );
+    for (const mod of mods) {
+      registry.register(mod);
+    }
+
+    const resolved = resolveStat(CHAR_ID, 'speed', 30, ctx, registry);
+
+    // Total must be base 30 + Fast Movement +10 = 40.
+    expect(resolved.value).toBe(40);
+
+    // Breakdown provenance: exactly 1 entry with label containing 'Fast Movement'.
+    const fastMovementSources = resolved.breakdown.filter(
+      (s) => typeof s.label === 'string' && s.label.includes('Fast Movement'),
+    );
+    expect(fastMovementSources).toHaveLength(1);
+    expect(fastMovementSources[0]!.label).toBe('Fast Movement (+10)');
+    expect(fastMovementSources[0]!.amount).toBe(10);
   });
 });
