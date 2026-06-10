@@ -159,6 +159,10 @@ export type { RollSavingThrowResult } from './save/roll-saving-throw.js';
 export { rollAbilityCheck } from './check/roll-ability-check.js';
 export type { RollAbilityCheckResult } from './check/roll-ability-check.js';
 
+// B7 — rollInitiative pure primitive (DC-less ordering roll, PHB p.189; design D1)
+export { rollInitiative } from './check/roll-initiative.js';
+export type { RollInitiativeResult } from './check/roll-initiative.js';
+
 // Slice 3b-ii — Stunning Strike ki save DC (PHB p.78)
 export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
 
