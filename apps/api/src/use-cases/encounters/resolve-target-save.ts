@@ -7,6 +7,13 @@
  *
  * Design ref: sdd/engine-forced-check-3a/design — ADR-2 (gemelo of resolveTargetAc.ts).
  *
+ * ADR-2 REVERSAL: The original sdd/engine-forced-check-3a/design ADR-2 declared this file
+ * STANDALONE (no shared helper). Per FORK-1 decision #2137 (consumer count went 1→2),
+ * the PC-success branch now EXPOSES the already-built EvaluationContext, ModifierRegistry,
+ * and derived barbarianLevel as a `gather` payload. performForcedCheck reuses them for the
+ * save-advantage gather query (D1 / sdd/engine-save-advantage-gather/design).
+ * This is a deliberate reversal of the original ADR-2 stance — do NOT silently re-revert.
+ *
  * STANDALONE: does NOT extract a shared helper with resolveTargetAc — accepted tech debt ADR-2.
  * The duplication is ~6 loader lines, acceptable until a future consolidation slice.
  *
@@ -32,6 +39,7 @@ import {
   deriveSavingThrowProficiencies,
   type EvaluationContext,
   type EntityId,
+  type ModifierRegistry,
 } from '@dungeon-hub/domain/engine';
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
@@ -47,7 +55,21 @@ export type Ability = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 // ── Result union ───────────────────────────────────────────────────────────────
 
 export type ResolveTargetSaveResult =
-  | { ok: true; saveMod: number }
+  | {
+      ok: true;
+      saveMod: number;
+      // ── Gather payload (PC path only; FORK-1 #2137, reverses ADR-2) ──
+      // Present ONLY on the PC branch. NPC branch omits this field entirely
+      // (exactOptionalPropertyTypes: never assign gather: undefined).
+      // Caller narrows by: saveResult.gather !== undefined
+      gather?: {
+        charId: EntityId;           // branded character EntityId (== registry owner)
+        ctx: EvaluationContext;     // built ctx (self.conditions populated from selfConditions param)
+        registry: ModifierRegistry; // inventory + persisted + saveProf mods already registered
+        barbarianLevel: number;     // summed barbarian class level from charData.classes (0 if none)
+      };
+    }
+  | { ok: true; saveMod: number }                    // NPC branch — no gather (unchanged shape)
   | { ok: false; code: 'NO_TARGET_SAVE' }            // NPC with null npcSaveMod
   | { ok: false; code: 'NOT_FOUND'; target: 'character' };
 
@@ -64,8 +86,12 @@ export type ResolveTargetSaveResult =
  * ADR-2: PC path adds ~4 DB queries (char SELECT + modifier catalog + persisted mods).
  * Cloak of Protection (+1 saves) is captured via loadPersistedModifiers.
  *
- * @param target    - Combatant data: kind, characterId, and ability to resolve.
- * @param npcSaveMod - Caller-supplied NPC save modifier (null/undefined → NO_TARGET_SAVE).
+ * @param target          - Combatant data: kind, characterId, and ability to resolve.
+ * @param npcSaveMod      - Caller-supplied NPC save modifier (null/undefined → NO_TARGET_SAVE).
+ * @param selfConditions  - Saver's current conditions, used to populate ctx.self.conditions on the
+ *                          PC path (REQ-GATHER-04 / D7). Default [] preserves all existing callers.
+ *                          Ignored on NPC path (no gather). Zero extra DB reads — caller reuses
+ *                          already-loaded condition rows.
  */
 export async function resolveTargetSave(
   target: {
@@ -74,6 +100,7 @@ export async function resolveTargetSave(
     ability: Ability;
   },
   npcSaveMod: number | null | undefined,
+  selfConditions: { name: string }[] = [],
 ): Promise<ResolveTargetSaveResult> {
   // ── NPC path ─────────────────────────────────────────────────────────────────
   if (target.kind === 'npc') {
@@ -148,9 +175,11 @@ export async function resolveTargetSave(
   const inventoryMods = deriveCharacterModifiers(inventory, charId, modifierCatalog);
 
   // Step 5: Build EvaluationContext (minimal — no weaponInUse needed for saves).
+  // selfConditions populates ctx.self.conditions so dangerSense/rage predicates
+  // can evaluate suppression at query time (REQ-GATHER-03 / D7 / ADR-5).
   const ctx: EvaluationContext = {
-    self: { id: charId, conditions: [] },
-    activeConditions: [],
+    self: { id: charId, conditions: selfConditions },
+    activeConditions: selfConditions,
   };
 
   // Step 6: Load persisted modifier_instances (captures Cloak of Protection +1 saves, Bless, etc.).
@@ -180,5 +209,22 @@ export async function resolveTargetSave(
     sheet.proficiencyBonus,
   );
 
-  return { ok: true, saveMod: resolved.value };
+  // Derive barbarianLevel for Gate A threshold check (Danger Sense requires L2+, PHB p.48).
+  // Uses c.slug (not c.classSlug) — matches charData shape in build-attack-context.ts:542.
+  const barbarianLevel = rawClasses
+    .filter((c) => c.slug === 'barbarian')
+    .reduce((sum, c) => sum + c.level, 0);
+
+  // Return PC arm with gather payload (FORK-1 #2137, reverses ADR-2).
+  // REQ-GATHER-01: gather present on PC branch; absent (not undefined) on NPC branch.
+  return {
+    ok: true,
+    saveMod: resolved.value,
+    gather: {
+      charId,
+      ctx,
+      registry,
+      barbarianLevel,
+    },
+  };
 }
