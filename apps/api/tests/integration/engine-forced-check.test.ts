@@ -973,6 +973,7 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
         expect(res.statusCode).toBe(200);
         const body = res.json();
         expect(body.save.d20All.length).toBe(1);
+        expect(body.save.rollMode).toBe('normal');
       },
     );
 
@@ -1005,6 +1006,7 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
         // Incapacitated alone does not auto-fail DEX saves (only Stunned/Petrified do).
         // Rolled normally; Danger Sense suppressed.
         expect(body.save.d20All.length).toBe(1);
+        expect(body.save.rollMode).toBe('normal');
       },
     );
 

@@ -122,6 +122,16 @@ describe('extraAttacksPerAction — Non-martial classes (always 1)', () => {
     // Feature is now LIVE. Monk is included in MARTIAL_L5_SLUGS.
     expect(extraAttacksPerAction([cls('monk', 5)])).toBe(2);
   });
+
+  it('Monk L4 → 1 attack (below Extra Attack threshold, PHB p.79)', () => {
+    // PHB p.79: Extra Attack begins at 5th level — L4 has no Extra Attack.
+    expect(extraAttacksPerAction([cls('monk', 4)])).toBe(1);
+  });
+
+  it('Monk L10 → 2 attacks (no scaling beyond 2 — only Fighter scales, PHB p.72 vs p.79)', () => {
+    // PHB p.72: Extra Attack 2/3 (L11/L20) are Fighter-only. Monk stays at 2.
+    expect(extraAttacksPerAction([cls('monk', 10)])).toBe(2);
+  });
 });
 
 describe('extraAttacksPerAction — Classless / empty array (NPC, REQ-AE-08)', () => {
