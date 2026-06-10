@@ -90,6 +90,10 @@ export type Trigger =
   // B6 — REQ-TRIGGER-01: on-check trigger for ability check advantage grants (PHB p.174).
   // Positioned after 'on-save' — symmetric pair per D4.
   | 'on-check'
+  // B7 — REQ-TRIGGER-01: on-initiative trigger for Feral Instinct initiative advantage (PHB p.50).
+  // Positioned after 'on-check' for the symmetric-pair pattern (design D2).
+  // Isolation: {trigger:'on-initiative'} query DOES NOT match 'on-check' instances → no leak.
+  | 'on-initiative'
   | 'on-cast'
   | 'on-attacked'
   | 'on-hit'

@@ -293,6 +293,9 @@ export { rageRuleDoc } from './rules-authored/rage.js';
 export { recklessAttackRuleDoc } from './rules-authored/reckless-attack.js';
 export { dangerSenseRuleDoc } from './rules-authored/danger-sense.js';
 
+// B7 — Feral Instinct (PHB p.50 — advantage on initiative rolls, barbarian level 7)
+export { feralInstinctRuleDoc } from './rules-authored/feral-instinct.js';
+
 export { buildInvisibleModifiers } from './rules/invisible.js';
 export type { BuildInvisibleResult } from './rules/invisible.js';
 

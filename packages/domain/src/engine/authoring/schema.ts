@@ -243,6 +243,10 @@ export const RuleEmitSchema = z.object({
       'on-save',
       // B6 — REQ-TRIGGER-01: on-check trigger for ability check advantage grants (PHB p.174)
       'on-check',
+      // B7 — REQ-TRIGGER-01: on-initiative trigger for Feral Instinct (PHB p.50, design D2)
+      // MUST be in BOTH types.ts Trigger union AND this Zod enum (dual-location rule).
+      // Absence here → parseRule rejects feralInstinctRuleDoc.
+      'on-initiative',
       'on-cast',
       'on-attacked',
       'on-damage',
