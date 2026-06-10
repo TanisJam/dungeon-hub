@@ -36,9 +36,9 @@ const FIGHTER_SLUG = 'fighter';
 
 /**
  * Classes that gain Extra Attack at L5 with NO further scaling.
- * PHB p.49 (Barbarian), p.84 (Paladin), p.89 (Ranger).
+ * PHB p.49 (Barbarian), p.84 (Paladin), p.89 (Ranger), p.79 (Monk).
  */
-const MARTIAL_L5_SLUGS: ReadonlySet<string> = new Set(['barbarian', 'paladin', 'ranger']);
+const MARTIAL_L5_SLUGS: ReadonlySet<string> = new Set(['barbarian', 'paladin', 'ranger', 'monk']);
 
 // ── extraAttacksPerAction ─────────────────────────────────────────────────────
 
@@ -86,8 +86,7 @@ function attacksForClass(slug: string, level: number): number {
     return level >= 5 ? 2 : 1;
   }
 
-  // Monk Extra Attack (PHB p.79) IS granted at L5 — known compliance gap, DEFERRED.
-  // See engram sdd/engine-barbarian-dsl-4. Wizard/Cleric/Rogue genuinely do not grant it.
+  // All other classes (Wizard, Cleric, Rogue, etc.) genuinely do not grant Extra Attack.
   return 1;
 }
 
