@@ -58,11 +58,13 @@ const cryptoRng: RngFn = (sides: number): number => {
 // Mirrors build-attack-context.ts:59/63 pattern.
 
 // PHB p.48 — Danger Sense: advantage on DEX saves when not Blinded/Deafened/Incapacitated.
-// Gate A in Step 6b: registers when ability==='dex' && barbarianLevel>=2.
+// B6 D5: registers when barbarianLevel>=2 (unconditional on ability — saveAbility:'dex'
+// leaf in predicate gates DEX-only at query time via ctx.save.ability).
 const compiledDangerSense = compileRule(dangerSenseRuleDoc);
 
 // PHB p.48 — Rage: advantage on STR saves (and checks) while raging.
-// Gate B in Step 6b: registers when ability==='str' && isRaging(conditions).
+// B6 D5: registers when isRaging (unconditional on ability — saveAbility:'str'
+// leaf in emit 2 predicate gates STR-only at query time via ctx.save.ability).
 const compiledRage = compileRule(rageRuleDoc);
 
 // ── Condition catalog (hardcoded in 3a) ───────────────────────────────────────
@@ -315,12 +317,14 @@ export async function performForcedCheck(
   if ('gather' in saveResult && saveResult.gather !== undefined && rollMode === 'normal') {
     const { gather } = saveResult;
 
-    // ── Gate A: Danger Sense (PHB p.48) — DEX save + barbarian L2+ ───────────
-    // REQ-GATHER-05: register compiledDangerSense instances when ability==='dex'
-    // AND barbarianLevel>=2. The !Blinded/!Deafened/!Incapacitated suppression
-    // is handled by the predicate at query time via ctx.self.conditions (D7).
-    // TODO B6: saveAbility predicate leaf would replace this caller-side ability gate (#2135).
-    if (ability === 'dex' && gather.barbarianLevel >= 2) {
+    // ── Danger Sense (PHB p.48) — barbarian L2+ ──────────────────────────────
+    // Register compiledDangerSense instances when barbarianLevel>=2.
+    // B6 D5: the ability==='dex' guard (Gate A) is DELETED — the saveAbility:'dex'
+    // leaf in dangerSenseRuleDoc now gates DEX-save-only at predicate-eval time via
+    // ctx.save.ability (populated in resolve-target-save.ts). The barbarianLevel>=2
+    // threshold is a level gate (PHB p.48: "At 2nd level") — not replaced by a leaf.
+    // The !Blinded/!Deafened/!Incapacitated suppression remains in the predicate (D7).
+    if (gather.barbarianLevel >= 2) {
       for (const i of compiledDangerSense
         .build({ barbarianId: gather.charId })
         .filter((i) => i.def.kind === 'advantage')) {
@@ -328,14 +332,12 @@ export async function performForcedCheck(
       }
     }
 
-    // ── Gate B: Rage STR-save (PHB p.48) — STR save + isRaging ──────────────
-    // REQ-GATHER-06: register compiledRage advantage instances when ability==='str'
-    // AND isRaging(ctx.self.conditions). The caller-side ability==='str' gate is
-    // REQUIRED — rage emit 2 has trigger:'always' and predicate hasCondition:Raging
-    // only (no ability gate); without this guard, a Raging barbarian would gain
-    // advantage on ALL saves (PHB violation — rage is STR-only, PHB p.48).
-    // TODO B6: saveAbility predicate leaf would replace this caller-side ability gate (#2135).
-    if (ability === 'str' && isRaging(gather.ctx.self.conditions)) {
+    // ── Rage STR-save advantage (PHB p.48) ───────────────────────────────────
+    // Register compiledRage advantage instances when isRaging.
+    // B6 D5: the ability==='str' guard (Gate B) is DELETED — the saveAbility:'str'
+    // leaf in rage emit 2 now gates STR-save-only at predicate-eval time via
+    // ctx.save.ability (populated in resolve-target-save.ts).
+    if (isRaging(gather.ctx.self.conditions)) {
       const rageInstances = compiledRage.build({
         ragerId: gather.charId,
         rageBonus: 2,  // dummy — advantage emits don't read rageBonus (NumMod emit 6 does, skipped)
@@ -348,8 +350,9 @@ export async function performForcedCheck(
 
     // ── Step 6c: query + resolveRollMode + precedence ────────────────────────
     // REQ-GATHER-08: query({trigger:'on-save'}) matches 'on-save' AND 'always' instances
-    // (query.ts:59 always-matches-any-trigger — documented behaviour; rage Gate B
-    // ensures the rage instance only reaches here on STR saves).
+    // (query.ts:59 always-matches-any-trigger — documented behaviour).
+    // B6: saveAbility leaves in dangerSense + rage emit 2 gate ability at predicate-eval
+    // time via ctx.save.ability — ability gates are now declarative, not imperative.
     const gatherMods = gather.registry.query({
       trigger: 'on-save',
       self: gather.charId,

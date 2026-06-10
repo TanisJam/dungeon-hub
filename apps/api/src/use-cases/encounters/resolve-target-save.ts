@@ -177,9 +177,12 @@ export async function resolveTargetSave(
   // Step 5: Build EvaluationContext (minimal — no weaponInUse needed for saves).
   // selfConditions populates ctx.self.conditions so dangerSense/rage predicates
   // can evaluate suppression at query time (REQ-GATHER-03 / D7 / ADR-5).
+  // B6 D1: save.ability populated so saveAbility leaf evaluates the governing ability
+  // (dangerSense saveAbility:'dex' + rage emit 2 saveAbility:'str' require this field).
   const ctx: EvaluationContext = {
     self: { id: charId, conditions: selfConditions },
     activeConditions: selfConditions,
+    save: { ability: target.ability },
   };
 
   // Step 6: Load persisted modifier_instances (captures Cloak of Protection +1 saves, Bless, etc.).

@@ -514,3 +514,201 @@ describe('engine-ability-check — POST /encounters/:id/actions/ability-check', 
     expect(result.body.error).toBe('FORBIDDEN');
   });
 });
+
+// ── CHECK-T8: Regression canary — Gate A/B deletion preserves save-advantage paths ──────────────
+//
+// After deleting the imperative Gates A/B from perform-forced-check.ts, the forced-check route
+// must still grant advantage on DEX saves (dangerSense saveAbility:'dex') and STR saves
+// (rage emit 2 saveAbility:'str'). These test the declarative predicate path via ctx.save.ability.
+//
+// This is a separate describe block to isolate the regression concern from the ability-check surface.
+//
+// PHB p.48: "advantage on Strength checks and Strength saving throws" (rage)
+//           "advantage on Dexterity saving throws" (danger sense, L2+)
+// B6 D5: Gates A/B deleted; ctx.save.ability field populated in resolve-target-save.ts.
+
+describe('CHECK-T8: Gate deletion regression canary — forced-check save-advantage paths', () => {
+  let gm: TestUser;
+  let campaignId: string;
+  let worldId: string;
+
+  const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+    if (res.statusCode !== 200 && res.statusCode !== 201) {
+      throw new Error(`${label}: expected 200/201, got ${res.statusCode} — ${res.body}`);
+    }
+  };
+
+  /** Insert 'Raging' condition directly into DB. */
+  const setRaging = async (combatantId: string, turnsRemaining = 10): Promise<void> => {
+    const { db } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
+    await db.insert(encounterCombatantConditions).values({
+      combatantId,
+      conditionName: 'Raging',
+      appliedByCombatantId: combatantId,
+      turnAnchorEntityId: combatantId,
+      turnAnchorBoundary: 'end',
+      turnsRemaining,
+    });
+  };
+
+  /**
+   * Create a Barbarian PC at the given level and return a fresh encounter.
+   * Stats: STR 15 (+2), DEX 14 (+2). DC=1 always succeeds.
+   */
+  const makeBarbarianEncounter = async (label: string, level: number) => {
+    const app = await getTestApp();
+
+    const charRes = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: `Barbarian CHECK-T8 (${label})` },
+      })
+      .then((r) => r.json());
+    const charId = charRes.id as string;
+
+    await expectOk(
+      `${label}: stats`,
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/stats`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { method: 'standard-array', scores: { str: 15, dex: 14, con: 13, int: 8, wis: 12, cha: 10 } },
+      }),
+    );
+    await expectOk(
+      `${label}: class`,
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/class`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { class: { slug: 'barbarian', source: 'PHB' }, level, skillChoices: ['athletics', 'animal handling'] },
+      }),
+    );
+
+    const enc = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          campaignId,
+          name: `CHECK-T8 ${label}`,
+          combatants: [
+            { name: 'Barbarian', kind: 'pc', characterId: charId, initiative: 20, hpCurrent: 20, hpMax: 20 },
+            { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 20, hpMax: 20, ac: 13 },
+          ],
+        },
+      })
+      .then((r) => r.json());
+
+    const barbarianCombatantId = enc.currentCombatantId as string;
+    return { encounterId: enc.id as string, barbarianCombatantId, charId };
+  };
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    gm = await createTestUser();
+
+    const campaign = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/campaigns',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { name: 'CHECK-T8 Gate Regression Campaign' },
+      })
+      .then((r) => r.json());
+    campaignId = campaign.id;
+    worldId = campaign.worldId as string;
+  });
+
+  afterAll(async () => {
+    await deleteTestUser(gm.id);
+  });
+
+  it('CHECK-T8a: Barbarian L2, DEX save vs DC=1 → rollMode=advantage (saveAbility:dex leaf fires, PHB p.48)', async () => {
+    // PHB p.48: "Danger Sense — advantage on Dexterity saving throws" (L2+).
+    // B6 D5: Gate A deleted. dangerSenseRuleDoc predicate now has saveAbility:'dex' leaf.
+    // resolve-target-save.ts spreads ctx.save.ability='dex' → leaf returns true → advantage granted.
+    // d20All.length===2 is RNG-independent (always 2 with advantage).
+    const app = await getTestApp();
+    const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter('T8a-DEX-L2', 2);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: {
+        targetCombatantId: barbarianCombatantId,
+        ability: 'dex',
+        dc: 1, // DC=1 guarantees success; focus is rollMode
+        conditionOnFail: 'Blinded',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.outcome).toBe('save'); // DC=1 always passes
+    // REQ-HYGIENE-01: unconditional advantage assertion post-Gate-A deletion.
+    expect(body.save.d20All).toHaveLength(2);
+    expect(body.save.rollMode).toBe('advantage');
+  });
+
+  it('CHECK-T8b: Raging barbarian L1, STR save vs DC=1 → rollMode=advantage (saveAbility:str leaf fires, PHB p.48)', async () => {
+    // PHB p.48: "While raging, you have advantage on...Strength saving throws."
+    // B6 D5: Gate B deleted. rage emit 2 predicate now has saveAbility:'str' leaf.
+    // resolve-target-save.ts spreads ctx.save.ability='str' → leaf returns true → advantage granted.
+    const app = await getTestApp();
+    const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter('T8b-STR-Raging', 1);
+
+    await setRaging(barbarianCombatantId);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: {
+        targetCombatantId: barbarianCombatantId,
+        ability: 'str',
+        dc: 1,
+        conditionOnFail: 'Blinded',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.outcome).toBe('save'); // DC=1 always passes
+    // REQ-HYGIENE-01: unconditional advantage assertion post-Gate-B deletion.
+    expect(body.save.d20All).toHaveLength(2);
+    expect(body.save.rollMode).toBe('advantage');
+  });
+
+  it('CHECK-T8c: Barbarian L1, DEX save vs DC=1 → rollMode=normal (no false-positive from dangerSense L2 threshold)', async () => {
+    // B6 D5: Gate A deletion must not cause false-positives for L1 barbarians.
+    // The barbarianLevel>=2 registration guard in perform-forced-check.ts is PRESERVED.
+    // L1 barbarian: compiledDangerSense not registered → no advantage.
+    const app = await getTestApp();
+    const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter('T8c-DEX-L1', 1);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: {
+        targetCombatantId: barbarianCombatantId,
+        ability: 'dex',
+        dc: 1,
+        conditionOnFail: 'Blinded',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.outcome).toBe('save');
+    // L1 barbarian does NOT get danger-sense advantage — no false positive.
+    expect(body.save.d20All).toHaveLength(1);
+    expect(body.save.rollMode).toBe('normal');
+  });
+});
