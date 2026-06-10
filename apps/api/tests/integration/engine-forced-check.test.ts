@@ -754,6 +754,381 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
     },
   );
 
+  // ── Save-advantage gather — Danger Sense + Rage (PHB p.48) ──────────────────────
+  //
+  // DS-T1..DS-T6: Danger Sense (Barbarian L2+, DEX save, PHB p.48)
+  // RAGE-Tx:      Rage STR-save gate (PHB p.48 — rage is STR-only)
+  // RAGE-Tcombo:  Danger Sense fires while raging (DEX axis) — no-stack PHB p.173
+  //
+  // Fixture pattern: makeBarbarianEncounter + setBarbarianCondition helpers below.
+  // Determinism (REQ-HYGIENE-03): DC=1 (always succeeds) → advantage proven by d20All.length===2.
+  // No RNG retry loops — saves have no nat-20/nat-1 special case (PHB p.179).
+  //
+  // REQ-CANCEL-01: cancellation (adv+disadv→normal) is unit-level only (resolveRollMode).
+  // No on-save DISADVANTAGE source exists today — no integration cancellation test needed.
+  // See packages/domain/src/engine/resolve/roll-mode.test.ts (7 existing unit tests cover PHB p.173).
+
+  /** Barbarian character ID shared across DS-T and RAGE-T describe block. */
+  let barbarianCharId: string;
+
+  /**
+   * makeBarbarianEncounter — creates a Barbarian character at the given level and an
+   * encounter with that barbarian as the PC combatant vs a single NPC goblin.
+   *
+   * Stats: STR 15 (+2), DEX 14 (+2), CON 14 (+2) — ensures deterministic saves at DC=1.
+   * All fixture setup steps assert statusCode 200/201 (REQ-HYGIENE-01).
+   *
+   * Returns { encounterId, barbarianCombatantId, npcCombatantId }.
+   */
+  const makeBarbarianEncounter = async (
+    app: Awaited<ReturnType<typeof getTestApp>>,
+    barbarianLevel: number,
+    label: string,
+  ): Promise<{ encounterId: string; barbarianCombatantId: string; npcCombatantId: string }> => {
+    // Create a fresh barbarian character for each scenario to avoid cross-test state.
+    const charRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/characters',
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { worldId, name: `Barbarian (${label})` },
+    });
+    expect(charRes.statusCode).toBe(201);
+    const charId = charRes.json().id as string;
+    barbarianCharId = charId;
+
+    await expectOk(
+      `${label}: set-stats`,
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/stats`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          method: 'standard-array',
+          // Standard array: [15,14,13,12,10,8] — all distinct. STR=15(+2), DEX=14(+2), CON=13(+1).
+          // DC=1 always succeeds with any positive save mod.
+          scores: { str: 15, dex: 14, con: 13, int: 8, wis: 10, cha: 12 },
+        },
+      }),
+    );
+
+    await expectOk(
+      `${label}: set-class`,
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${charId}/class`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          class: { slug: 'barbarian', source: 'PHB' },
+          level: barbarianLevel,
+          skillChoices: ['athletics', 'animal handling'],
+        },
+      }),
+    );
+
+    const enc = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          campaignId,
+          name: label,
+          combatants: [
+            {
+              name: 'Barbarian',
+              kind: 'pc',
+              characterId: charId,
+              initiative: 20,
+              hpCurrent: 20,
+              hpMax: 20,
+            },
+            {
+              name: 'Goblin',
+              kind: 'npc',
+              initiative: 5,
+              hpCurrent: 20,
+              hpMax: 20,
+              ac: 13,
+            },
+          ],
+        },
+      })
+      .then((r) => r.json());
+    expect(enc.id).toBeDefined();
+
+    const barbarianCombatantId = enc.currentCombatantId as string;
+    const npcCombatantId =
+      (enc.combatants.find((c: { id: string }) => c.id !== barbarianCombatantId)?.id as string) ?? '';
+    expect(barbarianCombatantId).not.toBe('');
+    expect(npcCombatantId).not.toBe('');
+
+    return { encounterId: enc.id as string, barbarianCombatantId, npcCombatantId };
+  };
+
+  /**
+   * setBarbarianCondition — inserts a condition into encounterCombatantConditions for
+   * the given combatant (mirrors engine-rage.test.ts setRaging pattern).
+   * All DS-T suppression tests use this to pre-set Blinded/Deafened/Incapacitated.
+   */
+  const setBarbarianCondition = async (combatantId: string, conditionName: string): Promise<void> => {
+    const { db: dbLocal } = await import('../../src/infra/db/client.js');
+    const { encounterCombatantConditions: ecc } = await import('../../src/infra/db/schema.js');
+    await dbLocal.insert(ecc).values({
+      combatantId,
+      conditionName,
+      appliedByCombatantId: null,
+      turnAnchorEntityId: null,
+      turnAnchorBoundary: null,
+      turnsRemaining: null,
+    });
+  };
+
+  /**
+   * setRagingCondition — inserts 'Raging' condition directly (mirrors engine-rage.test.ts setRaging).
+   */
+  const setRagingCondition = async (combatantId: string): Promise<void> => {
+    await setBarbarianCondition(combatantId, 'Raging');
+  };
+
+  describe('Save-advantage gather — Danger Sense + Rage (PHB p.48)', () => {
+    // DS-T1: Barbarian L2, DEX save, not suppressed → advantage (REQ-GATHER-05)
+    it(
+      'DS-T1: Barbarian-L2, DEX save, no suppressing conditions → d20All.length===2, rollMode===advantage (PHB p.48)',
+      async () => {
+        // PHB p.48: "At 2nd level, you gain ... advantage on Dexterity saving throws ... you can't be blinded, deafened, or incapacitated."
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'DS-T1');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1, // DC=1 always succeeds; advantage proven by d20All.length===2 (REQ-HYGIENE-03)
+            conditionOnFail: 'Stunned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.outcome).toBe('save');
+        // REQ-HYGIENE-02: exact, unconditional assertions — no hedge asserts.
+        expect(body.save.d20All.length).toBe(2);
+        expect(body.save.rollMode).toBe('advantage');
+      },
+    );
+
+    // DS-T2: Barbarian L2, DEX save, Blinded → suppressed (REQ-GATHER-05 predicate)
+    it(
+      'DS-T2: Barbarian-L2, DEX save, Blinded set → suppressed → d20All.length===1 (PHB p.48)',
+      async () => {
+        // PHB p.48: "you can't be blinded ... to gain this benefit"
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'DS-T2');
+        await setBarbarianCondition(barbarianCombatantId, 'Blinded');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.outcome).toBe('save');
+        expect(body.save.d20All.length).toBe(1);
+        expect(body.save.rollMode).toBe('normal');
+      },
+    );
+
+    // DS-T3: Barbarian L2, DEX save, Deafened → suppressed (distinct PHB clause)
+    it(
+      'DS-T3: Barbarian-L2, DEX save, Deafened set → suppressed → d20All.length===1 (PHB p.48)',
+      async () => {
+        // PHB p.48: "you can't be ... deafened"
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'DS-T3');
+        await setBarbarianCondition(barbarianCombatantId, 'Deafened');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.save.d20All.length).toBe(1);
+      },
+    );
+
+    // DS-T4: Barbarian L2, DEX save, Incapacitated → suppressed (distinct PHB clause)
+    it(
+      'DS-T4: Barbarian-L2, DEX save, Incapacitated set → suppressed → d20All.length===1 (PHB p.48)',
+      async () => {
+        // PHB p.48: "you can't be ... incapacitated"
+        // NOTE: Incapacitated also causes auto-fail on STR/DEX (PHB p.292), but for DEX
+        // saves Incapacitated alone does NOT trigger auto-fail (Stunned/Petrified do).
+        // Forced-check will roll normally and Danger Sense will be suppressed.
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'DS-T4');
+        await setBarbarianCondition(barbarianCombatantId, 'Incapacitated');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        // Incapacitated alone does not auto-fail DEX saves (only Stunned/Petrified do).
+        // Rolled normally; Danger Sense suppressed.
+        expect(body.save.d20All.length).toBe(1);
+      },
+    );
+
+    // DS-T5: Barbarian L2, WIS save (non-DEX) → no advantage (proves DEX gate)
+    it(
+      'DS-T5: Barbarian-L2, WIS save (non-DEX), no suppressing conditions → d20All.length===1 (proves DEX gate, PHB p.48)',
+      async () => {
+        // PHB p.48: Danger Sense is DEX-only. WIS save must NOT get advantage.
+        // Gate A check: ability==='dex' prevents registration on non-DEX saves.
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'DS-T5');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'wis',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.save.d20All.length).toBe(1);
+      },
+    );
+
+    // DS-T6: Barbarian L1, DEX save → no advantage (proves L2 threshold gate)
+    it(
+      'DS-T6: Barbarian-L1, DEX save, no suppressing conditions → d20All.length===1 (proves L2 threshold gate, PHB p.48)',
+      async () => {
+        // PHB p.48: "At 2nd level, you gain an uncanny sense ..."
+        // Level 1 barbarian has NOT yet gained Danger Sense.
+        // Gate A check: barbarianLevel >= 2 prevents registration for L1.
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 1, 'DS-T6');
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.save.d20All.length).toBe(1);
+      },
+    );
+
+    // RAGE-Tx: Raging Barbarian L1, CON save → no advantage (proves STR gate)
+    it(
+      'RAGE-Tx: Raging Barbarian-L1, CON save (non-STR/non-DEX) → d20All.length===1 (proves STR gate, PHB p.48)',
+      async () => {
+        // PHB p.48: "You have advantage on Strength ... saving throws."
+        // Rage advantage is STR-ONLY. CON save must NOT get advantage even while raging.
+        // Use L1 to avoid Danger Sense interaction (DEX axis isolated from Danger Sense).
+        // Gate B check: ability==='str' prevents registration on non-STR saves.
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 1, 'RAGE-Tx');
+        await setRagingCondition(barbarianCombatantId);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'con',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.save.d20All.length).toBe(1);
+      },
+    );
+
+    // RAGE-Tcombo: Raging Barbarian L2+, DEX save, not suppressed → advantage via Danger Sense (PHB p.173 no-stacking)
+    it(
+      'RAGE-Tcombo: Raging Barbarian-L2, DEX save, not suppressed → d20All.length===2 (Danger Sense only; PHB p.173 no-stacking)',
+      async () => {
+        // PHB p.48: Danger Sense fires on DEX axis; Rage gate B requires STR axis.
+        // PHB p.173: "if circumstances cause a roll to have both advantage and disadvantage,
+        //            you are considered to have neither" — and multiple advantage sources
+        //            still roll only ONE extra d20 (not one per source).
+        // With DEX save + L2+ barbarian + Raging: Danger Sense (Gate A) registers.
+        // Rage (Gate B) does NOT register (ability !== 'str').
+        // Result: single advantage source → d20All.length===2 (not 3).
+        const app = await getTestApp();
+        const { encounterId, barbarianCombatantId } = await makeBarbarianEncounter(app, 2, 'RAGE-Tcombo');
+        await setRagingCondition(barbarianCombatantId);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/api/v1/encounters/${encounterId}/actions/forced-check`,
+          headers: { authorization: `Bearer ${gm.accessToken}` },
+          payload: {
+            targetCombatantId: barbarianCombatantId,
+            ability: 'dex',
+            dc: 1,
+            conditionOnFail: 'Poisoned',
+          },
+        });
+
+        expect(res.statusCode).toBe(200);
+        const body = res.json();
+        expect(body.outcome).toBe('save');
+        expect(body.save.d20All.length).toBe(2);
+        expect(body.save.rollMode).toBe('advantage');
+      },
+    );
+  });
+
   // ── CID-INCAP tests: concentration break on incapacitation (REQ-CID-01, ADR-4, Batch A2) ──
   //
   // PHB p.203: concentration ends when the caster becomes Incapacitated.

@@ -30,11 +30,15 @@ import { encounters, encounterCombatants, encounterCombatantConditions } from '.
 import {
   rollSavingThrow,
   isImmuneToCondition,
+  isRaging,
+  compileRule,
+  rageRuleDoc,
+  dangerSenseRuleDoc,
+  resolveRollMode,
   type RngFn,
 } from '@dungeon-hub/domain/engine';
 import { resolveTargetSave, type Ability } from './resolve-target-save.js';
 import { breakConcentration } from '../engine/concentration-service.js';
-import { isRaging } from '@dungeon-hub/domain/engine';
 
 // ── Crypto RNG (mirrors perform-weapon-attack-apply.ts) ───────────────────────
 
@@ -47,6 +51,19 @@ const cryptoRng: RngFn = (sides: number): number => {
   globalThis.crypto.getRandomValues(buf);
   return (buf[0]! % sides) + 1;
 };
+
+// ── Module-scope compiled rules (D2 / REQ-GATHER-07) ──────────────────────────
+
+// Compiled once at module scope — pure/no-IO. .build() called per request inside gate blocks.
+// Mirrors build-attack-context.ts:59/63 pattern.
+
+// PHB p.48 — Danger Sense: advantage on DEX saves when not Blinded/Deafened/Incapacitated.
+// Gate A in Step 6b: registers when ability==='dex' && barbarianLevel>=2.
+const compiledDangerSense = compileRule(dangerSenseRuleDoc);
+
+// PHB p.48 — Rage: advantage on STR saves (and checks) while raging.
+// Gate B in Step 6b: registers when ability==='str' && isRaging(conditions).
+const compiledRage = compileRule(rageRuleDoc);
 
 // ── Condition catalog (hardcoded in 3a) ───────────────────────────────────────
 
@@ -265,23 +282,10 @@ export async function performForcedCheck(
     };
   }
 
-  // ── Step 5b: Raging STR-save advantage (REQ-RAGE-04, PHB p.48 — ADR-6 Option A) ──
-  // PHB p.48: "You have advantage on Strength checks and Strength saving throws."
-  // Pre-compute rollMode upgrade: if the TARGET is Raging and the ability is 'str',
-  // upgrade rollMode → 'advantage' (explicit caller-supplied rollMode still wins if provided,
-  // unless the caller left it at the default 'normal').
-  // ADR-6: derive INSIDE performForcedCheck so every caller benefits without duplication.
-  // NOTE: existingConditionNames is already loaded in Step 4 — no additional DB query needed.
-  let resolvedRollMode = rollMode;
-  if (
-    resolvedRollMode === 'normal' &&
-    ability === 'str' &&
-    isRaging(existingConditionRows.map((r) => ({ name: r.conditionName })))
-  ) {
-    resolvedRollMode = 'advantage';
-  }
-
   // ── Step 6: Resolve target save modifier ──────────────────────────────────────
+  // Pass selfConditions (Step 4 rows) to populate ctx.self.conditions on the PC path
+  // so dangerSense/rage predicates evaluate correctly at query time (REQ-GATHER-04 / D7).
+  // Zero extra DB read — reuses existingConditionRows already loaded in Step 4.
   const saveResult = await resolveTargetSave(
     {
       kind: targetCombatant.kind as 'pc' | 'npc',
@@ -289,6 +293,7 @@ export async function performForcedCheck(
       ability,
     },
     npcSaveMod ?? null,
+    existingConditionRows.map((r) => ({ name: r.conditionName })),
   );
 
   if (!saveResult.ok) {
@@ -300,8 +305,66 @@ export async function performForcedCheck(
 
   const { saveMod } = saveResult;
 
+  // ── Step 6b + 6c: Save-advantage gather (D2 / REQ-GATHER-08/09) ──────────────
+  // Only fires on PC path (saveResult.gather present) when caller left rollMode at default
+  // 'normal'. Explicit caller rollMode wins (REQ-GATHER-10 — caller-wins-on-explicit).
+  // REQ-GATHER-12: no on-save DISADVANTAGE source exists today; rollModeResult.mode is
+  // only 'normal'|'advantage' this batch — rule written generically for future emits.
+  let resolvedRollMode = rollMode;
+
+  if ('gather' in saveResult && saveResult.gather !== undefined && rollMode === 'normal') {
+    const { gather } = saveResult;
+
+    // ── Gate A: Danger Sense (PHB p.48) — DEX save + barbarian L2+ ───────────
+    // REQ-GATHER-05: register compiledDangerSense instances when ability==='dex'
+    // AND barbarianLevel>=2. The !Blinded/!Deafened/!Incapacitated suppression
+    // is handled by the predicate at query time via ctx.self.conditions (D7).
+    // TODO B6: saveAbility predicate leaf would replace this caller-side ability gate (#2135).
+    if (ability === 'dex' && gather.barbarianLevel >= 2) {
+      for (const i of compiledDangerSense
+        .build({ barbarianId: gather.charId })
+        .filter((i) => i.def.kind === 'advantage')) {
+        gather.registry.register(i);
+      }
+    }
+
+    // ── Gate B: Rage STR-save (PHB p.48) — STR save + isRaging ──────────────
+    // REQ-GATHER-06: register compiledRage advantage instances when ability==='str'
+    // AND isRaging(ctx.self.conditions). The caller-side ability==='str' gate is
+    // REQUIRED — rage emit 2 has trigger:'always' and predicate hasCondition:Raging
+    // only (no ability gate); without this guard, a Raging barbarian would gain
+    // advantage on ALL saves (PHB violation — rage is STR-only, PHB p.48).
+    // TODO B6: saveAbility predicate leaf would replace this caller-side ability gate (#2135).
+    if (ability === 'str' && isRaging(gather.ctx.self.conditions)) {
+      const rageInstances = compiledRage.build({
+        ragerId: gather.charId,
+        rageBonus: 2,  // dummy — advantage emits don't read rageBonus (NumMod emit 6 does, skipped)
+        rageCount: 1,  // dummy — mirrors build-attack-context.ts:552 precedent
+      });
+      for (const i of rageInstances.filter((i) => i.def.kind === 'advantage')) {
+        gather.registry.register(i);
+      }
+    }
+
+    // ── Step 6c: query + resolveRollMode + precedence ────────────────────────
+    // REQ-GATHER-08: query({trigger:'on-save'}) matches 'on-save' AND 'always' instances
+    // (query.ts:59 always-matches-any-trigger — documented behaviour; rage Gate B
+    // ensures the rage instance only reaches here on STR saves).
+    const gatherMods = gather.registry.query({
+      trigger: 'on-save',
+      self: gather.charId,
+      ctx: gather.ctx,
+    });
+    const rollModeResult = resolveRollMode(gatherMods, gather.ctx);
+
+    // REQ-GATHER-10: only upgrade from 'normal'; explicit caller rollMode wins.
+    if (rollModeResult.mode !== 'normal') {
+      resolvedRollMode = rollModeResult.mode;
+    }
+  }
+
   // ── Step 7: Roll the saving throw ─────────────────────────────────────────────
-  // Use resolvedRollMode (may be upgraded to 'advantage' by Step 5b Raging gate).
+  // Use resolvedRollMode (may be upgraded by gather Gates A/B — Step 6b/6c).
   const saveRoll = rollSavingThrow(saveMod, dc, resolvedRollMode, cryptoRng);
 
   // ── Step 8: On fail, apply conditions idempotently ───────────────────────────
