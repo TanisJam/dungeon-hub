@@ -96,6 +96,18 @@ const WorldQuerySchema: z.ZodType<unknown> = z.union([
     kind: z.literal('usesAbility'),
     ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
   }),
+  // B6 — REQ-LEAF-01: saveAbility leaf — ability gate for save-advantage grants (PHB p.48/p.179).
+  // Fail-closed: ctx.save absent → false (no throw). Cross-context safe (check ctx → false).
+  z.object({
+    kind: z.literal('saveAbility'),
+    ability: abilityLiterals,
+  }),
+  // B6 — REQ-LEAF-02: checkAbility leaf — ability gate for check-advantage grants (PHB p.48/p.174).
+  // Fail-closed: ctx.check absent → false (no throw). Cross-context safe (save ctx → false).
+  z.object({
+    kind: z.literal('checkAbility'),
+    ability: abilityLiterals,
+  }),
 ]);
 
 // ── PredicateSchema (recursive via z.lazy) ─────────────────────────────────
@@ -229,6 +241,8 @@ export const RuleEmitSchema = z.object({
       'always',
       'on-attack-roll',
       'on-save',
+      // B6 — REQ-TRIGGER-01: on-check trigger for ability check advantage grants (PHB p.174)
+      'on-check',
       'on-cast',
       'on-attacked',
       'on-damage',

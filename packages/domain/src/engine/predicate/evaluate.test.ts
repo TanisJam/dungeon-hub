@@ -24,6 +24,9 @@ import type { EvaluationContext } from '../context.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';
 import type { EntityId } from '../types.js';
 
+// B6 imports for saveAbility/checkAbility leaf tests
+import type { Predicate } from './types.js';
+
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -409,5 +412,76 @@ describe('evaluatePredicate — throw_safety_via_query (REQ-SA-WQ-01 CRITICAL)',
 
     // @ts-expect-error result assigned inside expect() above
     expect(result).toHaveLength(0); // rider excluded — predicate false
+  });
+});
+
+// ── B6: saveAbility leaf (REQ-LEAF-01, EVAL-U1..U2) ─────────────────────────
+
+describe('evaluatePredicate — saveAbility leaf (REQ-LEAF-01, D2, PHB p.48/p.179)', () => {
+  it('EVAL-U1 — saveAbility match: ctx.save.ability===dex + leaf saveAbility:dex → true', () => {
+    // REQ-LEAF-01, LEAF-S1: save context with matching ability → true
+    // PHB p.48: "advantage on Dexterity saving throws" (danger sense)
+    const predicate: Predicate = { op: 'query', q: { kind: 'saveAbility', ability: 'dex' } };
+    const ctx = makeCtx({ save: { ability: 'dex' } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+
+  it('EVAL-U2 — saveAbility absent ctx → false (no throw): check context has no ctx.save', () => {
+    // REQ-LEAF-01, LEAF-S2, D2: cross-context evaluation is EXPECTED — not a programmer error.
+    // saveAbility leaf evaluated during a check query → ctx.save absent → return false.
+    const predicate: Predicate = { op: 'query', q: { kind: 'saveAbility', ability: 'dex' } };
+    const ctx = makeCtx(); // no ctx.save
+    expect(() => evaluatePredicate(predicate, ctx)).not.toThrow();
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('saveAbility mismatch: ctx.save.ability===str + leaf saveAbility:dex → false', () => {
+    // REQ-LEAF-01, LEAF-S5 analogue: ability mismatch → false
+    const predicate: Predicate = { op: 'query', q: { kind: 'saveAbility', ability: 'dex' } };
+    const ctx = makeCtx({ save: { ability: 'str' } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('saveAbility match: ctx.save.ability===str + leaf saveAbility:str → true (PHB p.48 rage)', () => {
+    // PHB p.48: "advantage on Strength saving throws" — rage emit 2 gate
+    const predicate: Predicate = { op: 'query', q: { kind: 'saveAbility', ability: 'str' } };
+    const ctx = makeCtx({ save: { ability: 'str' } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+});
+
+// ── B6: checkAbility leaf (REQ-LEAF-02, EVAL-U3..U5) ─────────────────────────
+
+describe('evaluatePredicate — checkAbility leaf (REQ-LEAF-02, D2, PHB p.48/p.174)', () => {
+  it('EVAL-U3 — checkAbility match: ctx.check.ability===str + leaf checkAbility:str → true', () => {
+    // REQ-LEAF-02, LEAF-S3: check context with matching ability → true
+    // PHB p.48: "advantage on Strength checks" (rage emit 1)
+    const predicate: Predicate = { op: 'query', q: { kind: 'checkAbility', ability: 'str' } };
+    const ctx = makeCtx({ check: { ability: 'str' } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
+  });
+
+  it('EVAL-U4 — checkAbility absent ctx → false (no throw): save context has no ctx.check', () => {
+    // REQ-LEAF-02, LEAF-S4, D2: cross-context evaluation is EXPECTED — not a programmer error.
+    // checkAbility leaf evaluated during a save query → ctx.check absent → return false.
+    const predicate: Predicate = { op: 'query', q: { kind: 'checkAbility', ability: 'str' } };
+    const ctx = makeCtx(); // no ctx.check
+    expect(() => evaluatePredicate(predicate, ctx)).not.toThrow();
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('EVAL-U5 — checkAbility mismatch: ctx.check.ability===dex + leaf checkAbility:str → false', () => {
+    // REQ-LEAF-02, LEAF-S5: ability mismatch → false
+    // PHB p.48: DEX check while raging → rage check advantage should NOT fire (not STR)
+    const predicate: Predicate = { op: 'query', q: { kind: 'checkAbility', ability: 'str' } };
+    const ctx = makeCtx({ check: { ability: 'dex' } });
+    expect(evaluatePredicate(predicate, ctx)).toBe(false);
+  });
+
+  it('checkAbility match on Athletics (REQ-SKILL-01): ctx.check.ability===str (STR governs Athletics)', () => {
+    // PHB p.175: Athletics is a STR check → check.ability='str' → rage's checkAbility:'str' fires
+    const predicate: Predicate = { op: 'query', q: { kind: 'checkAbility', ability: 'str' } };
+    const ctx = makeCtx({ check: { ability: 'str' } }); // 'str' set because Athletics is STR check
+    expect(evaluatePredicate(predicate, ctx)).toBe(true);
   });
 });

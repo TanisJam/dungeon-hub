@@ -152,3 +152,74 @@ describe('parseRule — INVALID_PREDICATE_AST (REQ-SCHEMA-01 / Scenario: Malform
     }
   });
 });
+
+// ── B6: SCHEMA-U1..U3 — on-check trigger + saveAbility/checkAbility leaves ───
+
+describe('parseRule — B6 DSL infra: on-check trigger + saveAbility/checkAbility leaves (REQ-TRIGGER-01, REQ-LEAF-01/02)', () => {
+  const makeBaseRule = (overrides: Record<string, unknown>) => ({
+    id: 'test-b6',
+    source: 'PHB p.48',
+    params: [{ name: 'charId', type: 'EntityId' }],
+    testCases: [],
+    ...overrides,
+  });
+
+  it('SCHEMA-U1 — parseRule accepts trigger:on-check (REQ-TRIGGER-01)', () => {
+    // PHB p.174: ability checks use the new 'on-check' trigger (signed FORK-B6-TRIGGER)
+    const result = parseRule(makeBaseRule({
+      emits: [{
+        def: { kind: 'advantage', mode: 'grant', rollType: 'check' },
+        scope: { owner: '{charId}', target: { axis: 'self' }, trigger: 'on-check' },
+        predicate: { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+      }],
+    }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('SCHEMA-U2 — parseRule accepts saveAbility leaf (REQ-LEAF-01)', () => {
+    // PHB p.48: saveAbility:str leaf gates STR-save advantage (rage emit 2)
+    const result = parseRule(makeBaseRule({
+      emits: [{
+        def: { kind: 'advantage', mode: 'grant', rollType: 'save' },
+        scope: { owner: '{charId}', target: { axis: 'self' }, trigger: 'on-save' },
+        predicate: {
+          op: 'and',
+          nodes: [
+            { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+            { op: 'query', q: { kind: 'saveAbility', ability: 'str' } },
+          ],
+        },
+      }],
+    }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('SCHEMA-U3 — parseRule accepts checkAbility leaf (REQ-LEAF-02)', () => {
+    // PHB p.48: checkAbility:str leaf gates STR-check advantage (rage emit 1)
+    const result = parseRule(makeBaseRule({
+      emits: [{
+        def: { kind: 'advantage', mode: 'grant', rollType: 'check' },
+        scope: { owner: '{charId}', target: { axis: 'self' }, trigger: 'on-check' },
+        predicate: {
+          op: 'and',
+          nodes: [
+            { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+            { op: 'query', q: { kind: 'checkAbility', ability: 'str' } },
+          ],
+        },
+      }],
+    }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('parseRule rejects unknown trigger value (regression guard)', () => {
+    // Ensures the trigger enum is still closed — unknown triggers should fail
+    const result = parseRule(makeBaseRule({
+      emits: [{
+        def: { kind: 'noop' },
+        scope: { owner: '{charId}', target: { axis: 'self' }, trigger: 'on-unknown-trigger' },
+      }],
+    }));
+    expect(result.ok).toBe(false);
+  });
+});

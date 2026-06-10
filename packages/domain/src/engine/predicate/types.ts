@@ -55,7 +55,23 @@ export type WorldQuery =
    * Fail-closed: safe in non-attack resolutions (save/check paths) — REQ-PRED-01.
    * PHB p.48: "melee weapon attack rolls using Strength" (rage damage + reckless STR gate).
    */
-  | { kind: 'usesAbility'; ability: Ability };
+  | { kind: 'usesAbility'; ability: Ability }
+  /**
+   * Does the current save target the specified ability?
+   * Returns false (NOT throws) when ctx.save is absent (cross-context — check ctx).
+   * Fail-closed: returns false on mismatch or absent ctx — REQ-LEAF-01, D2.
+   * PHB p.48: "advantage on Strength saving throws" (rage save gate).
+   * PHB p.48: "advantage on Dexterity saving throws" (danger sense gate).
+   */
+  | { kind: 'saveAbility'; ability: Ability }
+  /**
+   * Does the current ability check use the specified ability?
+   * Returns false (NOT throws) when ctx.check is absent (cross-context — save ctx).
+   * Fail-closed: returns false on mismatch or absent ctx — REQ-LEAF-02, D2.
+   * PHB p.48: "advantage on Strength checks" (rage check gate).
+   * REQ-SKILL-01: Athletics is a STR check — ctx.check.ability='str' when skill='athletics'.
+   */
+  | { kind: 'checkAbility'; ability: Ability };
 
 // ── Predicate AST ─────────────────────────────────────────────────────────────
 

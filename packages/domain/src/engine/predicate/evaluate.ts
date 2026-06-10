@@ -160,6 +160,22 @@ function evaluateWorldQuery(q: WorldQuery, ctx: EvaluationContext): boolean {
       return ctx.weaponInUse?.abilityUsed === q.ability;
     }
 
+    case 'saveAbility': {
+      // Returns false (NOT throws) when ctx.save absent (cross-context — check ctx, attack ctx).
+      // Fail-closed: absent ctx is EXPECTED (e.g., saveAbility leaf evaluated in check query) — D2.
+      // PHB p.48: "advantage on Strength saving throws" (rage); "Dexterity saving throws" (danger sense).
+      if (ctx.save === undefined) return false;
+      return ctx.save.ability === q.ability;
+    }
+
+    case 'checkAbility': {
+      // Returns false (NOT throws) when ctx.check absent (cross-context — save ctx, attack ctx).
+      // Fail-closed: absent ctx is EXPECTED (e.g., checkAbility leaf evaluated in save query) — D2.
+      // PHB p.48: "advantage on Strength checks" (rage); REQ-SKILL-01: Athletics IS a STR check.
+      if (ctx.check === undefined) return false;
+      return ctx.check.ability === q.ability;
+    }
+
     default: {
       // Exhaustiveness guard — future WorldQuery leaves added without a case
       // will cause a compile-time error here. REQ-SA-WQ-01.4.

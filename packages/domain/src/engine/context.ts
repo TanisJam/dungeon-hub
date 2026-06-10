@@ -11,7 +11,7 @@
  *
  * Design ref: sdd/resolution-engine/design — EvaluationContext shape.
  */
-import type { EntityId, EntityRef, ConditionRef, StatKey } from './types.js';
+import type { EntityId, EntityRef, ConditionRef, StatKey, Ability } from './types.js';
 import type { ActionInFlight } from './pipeline/phases.js';
 
 export type { ConditionRef };
@@ -114,6 +114,29 @@ export interface EvaluationContext {
   attackerCombatantId?: string;
 
   /**
+   * The ability being saved against in a forced-check (saving throw) context.
+   * Populated by resolveTargetSave on the PC path (REQ-CTX-03 confirms existing behavior).
+   * Used by the saveAbility WorldQuery leaf — REQ-LEAF-01, D2.
+   *
+   * exactOptionalPropertyTypes: absent means the field is not present at all.
+   * Callers MUST conditional-spread: `...(ability ? { save: { ability } } : {})`.
+   * Never assign `save: undefined`. PHB p.179 — Saving Throws.
+   */
+  save?: { ability: Ability };
+
+  /**
+   * The ability being checked in an ability check context.
+   * Populated by resolveActorCheck on the PC path (REQ-CTX-02).
+   * For skill checks, set to the GOVERNING ability (Athletics → 'str', PHB p.175).
+   * Used by the checkAbility WorldQuery leaf — REQ-LEAF-02, D2.
+   *
+   * exactOptionalPropertyTypes: absent means the field is not present at all.
+   * Callers MUST conditional-spread: `...(ability ? { check: { ability } } : {})`.
+   * Never assign `check: undefined`. PHB p.174 — Ability Checks.
+   */
+  check?: { ability: Ability };
+
+  /**
    * The UUID of the combatant whose turn is currently being processed.
    *
    * ⚠️ IDENTITY-SPACE WARNING (same namespace as attackerCombatantId):
@@ -167,4 +190,4 @@ export function attackerDistanceFt(ctx: EvaluationContext): number | undefined {
 }
 
 // Re-export EntityRef and EntityId so consumers only need to import from context.
-export type { EntityId, EntityRef, StatKey };
+export type { EntityId, EntityRef, StatKey, Ability };

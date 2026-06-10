@@ -87,6 +87,9 @@ export type Trigger =
   | 'always'
   | 'on-attack-roll'
   | 'on-save'
+  // B6 — REQ-TRIGGER-01: on-check trigger for ability check advantage grants (PHB p.174).
+  // Positioned after 'on-save' — symmetric pair per D4.
+  | 'on-check'
   | 'on-cast'
   | 'on-attacked'
   | 'on-hit'
