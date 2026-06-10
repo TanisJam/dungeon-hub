@@ -14,6 +14,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { parseRule } from './parse.js';
+import { dangerSenseRuleDoc } from '../rules-authored/danger-sense.js';
+import { rageRuleDoc } from '../rules-authored/rage.js';
 
 // ── Scenario 1: valid rule passes ────────────────────────────────────────────
 
@@ -221,5 +223,19 @@ describe('parseRule — B6 DSL infra: on-check trigger + saveAbility/checkAbilit
       }],
     }));
     expect(result.ok).toBe(false);
+  });
+
+  it('SCHEMA-U4 — amended dangerSense doc round-trips via parseRule (REQ-RAGE-03)', () => {
+    // REQ-RAGE-03: dangerSenseRuleDoc with saveAbility:dex leaf must parse without error.
+    // This ensures the Zod schema accepts the new leaf shape (triple-add verified by parse gate).
+    const result = parseRule(dangerSenseRuleDoc);
+    expect(result.ok).toBe(true);
+  });
+
+  it('SCHEMA-U5 — amended rage doc (emit 1 + emit 2) round-trips via parseRule (REQ-RAGE-01/02)', () => {
+    // REQ-RAGE-01/02: rageRuleDoc with on-check trigger + checkAbility:str + saveAbility:str must parse.
+    // Ensures the Zod schema accepts both new leaves and the new on-check trigger value.
+    const result = parseRule(rageRuleDoc);
+    expect(result.ok).toBe(true);
   });
 });

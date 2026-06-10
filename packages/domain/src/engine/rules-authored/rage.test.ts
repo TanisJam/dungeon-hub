@@ -136,16 +136,22 @@ describe('rageRuleDoc — AdvantageMod emits (REQ-RAGE-DOC-03, REQ-RAGE-COMPILE-
   });
 
   it('AdvantageMods have hasCondition:Raging predicate (REQ-RAGE-DOC-03)', () => {
-    // PHB p.48 — advantage applies while Raging
+    // PHB p.48 — advantage applies while Raging.
+    // B6 amendment: emit 1 is now op:'and' (checkAbility:str added); emit 2 is op:'and' (saveAbility:str added).
+    // Both still contain a hasCondition:Raging node (the primary condition guard).
     const instances = buildRage(RAGER_ID, 2, 2);
     const adv = instances.filter((i) => i.def.kind === 'advantage');
     for (const inst of adv) {
       expect(inst.predicate).toBeDefined();
-      // predicate is {op:'query', q:{kind:'hasCondition', entity:'self', condition:'Raging'}}
-      const pred = inst.predicate as { op: string; q?: { kind: string; condition?: string } };
-      expect(pred.op).toBe('query');
-      expect(pred.q?.kind).toBe('hasCondition');
-      expect(pred.q?.condition).toBe('Raging');
+      // Both AdvantageMod predicates are now op:'and' (B6 amendment)
+      // Walk the predicate tree to find the hasCondition:Raging node
+      function hasRagingNode(pred: unknown): boolean {
+        const node = pred as { op?: string; q?: { kind?: string; condition?: string }; nodes?: unknown[] };
+        if (node.op === 'query' && node.q?.kind === 'hasCondition' && node.q?.condition === 'Raging') return true;
+        if (node.op === 'and' && node.nodes) return node.nodes.some(hasRagingNode);
+        return false;
+      }
+      expect(hasRagingNode(inst.predicate)).toBe(true);
     }
   });
 });
@@ -388,6 +394,64 @@ describe('rageRuleDoc — REQ-CHAR-DIVERGENCE: STR-divergence documented (ADR-5 
     }
 
     expect(hasUsesAbilityStr(damageEmit.predicate)).toBe(true);
+  });
+});
+
+// ── B6 Batch 6: Emit 1 amendment (REQ-RAGE-01, D12) ─────────────────────────
+
+describe('rageRuleDoc — emit 1 amendment: on-check trigger + checkAbility:str (REQ-RAGE-01, D12)', () => {
+  it('RAGE-U1 (RED→GREEN): emit 1 trigger MUST be on-check (not always) (REQ-RAGE-01, PHB p.48)', () => {
+    // PHB p.48: "advantage on Strength CHECKS" — only fires on check queries, not always.
+    // D12: trigger 'always' → 'on-check' prevents advantage leaking to non-check contexts.
+    // RED: current rage.ts emit 1 has trigger:'always' — this test fails until amended.
+    const emit1 = rageRuleDoc.emits[0]!;
+    expect(emit1.scope.trigger).toBe('on-check');
+  });
+
+  it('RAGE-U2 (RED→GREEN): emit 1 predicate MUST be op:and with checkAbility:str node (REQ-RAGE-01, D12)', () => {
+    // PHB p.48: "advantage on STRENGTH checks" — checkAbility:str gates non-STR checks.
+    // D12: single-predicate hasCondition:Raging → op:and[hasCondition:Raging, checkAbility:str]
+    // RED: current rage.ts emit 1 has single-predicate (op:query) — this test fails until amended.
+    const emit1 = rageRuleDoc.emits[0]!;
+    expect(emit1.predicate).toBeDefined();
+    const pred = emit1.predicate!;
+    // Must be an AND node
+    expect((pred as { op: string }).op).toBe('and');
+    const nodes = (pred as { op: string; nodes: Array<{ op: string; q?: { kind: string; ability?: string } }> }).nodes;
+    // Must contain checkAbility:str node
+    const hasCheckAbility = nodes.some((n) => n.op === 'query' && n.q?.kind === 'checkAbility' && n.q?.ability === 'str');
+    expect(hasCheckAbility).toBe(true);
+    // Must still contain hasCondition:Raging node
+    const hasRagingCondition = nodes.some((n) => n.op === 'query' && n.q?.kind === 'hasCondition');
+    expect(hasRagingCondition).toBe(true);
+  });
+
+  it('RAGE-U3: emit 1 MUST NOT have trigger:always after amendment (regression guard)', () => {
+    // After amendment, trigger:'always' must be gone (replaced by 'on-check')
+    const emit1 = rageRuleDoc.emits[0]!;
+    expect(emit1.scope.trigger).not.toBe('always');
+  });
+});
+
+// ── B6 Batch 6: Emit 2 amendment (REQ-RAGE-02, D5) ───────────────────────────
+
+describe('rageRuleDoc — emit 2 amendment: saveAbility:str AND-node (REQ-RAGE-02, D5)', () => {
+  it('RAGE-emit2 (RED→GREEN): emit 2 predicate MUST be op:and with saveAbility:str node (REQ-RAGE-02)', () => {
+    // PHB p.48: "advantage on Strength SAVING THROWS" — saveAbility:str gates non-STR saves.
+    // D5: single-predicate hasCondition:Raging → op:and[hasCondition:Raging, saveAbility:str]
+    // RED: current rage.ts emit 2 has single-predicate (op:query) — this test fails until amended.
+    const emit2 = rageRuleDoc.emits[1]!;
+    expect(emit2.predicate).toBeDefined();
+    const pred = emit2.predicate!;
+    // Must be an AND node
+    expect((pred as { op: string }).op).toBe('and');
+    const nodes = (pred as { op: string; nodes: Array<{ op: string; q?: { kind: string; ability?: string } }> }).nodes;
+    // Must contain saveAbility:str node
+    const hasSaveAbility = nodes.some((n) => n.op === 'query' && n.q?.kind === 'saveAbility' && n.q?.ability === 'str');
+    expect(hasSaveAbility).toBe(true);
+    // Must still contain hasCondition:Raging node
+    const hasRagingCondition = nodes.some((n) => n.op === 'query' && n.q?.kind === 'hasCondition');
+    expect(hasRagingCondition).toBe(true);
   });
 });
 

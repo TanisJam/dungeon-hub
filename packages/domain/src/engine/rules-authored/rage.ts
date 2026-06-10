@@ -18,8 +18,10 @@
  * rageRuleDoc itself, not parity against a removed reference implementation.
  *
  * 7 emits total:
- *   1. AdvantageMod — STR check advantage (trigger:always, hasCondition:Raging)
- *   2. AdvantageMod — STR save advantage (trigger:always, hasCondition:Raging)
+ *   1. AdvantageMod — STR check advantage (trigger:on-check, AND[hasCondition:Raging, checkAbility:str])
+ *      B6 REQ-RAGE-01: trigger was 'always'; now 'on-check' + checkAbility:'str' gates STR checks.
+ *   2. AdvantageMod — STR save advantage (trigger:always, AND[hasCondition:Raging, saveAbility:str])
+ *      B6 REQ-RAGE-02: gains saveAbility:'str' AND-node (previously single hasCondition:Raging).
  *   3. ResistMod — bludgeoning resistance (trigger:on-damage, hasCondition:Raging)
  *   4. ResistMod — piercing resistance
  *   5. ResistMod — slashing resistance
@@ -37,11 +39,6 @@
  * engine/registry/query.ts:67 resolves axis:'self' as owner===self at query time.
  * For Rage, owner===ragerId always holds — axis:'self' and legacy entities:[ragerId]
  * are RUNTIME-EQUIVALENT (both collapse to {ragerId}).
- *
- * STR-divergence (ADR-5):
- * PHB p.48 restricts advantage to STRENGTH checks/saves. The DSL currently lacks
- * a usesAbility WorldQuery leaf. rageRuleDoc emits UNCONSTRAINED AdvantageMods.
- * The STR fix is OUT OF SCOPE for Batch 1.
  *
  * UsageMod (shape-only, Batch 1):
  * The runtime UsageMod type only has pool:'tiered'. The pool:'count' + count fields
@@ -69,8 +66,11 @@ export const rageRuleDoc: RuleDoc = {
   emits: [
     // ── EMIT 1: AdvantageMod — STR check advantage (PHB p.48) ──────────────
     // PHB p.48: "advantage on Strength checks"
-    // TODO: usesAbility WorldQuery — advantage should be STR-only (PHB p.48) but predicate
-    //       primitive absent; STR-only divergence deferred (ADR-5).
+    // B6 REQ-RAGE-01 (D12): trigger 'always' → 'on-check' + checkAbility:'str' AND-node.
+    //   - 'on-check' ensures the registry only matches on check queries (not save/attack/always).
+    //   - checkAbility:'str' gates advantage to STR checks only (PHB p.48: STRENGTH checks).
+    //     REQ-SKILL-01: Athletics sets check.ability='str' → rage fires on Athletics too (PHB p.175).
+    //   - Combined: a Raging barbarian gets advantage only on STR/Athletics checks (PHB p.48).
     {
       def: {
         kind: 'advantage',
@@ -80,19 +80,24 @@ export const rageRuleDoc: RuleDoc = {
       scope: {
         owner: '{ragerId}',
         target: { axis: 'self' },
-        trigger: 'always',
+        trigger: 'on-check',
       },
       predicate: {
-        op: 'query',
-        q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' },
+        op: 'and',
+        nodes: [
+          { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+          { op: 'query', q: { kind: 'checkAbility', ability: 'str' } },
+        ],
       },
       label: 'Raging',
       idTemplate: 'rage-str-check-{ragerId}',
     },
     // ── EMIT 2: AdvantageMod — STR save advantage (PHB p.48) ───────────────
     // PHB p.48: "advantage on Strength saving throws"
-    // TODO: usesAbility WorldQuery — advantage should be STR-only (PHB p.48) but predicate
-    //       primitive absent; STR-only divergence deferred (ADR-5).
+    // B6 REQ-RAGE-02 (D5): gains saveAbility:'str' AND-node alongside hasCondition:Raging.
+    //   - saveAbility:'str' gates advantage to STR saves only (PHB p.48: STRENGTH saves).
+    //   - Gate B in perform-forced-check.ts (ability==='str') will be deleted after this leaf
+    //     is live (REQ-RAGE-04); the predicate now handles the ability discrimination.
     {
       def: {
         kind: 'advantage',
@@ -105,8 +110,11 @@ export const rageRuleDoc: RuleDoc = {
         trigger: 'always',
       },
       predicate: {
-        op: 'query',
-        q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' },
+        op: 'and',
+        nodes: [
+          { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Raging' } },
+          { op: 'query', q: { kind: 'saveAbility', ability: 'str' } },
+        ],
       },
       label: 'Raging',
       idTemplate: 'rage-str-save-{ragerId}',
@@ -179,8 +187,8 @@ export const rageRuleDoc: RuleDoc = {
     // Batch 2 (REQ-RAGE-RETROFIT-01): usesAbility:str added to emit 6 only.
     // STR-gating moves from registration-time (build-attack-context.ts:548 imperative guard)
     // to predicate-time — the build-attack-context guard is deleted in Commit 4.
-    // NOTE: emits 1/2 (advantage on STR checks/saves) do NOT get usesAbility — they resolve
-    // via ability-check/forced-check paths where ctx.weaponInUse is absent (fail-closed = silent death).
+    // emits 1/2 (advantage on STR checks/saves) use checkAbility/saveAbility leaves instead
+    // of usesAbility — they resolve via ability-check/forced-check paths (no weaponInUse).
     {
       def: {
         kind: 'num',

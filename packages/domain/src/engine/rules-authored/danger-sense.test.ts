@@ -125,8 +125,10 @@ describe('dangerSenseRuleDoc — predicate evaluation (SCENARIO-19, SCENARIO-20)
     expect(evaluatePredicate(inst.predicate!, ctx)).toBe(false);
   });
 
-  it('SCENARIO-20: no impairing conditions → predicate true', () => {
+  it('SCENARIO-20: no impairing conditions + DEX save ctx → predicate true', () => {
     // PHB p.48: "you can't be blinded, deafened, or incapacitated"
+    // B6 amendment: ctx.save.ability must be 'dex' (saveAbility:dex node added in REQ-RAGE-03).
+    // Without ctx.save, the new leaf returns false (fail-closed — D2). Must provide DEX save ctx.
     const compiled = compileRule(dangerSenseRuleDoc);
     const instances = compiled.build({ barbarianId: BARB_ID });
     const inst = instances[0]!;
@@ -134,6 +136,7 @@ describe('dangerSenseRuleDoc — predicate evaluation (SCENARIO-19, SCENARIO-20)
 
     const ctx = makeCtx({
       activeConditions: [],
+      save: { ability: 'dex' }, // B6: must provide DEX save context for saveAbility:dex to pass
     });
     expect(evaluatePredicate(inst.predicate!, ctx)).toBe(true);
   });
@@ -152,5 +155,52 @@ describe('dangerSenseRuleDoc — predicate evaluation (SCENARIO-19, SCENARIO-20)
     const inst = compiled.build({ barbarianId: BARB_ID })[0]!;
     const ctx = makeCtx({ activeConditions: [{ name: 'Incapacitated' }] });
     expect(evaluatePredicate(inst.predicate!, ctx)).toBe(false);
+  });
+});
+
+// ── B6: Danger Sense saveAbility:dex amendment (REQ-RAGE-03, D5) ────────────
+
+describe('dangerSenseRuleDoc — B6 amendment: saveAbility:dex AND-node (REQ-RAGE-03, D5)', () => {
+  it('DS-emit1 (RED→GREEN): predicate MUST contain saveAbility:dex node (REQ-RAGE-03, PHB p.48)', () => {
+    // PHB p.48: "advantage on Dexterity saving throws" — saveAbility:dex gates DEX saves only.
+    // D5: AND[!Blinded, !Deafened, !Incapacitated, saveAbility:dex] (new leaf added to existing cluster).
+    // Gate A in perform-forced-check.ts (ability==='dex') will be deleted after this leaf is live.
+    // RED: current danger-sense.ts has no saveAbility leaf — this test fails until amended.
+    const emit = dangerSenseRuleDoc.emits[0]!;
+    expect(emit.predicate).toBeDefined();
+
+    // Walk the predicate tree to find a saveAbility:dex node
+    function hasSaveAbilityDex(pred: unknown): boolean {
+      const node = pred as { op?: string; q?: { kind?: string; ability?: string }; nodes?: unknown[]; node?: unknown };
+      if (node.op === 'query' && node.q?.kind === 'saveAbility' && node.q?.ability === 'dex') return true;
+      if (node.op === 'and' && node.nodes) return node.nodes.some(hasSaveAbilityDex);
+      if (node.op === 'not' && node.node) return hasSaveAbilityDex(node.node);
+      return false;
+    }
+
+    expect(hasSaveAbilityDex(emit.predicate)).toBe(true);
+  });
+
+  it('DS-predicate is still op:and with NOT-Blinded, NOT-Deafened, NOT-Incapacitated (regression)', () => {
+    // B6 amendment must NOT remove the existing condition guards (PHB p.48)
+    const emit = dangerSenseRuleDoc.emits[0]!;
+    const pred = emit.predicate!;
+
+    function collectNotConditions(p: unknown): string[] {
+      const node = p as { op?: string; node?: unknown; nodes?: unknown[]; q?: { kind?: string; condition?: string } };
+      if (node.op === 'not' && node.node) {
+        const inner = node.node as { op?: string; q?: { kind?: string; condition?: string } };
+        if (inner.op === 'query' && inner.q?.kind === 'hasCondition' && inner.q?.condition) {
+          return [inner.q.condition];
+        }
+      }
+      if (node.op === 'and' && node.nodes) return node.nodes.flatMap((n) => collectNotConditions(n));
+      return [];
+    }
+
+    const notConditions = collectNotConditions(pred);
+    expect(notConditions).toContain('Blinded');
+    expect(notConditions).toContain('Deafened');
+    expect(notConditions).toContain('Incapacitated');
   });
 });

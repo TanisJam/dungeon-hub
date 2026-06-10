@@ -45,7 +45,10 @@ export const dangerSenseRuleDoc: RuleDoc = {
     // PHB p.48: "advantage on Dexterity saving throws against effects you can see"
     // DEX-save targeting expressed via rollType:'save' only (DIV-03 — no per-ability save rollType field).
     // "effects you can see" approximated as !Blinded (DIV-03).
-    // INERT: save-gather not yet wired — follow-up SDD engine-save-advantage-gather.
+    // B6 REQ-RAGE-03 (D5): gains saveAbility:'dex' AND-node alongside existing condition guards.
+    //   - saveAbility:'dex' gates advantage to DEX saves only (PHB p.48: DEXTERITY saving throws).
+    //   - Gate A in perform-forced-check.ts (ability==='dex') will be deleted after this leaf is live.
+    //   - All existing !Blinded/!Deafened/!Incapacitated guards are preserved (PHB p.48 requirements).
     {
       def: {
         kind: 'advantage',
@@ -66,6 +69,8 @@ export const dangerSenseRuleDoc: RuleDoc = {
           { op: 'not', node: { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Deafened' } } },
           // PHB p.48: "you can't be ... incapacitated"
           { op: 'not', node: { op: 'query', q: { kind: 'hasCondition', entity: 'self', condition: 'Incapacitated' } } },
+          // B6 REQ-RAGE-03: saveAbility:dex gates advantage to DEX saves only (PHB p.48)
+          { op: 'query', q: { kind: 'saveAbility', ability: 'dex' } },
         ],
       },
       label: 'Danger Sense',
