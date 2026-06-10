@@ -80,12 +80,11 @@ describe('deriveSpeedModifiers — SCENARIO-01: barbarian 5, unarmored', () => {
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') {
-      expect(mod.def.stat).toBe('speed');
-      expect(mod.def.op).toBe('add');
-      expect(mod.def.value).toBe(10);
-      expect(mod.def.category).toBe('untyped');
-    }
+    const numDef = mod.def as NumMod;
+    expect(numDef.stat).toBe('speed');
+    expect(numDef.op).toBe('add');
+    expect(numDef.value).toBe(10);
+    expect(numDef.category).toBe('untyped');
     expect(mod.scope.owner).toBe(CHAR_ID);
     expect(mod.scope.target).toEqual({ axis: 'self' });
     expect(mod.scope.trigger).toBe('always');
@@ -113,7 +112,7 @@ describe('deriveSpeedModifiers — SCENARIO-02: barbarian 5, light armor', () =>
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
   });
 });
 
@@ -135,7 +134,7 @@ describe('deriveSpeedModifiers — SCENARIO-03: barbarian 5, medium armor', () =
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
   });
 });
 
@@ -211,7 +210,7 @@ describe('deriveSpeedModifiers — SCENARIO-10: barbarian 5 / wizard 2, qualifie
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
   });
 });
 
@@ -255,7 +254,7 @@ describe('deriveSpeedModifiers — SCENARIO-12: two barbarian entries summing to
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
   });
 });
 
@@ -324,7 +323,7 @@ describe('deriveSpeedModifiers — SCENARIO-18: barbarian 10', () => {
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    if (mod.def.kind === 'num') expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
   });
 });
 
