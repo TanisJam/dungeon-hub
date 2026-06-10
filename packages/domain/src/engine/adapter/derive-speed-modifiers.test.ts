@@ -15,6 +15,7 @@ import { resolveStat } from '../resolve/stat.js';
 import { createInMemoryRegistry } from '../registry/query.js';
 import { applyExhaustionToSpeed } from '../../character/sheet/speed.js';
 import type { EntityId } from '../types.js';
+import type { NumMod } from '../types.js';
 import type { EvaluationContext } from '../context.js';
 import type { InventoryItem, ItemCompendiumLite } from '../../character/inventory/types.js';
 
@@ -363,11 +364,13 @@ describe('deriveSpeedModifiers — SCENARIO-20: monk-2, unarmored, no shield', (
     );
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
+    // Unconditional kind assertion before accessing discriminated union fields (Batch 3 W4).
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.stat).toBe('speed');
-    expect(mod.def.op).toBe('add');
-    expect(mod.def.value).toBe(10);
-    expect(mod.def.category).toBe('untyped');
+    const numDef20 = mod.def as NumMod;
+    expect(numDef20.stat).toBe('speed');
+    expect(numDef20.op).toBe('add');
+    expect(numDef20.value).toBe(10);
+    expect(numDef20.category).toBe('untyped');
     expect(mod.label).toBe('Unarmored Movement (+10)');
   });
 });
@@ -406,7 +409,7 @@ describe('deriveSpeedModifiers — SCENARIO-22: monk-6 → +15', () => {
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.value).toBe(15);
+    expect((mod.def as NumMod).value).toBe(15);
     expect(mod.label).toBe('Unarmored Movement (+15)');
   });
 });
@@ -427,7 +430,7 @@ describe('deriveSpeedModifiers — SCENARIO-23: monk-10 → +20', () => {
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.value).toBe(20);
+    expect((mod.def as NumMod).value).toBe(20);
     expect(mod.label).toBe('Unarmored Movement (+20)');
   });
 });
@@ -448,7 +451,7 @@ describe('deriveSpeedModifiers — SCENARIO-24: monk-14 → +25', () => {
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.value).toBe(25);
+    expect((mod.def as NumMod).value).toBe(25);
     expect(mod.label).toBe('Unarmored Movement (+25)');
   });
 });
@@ -470,7 +473,7 @@ describe('deriveSpeedModifiers — SCENARIO-25: monk-18 → +30 (final threshold
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.value).toBe(30);
+    expect((mod.def as NumMod).value).toBe(30);
     expect(mod.label).toBe('Unarmored Movement (+30)');
   });
 });
@@ -492,7 +495,7 @@ describe('deriveSpeedModifiers — SCENARIO-26: monk-5 → +10 (not L5-keyed)', 
     expect(result.mods).toHaveLength(1);
     const mod = result.mods[0]!;
     expect(mod.def.kind).toBe('num');
-    expect(mod.def.value).toBe(10);
+    expect((mod.def as NumMod).value).toBe(10);
     expect(mod.label).toBe('Unarmored Movement (+10)');
   });
 });
@@ -582,10 +585,10 @@ describe('deriveSpeedModifiers — SCENARIO-30: barb-5/monk-2, unarmored (D3 man
     expect(umMod).toBeDefined();
 
     expect(fmMod!.def.kind).toBe('num');
-    expect(fmMod!.def.value).toBe(10);
+    expect((fmMod!.def as NumMod).value).toBe(10);
 
     expect(umMod!.def.kind).toBe('num');
-    expect(umMod!.def.value).toBe(10);
+    expect((umMod!.def as NumMod).value).toBe(10);
 
     // resolveStat integration: both mods registered → walk = 50.
     const registry = createInMemoryRegistry();
@@ -598,10 +601,13 @@ describe('deriveSpeedModifiers — SCENARIO-30: barb-5/monk-2, unarmored (D3 man
     }
     const resolved = resolveStat(CHAR_ID, 'speed', 30, ctx, registry);
     expect(resolved.value).toBe(50);
-    expect(resolved.breakdown).toHaveLength(2);
-    const labels = resolved.breakdown.map((b) => b.label);
-    expect(labels).toContain('Fast Movement (+10)');
-    expect(labels).toContain('Unarmored Movement (+10)');
+    // Filter for the two feature-sourced breakdown entries (excluding the synthetic 'base' entry).
+    const fmBreakdown = resolved.breakdown.filter((b) => b.label === 'Fast Movement (+10)');
+    const umBreakdown = resolved.breakdown.filter((b) => b.label === 'Unarmored Movement (+10)');
+    expect(fmBreakdown).toHaveLength(1);
+    expect(umBreakdown).toHaveLength(1);
+    expect(fmBreakdown[0]!.amount).toBe(10);
+    expect(umBreakdown[0]!.amount).toBe(10);
   });
 });
 
@@ -630,9 +636,11 @@ describe('deriveSpeedModifiers — SCENARIO-31: resolveStat provenance (W3 regre
     }
     const resolved = resolveStat(CHAR_ID, 'speed', 30, ctx, registry);
     expect(resolved.value).toBe(40);
-    expect(resolved.breakdown).toHaveLength(1);
-    expect(resolved.breakdown[0]!.label).toBe('Unarmored Movement (+10)');
-    expect(resolved.breakdown[0]!.amount).toBe(10);
+    // Filter for the UM feature breakdown entry (excluding the synthetic 'base' entry).
+    const umSources = resolved.breakdown.filter((b) => b.label === 'Unarmored Movement (+10)');
+    expect(umSources).toHaveLength(1);
+    expect(umSources[0]!.label).toBe('Unarmored Movement (+10)');
+    expect(umSources[0]!.amount).toBe(10);
   });
 });
 
