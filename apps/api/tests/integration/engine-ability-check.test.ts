@@ -390,7 +390,8 @@ describe('engine-ability-check — POST /encounters/:id/actions/ability-check', 
     expect(result.statusCode).toBe(400);
     expect(result.body.error).toBe('VALIDATION_FAILED');
     const codes: string[] = (result.body.issues as Array<{ code: string }>).map((i) => i.code);
-    expect(codes).toContain('NO_ACTOR_CHECK');
+    // S3 → exact assertion: exactly one issue expected on NPC-no-mod path (REQ-HYGIENE-01 precision).
+    expect(codes).toEqual(['NO_ACTOR_CHECK']);
   });
 
   // ── CHECK-T4: Raging barbarian STR → advantage (d20All.length===2) ────────────
@@ -491,7 +492,8 @@ describe('engine-ability-check — POST /encounters/:id/actions/ability-check', 
     expect(result.body.check.rollMode).toBe('disadvantage');
     // d20All.length=2 because disadvantage also rolls 2 dice (keeps lower).
     expect(result.body.check.d20All).toHaveLength(2);
-    expect(result.body.check.outcome ?? result.body.outcome).toBe('fail');
+    // W3 → direct outcome assertion (result.body.check has no 'outcome' field per REQ-ROUTE-03).
+    expect(result.body.outcome).toBe('fail');
   });
 
   // ── CHECK-T7: Non-GM → 403 FORBIDDEN ─────────────────────────────────────────
@@ -512,6 +514,33 @@ describe('engine-ability-check — POST /encounters/:id/actions/ability-check', 
 
     expect(result.statusCode).toBe(403);
     expect(result.body.error).toBe('FORBIDDEN');
+  });
+
+  // ── CHECK-T9: PHB p.175 variant — caller ability is authoritative (decision #2163) ──────────────
+
+  it('CHECK-T9: PHB p.175 variant — STR (Intimidation) on raging barbarian → rage advantage fires (decision #2163)', async () => {
+    // PHB p.175 Variant: Skills with Different Abilities — caller ability is authoritative (decision #2163).
+    // "The DM might ask for a Charisma (Intimidation) check but let you use Strength instead."
+    // When the DM calls STR (Intimidation): caller passes ability='str', skill='intimidation'.
+    // ctx.check.ability = 'str' (set from actor.ability, NOT coerced from SKILL_TO_ABILITY).
+    // Rage's checkAbility:'str' leaf evaluates ctx.check.ability — sees 'str' → fires advantage.
+    // Result: rollMode='advantage', d20All.length=2. Zero production behavior change vs B6 impl.
+    const { encounterId, actorCombatantId } = await makeFreshEncounter('CHECK-T9');
+
+    await setRaging(actorCombatantId);
+
+    const result = await doAbilityCheck(encounterId, {
+      actorCombatantId,
+      ability: 'str',
+      skill: 'intimidation', // CHA skill per default PHB table — but caller says STR (variant)
+      dc: 1,
+    });
+
+    expect(result.statusCode).toBe(200);
+    // PHB p.175 Variant: Skills with Different Abilities — caller ability is authoritative (decision #2163).
+    // Rage advantage fires because ctx.check.ability='str' matches checkAbility:'str' leaf.
+    expect(result.body.check.rollMode).toBe('advantage');
+    expect(result.body.check.d20All).toHaveLength(2);
   });
 });
 

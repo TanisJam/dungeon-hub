@@ -17,7 +17,9 @@
  *   - Bare ability check (no skill): stat key = ability (e.g. 'str'). NO proficiency bonus.
  *   - Skill check: stat key = 'skill.${skill}'. Proficiency bonus applied IF proficient.
  *     deriveSkillProficiencies is registered when skill is provided so the proficiency channel fires.
- *     Governing ability = SKILL_TO_ABILITY[skill] — set in ctx.check.ability (REQ-SKILL-01).
+ *     Governing ability = actor.ability (CALLER IS AUTHORITATIVE, decision #2163, PHB p.175 variant).
+ *     The DM may pair any ability with any skill ("Strength (Intimidation)" etc.); the server
+ *     does NOT coerce ability from a SKILL_TO_ABILITY table.
  *
  * REQ-GATHER-01..04: NPC arm, PC bare ability, PC skill (proficient/non-proficient), classes.slug shape.
  * REQ-CTX-02: resolveActorCheck spreads check:{ ability } into EvaluationContext.
@@ -46,7 +48,6 @@ import {
 import type { InventoryItem } from '@dungeon-hub/domain/character/inventory';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
-import { SKILL_TO_ABILITY } from '@dungeon-hub/domain/character/sheet';
 import { loadModifierDefinitions } from '../characters/load-modifier-definitions.js';
 import { loadPersistedModifiers } from '../characters/load-persisted-modifiers.js';
 import { deriveCharacterModifiers } from '../characters/derive-character-modifiers.js';
