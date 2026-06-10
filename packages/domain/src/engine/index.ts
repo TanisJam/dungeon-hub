@@ -153,6 +153,12 @@ export type { RngFn, RollResult, PerDieEntry } from './dice/roll.js';
 export { rollSavingThrow } from './save/roll-saving-throw.js';
 export type { RollSavingThrowResult } from './save/roll-saving-throw.js';
 
+// ── Ability check ─────────────────────────────────────────────────────────────
+
+// B6 — rollAbilityCheck pure function (no nat-20/nat-1 exception, PHB p.174)
+export { rollAbilityCheck } from './check/roll-ability-check.js';
+export type { RollAbilityCheckResult } from './check/roll-ability-check.js';
+
 // Slice 3b-ii — Stunning Strike ki save DC (PHB p.78)
 export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
 
