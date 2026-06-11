@@ -292,18 +292,118 @@ describe('GET /characters/:id/sheet — SCENARIO-UM-API-04: Monk-2 + shield → 
   });
 });
 
-// ── SCENARIO-UM-API-05 — Multiclass Barb-5/Monk-2 → walk = 50 ───────────────
-// SKIPPED: PUT /characters/:id/class replaces the entire classes array (single class, multiclass
-// deferred to slice 1.4e — see characters.ts:2401). Sequential PUT barb-5 then monk-2 overwrites
-// the barbarian entry. No multiclass ADD route exists yet.
-// Unit SCENARIO-30 in derive-speed-modifiers.test.ts is the binding stack proof (D3).
-// REQ-UM-06 (Fast Movement + Unarmored Movement stack) is locked by domain unit tests.
+// SCENARIO-UM-API-05 — Multiclass Barb-5/Monk-2 → walk = 50 (PHB p.49 + p.77-78 [pending physical-book verification by Mauricio])
 
 describe('GET /characters/:id/sheet — SCENARIO-UM-API-05: Barb-5/Monk-2 multiclass → walk = 50', () => {
-  it.skip('sheet.speed.walk = 50 (barb FM +10 + monk UM +10, PHB p.49 + p.78) — BLOCKED: PUT /class is replace-semantics, multiclass deferred to slice 1.4e. Binding proof: unit SCENARIO-30.', () => {
-    // PHB p.49: Barbarian L5 Fast Movement → +10.
-    // PHB p.77-78: Monk L2 Unarmored Movement → +10.
-    // Base 30 + 10 + 10 = 50 (RAW additive — no anti-stack rule for speed bonuses).
-    // REQ-UM-06: stacking confirmed by domain SCENARIO-30 (unit proof).
+  let user: TestUser;
+  let characterId: string;
+
+  beforeAll(async () => {
+    const app = await getTestApp();
+    user = await createTestUser();
+    ({ characterId } = await createCampaignAndCharacter(app, user, 'Raging Monk'));
+
+    // Own stat block: str:13/dex:13/con:13/int:10/wis:13/cha:13 = 27 pts (point-buy budget).
+    // REQUIRED: barb prereq STR>=13 (prereqs.ts:24) + monk prereq DEX>=13 AND WIS>=13 (prereqs.ts:29).
+    // Do NOT reuse setStats() — it uses str:10 which fails barb STR>=13 silently.
+    await expectOk(
+      'stats',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/stats`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          method: 'point-buy',
+          scores: { str: 13, dex: 13, con: 13, int: 10, wis: 13, cha: 13 },
+        },
+      }),
+    );
+
+    // Human base walk 30 ft (PHB p.29).
+    await expectOk(
+      'race',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/race`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          race: { slug: 'human', source: 'PHB' },
+          subrace: null,
+          languageChoices: ['dwarvish'],
+        },
+      }),
+    );
+
+    // Set barbarian L5 via PUT /class (replace-semantics — sets primary class directly).
+    // Barbarian L5: Fast Movement unlocked (PHB p.49 — feature at L5). Subclass required at L3+.
+    await expectOk(
+      'barbarian-5',
+      await app.inject({
+        method: 'PUT',
+        url: `/api/v1/characters/${characterId}/class`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          class: { slug: 'barbarian', source: 'PHB' },
+          level: 5,
+          subclass: { slug: 'barbarian--berserker', source: 'PHB' },
+          skillChoices: ['athletics', 'intimidation'],
+        },
+      }),
+    );
+
+    // Add monk at L1 via POST /classes (adds secondary class; always lands at L1 per characters.ts:2567).
+    // Monk skill choices: acrobatics + stealth (PHB p.76 — Monk proficiencies).
+    await expectOk(
+      'post-classes-monk',
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${characterId}/classes`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: {
+          class: { slug: 'monk', source: 'PHB' },
+          skillChoices: ['acrobatics', 'stealth'],
+        },
+      }),
+    );
+
+    // Grant XP to reach total level 7 (barb5 + monk2 = 7).
+    // XP_THRESHOLDS[6] = 23_000 (xp-table.ts, index 0 = L1). Campaign creator is world GM.
+    await expectOk(
+      'award-xp',
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${characterId}/xp`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { award: 23000 },
+      }),
+    );
+
+    // Level monk from L1 → L2 using per-class level-up route (edit-time path, XP-gated).
+    // Monk L2: Unarmored Movement unlocks (+10 ft while unarmored/no shield, PHB p.77-78).
+    // hpMethod:'average' is deterministic — no RNG needed (REQ-UMAPI-06).
+    await expectOk(
+      'monk-level-up',
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/characters/${characterId}/classes/monk/level-up`,
+        headers: { authorization: `Bearer ${user.accessToken}` },
+        payload: { hpMethod: 'average' },
+      }),
+    );
+  });
+
+  afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+    await closeTestApp();
+  });
+
+  it('sheet.speed.walk = 50 (barb5 FM +10 + monk2 UM +10, PHB p.49 + p.77-78)', async () => {
+    // PHB p.49: Barbarian L5 Fast Movement → +10 ft (unarmored/light/medium).
+    // PHB p.77-78: Monk L2 Unarmored Movement → +10 ft (no armor, no shield). [pending physical-book verification by Mauricio]
+    // Base 30 + 10 + 10 = 50 (additive — no anti-stack rule for speed bonuses).
+    // REQ-UMAPI-06: speed is deterministic, no RNG retry loop needed.
+    const app = await getTestApp();
+    const sheet = await getSheet(app, user, characterId);
+    expect(sheet.speed.walk).toBe(50);
   });
 });
