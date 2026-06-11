@@ -1519,7 +1519,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
   const RollInitiativeBody = z.object({
     combatantId: z.string().uuid(),
     npcInitiativeMod: z.number().int().optional(),
-    rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional(),
+    rollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
   });
 
   app.post(
