@@ -134,10 +134,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   // Hero props
   const { identity } = sheet;
   const totalLevel = identity.totalLevel;
-  const firstClass = identity.classes[0] ?? null;
   const raceLabel = identity.race?.slug ?? undefined;
-  const classLabel = firstClass?.slug ?? undefined;
-  const subclassLabel = firstClass?.subclass?.slug ?? undefined;
   const xpCurrent = character.xp;
   const xpNextThreshold = xpForLevel(totalLevel + 1);
 
