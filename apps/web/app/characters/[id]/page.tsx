@@ -220,6 +220,20 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
           isOwner={character.userId === session.user.id}
         />
 
+        {/* Agregar clase — multiclass handoff to level-up new-class flow.
+            REQ-MC-CTA-03: active + owner only. REQ-MC-CTA-04: no XP gate.
+            REQ-MC-CTA-06: plain Link. D-CTA: multiclassingEnabled omitted (no new fetch).
+            The level-up flow surfaces INSUFFICIENT_XP / PREREQ errors inline. */}
+        {isActive && character.userId === session.user.id && (
+          <Link
+            href={`/characters/${id}/level-up`}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-transparent px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/5 transition-colors"
+            aria-label="Agregar una nueva clase (multiclase)"
+          >
+            + Agregar clase
+          </Link>
+        )}
+
         {/* REQ-CRG-WIDGET: Recent grants for owner + DM (sdd/inventory-d4-d6). */}
         <RecentGrants
           characterId={id}
