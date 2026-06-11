@@ -176,8 +176,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         <SheetHero
           name={identity.name}
           raceLabel={raceLabel}
-          classLabel={classLabel}
-          subclassLabel={subclassLabel}
+          classes={identity.classes}
           level={totalLevel}
           xpCurrent={xpCurrent}
           xpNextThreshold={xpNextThreshold}

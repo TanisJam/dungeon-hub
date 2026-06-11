@@ -13,11 +13,25 @@ export function xpForLevel(level: number): number {
   return XP_TABLE[level - 1];
 }
 
+export interface ClassEntry {
+  slug: string;
+  level: number;
+  subclass?: { slug: string } | null;
+}
+
 interface SheetHeroProps {
   name: string;
   raceLabel?: string;
+  /** @deprecated Pass `classes` instead for multiclass support. Kept for back-compat. */
   classLabel?: string;
+  /** @deprecated Pass `classes` instead for multiclass support. Kept for back-compat. */
   subclassLabel?: string;
+  /**
+   * All classes on the character. When provided (and non-empty), renders one accent pill
+   * per class (slug + level) and one neutral outline pill per subclass entry.
+   * When absent, falls back to classLabel / subclassLabel behaviour.
+   */
+  classes?: ClassEntry[];
   level: number;
   xpCurrent: number;
   xpNextThreshold: number;
@@ -28,6 +42,7 @@ export function SheetHero({
   raceLabel,
   classLabel,
   subclassLabel,
+  classes,
   level,
   xpCurrent,
   xpNextThreshold,
@@ -61,14 +76,37 @@ export function SheetHero({
             {/* Level — NORM: font-semibold→font-medium (atom base) */}
             <Pill tone="neutral" fill="outline" size="md">✦ Nivel {level}</Pill>
 
-            {/* Class — FLAG: text-white→text-on-accent (dark ink on copper). Human sign-off needed. */}
-            {classLabel && (
-              <Pill tone="accent" fill="solid" size="md">{classLabel}</Pill>
-            )}
-
-            {/* Subclass — NORM: border-white/30→/40, text-white/70→/90 (atom outline neutral) */}
-            {subclassLabel && (
-              <Pill tone="neutral" fill="outline" size="md">{subclassLabel}</Pill>
+            {classes && classes.length > 0 ? (
+              // Multiclass-aware: one accent pill per class + one neutral outline pill per subclass.
+              // REQ-HERO-06: flex-wrap handles 375px without overflow — no layout change needed.
+              <>
+                {classes.map((c) => (
+                  <Pill key={c.slug} tone="accent" fill="solid" size="md">
+                    {c.slug} {c.level}
+                  </Pill>
+                ))}
+                {classes.flatMap((c) =>
+                  c.subclass
+                    ? [
+                        <Pill key={`${c.slug}-sub`} tone="neutral" fill="outline" size="md">
+                          {c.subclass.slug}
+                        </Pill>,
+                      ]
+                    : [],
+                )}
+              </>
+            ) : (
+              // Back-compat: render classLabel / subclassLabel when classes prop is absent.
+              <>
+                {/* Class — FLAG: text-white→text-on-accent (dark ink on copper). Human sign-off needed. */}
+                {classLabel && (
+                  <Pill tone="accent" fill="solid" size="md">{classLabel}</Pill>
+                )}
+                {/* Subclass — NORM: border-white/30→/40, text-white/70→/90 (atom outline neutral) */}
+                {subclassLabel && (
+                  <Pill tone="neutral" fill="outline" size="md">{subclassLabel}</Pill>
+                )}
+              </>
             )}
           </div>
         </div>
