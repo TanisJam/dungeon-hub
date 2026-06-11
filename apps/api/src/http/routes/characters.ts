@@ -2316,7 +2316,8 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
 
   // ---- PUT /characters/:id/class ------------------------------------------
   // Setea la clase principal + level + subclass (si está desbloqueada) + skill choices.
-  // En este slice: una sola clase. Multiclass entra en 1.4e.
+  // Reemplaza el array de clases completo (semántica de creación/edición de la clase
+  // principal). Las clases adicionales se agregan vía POST /characters/:id/classes.
   app.put('/characters/:id/class', { preHandler: app.authenticate }, async (request, reply) => {
     const { id } = ParamsWithId.parse(request.params);
     const body = SetClassBody.parse(request.body);
