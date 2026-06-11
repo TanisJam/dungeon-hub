@@ -3,13 +3,22 @@
  *
  * E2E for the multiclass spell picker tab UI (SP-06).
  *
- * Fixture: Cleric 1 / Wizard 1 character, pre-seeded via API because the
- * wizard class step does not yet support multiclass character creation
- * (class step only supports classes[0] — P.4 result from apply phase).
+ * DESIGN NOTE (FORK A=A3, signed — multiclass-additive Batch 8):
+ * The creation wizard is intentionally L1-only and single-class per PHB p.163
+ * ("Prerequisites: to qualify for a new class, you must meet the ability score
+ * prerequisites for both your current class and your new one — this is done
+ * at level-up, not character creation"). Multiclassing is a level-up mechanic.
  *
- * When multiclass class-step lands, this fixture can be replaced with a
- * full wizard walkthrough. Until then, the test creates the character via
- * direct API calls in beforeEach.
+ * The canonical path for a multiclass character is:
+ *   1. Create character via wizard (stats + race + class + background — single L1 class).
+ *   2. DM approves → character becomes active.
+ *   3. Player uses "Agregar clase" CTA on the sheet (/characters/:id) to reach
+ *      the level-up new-class flow (/characters/:id/level-up).
+ *   4. Post /classes → monk L1; grant XP; POST /classes/monk/level-up → monk L2.
+ *
+ * These tests remain fixme because implementing the E2E for the multiclass
+ * spell-picker tab requires API-seeding the character (POST /classes, POST /level-up),
+ * DM-approval flow, and a multi-step Playwright walkthrough — out of scope for B8.
  *
  * PHB reference:
  *   - Cleric 1: WIS-based, cantripsKnown=3, spellsPrepared=WIS_mod+1
@@ -76,27 +85,24 @@ test.describe('character wizard — multiclass spell picker tabs (SP-06)', () =>
     'Cleric 1 / Wizard 1 — two tabs render, picks on each, land on /review',
     async ({ page }) => {
       /*
-       * FIXME: This E2E requires the API to support patching character.data.classes
-       * with multiple entries via the class wizard step or a PATCH endpoint.
-       * At time of SP-06 apply, the class step only supports classes[0] and there
-       * is no PATCH /characters/:id/data endpoint.
+       * FIXME: Multiclass character creation will NOT land in the wizard by design
+       * (FORK A=A3 signed, PHB p.163 — multiclassing is a level-up mechanic, not a
+       * creation-wizard feature).
        *
-       * Pre-condition to unblock:
-       *   Option A: the multiclass class-step lands (follow-up SDD)
-       *   Option B: add PATCH /characters/:id endpoint to accept full character data
+       * True E2E for multiclass spell tabs belongs in a level-up-flow E2E:
+       *   1. Seed character via API (POST /characters, PUT /class cleric L1, PUT /race, etc.)
+       *   2. DM-approve the character (POST /characters/:id/approve)
+       *   3. Grant XP so the character qualifies for a new class (POST /characters/:id/xp)
+       *   4. Navigate to /characters/:id (sheet)
+       *   5. Click "Agregar clase" CTA → lands on /characters/:id/level-up (new-class mode)
+       *   6. Select wizard as new class → wizard spell picker renders
+       *   7. Assert two tabs: "Clérigo" and "Mago"
+       *   8. Pick spells on each tab, assert picks preserved on tab switch
+       *   9. Complete level-up flow
+       * This is tracked as a follow-up (out of scope for B8).
        *
-       * When unblocked, remove test.fixme, implement setup below:
-       *
-       *   1. Create character via wizard (stats + race + background)
-       *   2. PATCH classes to [{cleric, L1}, {wizard, L1}]
-       *   3. Navigate to /wizard/spells
-       *   4. Assert two tabs: "Clérigo" and "Mago"
-       *   5. Pick spells on Cleric tab (N cantrips + M prepared)
-       *   6. Switch to Wizard tab
-       *   7. Assert Cleric picks preserved (tab state not reset on switch)
-       *   8. Pick spells on Wizard tab (cantrips + spellbook + prepared)
-       *   9. Click "Siguiente"
-       *   10. Assert redirect to /wizard/review
+       * REQ-FIXME-02: "Option A: multiclass class-step lands" is NOT the unblock condition
+       * (that option was explicitly rejected). REQ-FIXME-04.
        */
 
       // Placeholder: login to avoid "requires auth" bail-out at test start
@@ -112,14 +118,21 @@ test.describe('character wizard — multiclass spell picker tabs (SP-06)', () =>
     'single Wizard — no tab bar renders (regression guard)',
     async ({ page }) => {
       /*
-       * FIXME: same pre-condition as above — need full wizard creation to
-       * reach /wizard/spells in E2E mode.
+       * FIXME: same canonical-path reasoning as above (FORK A=A3, PHB p.163).
+       * The single-caster regression guard also requires the full level-up E2E
+       * fixture setup to reach a post-creation active wizard character reliably.
        *
-       * When unblocked:
-       *   1. Create Wizard-only character
-       *   2. Navigate to /wizard/spells
-       *   3. Assert no role=tab elements in DOM (REQ-SP06-SINGLE-CASTER-NO-TAB-BAR)
-       *   4. Assert existing single-caster flow still works end-to-end
+       * True E2E unblock path:
+       *   1. Seed Wizard-only character via API, DM-approve
+       *   2. Navigate to /characters/:id (sheet) — no "Agregar clase" CTA expected
+       *      (single class, already at L1)
+       *   3. Navigate to /wizard/spells (or equivalent post-creation spell step)
+       *   4. Assert no role=tab elements in DOM (REQ-SP06-SINGLE-CASTER-NO-TAB-BAR)
+       *   5. Assert existing single-caster flow still works end-to-end
+       * This is tracked as a follow-up (out of scope for B8).
+       *
+       * REQ-FIXME-02: "Option A: multiclass class-step lands" is NOT the unblock condition.
+       * REQ-FIXME-04.
        */
       await page.goto('/dashboard');
       await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
