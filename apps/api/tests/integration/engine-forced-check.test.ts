@@ -466,7 +466,10 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
   it(
     'FC-T8: unknown conditionOnFail → 400 VALIDATION_FAILED (REQ-API-01)',
     async () => {
-      // 'Grappled' is not in the 3a catalog (only 'Stunned' is valid).
+      // 'Frightened' is not in the 3a catalog.
+      // (FC-T8 was re-fixtured from 'Grappled' in C4 — B9 REQ-REGRESS-02:
+      //  'Grappled' was added to CONDITION_CATALOG when the contest route shipped,
+      //  so the invalid-condition guard must use a condition not yet cataloged.)
       const app = await getTestApp();
       const { encounterId, fighterId } = await makeFreshEncounter(app, 'FC-T8 unknown condition');
 
@@ -478,7 +481,7 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
           targetCombatantId: fighterId,
           ability: 'str',
           dc: 15,
-          conditionOnFail: 'Grappled', // not in 3a catalog
+          conditionOnFail: 'Frightened', // not in 3a catalog (re-fixtured from 'Grappled' — B9 REQ-REGRESS-02)
         },
       });
 

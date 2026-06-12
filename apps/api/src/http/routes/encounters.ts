@@ -31,6 +31,7 @@ import { deactivateRage } from '../../use-cases/encounters/deactivate-rage.js';
 import { passEncounterTurn } from '../../use-cases/encounters/pass-encounter-turn.js';
 import { performAbilityCheck } from '../../use-cases/encounters/perform-ability-check.js';
 import { rollCombatantInitiative } from '../../use-cases/encounters/roll-combatant-initiative.js';
+import { performContest } from '../../use-cases/encounters/perform-contest.js';
 import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
 
 const CreateBody = z.object({
@@ -1576,6 +1577,135 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       // REQ-ROUTE-03: response shape — NO success, NO dc, NO crit.
       return reply.code(200).send({
         initiative: result.initiative,
+      });
+    },
+  );
+
+  // ---- POST /encounters/:id/actions/contest --------------------------------
+  // Two-actor contested check (grapple/shove/escape). GM-only. Server-authoritative.
+  // B9 REQ-ROUTE-01..10: discriminated union on verb; shoveOutcome required iff shove.
+  // PHB p.174: contests — both roll, higher wins.
+  // PHB p.195: grapple/shove = one attack from Attack action; escape = full action.
+  // PHB p.290: Grappled condition (speed=0, narrative-only until #513).
+  const ContestBaseFields = {
+    attackerCombatantId: z.string().uuid(),
+    defenderCombatantId: z.string().uuid(),
+    defenderSkill: z.enum(['athletics', 'acrobatics']),
+    defenderAbility: z.enum(['str', 'dex']),
+    npcAttackerCheckMod: z.number().optional(),
+    npcDefenderCheckMod: z.number().optional(),
+    attackerRollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
+    defenderRollMode: z.enum(['normal', 'advantage', 'disadvantage']).optional().default('normal'),
+    version: z.number().int().nonnegative(),
+  };
+  const ContestBody = z.discriminatedUnion('verb', [
+    z.object({ verb: z.literal('grapple'), ...ContestBaseFields }),
+    z.object({ verb: z.literal('shove'), shoveOutcome: z.enum(['prone', 'push']), ...ContestBaseFields }),
+    z.object({ verb: z.literal('escape'), ...ContestBaseFields }),
+  ]);
+
+  app.post(
+    '/encounters/:id/actions/contest',
+    { preHandler: app.authenticate },
+    async (request, reply) => {
+      const { id } = ParamsWithId.parse(request.params);
+
+      // Zod body validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
+      const bodyResult = ContestBody.safeParse(request.body);
+      if (!bodyResult.success) {
+        return reply
+          .code(400)
+          .send({ error: 'VALIDATION_FAILED', issues: bodyResult.error.issues });
+      }
+      const userId = request.user!.sub;
+
+      // Load encounter for GM membership check.
+      const [encRow] = await db
+        .select({ campaignId: encounters.campaignId })
+        .from(encounters)
+        .where(eq(encounters.id, id))
+        .limit(1);
+      if (!encRow) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+      // GM-only gate (REQ-ROUTE-02 — mirrors ability-check :1476-1477 pattern).
+      const role = await memberRole(encRow.campaignId, userId);
+      if (role !== 'gm') return reply.code(403).send({ error: 'FORBIDDEN' });
+
+      const {
+        attackerCombatantId,
+        defenderCombatantId,
+        verb,
+        defenderSkill,
+        defenderAbility,
+        npcAttackerCheckMod,
+        npcDefenderCheckMod,
+        attackerRollMode,
+        defenderRollMode,
+        version,
+      } = bodyResult.data;
+      const shoveOutcome = verb === 'shove' ? bodyResult.data.shoveOutcome : undefined;
+
+      const result = await performContest({
+        encounterId: id,
+        attackerCombatantId,
+        defenderCombatantId,
+        verb,
+        defenderAbility,
+        defenderSkill,
+        ...(shoveOutcome !== undefined ? { shoveOutcome } : {}),
+        npcAttackerCheckMod: npcAttackerCheckMod ?? null,
+        npcDefenderCheckMod: npcDefenderCheckMod ?? null,
+        attackerRollMode,
+        defenderRollMode,
+        version,
+      });
+
+      if (!result.ok) {
+        switch (result.code) {
+          case 'NOT_FOUND':
+            return reply.code(404).send({ error: 'NOT_FOUND', target: result.target });
+          case 'ENCOUNTER_NOT_ACTIVE':
+            return reply.code(409).send({ error: 'ENCOUNTER_NOT_ACTIVE' });
+          case 'NO_ATTACKER_CONTEST':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_ATTACKER_CONTEST' }],
+            });
+          case 'NO_DEFENDER_CONTEST':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_DEFENDER_CONTEST' }],
+            });
+          case 'NOT_GRAPPLED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NOT_GRAPPLED' }],
+            });
+          case 'NO_GRAPPLER_RECORDED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'NO_GRAPPLER_RECORDED' }],
+            });
+          case 'ACTION_ALREADY_USED':
+            return reply.code(409).send({ error: 'ACTION_ALREADY_USED' });
+          case 'VERSION_CONFLICT':
+            return reply.code(409).send({ error: 'VERSION_CONFLICT' });
+          default:
+            return reply.code(400).send({ error: 'BAD_REQUEST' });
+        }
+      }
+
+      // REQ-ROUTE-10: response shape.
+      return reply.code(200).send({
+        ok: true,
+        outcome: result.outcome,
+        attackerCheck: result.attackerCheck,
+        defenderCheck: result.defenderCheck,
+        verb: result.verb,
+        ...(result.shoveOutcome !== undefined ? { shoveOutcome: result.shoveOutcome } : {}),
+        applied: result.applied,
+        removed: result.removed,
+        ...(result.autoSuccess ? { autoSuccess: true } : {}),
       });
     },
   );

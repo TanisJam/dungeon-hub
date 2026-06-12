@@ -73,7 +73,7 @@ const compiledRage = compileRule(rageRuleDoc);
  * Condition catalog — valid values for conditionOnFail.
  * TODO #513: replace with DB catalog when conditions-catalog SDD lands.
  */
-const CONDITION_CATALOG = new Set(['Stunned', 'Blinded', 'Invisible', 'Poisoned', 'Incapacitated', 'Petrified']);
+const CONDITION_CATALOG = new Set(['Stunned', 'Blinded', 'Invisible', 'Poisoned', 'Incapacitated', 'Petrified', 'Grappled']);
 
 // Abilities that trigger auto-fail when target is Stunned (PHB p.292).
 const STUNNED_AUTOFAIL_ABILITIES = new Set<Ability>(['str', 'dex']);
