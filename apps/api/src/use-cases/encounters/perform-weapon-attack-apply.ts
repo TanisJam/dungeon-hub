@@ -33,6 +33,7 @@ import {
   extraAttacksPerAction,
   compileRule,
   recklessAttackRuleDoc,
+  isSurprisedFirstTurn,
   type RngFn,
   type RollResult,
   type Source,
@@ -47,6 +48,7 @@ import { resolveResistance } from './resolve-resistance.js';
 import { resolveTargetAc } from './resolve-target-ac.js';
 import { performForcedCheck, type PerformForcedCheckResult } from './perform-forced-check.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
 import {
   prepareConcentrationCheck,
   resolveConcentrationCheck,
@@ -247,6 +249,8 @@ export type PerformWeaponAttackApplyResult =
   | { ok: false; code: 'FORBIDDEN' }
   // engine-incapacitated-gating — REQ-INC-02 (PHB p.290: can't take actions).
   | { ok: false; code: 'ACTOR_INCAPACITATED' }
+  // engine-surprise-round1 — REQ-SUR-S2-02 (PHB p.189: can't act on first surprised turn).
+  | { ok: false; code: 'ACTOR_SURPRISED' }
   // Stunning Strike pre-roll 400 guards (Slice 3b-ii, FAIL-FAST — REQ-SS-MELEE-01, REQ-SS-KI-EXHAUSTED-01, REQ-SS-NPC-01).
   // NOTHING committed (no to-hit roll, no HP change, no ki change) — pure pre-validation.
   | { ok: false; code: 'STUNNING_STRIKE_NOT_MELEE' }
@@ -344,6 +348,13 @@ export async function performWeaponAttackApply(
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
+  // ── Step 3a.1: Surprised gate (REQ-SUR-S2-02, PHB p.189 — can't act on first surprised turn) ──
+  // Fail-fast AFTER incap gate, BEFORE auth/context build (ADR-3.2 version→turn→incap→SURPRISE ladder).
+  // No RNG involved — surprise gating is deterministic state-based check.
+  if (await isCombatantSurprisedFirstTurn(attackerId)) {
+    return { ok: false, code: 'ACTOR_SURPRISED' };
+  }
+
   // ── Step 3b: Owner-or-GM auth gate (REQ-WCA-API-01 — C2 gate relaxation) ────────
   // Replaces the old inline NPC-attacker check (Step 5, L334-336) which was GM-only-compatible
   // only because the route enforced GM-only before use-case entry.
@@ -369,6 +380,7 @@ export async function performWeaponAttackApply(
 
   // ── Step 4: Load target combatant (explicit select: hp, ac, kind, characterId) ─
   // REQ: target SELECT must explicitly include ac, kind, characterId for resolveTargetAc.
+  // engine-surprise-round1 S3: include surprised + firstTurnActed to gate Shield reaction (REQ-SUR-S3-01).
   const [targetCombatant] = await db
     .select({
       id: encounterCombatants.id,
@@ -378,6 +390,8 @@ export async function performWeaponAttackApply(
       kind: encounterCombatants.kind,
       characterId: encounterCombatants.characterId,
       reactionUsed: encounterCombatants.reactionUsed,
+      surprised: encounterCombatants.surprised,
+      firstTurnActed: encounterCombatants.firstTurnActed,
     })
     .from(encounterCombatants)
     .where(and(eq(encounterCombatants.id, targetId), eq(encounterCombatants.encounterId, encounterId)))
@@ -680,6 +694,10 @@ export async function performWeaponAttackApply(
   if (
     targetCombatant.kind === 'pc' &&
     !targetCombatant.reactionUsed &&
+    // engine-surprise-round1 S3 (REQ-SUR-S3-01, PHB p.189): "you can't take a reaction until
+    // that turn ends." A surprised defender cannot use Shield. The gate is silent (no error —
+    // the surprised state is unknown to the attacker; the reaction window simply doesn't open).
+    !isSurprisedFirstTurn(targetCombatant.surprised, targetCombatant.firstTurnActed) &&
     isShieldableHit({
       hit: toHitResult.hit,
       crit: toHitResult.crit,

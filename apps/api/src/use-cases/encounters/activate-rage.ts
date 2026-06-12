@@ -39,6 +39,7 @@ import {
 } from '../../infra/db/schema.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
+import { isSurpriseExempt } from '@dungeon-hub/domain/engine';
 import { loadItemDataDetailMany } from '../characters/load-item-data.js';
 import { classifyItem } from '@dungeon-hub/domain/character/inventory';
 import { breakConcentration } from '../engine/concentration-service.js';
@@ -137,15 +138,6 @@ export async function activateRage(input: {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
   }
 
-  // ── Step 4b: Surprise gate — S2 unconditional (ADR-3.2, REQ-SUR-S2-02, PHB p.189) ──
-  // PHB p.189: "you can't move or take an action … and you can't take a reaction"
-  // Bonus actions are also blocked (PHB p.189 implicitly; same "your turn" restriction).
-  // NOTE: S3 REPLACES this block with the Feral Instinct (PHB p.50) carve-out;
-  //       do NOT duplicate — move the gate, don't add a second check.
-  if (await isCombatantSurprisedFirstTurn(ragerId)) {
-    return { ok: false, code: 'ACTOR_SURPRISED' };
-  }
-
   // ── Step 5: Bonus-action gate (PHB p.48 — rage costs a bonus action) ──────────
   if (ragerCombatant.bonusActionUsed) {
     return { ok: false, code: 'BONUS_ACTION_ALREADY_USED' };
@@ -167,6 +159,31 @@ export async function activateRage(input: {
   const barbarianLevel = classes
     .filter((c) => c.slug === 'barbarian')
     .reduce((sum, c) => sum + c.level, 0);
+
+  // ── Step 6a: Surprise gate — FI-aware (ADR-3.2, REQ-SUR-S3-02, PHB p.189 + p.50) ──
+  // Placed HERE (after barbarianLevel) because the Feral Instinct carve-out requires knowing
+  // the barbarian level. Exception to the standard version→turn→incap→SURPRISE ladder (ADR-3.2).
+  //
+  // PHB p.189: "you can't move or take an action on your first turn … and you can't take a reaction"
+  // PHB p.50 Feral Instinct: "If you are surprised at the beginning of combat and aren't
+  //   incapacitated, you can act normally on your first turn, but only if you enter your rage
+  //   before doing anything else on that turn."
+  //
+  // Note: incap was already verified above (Step 4a returned ACTOR_INCAPACITATED).
+  // So at this point isIncapacitated === false — safe to pass false to isSurpriseExempt.
+  //
+  // post-design #2256: rejected attempts are no-ops — rage need only be the FIRST SUCCESSFUL act.
+  // A prior rejected attempt (ACTOR_SURPRISED) does NOT consume the FI exemption.
+  let isFeralInstinctCase = false;
+  if (await isCombatantSurprisedFirstTurn(ragerId)) {
+    if (isSurpriseExempt(barbarianLevel, /* isIncapacitated = */ false)) {
+      // FI carve-out applies: allow rage through. Mark for atomically lifting firstTurnActed in tx.
+      isFeralInstinctCase = true;
+    } else {
+      // Surprised AND not FI-exempt (L1-6 Barbarian, non-Barbarian, or under incap) → gate.
+      return { ok: false, code: 'ACTOR_SURPRISED' };
+    }
+  }
 
   // Derive max rage-uses from the same registry the domain uses (inline for V1).
   // PHB p.48 table: L1-2→2, L3-5→3, L6-11→4, L12-16→5, L17-19→6, L20→sentinel 999.
@@ -225,9 +242,14 @@ export async function activateRage(input: {
     }
 
     // Step 10: Consume bonus action.
+    // engine-surprise-round1 FI atomicity (ADR-5, REQ-SUR-S3-02): if this is the Feral
+    // Instinct case (L7+ surprised Barbarian entering rage as their FIRST act), lift the
+    // surprise restriction atomically here INSIDE this tx. Doing it outside the tx would
+    // create a window where the flag is partially written. The write is idempotent: if
+    // firstTurnActed is already true (impossible per pre-tx gate, but harmless if replayed).
     await tx
       .update(encounterCombatants)
-      .set({ bonusActionUsed: true })
+      .set({ bonusActionUsed: true, ...(isFeralInstinctCase ? { firstTurnActed: true } : {}) })
       .where(eq(encounterCombatants.id, ragerId));
 
     // Step 11: Spend one rage-use via jsonb_set (atomic path mutation — mirrors ki pattern).
