@@ -7,6 +7,8 @@
  *   GRAPPLE-S3: equal mods (skewed to tie via identical +5) → tie, no condition applied
  *   GRAPPLE-S4: incapacitated defender → auto-success, attackerCheck=null, budget consumed
  *              (amendment spec-amendment-auto01: budget tx runs even on auto-success)
+ *   GRAPPLE-S4b: fighter L5 (Extra Attack) + incapacitated → attacksRemaining = totalAttacks - 1 = 1
+ *               (direct budget proof for Extra Attack + auto-success amendment)
  *   SHOVE-S1:  shove+prone → attacker-wins, Prone condition inserted
  *   SHOVE-S2:  shove+push → attacker-wins, no condition (narrative-only), shoveOutcome echoed
  *   SHOVE-S3:  shove without shoveOutcome → 400 SHOVE_OUTCOME_REQUIRED (discriminated union)
@@ -52,6 +54,12 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
   // Fighter L1: STR 15 (+2), Athletics proficient → STR mod +2 + PB +2 = +4 athletics mod.
   // Used for PC-sided tests. L1 fighter has no Extra Attack → totalAttacks=1.
   let fighterCharId: string;
+
+  // Fighter L5: Extra Attack (PHB p.72) → totalAttacks=2.
+  // Used for GRAPPLE-S4b: auto-grapple against incapacitated target must consume
+  // exactly one attack slot, leaving attacksRemaining = 1 (totalAttacks - 1).
+  // Spec amendment spec-amendment-auto01: budget tx runs even on auto-success.
+  let fighterL5CharId: string;
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -126,6 +134,36 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
       .then((r) => r.json());
 
     const attackerCombatantId: string = enc.currentCombatantId; // fighter, initiative 20
+    const defenderCombatantId: string = enc.combatants.find(
+      (c: { id: string }) => c.id !== attackerCombatantId,
+    )?.id ?? '';
+
+    return { encounterId: enc.id as string, version: enc.version as number, attackerCombatantId, defenderCombatantId };
+  };
+
+  /**
+   * Create a fresh encounter with a PC fighter L5 (attacker) vs NPC goblin (defender).
+   * Fighter L5 has Extra Attack → totalAttacks=2. Initiative 20 → currentCombatantId = fighter.
+   */
+  const makePcL5VsNpcEncounter = async (name: string) => {
+    const app = await getTestApp();
+    const enc = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/encounters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          campaignId,
+          name,
+          combatants: [
+            { name: 'Fighter-L5', kind: 'pc', characterId: fighterL5CharId, initiative: 20, hpCurrent: 44, hpMax: 44 },
+            { name: 'Goblin', kind: 'npc', initiative: 5, hpCurrent: 20, hpMax: 20, ac: 13 },
+          ],
+        },
+      })
+      .then((r) => r.json());
+
+    const attackerCombatantId: string = enc.currentCombatantId; // fighter L5, initiative 20
     const defenderCombatantId: string = enc.combatants.find(
       (c: { id: string }) => c.id !== attackerCombatantId,
     )?.id ?? '';
@@ -264,6 +302,49 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
         },
       }),
     );
+
+    // ── Fighter L5 fixture ────────────────────────────────────────────────────────
+    // PHB p.72: "Beginning at 5th level, you can attack twice, instead of once,
+    // whenever you take the Attack action on your turn." → totalAttacks=2.
+    // Used for GRAPPLE-S4b (RAW proof of Extra Attack amendment — spec-amendment-auto01).
+    // PATCH pattern follows engine-action-economy.test.ts AE-T4 Fighter L5 fixture.
+    const f5 = await app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/characters',
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: { worldId, name: 'Fighter-L5 (contest test)' },
+      })
+      .then((r) => r.json());
+    fighterL5CharId = f5.id as string;
+
+    await expectOk(
+      'fighter-l5-patch',
+      await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/characters/${fighterL5CharId}`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+        payload: {
+          data: {
+            classes: [
+              {
+                slug: 'fighter',
+                source: 'PHB',
+                level: 5,
+                hitDie: 'd10',
+                subclass: null,
+                savingThrows: ['str', 'con'],
+                armorProficiencies: [],
+                weaponProficiencies: [],
+                toolProficiencies: [],
+                skillChoices: ['athletics', 'perception'],
+              },
+            ],
+            baseStats: { str: 15, dex: 10, con: 14, int: 8, wis: 12, cha: 13 },
+          },
+        },
+      }),
+    );
   });
 
   afterAll(async () => {
@@ -352,17 +433,19 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
   // ── GRAPPLE-S3: tie → no condition applied ─────────────────────────────────
 
   it(
-    'GRAPPLE-S3: equal check mods → tie is possible, no condition applied (REQ-GRAPPLE-08, PHB p.174 tie=status-quo)',
+    'GRAPPLE-S3: equal check mods → valid outcome + both check shapes present (REQ-GRAPPLE-08, REQ-HYGIENE-01, PHB p.174 tie=status-quo)',
     async () => {
       // PHB p.174: "If the contest results in a tie, the situation remains the same."
-      // Tie: only when both totals equal. With NPC mods=+5/+5, totals can tie when
-      // both roll the same d20. This is a rare event — we test the tie branch via
-      // the unit-level rollContest tests (T1c: both=10, tie). For integration coverage
-      // we verify that a tie response shape is correct when it occurs.
-      // NOTE: we cannot force a tie deterministically at integration level without
-      // mocking the RNG. We verify STRUCTURE only — the tie logic is proven at unit level.
-      // This test uses identical mods and asserts that EITHER outcome is valid +
-      // that on 'tie', applied=[] (no condition insert).
+      // With NPC mods=+5/+5 the outcome is non-deterministic at integration level —
+      // any of the three outcomes is valid depending on the d20 rolls.
+      //
+      // REQ-HYGIENE-01 (no hedge asserts): no conditional expects may wrap assertions.
+      // Tie SEMANTICS (winner='tie' → applied=[]) are proven deterministically at unit
+      // level in roll-contest.test.ts T1c (mocked RNG both=10). Here we assert:
+      //   (a) response shape is always valid (outcome in the three-value set),
+      //   (b) both check objects are always present with correct structure (rolled, not auto-success),
+      //   (c) applied is always an array (defender-wins/tie → [] ; attacker-wins → ['Grappled']).
+      // These assertions hold unconditionally for ANY outcome the RNG produces.
       const { encounterId, version, attackerCombatantId, defenderCombatantId } =
         await makeNpcVsNpcEncounter('GRAPPLE-S3 tie-possible');
 
@@ -378,16 +461,19 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
       });
 
       expect(result.statusCode).toBe(200);
-      // Outcome can be any of the three — what matters is that on tie, no condition was applied.
+      // (a) Outcome is always one of the three valid values.
       expect(['attacker-wins', 'defender-wins', 'tie']).toContain(result.body.outcome);
-      if (result.body.outcome === 'tie') {
-        expect(result.body.applied).toEqual([]);
-        const grappledRow = await getGrappledRow(defenderCombatantId);
-        expect(grappledRow).toBeNull();
-      }
-      if (result.body.outcome === 'defender-wins') {
-        expect(result.body.applied).toEqual([]);
-      }
+      // (b) Both check objects are always present (rolled contest, not auto-success).
+      expect(result.body.attackerCheck).not.toBeNull();
+      expect(result.body.defenderCheck).not.toBeNull();
+      expect(typeof result.body.attackerCheck.d20).toBe('number');
+      expect(typeof result.body.defenderCheck.d20).toBe('number');
+      expect(Array.isArray(result.body.attackerCheck.d20All)).toBe(true);
+      expect(Array.isArray(result.body.defenderCheck.d20All)).toBe(true);
+      expect(result.body.attackerCheck.checkMod).toBe(5);
+      expect(result.body.defenderCheck.checkMod).toBe(5);
+      // (c) applied is always an array (tie SEMANTICS unit-proven at T1c).
+      expect(Array.isArray(result.body.applied)).toBe(true);
     },
   );
 
@@ -432,6 +518,64 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
       // Verify budget was consumed (version bumped by at least 1).
       const afterEnc = await getEncounter(encounterId);
       expect(afterEnc.version).toBeGreaterThan(version);
+    },
+  );
+
+  // ── GRAPPLE-S4b: Fighter L5 Extra Attack + incapacitated → budget = totalAttacks - 1 ──
+
+  it(
+    'GRAPPLE-S4b: fighter L5 (Extra Attack) auto-grapples incapacitated defender → attacksRemaining = totalAttacks - 1 = 1 (amendment spec-amendment-auto01, PHB p.72/p.195)',
+    async () => {
+      // RAW proof for spec amendment spec-amendment-auto01:
+      // PHB p.72: "Beginning at 5th level, you can attack twice" → totalAttacks=2.
+      // PHB p.195: grapple "replaces one of them [attacks from the Attack action]" AND
+      //   "You succeed automatically if the target is incapacitated."
+      //
+      // Claim: auto-success against incapacitated target STILL consumes one attack slot
+      // (budget tx runs before the contest is short-circuited).
+      // After auto-grapple: actionUsed=true, attacksRemaining=1 (totalAttacks-1=2-1=1).
+      //
+      // Falsification:
+      //   FAIL state: if budget tx did NOT run on auto-success, attacksRemaining would
+      //     remain 0 (initial value) and actionUsed=false — the assertion below would fail.
+      //   PASS state: budget tx ran → attacksRemaining=1.
+      // (Verified manually: removing the applyAttackReplaceBudget call from the
+      //  incapacitated arm in perform-contest.ts causes attacksRemaining=0, failing the assertion.)
+      const { encounterId, version, attackerCombatantId, defenderCombatantId } =
+        await makePcL5VsNpcEncounter('GRAPPLE-S4b extra-attack budget');
+
+      // Pre-apply Incapacitated to the defender (auto-success condition).
+      await insertCondition(defenderCombatantId, 'Incapacitated');
+
+      const result = await doContest(encounterId, {
+        attackerCombatantId,
+        defenderCombatantId,
+        verb: 'grapple',
+        defenderSkill: 'athletics',
+        defenderAbility: 'str',
+        // npcAttackerCheckMod omitted — PC attacker derives mod server-side (REQ-NPC-03).
+        // npcDefenderCheckMod omitted — PC defender path irrelevant (auto-success, no contest rolled).
+        // Per perform-contest.ts incapacitated arm: budget runs, then attacker-wins without rollContest.
+        version,
+      });
+
+      expect(result.statusCode).toBe(200);
+      // Auto-success response shape (REQ-AUTO-02).
+      expect(result.body.outcome).toBe('attacker-wins');
+      expect(result.body.autoSuccess).toBe(true);
+      expect(result.body.attackerCheck).toBeNull();
+      expect(result.body.defenderCheck).toBeNull();
+      expect(result.body.applied).toEqual(['Grappled']);
+
+      // Direct budget assertion: fighter L5 totalAttacks=2 → after one attack consumed,
+      // attacksRemaining MUST be 1 (not 0 or 2).
+      const afterEnc = await getEncounter(encounterId);
+      const attackerAfter = afterEnc.combatants.find(
+        (c: { id: string }) => c.id === attackerCombatantId,
+      );
+      expect(attackerAfter).not.toBeNull();
+      expect(attackerAfter.actionUsed).toBe(true);
+      expect(attackerAfter.attacksRemaining).toBe(1);
     },
   );
 
