@@ -6,9 +6,13 @@
  *    initiative rolls."
  *
  * Scope (advantage half only):
- *   The surprise exemption clause of Feral Instinct is OUT OF SCOPE (REQ-OOS-01).
- *   The 'surprised' condition has no combatant flag and no round-1 action-restriction
- *   enforcement. Deferred until a surprise/action-economy SDD exists.
+ *   This rule doc encodes only the advantage-on-initiative half of Feral Instinct.
+ *   The surprise exemption clause (PHB p.50: "if you are surprised at the beginning of
+ *   combat ... you can act normally on your first turn, but only if you enter your rage
+ *   before doing anything else") was OUT OF SCOPE (REQ-OOS-01) until engine-surprise-round1
+ *   (B10 S3). That SDD now enforces the carve-out via `isSurpriseExempt` (domain predicate,
+ *   packages/domain/src/engine/conditions/surprised.ts) + activate-rage.ts (IO layer).
+ *   REQ-OOS-01 is RESOLVED — the enforcement lives outside this rule doc.
  *
  * Implementation notes:
  *   - NO predicate on the emit. The barbarianLevel >= 7 gate is a registration-time
