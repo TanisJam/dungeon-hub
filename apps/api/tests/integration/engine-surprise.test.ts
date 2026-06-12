@@ -67,6 +67,7 @@ describe('engine-surprise-round1', () => {
 
   // Barbarian L7 — qualifies for Feral Instinct carve-out (PHB p.50).
   let barbarianL7CharId: string;
+  let barbarianL7LongswordInstanceId: string;
 
   // Barbarian L6 — just below Feral Instinct threshold.
   let barbarianL6CharId: string;
@@ -447,6 +448,25 @@ describe('engine-surprise-round1', () => {
       },
     });
 
+    // Equip longsword on BarbarianL7 so FI-S3-01 follow-up attack resolves without NOT_FOUND.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/characters/${barbarianL7CharId}/inventory`,
+      headers: { authorization: `Bearer ${gm.accessToken}` },
+      payload: { item: { slug: 'longsword', source: 'PHB' }, state: 'equipped' },
+    });
+    const barbL7Sheet = await app
+      .inject({
+        method: 'GET',
+        url: `/api/v1/characters/${barbarianL7CharId}/sheet`,
+        headers: { authorization: `Bearer ${gm.accessToken}` },
+      })
+      .then((r) => r.json());
+    const barbL7Longsword = barbL7Sheet.inventory?.find(
+      (i: { itemSlug: string }) => i.itemSlug === 'longsword',
+    );
+    barbarianL7LongswordInstanceId = barbL7Longsword?.instanceId ?? '';
+
     // ── Barbarian L6 — just below Feral Instinct threshold ───────────────────────
     // PHB p.50: L6 does NOT qualify for Feral Instinct (requires L7+).
     const barbL6 = await app
@@ -591,6 +611,11 @@ describe('engine-surprise-round1', () => {
 
     const before = await getCombatantFlags(actorCombatantId);
     expect(before.firstTurnActed).toBe(false);
+
+    // REQ-SUR-X-01: turn pointer must NOT auto-skip a surprised combatant —
+    // the currentCombatantId must still be the surprised actor before pass-turn is called.
+    const encBefore = await getEncounter(encounterId);
+    expect(encBefore.currentCombatantId).toBe(actorCombatantId);
 
     const adv = await passTurn(encounterId, version);
     expect(adv.statusCode).toBe(200);
@@ -953,13 +978,12 @@ describe('engine-surprise-round1', () => {
     const attackResult = await doAttack(encounterId, {
       attackerId: actorCombatantId,
       targetId: targetCombatantId,
-      weaponInstanceId: longswordInstanceId,
+      weaponInstanceId: barbarianL7LongswordInstanceId,
       version: newVersion,
     });
-    // Should NOT be blocked by ACTOR_SURPRISED — firstTurnActed was lifted.
-    if (attackResult.statusCode === 400) {
-      expect(attackResult.body.issues?.[0]?.code).not.toBe('ACTOR_SURPRISED');
-    }
+    // Must succeed unconditionally — firstTurnActed was lifted by rage, ACTOR_SURPRISED gate must not fire.
+    // REQ-SUR-X-02: no hedge asserts; this path must be verified at runtime.
+    expect(attackResult.statusCode).toBe(200);
   });
 
   it('FI-S3-02: surprised L7+ Barbarian — prior rejected attempt is no-op → still can rage (FI-S3-02, post-design #2256)', async () => {
@@ -1010,11 +1034,11 @@ describe('engine-surprise-round1', () => {
     await insertIncapacitated(actorCombatantId);
 
     const result = await doRage(encounterId, actorCombatantId, version);
-    // Incapacitated gate fires BEFORE Feral Instinct carve-out (Step 4a).
+    // Incapacitated gate fires BEFORE Feral Instinct carve-out (activate-rage.ts:137).
+    // The incap check runs at Step 4a; isSurpriseExempt at Step 4b is unreachable when incap=true.
+    // Production path is deterministically ACTOR_INCAPACITATED.
     expect(result.statusCode).toBe(400);
-    // Should be ACTOR_INCAPACITATED (incap gate runs first) or ACTOR_SURPRISED (FI carve-out knows incap=true).
-    // Either way, the rage is blocked.
-    expect(['ACTOR_INCAPACITATED', 'ACTOR_SURPRISED']).toContain(result.body.issues?.[0]?.code);
+    expect(result.body.issues?.[0]?.code).toBe('ACTOR_INCAPACITATED');
   });
 
   it('FI-S3-05: non-Barbarian L7+ → ACTOR_SURPRISED on any action (FI-S3-05, REQ-SUR-S3-02)', async () => {
