@@ -38,6 +38,7 @@ import {
   encounterCombatantConditions,
 } from '../../infra/db/schema.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
 import { loadItemDataDetailMany } from '../characters/load-item-data.js';
 import { classifyItem } from '@dungeon-hub/domain/character/inventory';
 import { breakConcentration } from '../engine/concentration-service.js';
@@ -64,7 +65,10 @@ export type ActivateRageResult =
   // Not a barbarian / level 0 → no rage-uses resource
   | { ok: false; code: 'RAGE_NOT_AVAILABLE' }
   // Wearing heavy armor (PHB p.48 — "not while wearing heavy armor")
-  | { ok: false; code: 'RAGE_BLOCKED_BY_HEAVY_ARMOR' };
+  | { ok: false; code: 'RAGE_BLOCKED_BY_HEAVY_ARMOR' }
+  // engine-surprise-round1 (REQ-SUR-S2-02, PHB p.189 — bonus actions blocked while surprised)
+  // NOTE: S3 replaces this with the FI-aware version (isSurpriseExempt carve-out)
+  | { ok: false; code: 'ACTOR_SURPRISED' };
 
 // ── activate-rage ─────────────────────────────────────────────────────────────
 
@@ -131,6 +135,15 @@ export async function activateRage(input: {
   // ── Step 4a: Incapacitated gate (PHB p.290) ────────────────────────────────────
   if (await isCombatantIncapacitated(ragerId)) {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
+  // ── Step 4b: Surprise gate — S2 unconditional (ADR-3.2, REQ-SUR-S2-02, PHB p.189) ──
+  // PHB p.189: "you can't move or take an action … and you can't take a reaction"
+  // Bonus actions are also blocked (PHB p.189 implicitly; same "your turn" restriction).
+  // NOTE: S3 REPLACES this block with the Feral Instinct (PHB p.50) carve-out;
+  //       do NOT duplicate — move the gate, don't add a second check.
+  if (await isCombatantSurprisedFirstTurn(ragerId)) {
+    return { ok: false, code: 'ACTOR_SURPRISED' };
   }
 
   // ── Step 5: Bonus-action gate (PHB p.48 — rage costs a bonus action) ──────────

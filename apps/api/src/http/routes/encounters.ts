@@ -476,6 +476,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
+          case 'ACTOR_SURPRISED':
+            // engine-surprise-round1 — REQ-SUR-S2-02 (PHB p.189). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_SURPRISED' }],
+            });
           case 'ACTION_ALREADY_USED':
             // engine-action-economy — REQ-AE-06 (PHB p.198). Attack action already spent this turn.
             return reply.code(400).send({
@@ -935,6 +941,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
+          case 'ACTOR_SURPRISED':
+            // engine-surprise-round1 — REQ-SUR-S2-02 + REQ-SUR-S2-03 (PHB p.189). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_SURPRISED' }],
+            });
           case 'ACTION_ALREADY_USED':
             // engine-action-economy — REQ-AE-02 (PHB p.230). Cure Wounds action already spent.
             return reply.code(400).send({
@@ -1132,6 +1144,12 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
+          case 'ACTOR_SURPRISED':
+            // engine-surprise-round1 — REQ-SUR-S2-02 (PHB p.189). State-gate refusal.
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_SURPRISED' }],
+            });
           case 'ACTION_ALREADY_USED':
             // engine-action-economy — REQ-AE-02 (PHB p.257). Cast action already spent this turn.
             return reply.code(400).send({
@@ -1321,6 +1339,7 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
           case 'VERSION_CONFLICT':
             return reply.code(409).send({ error: result.code });
           case 'ACTOR_INCAPACITATED':
+          case 'ACTOR_SURPRISED':
           case 'BONUS_ACTION_ALREADY_USED':
           case 'RESOURCE_OVER_LIMIT':
           case 'RAGE_NOT_AVAILABLE':
@@ -1726,6 +1745,11 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(409).send({ error: 'ACTION_ALREADY_USED' });
           case 'VERSION_CONFLICT':
             return reply.code(409).send({ error: 'VERSION_CONFLICT' });
+          case 'ACTOR_SURPRISED':
+            return reply.code(400).send({
+              error: 'VALIDATION_FAILED',
+              issues: [{ code: 'ACTOR_SURPRISED' }],
+            });
           default:
             return reply.code(400).send({ error: 'BAD_REQUEST' });
         }

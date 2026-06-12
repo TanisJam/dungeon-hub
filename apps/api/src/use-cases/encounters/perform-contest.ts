@@ -58,6 +58,7 @@ import {
 } from '@dungeon-hub/domain/engine';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import { resolveActorCheck, type Ability } from './resolve-actor-check.js';
+import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
 
 // ── Crypto RNG (mirrors perform-ability-check.ts) ─────────────────────────────
 
@@ -129,7 +130,9 @@ export type PerformContestResult =
   | { ok: false; code: 'NOT_GRAPPLED' }
   | { ok: false; code: 'NO_GRAPPLER_RECORDED' }
   | { ok: false; code: 'ACTION_ALREADY_USED' }
-  | { ok: false; code: 'VERSION_CONFLICT' };
+  | { ok: false; code: 'VERSION_CONFLICT' }
+  // engine-surprise-round1 (REQ-SUR-S2-02, PHB p.189 — actions blocked while surprised)
+  | { ok: false; code: 'ACTOR_SURPRISED' };
 
 // ── performContest ─────────────────────────────────────────────────────────────
 
@@ -214,6 +217,14 @@ export async function performContest(
     .limit(1);
 
   if (!attackerCombatant) return { ok: false, code: 'NOT_FOUND', target: 'attacker' };
+
+  // ── Step 2a: Surprise gate (ADR-3.2, REQ-SUR-S2-02, PHB p.189) ──────────────
+  // FIRST actor-side block (this file has NO actor turn/incap gate — ADR-3.2).
+  // Gate on resolvedAttackerCombatantId — covers both grapple/shove (attacker)
+  // and escape (actor is the grappled combatant, resolved above at verb==='escape').
+  if (await isCombatantSurprisedFirstTurn(resolvedAttackerCombatantId)) {
+    return { ok: false, code: 'ACTOR_SURPRISED' };
+  }
 
   // Load defender combatant.
   const [defenderCombatant] = await db
