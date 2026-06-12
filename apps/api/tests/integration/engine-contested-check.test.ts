@@ -894,4 +894,105 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
       expect(result.statusCode).toBe(403);
     },
   );
+
+  // ── EDGE-V1: VERSION_CONFLICT isolation ───────────────────────────────────────
+
+  it(
+    'EDGE-V1: stale version → 409 VERSION_CONFLICT, no condition inserted (REQ-BUDGET-02, CAS)',
+    async () => {
+      // REQ-BUDGET-02: budget tx uses CAS on encounters.version.
+      // A stale version means a concurrent mutation happened; we must reject without
+      // inserting any condition (atomicity — nothing committed on conflict).
+      const { encounterId, version, attackerCombatantId, defenderCombatantId } =
+        await makeNpcVsNpcEncounter('EDGE-V1 version-conflict');
+
+      const staleVersion = version - 1; // always stale relative to current
+
+      const result = await doContest(encounterId, {
+        attackerCombatantId,
+        defenderCombatantId,
+        verb: 'grapple',
+        defenderSkill: 'athletics',
+        defenderAbility: 'str',
+        npcAttackerCheckMod: 20,
+        npcDefenderCheckMod: -5,
+        version: staleVersion,
+      });
+
+      expect(result.statusCode).toBe(409);
+      expect(result.body.error).toBe('VERSION_CONFLICT');
+      // No Grappled condition inserted (atomic — nothing committed on conflict).
+      const grappledRow = await getGrappledRow(defenderCombatantId);
+      expect(grappledRow).toBeNull();
+    },
+  );
+
+  // ── EDGE-N1: NO_GRAPPLER_RECORDED — null appliedByCombatantId on escape ────────
+
+  it(
+    'EDGE-N1: Grappled row exists but appliedByCombatantId=null → 400 NO_GRAPPLER_RECORDED (REQ-ESCAPE-02 / D-UC escape-grappler-resolution)',
+    async () => {
+      // Design D-UC: if appliedByCombatantId is null on the Grappled row (legacy/unknown
+      // grappler), the use-case cannot identify the grappler → NO_GRAPPLER_RECORDED.
+      // This guards against a future "escape from unknown grapple" scenario where
+      // grapple was applied outside the engine (e.g., manual GM insert).
+      const { encounterId, version, attackerCombatantId: escaperCombatantId, defenderCombatantId } =
+        await makeNpcVsNpcEncounter('EDGE-N1 null-grappler');
+
+      // Insert Grappled with null appliedByCombatantId (simulates legacy/manual insert).
+      await insertCondition(escaperCombatantId, 'Grappled', null);
+
+      const result = await doContest(encounterId, {
+        attackerCombatantId: escaperCombatantId,
+        defenderCombatantId,
+        verb: 'escape',
+        defenderSkill: 'athletics',
+        defenderAbility: 'str',
+        npcAttackerCheckMod: 0,
+        npcDefenderCheckMod: 0,
+        version,
+      });
+
+      expect(result.statusCode).toBe(400);
+      expect(result.body.error).toBe('VALIDATION_FAILED');
+      expect(result.body.issues.some((i: { code: string }) => i.code === 'NO_GRAPPLER_RECORDED')).toBe(true);
+      // Version must not have changed (fail-fast, no budget tx).
+      const afterEnc = await getEncounter(encounterId);
+      expect(afterEnc.version).toBe(version);
+    },
+  );
+
+  // ── EDGE-I1: idempotent re-grapple — same attacker, same target ──────────────
+
+  it(
+    'EDGE-I1: grapple when Grappled row already exists (same attacker) → 200 ok, applied=[] idempotent (REQ-GRAPPLE-03/04)',
+    async () => {
+      // REQ-GRAPPLE-03/04: idempotent no-op if same (combatantId + appliedByCombatantId) exists.
+      // Budget IS still consumed (REQ-BUDGET-01 — the attack slot is used regardless).
+      const { encounterId, version, attackerCombatantId, defenderCombatantId } =
+        await makeNpcVsNpcEncounter('EDGE-I1 idempotent-grapple');
+
+      // Pre-apply Grappled (same attacker as we're about to send).
+      await insertCondition(defenderCombatantId, 'Grappled', attackerCombatantId);
+
+      const result = await doContest(encounterId, {
+        attackerCombatantId,
+        defenderCombatantId,
+        verb: 'grapple',
+        defenderSkill: 'athletics',
+        defenderAbility: 'str',
+        npcAttackerCheckMod: 20,
+        npcDefenderCheckMod: -5,
+        version,
+      });
+
+      expect(result.statusCode).toBe(200);
+      // Idempotent: condition already present, applied=[] (no duplicate insert).
+      expect(result.body.outcome).toBe('attacker-wins');
+      expect(result.body.applied).toEqual([]);
+      // Budget tx ran — version bumped.
+      const afterEnc = await getEncounter(encounterId);
+      expect(afterEnc.version).toBeGreaterThan(version);
+    },
+  );
 });
