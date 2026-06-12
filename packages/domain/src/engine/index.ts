@@ -247,6 +247,9 @@ export { GRAPPLED_CONDITION_DEF } from './conditions/grappled.js';
 // engine-rage — isRaging predicate (REQ-RAGE-06, PHB p.48)
 export { isRaging } from './conditions/rage.js';
 
+// engine-surprise-round1 — surprise gate predicates (REQ-SUR-S2-01, REQ-SUR-S3-02, PHB p.189+50)
+export { isSurprisedFirstTurn, isSurpriseExempt } from './conditions/surprised.js';
+
 // ── Authoring DSL ─────────────────────────────────────────────────────────────
 
 export { parseRule } from './authoring/parse.js';
