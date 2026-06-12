@@ -522,7 +522,10 @@ describe('engine-contested-check — POST /encounters/:id/actions/contest', () =
 
       expect(result.statusCode).toBe(400);
       expect(result.body.error).toBe('VALIDATION_FAILED');
+      // REQ-ROUTE-04 + S2 tightening: issues array must be non-empty with specific code.
       expect(Array.isArray(result.body.issues)).toBe(true);
+      expect(result.body.issues.length).toBeGreaterThan(0);
+      expect(result.body.issues.some((i: { code: string }) => i.code === 'SHOVE_OUTCOME_REQUIRED')).toBe(true);
     },
   );
 

@@ -1610,6 +1610,17 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { id } = ParamsWithId.parse(request.params);
 
+      // REQ-ROUTE-04: verb=shove without shoveOutcome → custom issue code BEFORE Zod.
+      // Zod's discriminatedUnion would emit 'invalid_type' for the missing shoveOutcome —
+      // the spec requires the client-facing code 'SHOVE_OUTCOME_REQUIRED'.
+      const rawBody = request.body as Record<string, unknown>;
+      if (rawBody?.['verb'] === 'shove' && rawBody['shoveOutcome'] === undefined) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'SHOVE_OUTCOME_REQUIRED', path: ['shoveOutcome'] }],
+        });
+      }
+
       // Zod body validation — CLAUDE.md §6: 400 VALIDATION_FAILED on bad body.
       const bodyResult = ContestBody.safeParse(request.body);
       if (!bodyResult.success) {
