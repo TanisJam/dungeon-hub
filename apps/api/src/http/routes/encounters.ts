@@ -49,6 +49,11 @@ const CreateBody = z.object({
         hpMax: z.number().int().positive(),
         /** AC: required for NPC combatants (REQ-AC-CREATE-01); optional/ignored for PC (REQ-AC-CREATE-02). */
         ac: z.number().int().nonnegative().optional(),
+        /**
+         * engine-surprise-round1: GM-supplied surprise flag (PHB p.189 — caller-authoritative).
+         * optional NOT nullable (B9 lesson): absence = not surprised. REQ-SUR-S1-01.
+         */
+        surprised: z.boolean().optional(),
       }),
     )
     .min(1)
@@ -76,7 +81,25 @@ const ParamsWithIdAndCid = z.object({
   cid: z.string().uuid(),
 });
 const AdvanceBody = z.object({ version: z.number().int().nonnegative() });
-const PatchCombatantBody = z.object({ hpCurrent: z.number().int().nonnegative() });
+const PatchCombatantBody = z
+  .object({
+    hpCurrent: z.number().int().nonnegative().optional(),
+    /**
+     * engine-surprise-round1: GM may set/clear surprised flag before firstTurnActed=true.
+     * After firstTurnActed=true → use-case returns SURPRISED_NOT_EDITABLE (post-design #2256).
+     * optional NOT nullable (B9 lesson). REQ-SUR-S1-01.
+     */
+    surprised: z.boolean().optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.hpCurrent === undefined && b.surprised === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one of hpCurrent or surprised must be provided',
+        params: { code: 'PATCH_BODY_EMPTY' },
+      });
+    }
+  });
 
 /**
  * POST /encounters/:id/actions/attack — engine action pipeline Slice 1 (read-only).
@@ -196,6 +219,8 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
         hpMax: c.hpMax,
         // REQ-AC-CREATE-03: ac threaded for NPC combatants. PC: undefined → null in use-case.
         ...(c.ac !== undefined ? { ac: c.ac } : {}),
+        // engine-surprise-round1: thread surprised flag when provided (REQ-SUR-S1-01).
+        ...(c.surprised !== undefined ? { surprised: c.surprised } : {}),
       })),
     });
     return reply.code(201).send(created);
@@ -1742,9 +1767,18 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
       const result = await patchCombatant({
         encounterId: id,
         combatantId: cid,
-        hpCurrent: body.hpCurrent,
+        ...(body.hpCurrent !== undefined ? { hpCurrent: body.hpCurrent } : {}),
+        ...(body.surprised !== undefined ? { surprised: body.surprised } : {}),
       });
-      if (!result.ok) return reply.code(404).send({ error: 'NOT_FOUND' });
+      if (!result.ok) {
+        if (result.code === 'SURPRISED_NOT_EDITABLE') {
+          return reply.code(400).send({
+            error: 'VALIDATION_FAILED',
+            issues: [{ code: 'SURPRISED_NOT_EDITABLE' }],
+          });
+        }
+        return reply.code(404).send({ error: 'NOT_FOUND' });
+      }
       return { hpCurrent: result.hpCurrent, newVersion: result.newVersion };
     },
   );

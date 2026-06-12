@@ -122,6 +122,9 @@ export async function loadEncounter(id: string): Promise<LoadedEncounter | null>
       actionUsed: c.actionUsed,
       bonusActionUsed: c.bonusActionUsed,
       attacksRemaining: c.attacksRemaining,
+      // engine-surprise-round1: surprise flags visible in GET (REQ-SUR-S1-03, #2252.4 — no role filtering).
+      surprised: c.surprised,
+      firstTurnActed: c.firstTurnActed,
     })),
   };
 }

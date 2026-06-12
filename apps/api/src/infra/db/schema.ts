@@ -1102,6 +1102,14 @@ export const encounterCombatants = pgTable(
     // PHB p.48: end-early if neither attacked hostile nor took damage since last turn.
     ragedAttackedHostile: boolean('raged_attacked_hostile').notNull().default(false),
     ragedTookDamage: boolean('raged_took_damage').notNull().default(false),
+    // engine-surprise-round1: PHB p.189 — "If you're surprised, you can't move or take an
+    // action on your first turn of the combat, and you can't take a reaction until that turn ends."
+    // surprised: GM-supplied (caller-authoritative #2163); the engine NEVER derives it.
+    // first_turn_acted: flips true at this combatant's OWN turn-END (advance-encounter-turn, OUTGOING side).
+    // Gate predicate = surprised && !first_turn_acted (NO round condition — late joiners, #2252.3).
+    // DEFAULT false backfills legacy rows; gate is inert for them (surprised=false). Read-path tolerant.
+    surprised: boolean('surprised').notNull().default(false),
+    firstTurnActed: boolean('first_turn_acted').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('idx_combatants_encounter').on(t.encounterId)],

@@ -1,0 +1,2 @@
+ALTER TABLE "encounter_combatants" ADD COLUMN "surprised" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "encounter_combatants" ADD COLUMN "first_turn_acted" boolean DEFAULT false NOT NULL;

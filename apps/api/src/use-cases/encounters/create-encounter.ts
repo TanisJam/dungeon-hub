@@ -21,6 +21,11 @@ export interface CreateEncounterInput {
     hpMax: number;
     /** NPC combatants: store AC in DB column. PC combatants: null (derived at attack time). */
     ac?: number | null;
+    /**
+     * engine-surprise-round1: GM-supplied surprise flag (PHB p.189 — caller-authoritative #2163).
+     * Defaults to false when absent. NOT nullable — there is no null surprised state.
+     */
+    surprised?: boolean;
   }>;
 }
 
@@ -57,6 +62,10 @@ export interface CreatedEncounter {
     bonusActionUsed: boolean;
     /** engine-action-economy: attacks remaining under the current Attack action (Extra Attack). 0 = resting state. */
     attacksRemaining: number;
+    /** engine-surprise-round1: GM-supplied surprise flag (PHB p.189). */
+    surprised: boolean;
+    /** engine-surprise-round1: true once this combatant's first turn ends (advance-encounter-turn OUTGOING write). */
+    firstTurnActed: boolean;
   }>;
 }
 
@@ -86,6 +95,8 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
           // NPC: store provided ac (null if not given). PC: always null (derived at attack time).
           ac: c.kind === 'npc' ? (c.ac ?? null) : null,
           insertionOrder: idx,
+          // engine-surprise-round1: thread surprised flag; defaults to false when absent (REQ-SUR-S1-01).
+          ...(c.surprised !== undefined ? { surprised: c.surprised } : {}),
         })),
       )
       .returning();
@@ -131,6 +142,8 @@ export async function createEncounter(input: CreateEncounterInput): Promise<Crea
         actionUsed: c.actionUsed,
         bonusActionUsed: c.bonusActionUsed,
         attacksRemaining: c.attacksRemaining,
+        surprised: c.surprised,
+        firstTurnActed: c.firstTurnActed,
       })),
     };
   });

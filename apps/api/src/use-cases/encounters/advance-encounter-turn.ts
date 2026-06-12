@@ -88,9 +88,16 @@ export async function advanceEncounterTurn(
     // Step 2.6: FLAG RESET for the OUTGOING combatant (single reset point — ADR-4).
     // Reset AFTER the end-early check above (step 2.5) — NOT before.
     // These flags reset at the rager's own turn-end so they are fresh next turn.
+    //
+    // engine-surprise-round1 Step 2.7 (ADR-5, #2240 false-friend):
+    // Set firstTurnActed = true for the OUTGOING combatant (oldCombatantId).
+    // PHB p.189 — "you can't take a reaction until that turn ends."
+    // OUTGOING = the combatant whose turn just ended.
+    // The INCOMING reset below (Step 4) targets result.currentCombatantId — a DIFFERENT combatant.
+    // These two writes MUST NOT be merged. Idempotent: re-setting true on a non-first turn is harmless.
     await tx
       .update(encounterCombatants)
-      .set({ ragedAttackedHostile: false, ragedTookDamage: false })
+      .set({ ragedAttackedHostile: false, ragedTookDamage: false, firstTurnActed: true })
       .where(eq(encounterCombatants.id, oldCombatantId));
 
     // Step 2: DELETE expired rows (turns_remaining=0, boundary='end') — DELETE-FIRST (ADR-2).
