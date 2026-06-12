@@ -163,6 +163,10 @@ export type { RollAbilityCheckResult } from './check/roll-ability-check.js';
 export { rollInitiative } from './check/roll-initiative.js';
 export type { RollInitiativeResult } from './check/roll-initiative.js';
 
+// B9 — rollContest pure primitive (DC-less two-actor contest, PHB p.174; D-PRIM)
+export { rollContest } from './check/roll-contest.js';
+export type { RollContestResult, ContestSideResult } from './check/roll-contest.js';
+
 // Slice 3b-ii — Stunning Strike ki save DC (PHB p.78)
 export { computeKiSaveDc } from './save/compute-ki-save-dc.js';
 
@@ -236,6 +240,9 @@ export { POISONED_CONDITION_DEF } from './conditions/poisoned.js';
 // engine-resist-immunity — Petrified condition def + immunity predicate (REQ-RI-09..17)
 export { PETRIFIED_CONDITION_DEF } from './conditions/petrified.js';
 export { isImmuneToCondition } from './conditions/condition-immunity.js';
+
+// engine-contested-checks — Grappled condition definition (B9, PHB p.290)
+export { GRAPPLED_CONDITION_DEF } from './conditions/grappled.js';
 
 // engine-rage — isRaging predicate (REQ-RAGE-06, PHB p.48)
 export { isRaging } from './conditions/rage.js';
