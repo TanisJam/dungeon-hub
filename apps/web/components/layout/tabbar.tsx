@@ -28,9 +28,10 @@ export function TabBar() {
   return (
     <nav
       aria-label="Navegación principal"
-      className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 px-1.5 pt-2 bg-paper/95 backdrop-blur-md border-t border-line"
+      className="fixed bottom-0 left-0 right-0 z-40 px-1.5 pt-2 bg-paper/95 backdrop-blur-md border-t border-line md:hidden"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 18px)' }}
     >
+      <div className="mx-auto grid w-full max-w-sm grid-cols-5">
       {WORLD_TABS.map((tab) => {
         const isActive = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         // World nav uses accent color for active state (world-neutral, no dm/player split)
@@ -55,6 +56,7 @@ export function TabBar() {
           </Link>
         );
       })}
+      </div>
     </nav>
   );
 }

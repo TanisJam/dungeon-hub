@@ -3,6 +3,7 @@ import type { Role } from '@/lib/use-role';
 import type { CallerRole } from '@/lib/active-world';
 import { TopBar } from './topbar';
 import { TabBar } from './tabbar';
+import { DesktopSidebar } from './desktop-sidebar';
 
 type AppShellProps = {
   title: string;
@@ -73,17 +74,24 @@ export function AppShell({
 
   return (
     <>
-      <TopBar
-        title={title}
-        subtitle={subtitle}
-        right={rightAction}
-        canBeDM={canBeDM}
-        hasNotif={hasNotif}
-        backHref={backHref}
-        roleDefault={roleDefault}
-        worldSwitcher={worldSwitcher}
-      />
-      <main className="mx-auto max-w-sm px-4 py-4 pb-28">{children}</main>
+      <div className="md:grid md:grid-cols-[var(--sidebar-w)_1fr]">
+        <DesktopSidebar />
+        <div className="md:min-w-0">
+          <TopBar
+            title={title}
+            subtitle={subtitle}
+            right={rightAction}
+            canBeDM={canBeDM}
+            hasNotif={hasNotif}
+            backHref={backHref}
+            roleDefault={roleDefault}
+            worldSwitcher={worldSwitcher}
+          />
+          <main className="mx-auto min-h-screen max-w-sm px-4 py-4 pb-28 md:max-w-3xl md:pb-8">
+            {children}
+          </main>
+        </div>
+      </div>
       {showTabBar && <TabBar />}
     </>
   );

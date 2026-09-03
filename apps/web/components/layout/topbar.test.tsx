@@ -96,6 +96,20 @@ describe('AppShell with backHref', () => {
   });
 });
 
+describe('TopBar — subtitle truncate (REQ-UXP1-TOPBAR-01)', () => {
+  it('T11: subtitle span has truncate class', () => {
+    render(<TopBar title="Mundo" subtitle="TU GREMIO — DM" />);
+    const subtitle = screen.getByText('TU GREMIO — DM');
+    expect(subtitle.className).toContain('truncate');
+  });
+
+  it('T12: regression — title h1 still has truncate class', () => {
+    render(<TopBar title="Mundo" subtitle="TU GREMIO — DM" />);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Mundo' });
+    expect(heading.className).toContain('truncate');
+  });
+});
+
 describe('TopBar — world switcher slot (REQ-WIS-03)', () => {
   it('T8: worldSwitcher prop present → renders switcher node in left slot (no CrowMark)', () => {
     render(

@@ -77,6 +77,9 @@
   --radius-lg:   18px;
   --radius-pill: 999px;
 
+  /* ── Layout ── */
+  --sidebar-w: 15rem;
+
   /* ── Shadows (dark-mode appropriate) ── */
   --shadow-stamp-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-stamp-md: 0 6px 16px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -484,6 +487,15 @@
   color: var(--color-ink-soft);
 }
 
+/* ── Horizontal-scroll edge fade (ux-p2-consistency Fix 3) ──
+   Subtle right-edge fade hinting more content off-screen for
+   horizontally-scrolling chip/tab rows (bitacora tags, personajes
+   status chips, character sheet tabs). Shared by ScrollNav + TagFilter. */
+.scroll-fade-r {
+  mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
+}
+
 /* ── Compendium screen — search + categories + recents + spell detail ── */
 .compendium-init {
   display: flex;
@@ -524,6 +536,16 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+}
+@media (min-width: 768px) {
+  .compendium-init-cat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (min-width: 1024px) {
+  .compendium-init-cat-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 .compendium-init-cat-card {
   display: flex;

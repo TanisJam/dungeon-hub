@@ -128,11 +128,18 @@ describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
     expect(activeLink?.textContent).toContain('Mercado');
   });
 
-  it('grid has grid-cols-5 class (Mercado tab added, ADR-2 — 75px/column @375px)', () => {
+  it('inner grid has grid-cols-5 class (Mercado tab added, ADR-2 — 75px/column @375px)', () => {
+    const { container } = render(<TabBar />);
+    const grid = container.querySelector('nav > div');
+    expect(grid?.className).toContain('grid-cols-5');
+    expect(grid?.className).not.toContain('grid-cols-4');
+  });
+
+  // REQ-DSHELL-TABBAR-HIDDEN-01: TabBar hidden on md+ (DesktopSidebar takes over)
+  it('nav is hidden on md+ (REQ-DSHELL-TABBAR-HIDDEN-01)', () => {
     const { container } = render(<TabBar />);
     const nav = container.querySelector('nav');
-    expect(nav?.className).toContain('grid-cols-5');
-    expect(nav?.className).not.toContain('grid-cols-4');
+    expect(nav?.className).toContain('md:hidden');
   });
 
   // Tab order: Inicio · Mapa · Biblioteca · Mercado · Bitácora (REQ-MERC-NAV-01, REQ-RENAME-02)

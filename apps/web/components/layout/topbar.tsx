@@ -75,9 +75,10 @@ export function TopBar({
 
   return (
     <header
-      className="sticky top-0 z-40 flex items-center gap-2.5 px-3.5 pb-3 bg-paper/90 backdrop-blur-md border-b border-line"
+      className="sticky top-0 z-40 bg-paper/90 backdrop-blur-md border-b border-line"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
+      <div className="mx-auto flex w-full max-w-sm items-center gap-2.5 px-3.5 pb-3 md:max-w-3xl">
       {/* LEFT slot: backHref > worldSwitcher > CrowMark */}
       {renderLeftSlot()}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
@@ -85,7 +86,7 @@ export function TopBar({
           {title}
         </h1>
         {subtitle && (
-          <span className="font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none">
+          <span className="font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none truncate">
             {subtitle}
           </span>
         )}
@@ -109,6 +110,7 @@ export function TopBar({
           </button>
         </div>
       )}
+      </div>
     </header>
   );
 }
