@@ -44,7 +44,7 @@ const TAG_LABELS: Record<string, string> = {
 export function TagFilter({ activeTag, onTagChange }: TagFilterProps) {
   return (
     <div
-      className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scroll-smooth"
+      className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scroll-smooth scroll-fade-r"
       style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
       aria-label="Filtro por etiqueta"
     >

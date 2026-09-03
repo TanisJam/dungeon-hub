@@ -26,7 +26,7 @@ export function CompendiumDemoIsland({ campaignId }: CompendiumDemoIslandProps) 
       aria-label="Buscar en el compendium"
     >
       <span className="ph">Hechizo, item, monstruo…</span>
-      <span className="kbd">⌘K</span>
+      <span className="kbd hidden md:inline-flex">⌘K</span>
     </Link>
   );
 }

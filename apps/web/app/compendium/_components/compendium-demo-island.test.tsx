@@ -34,4 +34,12 @@ describe('CompendiumDemoIsland', () => {
     const { queryByText } = render(<CompendiumDemoIsland campaignId={null} />);
     expect(queryByText('Bola de fuego')).toBeNull();
   });
+
+  it('ux-p2-consistency Fix 2: ⌘K kbd hint is hidden on mobile (hidden base, md:inline-flex)', () => {
+    const { container } = render(<CompendiumDemoIsland campaignId={null} />);
+    const kbd = container.querySelector('.kbd');
+    expect(kbd).toBeTruthy();
+    expect(kbd!.className).toContain('hidden');
+    expect(kbd!.className).toMatch(/md:(inline|flex|inline-flex)/);
+  });
 });

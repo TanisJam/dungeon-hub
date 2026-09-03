@@ -65,4 +65,17 @@ describe('DMQuickActions', () => {
     const herramientasLink = Array.from(links).find((a) => a.getAttribute('href') === '/herramientas/facciones');
     expect(herramientasLink).toBeTruthy();
   });
+
+  it('T8: renders no emoji glyphs — icons are line-icons, not emoji (ux-p2-consistency Fix 1)', () => {
+    const { container } = render(<DMQuickActions />);
+    // eslint-disable-next-line no-misleading-character-class -- emoji detection regex
+    const emojiPattern = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+    expect(emojiPattern.test(container.textContent ?? '')).toBe(false);
+  });
+
+  it('T9: renders one Icon svg per action cell (5 cells: Iniciativa, Herramientas, Mesa, NPC, Loot)', () => {
+    const { container } = render(<DMQuickActions />);
+    const svgs = container.querySelectorAll('svg');
+    expect(svgs.length).toBe(5);
+  });
 });

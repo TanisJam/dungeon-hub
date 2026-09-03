@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SectionHead } from '@/components/ui/section-head';
+import { Icon } from '@/components/ui/icon';
 
 /**
  * DMQuickActions — DM home screen quick action grid.
@@ -23,8 +24,8 @@ export function DMQuickActions() {
           href="/encuentros"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
         >
-          <span className="inicio-quick-iniciativa-ic flex items-center justify-center w-9 h-9 rounded-full text-lg">
-            ⚔️
+          <span className="inicio-quick-iniciativa-ic flex items-center justify-center w-9 h-9 rounded-full text-accent">
+            <Icon name="sword" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Iniciativa</span>
         </Link>
@@ -34,8 +35,8 @@ export function DMQuickActions() {
           href="/herramientas/facciones"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
-            🛠️
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+            <Icon name="hammer" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Herramientas</span>
         </Link>
@@ -45,8 +46,8 @@ export function DMQuickActions() {
           href="/campanas"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
-            🧭
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+            <Icon name="compass" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Mesa</span>
         </Link>
@@ -58,8 +59,8 @@ export function DMQuickActions() {
           aria-disabled="true"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
-            🧙
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+            <Icon name="user" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Nuevo NPC</span>
         </button>
@@ -71,8 +72,8 @@ export function DMQuickActions() {
           aria-disabled="true"
           className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-lg">
-            💰
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+            <Icon name="bag" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Loot</span>
         </button>

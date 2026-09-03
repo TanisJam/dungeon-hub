@@ -8,6 +8,9 @@
  * [&::-webkit-scrollbar]:hidden (Chromium/Safari) via Tailwind 4 arbitrary
  * variants — the standard approach in this codebase.
  *
+ * Edge fade (ux-p2-consistency Fix 3): `.scroll-fade-r` (globals.css) is
+ * applied by default so a cut-off row always shows a scroll affordance.
+ *
  * Sub-nav is NOT adopted here: it is a segmented control (overflow-hidden,
  * no scroll) — structurally incompatible with ScrollNav.
  */
@@ -43,6 +46,7 @@ export function ScrollNav({
     'overflow-x-auto',
     '[scrollbar-width:none]',
     '[&::-webkit-scrollbar]:hidden',
+    'scroll-fade-r',
     className,
   ]
     .filter(Boolean)

@@ -19,7 +19,7 @@ export function CompendiumSearchTrigger({ onOpen }: CompendiumSearchTriggerProps
     >
       <Icon name="eye" size={14} />
       <span className="ph">Hechizo, item, monstruo, lore…</span>
-      <span className="kbd">⌘K</span>
+      <span className="kbd hidden md:inline-flex">⌘K</span>
     </button>
   );
 }

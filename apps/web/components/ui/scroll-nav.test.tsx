@@ -11,6 +11,11 @@
  * REQ-C4-08: renders as <nav> when as="nav" + aria-label forwarded
  * REQ-C4-09: renders as <div> by default (no as prop)
  * REQ-C4-10: data-scroll-nav attribute on root for test selection
+ *
+ * ux-p2-consistency Fix 3: chip/tab rows that scroll horizontally need a
+ * scroll affordance (edge fade) so the cut-off edge doesn't look like a
+ * dead end. Since SheetTabs and StatusFilterChips both build on ScrollNav,
+ * adding the fade here fixes both at once — tested once here (T11).
  */
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -88,5 +93,11 @@ describe('ScrollNav', () => {
     const { container } = render(<ScrollNav><span>x</span></ScrollNav>);
     const root = container.firstElementChild as HTMLElement;
     expect(root.hasAttribute('data-scroll-nav')).toBe(true);
+  });
+
+  it('ux-p2-consistency Fix 3: renders scroll-fade-r edge-fade affordance', () => {
+    const { container } = render(<ScrollNav><span>x</span></ScrollNav>);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).toContain('scroll-fade-r');
   });
 });
