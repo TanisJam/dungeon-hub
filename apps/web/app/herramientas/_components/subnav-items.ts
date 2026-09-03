@@ -9,4 +9,5 @@ export const HERRAMIENTAS_SUBNAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Facciones', href: '/herramientas/facciones' },
   { label: 'NPCs',      href: '/herramientas/npcs' },
   { label: 'Quests',    href: '/herramientas/quests' },
+  { label: 'Tienda',    href: '/herramientas/tienda' },
 ];

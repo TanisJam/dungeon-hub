@@ -11,8 +11,8 @@ import { describe, it, expect } from 'vitest';
 import { HERRAMIENTAS_SUBNAV_ITEMS } from './subnav-items';
 
 describe('HERRAMIENTAS_SUBNAV_ITEMS', () => {
-  it('HERRAMIENTAS-S1: has exactly 3 entries (Compendio pill removed)', () => {
-    expect(HERRAMIENTAS_SUBNAV_ITEMS).toHaveLength(3);
+  it('HERRAMIENTAS-S1: has exactly 4 entries (Compendio pill removed, Tienda added)', () => {
+    expect(HERRAMIENTAS_SUBNAV_ITEMS).toHaveLength(4);
   });
 
   it('HERRAMIENTAS-S1: does NOT contain a Compendio entry (DM uses Biblioteca tab)', () => {
@@ -36,6 +36,12 @@ describe('HERRAMIENTAS_SUBNAV_ITEMS', () => {
     const item = HERRAMIENTAS_SUBNAV_ITEMS.find((i) => i.href === '/herramientas/quests');
     expect(item).toBeTruthy();
     expect(item!.label).toBe('Quests');
+  });
+
+  it('market-shop-dm-stock-web 3d: contains Tienda entry with href /herramientas/tienda', () => {
+    const item = HERRAMIENTAS_SUBNAV_ITEMS.find((i) => i.href === '/herramientas/tienda');
+    expect(item).toBeTruthy();
+    expect(item!.label).toBe('Tienda');
   });
 
   it('no /codex/* hrefs remain — all updated to /herramientas/*', () => {
