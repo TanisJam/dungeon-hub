@@ -12,6 +12,8 @@ import { HeroNextSession } from '@/components/inicio/hero-next-session';
 import { QuickActions } from '@/components/inicio/quick-actions';
 import { ActiveCharacterCard } from '@/components/inicio/active-character-card';
 import { NovedadesFeed } from '@/components/inicio/novedades-feed';
+import { feedItemsToNovedades } from '@/components/inicio/feed-to-novedad';
+import { listGuildBitacoraFeed } from '@/app/bitacora/actions';
 import { PendingFichasCardTrigger } from '@/components/inicio/dm/pending-fichas-card-trigger';
 import { DMNextSessionCard } from '@/components/inicio/dm/dm-next-session-card';
 import { DMQuickActions } from '@/components/inicio/dm/dm-quick-actions';
@@ -133,27 +135,44 @@ export default async function InicioPage() {
   ) : undefined;
 
   const callerRole = aw?.callerRole ?? null;
+  const worldId = aw?.id ?? null;
 
   if (effectiveView === 'dm') {
     return <DMView token={token} worldSwitcher={worldSwitcher} callerRole={callerRole} />;
   }
 
-  return <PlayerView token={token} worldSwitcher={worldSwitcher} callerRole={callerRole} />;
+  return (
+    <PlayerView
+      token={token}
+      worldSwitcher={worldSwitcher}
+      callerRole={callerRole}
+      worldId={worldId}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Player view
 // ---------------------------------------------------------------------------
 
-async function PlayerView({ token, worldSwitcher, callerRole }: { token?: string; worldSwitcher?: ReactNode; callerRole?: 'gm' | 'player' | null }) {
-  // Fetch campaigns and active character in parallel (REQ-AC-RES-02: getActiveCharacter inside allSettled).
+async function PlayerView({ token, worldSwitcher, callerRole, worldId }: { token?: string; worldSwitcher?: ReactNode; callerRole?: 'gm' | 'player' | null; worldId?: string | null }) {
+  // Fetch campaigns, active character, and the guild feed in parallel
+  // (REQ-AC-RES-02: getActiveCharacter inside allSettled). No waterfall.
   // getActiveCharacter replaces the previous roster[0] heuristic (REQ-AC-INI-01).
-  const [campaignsResult, activeCharResult] = await Promise.allSettled([
+  const [campaignsResult, activeCharResult, feedResult] = await Promise.allSettled([
     token ? api.get<{ data: UserCampaignRow[] }>('/campaigns', token) : Promise.resolve(null),
     getActiveCharacter(token),
+    worldId ? listGuildBitacoraFeed(worldId, { limit: 10 }) : Promise.resolve(null),
   ]);
 
   const campaigns = campaignsResult.status === 'fulfilled' ? campaignsResult.value?.data ?? [] : [];
+
+  // NovedadesFeed hookup: map the unified guild feed to the home widget.
+  // The widget itself caps display at 3 items. Empty/failed feed → empty state.
+  const novedades =
+    feedResult.status === 'fulfilled' && feedResult.value
+      ? feedItemsToNovedades(feedResult.value.rows)
+      : [];
 
   // Nearest future session from player's campaigns
   const campaignWithSession = campaigns
@@ -226,7 +245,7 @@ async function PlayerView({ token, worldSwitcher, callerRole }: { token?: string
             />
           </>
         )}
-        <NovedadesFeed items={[]} />
+        <NovedadesFeed items={novedades} />
       </div>
     </AppShell>
   );
