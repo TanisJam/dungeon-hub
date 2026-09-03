@@ -57,7 +57,7 @@ export default async function MercadoPage() {
   // Scope: ?world= (world-scoped, consistent with player codex path).
   const initialData = await api
     .get<ListEnvelope>(
-      `/compendium/items?world=${worldId}&magic=false&limit=50&offset=0`,
+      `/compendium/items?world=${worldId}&magic=false&forSale=true&limit=50&offset=0`,
       token,
     )
     .catch(() => null);
@@ -80,11 +80,16 @@ export default async function MercadoPage() {
     <AppShell title="Mercado" subtitle="MERCADO">
       {/*
         CompendiumList island — reused as-is (REQ-MERC-SURF-01, ADR-3 reuse over rebuild).
-        extraFilters={{ magic: 'false' }} pins the mundane filter for client-side search
-        and load-more calls via searchCompendium. The SSR fetch already uses magic=false;
-        extraFilters ensures the island stays consistent on user interactions.
-        REQ-MERC-BROWSE-01: DetailSheet renders ItemHeader only — no buy/add affordance
-        (no characterId write context; browse-only path).
+        extraFilters={{ magic: 'false', forSale: 'true' }} pins the mundane + shop-curation
+        filters for client-side search and load-more calls via searchCompendium. The SSR
+        fetch already uses magic=false&forSale=true; extraFilters ensures the island stays
+        consistent on user interactions.
+        market-shop-dm-stock-web 3d: forSale=true is a no-op unless the world's
+        rulesProfile.shopCuration.enabled is true (API-side gate) — Codex stays unaffected.
+        market-shop-buy-ui 3c: shopContext={{ characterId }} threads the buy affordance
+        into ItemRowView (price) + ItemHeader (Comprar) via config.{RowView,Header}.
+        /compendium/[category]/page.tsx never passes shopContext, so the codex stays
+        browse-only (BROWSE-UNCHANGED-01).
       */}
       <CompendiumList
         category="items"
@@ -93,7 +98,8 @@ export default async function MercadoPage() {
         accessToken={token}
         initialRows={initialRows}
         total={total}
-        extraFilters={{ magic: 'false' }}
+        extraFilters={{ magic: 'false', forSale: 'true' }}
+        shopContext={{ characterId: activeCharacter.id }}
       />
     </AppShell>
   );

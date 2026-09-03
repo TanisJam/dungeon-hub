@@ -7,6 +7,12 @@
 //   Headers must read rarity and property from data.rarity / data.property[].
 //
 // PHB 2014 p.144-150 — equipment fields: type, weight, cost, rarity, properties.
+//
+// shopContext (market-shop-buy-ui 3c) — optional. Renders <ItemBuyControl> only when
+// present; /mercado is the only caller that passes it, so /compendium stays browse-only.
+
+import type { ShopContext } from '@/app/compendium/_components/types';
+import { ItemBuyControl } from './item-buy-control';
 
 // ---------------------------------------------------------------------------
 // Item type labels (PHB p.144-150)
@@ -50,7 +56,7 @@ function itemTypeLabel(code: string | null | undefined): string {
 // Cost formatter — costCp (copper pieces) → readable gp/sp/cp display
 // PHB p.143 — 1 gp = 10 sp = 100 cp
 // ---------------------------------------------------------------------------
-function costLabel(costCp: number | null | undefined): string {
+export function costLabel(costCp: number | null | undefined): string {
   if (costCp == null) return '—';
   if (costCp === 0) return '0 cp';
   if (costCp % 100 === 0) return `${costCp / 100} gp`;
@@ -127,6 +133,7 @@ interface ItemDetailRow {
 
 interface ItemHeaderProps {
   data: ItemDetailRow;
+  shopContext?: ShopContext;
 }
 
 /**
@@ -135,7 +142,7 @@ interface ItemHeaderProps {
  *
  * PHB 2014 p.144-150 — item meta fields: type, weight, cost, rarity, properties.
  */
-export function ItemHeader({ data }: ItemHeaderProps) {
+export function ItemHeader({ data, shopContext }: ItemHeaderProps) {
   const weightStr = data.weight != null ? `${data.weight} lb.` : '—';
   const props = data.data?.property ?? [];
   const propsStr = props.length > 0 ? props.map(propertyLabel).join(', ') : '—';
@@ -157,6 +164,14 @@ export function ItemHeader({ data }: ItemHeaderProps) {
           <MetaRow label="Propiedades" value="—" field="properties" />
         )}
       </div>
+
+      {shopContext !== undefined && (
+        <ItemBuyControl
+          item={{ slug: data.slug, source: data.source }}
+          costCp={data.costCp}
+          shopContext={shopContext}
+        />
+      )}
     </div>
   );
 }

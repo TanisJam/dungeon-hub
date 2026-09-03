@@ -10,6 +10,14 @@ export type CompendiumCategory =
   | 'feats'
   | 'conditions';
 
+// ShopContext — optional per-render context threaded CompendiumList → DetailSheet →
+// config.{RowView, Header} (same seam as scope/worldId/accessToken). Only /mercado/page.tsx
+// passes it; /compendium/[category]/page.tsx never does, so the codex stays browse-only.
+// market-shop-buy-ui slice 3c.
+export interface ShopContext {
+  characterId: string | null;
+}
+
 // CategoryId is now an alias — the grid still uses 'lore' as the disabled card.
 // TODO #513: Once the backgrounds card is wired, CategoryId can be retired.
 export type CategoryId =

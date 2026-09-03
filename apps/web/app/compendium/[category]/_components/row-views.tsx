@@ -3,7 +3,8 @@
 // REQ-CBROWSE-03: required fields per category type.
 // Mobile-first: min-height 44px tap target.
 
-import type { SpellListHit } from '@/app/compendium/_components/types';
+import type { SpellListHit, ShopContext } from '@/app/compendium/_components/types';
+import { costLabel } from './item-header';
 
 // ---------------------------------------------------------------------------
 // Batch 2 list-hit types (projected columns from API list endpoints)
@@ -151,13 +152,18 @@ function itemTypeLabel(code: string | null): string {
   return ITEM_TYPE_LABELS[code] ?? code;
 }
 
-export function ItemRowView({ row }: { row: ItemListHit }) {
+// shopContext (market-shop-buy-ui 3c) — passed only by /mercado; the codex browser
+// never sets it, so the price stays hidden there (BROWSE-UNCHANGED-01).
+export function ItemRowView({ row, shopContext }: { row: ItemListHit; shopContext?: ShopContext }) {
   return (
     <div className="flex min-h-[44px] items-center gap-3 py-2">
       <div className="flex flex-1 flex-col">
         <span className="text-sm font-medium text-ink">{row.name}</span>
         <span className="text-xs text-ink-soft">{itemTypeLabel(row.type)}</span>
       </div>
+      {shopContext !== undefined && (
+        <span className="text-sm font-medium text-ink">{costLabel(row.costCp)}</span>
+      )}
     </div>
   );
 }

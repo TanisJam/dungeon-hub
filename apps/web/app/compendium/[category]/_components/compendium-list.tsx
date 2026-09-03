@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CATEGORY_CONFIG } from '../_config/registry';
-import type { CompendiumCategory } from '@/app/compendium/_components/types';
+import type { CompendiumCategory, ShopContext } from '@/app/compendium/_components/types';
 import { searchCompendium, type CompendiumScope } from '../actions';
 import { DetailSheet } from './detail-sheet';
 import { ITEM_TYPE_LABELS } from './row-views';
@@ -36,6 +36,12 @@ interface CompendiumListProps {
    * REQ-MERC-SURF-01, ADR-3: Mercado passes { magic: 'false' } to pin mundane-only.
    */
   extraFilters?: Record<string, string>;
+  /**
+   * shopContext (market-shop-buy-ui 3c) — optional, threaded to config.RowView + config.Header
+   * (via DetailSheet) alongside scope/worldId/accessToken. Only /mercado/page.tsx passes it;
+   * /compendium/[category]/page.tsx never does, so the codex browser stays browse-only.
+   */
+  shopContext?: ShopContext;
   // NOTE: config is NOT in props — resolved client-side from CATEGORY_CONFIG to avoid
   // serialization of function components across the Server/Client boundary.
 }
@@ -54,6 +60,7 @@ export function CompendiumList({
   initialRows,
   total: initialTotal,
   extraFilters = {},
+  shopContext,
 }: CompendiumListProps) {
   // Resolve config client-side — avoids passing function components as props (RSC boundary).
   const config = CATEGORY_CONFIG[category];
@@ -170,7 +177,7 @@ export function CompendiumList({
                 className="w-full min-h-[44px] px-4 text-left hover:bg-paper-soft transition-colors"
                 onClick={() => setSelected(row)}
               >
-                <config.RowView row={row} />
+                <config.RowView row={row} shopContext={shopContext} />
               </button>
             </li>
           ))}
@@ -201,6 +208,7 @@ export function CompendiumList({
           worldId={worldId}
           accessToken={accessToken}
           config={config}
+          shopContext={shopContext}
           onClose={() => setSelected(null)}
         />
       )}

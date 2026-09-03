@@ -11,7 +11,7 @@ import { CompendiumEntriesWithTerms } from '@/components/compendium/term/Compend
 import type { Entry } from '@/components/compendium/types';
 import { getCompendiumDetail, type CompendiumScope } from '../actions';
 import type { CategoryConfig } from '../_config/registry';
-import type { CompendiumCategory } from '@/app/compendium/_components/types';
+import type { CompendiumCategory, ShopContext } from '@/app/compendium/_components/types';
 
 interface DetailSheetProps {
   open: boolean;
@@ -23,6 +23,8 @@ interface DetailSheetProps {
   worldId: string | null;
   accessToken: string;
   config: CategoryConfig;
+  /** shopContext (market-shop-buy-ui 3c) — threaded to config.Header alongside data. */
+  shopContext?: ShopContext;
   onClose: () => void;
 }
 
@@ -40,6 +42,7 @@ export function DetailSheet({
   worldId,
   accessToken,
   config,
+  shopContext,
   onClose,
 }: DetailSheetProps) {
   const [detail, setDetail] = useState<unknown | null>(null);
@@ -108,7 +111,7 @@ export function DetailSheet({
         </div>
       ) : detail !== null ? (
         <div>
-          <config.Header data={detail} />
+          <config.Header data={detail} shopContext={shopContext} />
           <div className="mt-4">
             <CompendiumEntriesWithTerms
               entries={entries}

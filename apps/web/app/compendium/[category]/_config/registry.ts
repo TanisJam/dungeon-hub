@@ -6,7 +6,7 @@
 // Batch 1: spells. Batch 2: items, races, classes, backgrounds. Batch 3: monsters.
 
 import type { ComponentType } from 'react';
-import type { CompendiumCategory } from '@/app/compendium/_components/types';
+import type { CompendiumCategory, ShopContext } from '@/app/compendium/_components/types';
 import { SpellHeader } from '@/app/compendium/_components/spell-header';
 import { SpellRowView, ItemRowView, RaceRowView, ClassRowView, BackgroundRowView, MonsterRowView, FeatRowView, ConditionRowView } from '../_components/row-views';
 import { ItemHeader } from '../_components/item-header';
@@ -26,12 +26,18 @@ export interface CategoryConfig {
   endpoint: string;
   /** Display label (ES). */
   label: string;
-  /** Per-category list-row renderer. Receives a raw list-hit row from the API. */
+  /**
+   * Per-category list-row renderer. Receives a raw list-hit row from the API.
+   * shopContext (market-shop-buy-ui 3c) — optional; only /mercado passes it (buy affordance).
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RowView: ComponentType<{ row: any }>;
-  /** Per-type detail header component. Receives the full Drizzle row (cols + data JSONB). */
+  RowView: ComponentType<{ row: any; shopContext?: ShopContext }>;
+  /**
+   * Per-type detail header component. Receives the full Drizzle row (cols + data JSONB).
+   * shopContext (market-shop-buy-ui 3c) — optional; only /mercado passes it (buy affordance).
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Header: ComponentType<{ data: any }>;
+  Header: ComponentType<{ data: any; shopContext?: ShopContext }>;
 }
 
 // ---------------------------------------------------------------------------
