@@ -48,4 +48,8 @@ export const DEFAULT_RULES_PROFILE: RulesProfile = {
     roll: true,
   },
   hpOnLevelUp: 'player-choice',
+  shopCuration: {
+    enabled: false,
+    forSale: [],
+  },
 };

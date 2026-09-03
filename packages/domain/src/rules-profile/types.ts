@@ -50,6 +50,18 @@ const StatGenerationSchema = z.object({
   roll: z.boolean(),
 });
 
+/**
+ * DM Shop Curation (market-shop-dm-stock-api, sub-slice 3d). Existing stored
+ * profiles default to { enabled: false, forSale: [] } via Zod schema parse —
+ * no DB migration required, same pattern as `disabledEntities.languages` (#807).
+ *
+ * `forSale` entries use the "slug|SOURCE" key format (matches `disabledEntities`).
+ */
+const ShopCurationSchema = z.object({
+  enabled: z.boolean().default(false),
+  forSale: z.array(z.string()).default([]),
+});
+
 export const RulesProfileSchema = z.object({
   /**
    * Map de source code → habilitada/deshabilitada.
@@ -66,12 +78,16 @@ export const RulesProfileSchema = z.object({
 
   /** Método para calcular HP al subir nivel. */
   hpOnLevelUp: z.enum(['roll', 'average', 'player-choice']),
+
+  /** DM-curated shop stock (market-shop-dm-stock-api, sub-slice 3d). */
+  shopCuration: ShopCurationSchema.default({ enabled: false, forSale: [] }),
 });
 
 export type RulesProfile = z.infer<typeof RulesProfileSchema>;
 export type DisabledEntities = z.infer<typeof DisabledEntitiesSchema>;
 export type VariantRules = z.infer<typeof VariantRulesSchema>;
 export type StatGeneration = z.infer<typeof StatGenerationSchema>;
+export type ShopCuration = z.infer<typeof ShopCurationSchema>;
 
 /**
  * Devuelve la lista de source codes habilitados (los que tienen value: true).
