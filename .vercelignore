@@ -1,0 +1,7 @@
+data
+deploy
+docs
+infra/supabase/volumes
+scratchpad
+.atl
+apps/web/public/world-maps
