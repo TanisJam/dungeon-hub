@@ -12,6 +12,7 @@ import { worlds, worldMembers } from '../../infra/db/schema.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
 import { listWorldCharacters } from '../../use-cases/worlds/list-world-characters.js';
+import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
 
 const ListWorldsQuery = z.object({
   mine: z.coerce.number().int().optional(),
@@ -34,6 +35,16 @@ const WorldCharactersQuery = z.object({
     .optional()
     .transform((s) => (s ? s.split(',').map((v) => v.trim()).filter(Boolean) : undefined))
     .pipe(z.array(CharacterStatusEnum).optional()),
+});
+
+/**
+ * market-shop-dm-stock-api 3d: DM mutation for rulesProfile.shopCuration.
+ * Both fields optional — this is a MERGE against the current shopCuration,
+ * not a full replace (a partial update preserves the unspecified field).
+ */
+const ShopListingsBody = z.object({
+  enabled: z.boolean().optional(),
+  forSale: z.array(z.string()).optional(),
 });
 
 export const worldsRoute: FastifyPluginAsync = async (app) => {
@@ -163,5 +174,54 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
     });
 
     return reply.send({ characters: rows });
+  });
+
+  // ---- PATCH /worlds/:id/shop-listings --------------------------------------
+  // GM-only mutation for rulesProfile.shopCuration (enabled + forSale allowlist).
+  // See SDD `market-shop-dm-stock-api` sub-slice 3d. Merges against the current
+  // shopCuration — omitted fields keep their existing value (partial update).
+  app.patch('/worlds/:id/shop-listings', { preHandler: app.authenticate }, async (request, reply) => {
+    const paramsParsed = WorldIdParams.safeParse(request.params);
+    if (!paramsParsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: paramsParsed.error.issues,
+      });
+    }
+    const { id } = paramsParsed.data;
+    const userId = request.user!.sub;
+
+    const bodyParsed = ShopListingsBody.safeParse(request.body);
+    if (!bodyParsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: bodyParsed.error.issues,
+      });
+    }
+
+    const world = await loadWorldById(id);
+    if (!world) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const check = await assertWorldGm(id, userId);
+    if (!check.ok) {
+      return reply.code(403).send({
+        error: 'FORBIDDEN',
+        issues: [{ code: 'WORLD_GM_REQUIRED', worldId: id, userId }],
+      });
+    }
+
+    const current = world.rulesProfile.shopCuration;
+    const shopCuration = {
+      enabled: bodyParsed.data.enabled ?? current.enabled,
+      forSale: bodyParsed.data.forSale ?? current.forSale,
+    };
+    const rulesProfile = { ...world.rulesProfile, shopCuration };
+
+    await db
+      .update(worlds)
+      .set({ rulesProfile, updatedAt: new Date() })
+      .where(eq(worlds.id, id));
+
+    return reply.send({ shopCuration });
   });
 };

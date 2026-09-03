@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq, ilike, sql, type SQL } from 'drizzle-orm';
+import { and, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import {
   EQUIPMENT_TYPE_QUERY_MAP,
@@ -465,6 +465,10 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     // true or omitted → no predicate (all items, backward-compatible).
     // Only "true"/"false" strings coerce to boolean; other strings fail Zod validation.
     magic: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+    // market-shop-dm-stock-api 3d: opt-in DM shop curation allowlist. Only
+    // activates when BOTH ?forSale=true AND the world's rulesProfile.shopCuration
+    // is enabled — otherwise a no-op (full list, current behavior, Codex unaffected).
+    forSale: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
   });
   app.get('/compendium/items', { preHandler: app.authenticate }, async (request, reply) => {
     const campaign = await resolveProfile(request, reply);
@@ -473,7 +477,7 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsed.error.issues });
     }
-    const { limit, offset, q, type, category, magic } = parsed.data;
+    const { limit, offset, q, type, category, magic, forSale } = parsed.data;
 
     const filter = profileFilterConditions({
       profile: campaign.rulesProfile,
@@ -510,6 +514,16 @@ export const compendiumRoute: FastifyPluginAsync = async (app) => {
           ` OR (data->>'rarity') NOT IN ('common','uncommon','rare','very rare','legendary','artifact') )` +
           ` AND (type IS NULL OR type NOT IN ('RD','ST','WD','RG'))` +
           ` AND (data->>'reqAttune') IS NULL`,
+        ),
+      );
+    }
+    if (forSale === true && campaign.rulesProfile.shopCuration.enabled) {
+      // market-shop-dm-stock-api 3d: mirrors profileFilterConditions' array idiom
+      // (slug || '|' || source) as an ALLOWLIST instead of a denylist.
+      where.push(
+        inArray(
+          sql`${compendiumItems.slug} || '|' || ${compendiumItems.source}`,
+          campaign.rulesProfile.shopCuration.forSale,
         ),
       );
     }

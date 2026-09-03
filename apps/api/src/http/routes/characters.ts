@@ -22,6 +22,7 @@ import {
   exhaustionEffectsFor,
   type SpellSheetRef,
   type AbilityScoreView,
+  type Currency,
   ALL_SKILLS,
   SKILL_TO_ABILITY,
 } from '@dungeon-hub/domain/character/sheet';
@@ -67,6 +68,8 @@ import type { AppliedAsi } from '@dungeon-hub/domain/character/race';
 import { ABILITY_KEYS, type AbilityKey, type AbilityScores } from '@dungeon-hub/domain/character/stats';
 import type { AppliedClass } from '@dungeon-hub/domain/character/class';
 import type { AppliedFeat } from '@dungeon-hub/domain/character/feat';
+import { purchaseItems } from '@dungeon-hub/domain/character/currency';
+import { enabledSources } from '@dungeon-hub/domain/rules-profile';
 import { db } from '../../infra/db/client.js';
 import { characters, compendiumSpells, encounters, sessionEvents, sessionParticipants, sessions, users, worldMembers } from '../../infra/db/schema.js';
 import { inArray } from 'drizzle-orm';
@@ -501,6 +504,28 @@ const AddInventoryItemBody = z.object({
 const ConsumeInventoryBody = z
   .object({ count: z.number().int().min(1).optional() })
   .optional();
+
+// REQ-PRICE-AUTH-01: no `price` field — cost is server-authoritative (DB costCp).
+const ShopBuyBody = z.object({
+  item: z.object({ slug: z.string().min(1), source: z.string().min(1) }),
+  quantity: z.number().int().min(1).optional(),
+});
+
+/**
+ * REQ-MAGIC-REJECT-01, ADR-1 — mundane predicate. Mirrors the SQL predicate at
+ * compendium.ts (`magic === false` query filter) so the shop rejects the same
+ * set of items the mundane-only browse view would exclude:
+ *   - rarity NOT in magic tiers (normalizeRarity → non-null means magic tier)
+ *   - type NOT in magic type codes (RD/ST/WD/RG — rod/staff/wand/ring)
+ *   - reqAttune absent
+ */
+const MAGIC_ITEM_TYPE_CODES = new Set(['RD', 'ST', 'WD', 'RG']);
+
+function isMundaneItem(itemData: ItemCompendiumLite): boolean {
+  const rarityTier = normalizeRarity(itemData.rarity);
+  const hasMagicTypeCode = itemData.type != null && MAGIC_ITEM_TYPE_CODES.has(itemData.type);
+  return rarityTier === null && !hasMagicTypeCode && itemData.reqAttune == null;
+}
 
 const InventoryInstanceParams = z.object({
   id: z.string().uuid(),
@@ -2973,6 +2998,126 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       character: updated,
       addedInstanceId: result.addedInstanceId,
       warnings: result.warnings,
+    });
+  });
+
+  // ---- POST /characters/:id/shop/buy --------------------------------------
+  // Compra un ítem mundano del compendio. Precio server-authoritative (DB
+  // costCp) — el body NO acepta price. Ítems mágicos (rarity/type/reqAttune)
+  // no son comprables acá (ADR-1). Ítems ocultos por rulesProfile del world
+  // (disabledEntities.items o source deshabilitada) devuelven 404 — no leak.
+  app.post('/characters/:id/shop/buy', { preHandler: app.authenticate }, async (request, reply) => {
+    const { id } = ParamsWithId.parse(request.params);
+    const body = ShopBuyBody.parse(request.body);
+    const userId = request.user!.sub;
+
+    const character = await loadCharacter(id);
+    if (!character) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getCharacterAccess(character, userId);
+    if (access !== 'owner') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el dueño puede editar' });
+    }
+
+    const campaign = await loadWorldById(character.worldId);
+    if (!campaign) return reply.code(500).send({ error: 'CAMPAIGN_MISSING' });
+
+    const itemData = await loadItemData({ slug: body.item.slug, source: body.item.source });
+    if (!itemData) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'ITEM_NOT_FOUND', item: body.item }],
+      });
+    }
+
+    // World visibility gate (mirrors profileFilterConditions): source must be
+    // enabled AND slug|source must not be in disabledEntities.items. Hidden
+    // items 404 — same response as a genuinely nonexistent item, no leak.
+    const worldSources = enabledSources(campaign.rulesProfile);
+    const disabledItemKeys = campaign.rulesProfile.disabledEntities.items ?? [];
+    const itemKey = `${itemData.slug}|${itemData.source}`;
+    const isVisible = worldSources.includes(itemData.source) && !disabledItemKeys.includes(itemKey);
+    if (!isVisible) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    // DM shop curation gate (market-shop-dm-stock-api 3d): when enabled, only
+    // items explicitly listed in shopCuration.forSale are purchasable. Same
+    // no-leak 404 as the world-visibility gate above.
+    const { enabled: curationEnabled, forSale } = campaign.rulesProfile.shopCuration;
+    if (curationEnabled && !forSale.includes(itemKey)) {
+      return reply.code(404).send({ error: 'NOT_FOUND' });
+    }
+
+    if (!isMundaneItem(itemData) || itemData.costCp == null) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: [{ code: 'ITEM_NOT_PURCHASABLE', item: body.item }],
+      });
+    }
+
+    const charData = (character.data as Record<string, unknown> | null) ?? {};
+    const currentCurrency = (charData['currency'] as Currency | undefined) ?? {
+      cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+    };
+
+    const purchaseResult = purchaseItems({
+      costCp: itemData.costCp,
+      ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+      purse: currentCurrency,
+    });
+    if (!purchaseResult.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: purchaseResult.issues });
+    }
+
+    const ctx = await buildInventoryContext(character);
+    const existingInventory = (character.inventory as InventoryItem[] | null) ?? [];
+    const allRefs = [
+      ...existingInventory.map((it) => ({ slug: it.itemSlug, source: it.itemSource })),
+      { slug: itemData.slug, source: itemData.source },
+    ];
+    const weights = await loadItemDataMany(allRefs);
+
+    const addResult = addItemToInventory({
+      inventory: existingInventory,
+      itemData,
+      input: {
+        ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+      },
+      weights,
+      ctx,
+    });
+    if (!addResult.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: addResult.issues });
+    }
+
+    const [updated] = await db
+      .update(characters)
+      .set({
+        data: { ...charData, currency: purchaseResult.newPurse },
+        inventory: addResult.inventory,
+        updatedAt: new Date(),
+      })
+      .where(eq(characters.id, id))
+      .returning();
+
+    await recordSessionEventForCharacter({
+      characterId: id,
+      actorUserId: userId,
+      eventType: 'shop_buy',
+      payload: {
+        characterId: id,
+        instanceId: addResult.addedInstanceId,
+        itemSlug: itemData.slug,
+        itemSource: itemData.source,
+        quantity: body.quantity ?? 1,
+        spentCp: purchaseResult.spentCp,
+      },
+    });
+
+    return reply.code(201).send({
+      character: updated,
+      currency: purchaseResult.newPurse,
+      addedInstanceId: addResult.addedInstanceId,
+      warnings: addResult.warnings,
     });
   });
 
