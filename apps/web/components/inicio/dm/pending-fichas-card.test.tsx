@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen } from '@testing-library/react';
 import { PendingFichasCard } from './pending-fichas-card';
 import type { PendingFichaSummary } from '../types';
 
@@ -78,5 +78,18 @@ describe('PendingFichasCard', () => {
     expect(button!.getAttribute('aria-disabled')).toBeNull();
     fireEvent.click(button!);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('T5: renders nothing (null) when fichas is empty (REQ-UXP1-PENDING-01)', () => {
+    render(<PendingFichasCard fichas={[]} oldestAge={MOCK_PENDING_OLDEST_AGE} onClick={() => {}} />);
+    expect(screen.queryByText('Revisar')).toBeNull();
+  });
+
+  it('T6: regression — renders CTA and count with the 3-item fixture', () => {
+    render(
+      <PendingFichasCard fichas={MOCK_PENDING_FICHAS} oldestAge={MOCK_PENDING_OLDEST_AGE} onClick={() => {}} />,
+    );
+    expect(screen.getByText('Revisar')).toBeTruthy();
+    expect(screen.getByText('3 fichas pendientes')).toBeTruthy();
   });
 });

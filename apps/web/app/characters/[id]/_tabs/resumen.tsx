@@ -289,9 +289,6 @@ function RasgosSection({ sheet }: { sheet: CharacterSheet }) {
                 Subclase: {titleCase(cls.subclass.slug)}
               </p>
             )}
-            <p className="mt-1 text-xs text-ink-mute italic">
-              Próximamente: descripciones detalladas de rasgos.
-            </p>
           </div>
         ))}
       </div>

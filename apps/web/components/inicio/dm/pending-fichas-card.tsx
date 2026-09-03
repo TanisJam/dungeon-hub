@@ -13,6 +13,8 @@ interface PendingFichasCardProps {
  * REQ-IDM-PENDING-CARD-02 | REQ-PS-CARD-BUTTON-API-01
  */
 export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasCardProps) {
+  if (fichas.length === 0) return null;
+
   return (
     <button
       type="button"
