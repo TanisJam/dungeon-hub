@@ -71,6 +71,7 @@ export default async function MapaPage({
       <AppShell
         title="Mapa"
         subtitle="DEL MUNDO"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
@@ -116,6 +117,7 @@ export default async function MapaPage({
     <AppShell
       title="Mapa"
       subtitle="DEL MUNDO"
+      roleDefault={effectiveView}
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >

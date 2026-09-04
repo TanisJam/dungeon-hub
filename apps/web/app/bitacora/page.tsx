@@ -68,6 +68,7 @@ export default async function BitacoraPage({
       <AppShell
         title="Bitácora"
         subtitle="GREMIO"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
@@ -102,6 +103,7 @@ export default async function BitacoraPage({
     <AppShell
       title="Bitácora"
       subtitle="TODO"
+      roleDefault={effectiveView}
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >

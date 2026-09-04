@@ -66,6 +66,7 @@ export default async function TiendaPage() {
       <AppShell
         title="Herramientas"
         subtitle="TIENDA"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
@@ -95,6 +96,7 @@ export default async function TiendaPage() {
     <AppShell
       title="Herramientas"
       subtitle="TIENDA"
+      roleDefault={effectiveView}
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >
