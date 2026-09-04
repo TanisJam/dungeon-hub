@@ -38,7 +38,7 @@ export function CompendiumScreen({ counts, campaignName, campaignId, worldId }: 
       <div>
         <SectionHead title="Tu campaña" meta="curado por el DM" />
         <div className="mt-3">
-          <CompendiumCuratedRow campaignName={campaignName} />
+          <CompendiumCuratedRow campaignName={campaignName} campaignId={campaignId} />
         </div>
       </div>
 
