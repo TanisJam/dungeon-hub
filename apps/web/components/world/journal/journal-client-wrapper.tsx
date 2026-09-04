@@ -192,6 +192,7 @@ export function JournalClientWrapper({
         total={filteredInitial.length}
         effectiveView={effectiveView}
         searchPlaceholder="Buscar notas…"
+      emptyTitle="Todavía no hay notas"
         onSearch={onSearch}
         onLoadDetail={onLoadDetail}
         renderRow={renderRow}

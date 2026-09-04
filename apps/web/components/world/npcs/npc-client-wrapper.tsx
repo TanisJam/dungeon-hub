@@ -149,6 +149,7 @@ export function NpcClientWrapper({
       total={initialNpcs.length}
       effectiveView={effectiveView}
       searchPlaceholder="Buscar NPCs…"
+      emptyTitle="Todavía no hay NPCs"
       onSearch={onSearch}
       onLoadDetail={onLoadDetail}
       renderRow={renderRow}

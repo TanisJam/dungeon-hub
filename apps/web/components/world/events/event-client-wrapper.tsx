@@ -194,6 +194,7 @@ export function EventClientWrapper({
         total={filteredInitial.length}
         effectiveView={effectiveView}
         searchPlaceholder="Buscar eventos…"
+      emptyTitle="Todavía no hay eventos"
         onSearch={onSearch}
         onLoadDetail={onLoadDetail}
         renderRow={renderRow}
