@@ -43,7 +43,7 @@ export default async function MercadoPage() {
   // No active character → empty state (REQ-MERC-SURF-02, Scenario: no active campaign)
   if (!activeCharacter) {
     return (
-      <AppShell title="Mercado" subtitle="MERCADO">
+      <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
         <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
           <p>Seleccioná un personaje para ver el Mercado.</p>
         </div>
@@ -68,7 +68,7 @@ export default async function MercadoPage() {
   // No mundane items in world → empty state (REQ-MERC-SURF-02, Scenario: no mundane items)
   if (total === 0 && initialRows.length === 0) {
     return (
-      <AppShell title="Mercado" subtitle="MERCADO">
+      <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
         <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
           <p>No hay artículos disponibles en el Mercado de este mundo.</p>
         </div>
@@ -77,7 +77,7 @@ export default async function MercadoPage() {
   }
 
   return (
-    <AppShell title="Mercado" subtitle="MERCADO">
+    <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
       {/*
         CompendiumList island — reused as-is (REQ-MERC-SURF-01, ADR-3 reuse over rebuild).
         extraFilters={{ magic: 'false', forSale: 'true' }} pins the mundane + shop-curation
