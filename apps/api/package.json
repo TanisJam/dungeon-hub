@@ -16,6 +16,7 @@
     "db:push": "drizzle-kit push",
     "import:5etools": "tsx scripts/import-5etools.ts",
     "seed-test-character": "tsx scripts/seed-test-character.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "seed-modifier-definitions": "tsx scripts/seed-modifier-definitions.ts",
     "db:seed": "pnpm db:migrate && pnpm import:5etools && pnpm seed-modifier-definitions",
     "db:cleanup": "tsx scripts/cleanup-dev-data.ts",
