@@ -71,6 +71,7 @@ export default async function BuildLayout({ children, params }: Props) {
       subtitle={<StepSubtitle />}
       rightAction={exitLink}
       constructorHref={`/characters/${id}/wizard`}
+      showTabBar={false}
     >
       <div className="flex items-center gap-2 mb-4">
         <h1 className="font-display text-xl font-bold text-ink">{character.name}</h1>
