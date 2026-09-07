@@ -28,9 +28,26 @@ const { MockApiError } = vi.hoisted(() => {
   return { MockApiError };
 });
 
+// ApiNetworkError mock mirrors the real class shape (kind + message) so
+// `err instanceof ApiNetworkError` in handleApiError resolves correctly —
+// without this, the real import would be `undefined` under this mock and
+// any non-ApiError rejection would crash the instanceof check instead of
+// falling through to the generic-error branch.
+const { MockApiNetworkError } = vi.hoisted(() => {
+  class MockApiNetworkError extends Error {
+    kind: 'timeout' | 'network';
+    constructor(kind: 'timeout' | 'network', message: string) {
+      super(message);
+      this.kind = kind;
+    }
+  }
+  return { MockApiNetworkError };
+});
+
 vi.mock('@/lib/api', () => ({
   api: { post: vi.fn() },
   ApiError: MockApiError,
+  ApiNetworkError: MockApiNetworkError,
 }));
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
@@ -80,5 +97,36 @@ describe('joinSession error mapping (verify W1)', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected failure');
     expect(result.error).toBe('FORBIDDEN');
+  });
+
+  it('maps a timeout ApiNetworkError to a Spanish, non-technical message', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new MockApiNetworkError('timeout', 'Request to /sessions/x/join timed out after 10000ms'),
+    );
+
+    const { joinSession } = await import('./actions');
+    const result = await joinSession(SESSION_ID, CHAR_ID, CAMPAIGN_ID);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.error).toBe(
+      'El servidor tardó demasiado en responder. Probá de nuevo en unos segundos.',
+    );
+    expect(result.status).toBeUndefined();
+  });
+
+  it('maps a network ApiNetworkError to a Spanish, non-technical message', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(
+      new MockApiNetworkError('network', 'Network error requesting /sessions/x/join'),
+    );
+
+    const { joinSession } = await import('./actions');
+    const result = await joinSession(SESSION_ID, CHAR_ID, CAMPAIGN_ID);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected failure');
+    expect(result.error).toBe(
+      'No se pudo conectar con el servidor. Probá de nuevo en unos segundos.',
+    );
   });
 });

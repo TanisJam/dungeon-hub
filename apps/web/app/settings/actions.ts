@@ -13,7 +13,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, ApiNetworkError } from '@/lib/api';
 import { revalidatePath } from 'next/cache';
 
 export type ActionResult<T = void> =
@@ -33,6 +33,15 @@ function handleApiError(err: unknown): ActionResult<never> {
       ok: false,
       error: body?.message ?? body?.error ?? `API ${err.status}`,
       status: err.status,
+    };
+  }
+  if (err instanceof ApiNetworkError) {
+    return {
+      ok: false,
+      error:
+        err.kind === 'timeout'
+          ? 'El servidor tardó demasiado en responder. Probá de nuevo en unos segundos.'
+          : 'No se pudo conectar con el servidor. Probá de nuevo en unos segundos.',
     };
   }
   return {
