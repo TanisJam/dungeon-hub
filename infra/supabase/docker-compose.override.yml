@@ -1,0 +1,11 @@
+# Local override for the upstream Supabase docker-compose stack (copied in by bootstrap.sh).
+# This file is versioned (see .gitignore) even though the rest of infra/supabase/ is generated.
+#
+# Why: the upstream stack only exposes Postgres through Supavisor (pooler) on host port 5432.
+# Drizzle needs a direct connection for DDL/migrations, which the pooler does not support.
+# This maps the `db` service's internal port 5432 to an additional host port, 5433,
+# so DATABASE_URL (see apps/api/env.example) can connect directly to Postgres.
+services:
+  db:
+    ports:
+      - '5433:5432'

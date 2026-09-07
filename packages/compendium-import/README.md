@@ -4,9 +4,14 @@ Boundary between 5etools JSON packs and the `compendium_*` tables. **The importe
 
 ## Quickstart
 
-### Import the bundled 5etools pack into your DB
+### Import the 5etools pack into your DB
 
-The repo ships with the 5etools dataset at `data/5etools/data/`. To load it into your local Supabase Postgres:
+This package expects a 5etools dataset at `data/5etools/data/`. It is **not** distributed
+with this repo (`data/5etools/` is gitignored, no submodule) — populate it manually first,
+e.g. from the upstream mirror at https://github.com/5etools-mirror-3/5etools-src, whose
+`data/` directory already matches the layout `src/reader.ts` expects.
+See the root `README.md` "Known setup gaps" section. Once the data is in place, load it
+into your local Supabase Postgres:
 
 ```bash
 # from repo root, with Supabase running
