@@ -52,3 +52,6 @@ docs/design_handoff_dungeon_hub/
 
 # Skill registry cache (generated)
 .atl/.skill-registry.cache.json
+
+# CodeGraph index (generated per checkout, ~70MB — never share between checkouts)
+.codegraph/
