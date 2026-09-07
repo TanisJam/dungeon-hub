@@ -33,7 +33,8 @@ infra/supabase/.[!.]*
 !infra/supabase/bootstrap.sh
 !infra/supabase/docker-compose.override.yml
 
-# 5etools data (gestionado por submodulo)
+# 5etools data — not versioned and NOT a submodule: populate it manually from
+# the upstream mirror (see "Known setup gaps" in README.md).
 data/5etools/
 
 # Test coverage
