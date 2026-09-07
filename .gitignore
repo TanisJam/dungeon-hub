@@ -42,3 +42,13 @@ coverage/
 # Misc
 *.swp
 *.swo
+.vercel
+.env*
+
+# Local-only heavy data / third-party inputs (not versioned)
+data/
+apps/web/public/world-maps/
+docs/design_handoff_dungeon_hub/
+
+# Skill registry cache (generated)
+.atl/.skill-registry.cache.json

@@ -125,6 +125,7 @@ export function QuestClientWrapper({
       total={initialQuests.length}
       effectiveView={effectiveView}
       searchPlaceholder="Buscar quests…"
+      emptyTitle="Todavía no hay quests"
       onSearch={onSearch}
       onLoadDetail={onLoadDetail}
       renderRow={renderRow}

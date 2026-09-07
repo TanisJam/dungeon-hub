@@ -12,8 +12,6 @@ interface TopBarProps {
   right?: ReactNode;
   /** Show the role switcher pill. Defaults true. */
   canBeDM?: boolean;
-  /** Render the unread dot on the notif bell. */
-  hasNotif?: boolean;
   /**
    * When set: back arrow renders in LEFT slot (CrowMark hidden);
    * canBeDM is suppressed; `right` prop still renders in right slot.
@@ -49,7 +47,6 @@ export function TopBar({
   subtitle,
   right,
   canBeDM = true,
-  hasNotif = false,
   backHref,
   roleDefault = 'player',
   worldSwitcher,
@@ -86,28 +83,20 @@ export function TopBar({
           {title}
         </h1>
         {subtitle && (
-          <span className="font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none truncate">
+          <span className="hidden sm:block font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none truncate">
             {subtitle}
           </span>
         )}
       </div>
-      {/* RIGHT slot: rightAction prop OR default cluster (RoleSwitcher + bell) */}
+      {/* RIGHT slot: `right` prop OR the RoleSwitcher (DM/PJ view toggle).
+          The old notifications button was a dead affordance (no handler, no
+          notifications feature) and used an eye glyph, so it was removed —
+          it also freed header width, easing title truncation on mobile. */}
       {right ?? (
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* RoleSwitcher visible in all screens (including sub-screens) when canBeDM=true */}
           {/* SDD ficha-dm-affordances: removed !backHref guard per spec override of design README §State management */}
           {canBeDM && <RoleSwitcher defaultRole={roleDefault} />}
-          <button
-            type="button"
-            aria-label="Notificaciones"
-            className={`relative w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink${
-              hasNotif
-                ? " after:content-[''] after:absolute after:top-[5px] after:right-[5px] after:w-[7px] after:h-[7px] after:rounded-full after:bg-accent after:shadow-[0_0_6px_var(--color-accent)]"
-                : ''
-            }`}
-          >
-            <Icon name="eye" size={16} />
-          </button>
         </div>
       )}
       </div>

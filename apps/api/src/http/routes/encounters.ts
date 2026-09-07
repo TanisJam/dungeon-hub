@@ -941,12 +941,6 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
             });
-          case 'ACTOR_SURPRISED':
-            // engine-surprise-round1 — REQ-SUR-S2-02 + REQ-SUR-S2-03 (PHB p.189). State-gate refusal.
-            return reply.code(400).send({
-              error: 'VALIDATION_FAILED',
-              issues: [{ code: 'ACTOR_SURPRISED' }],
-            });
           case 'ACTION_ALREADY_USED':
             // engine-action-economy — REQ-AE-02 (PHB p.230). Cure Wounds action already spent.
             return reply.code(400).send({
@@ -1143,12 +1137,6 @@ export const encountersRoute: FastifyPluginAsync = async (app) => {
             return reply.code(400).send({
               error: 'VALIDATION_FAILED',
               issues: [{ code: 'ACTOR_INCAPACITATED' }],
-            });
-          case 'ACTOR_SURPRISED':
-            // engine-surprise-round1 — REQ-SUR-S2-02 (PHB p.189). State-gate refusal.
-            return reply.code(400).send({
-              error: 'VALIDATION_FAILED',
-              issues: [{ code: 'ACTOR_SURPRISED' }],
             });
           case 'ACTION_ALREADY_USED':
             // engine-action-economy — REQ-AE-02 (PHB p.257). Cast action already spent this turn.

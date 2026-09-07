@@ -59,6 +59,7 @@ export default async function FaccionesPage() {
       <AppShell
         title="Herramientas"
         subtitle="FACCIONES"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >

@@ -58,6 +58,7 @@ export default async function NpcsPage() {
       <AppShell
         title="Herramientas"
         subtitle="NPCs"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
@@ -93,6 +94,7 @@ export default async function NpcsPage() {
     <AppShell
       title="Herramientas"
       subtitle="NPCs"
+      roleDefault={effectiveView}
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >

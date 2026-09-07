@@ -241,6 +241,7 @@ export function HexClientWrapper({
         total={initialHexes.length}
         effectiveView={effectiveView}
         searchPlaceholder="Buscar ubicaciones…"
+      emptyTitle="Todavía no hay ubicaciones"
         onSearch={onSearch}
         onLoadDetail={onLoadDetail}
         renderRow={renderRow}

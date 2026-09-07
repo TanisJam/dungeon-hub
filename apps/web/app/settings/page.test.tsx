@@ -1,5 +1,5 @@
 /**
- * Test for /settings index redirect to /inicio.
+ * Test for /settings index redirect to /dashboard (account preferences live there).
  */
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
@@ -10,8 +10,8 @@ import { redirect } from 'next/navigation';
 import SettingsIndexPage from './page';
 
 describe('SettingsIndexPage', () => {
-  it('redirects to /inicio', () => {
+  it('redirects to /dashboard', () => {
     SettingsIndexPage();
-    expect(redirect).toHaveBeenCalledWith('/inicio');
+    expect(redirect).toHaveBeenCalledWith('/dashboard');
   });
 });

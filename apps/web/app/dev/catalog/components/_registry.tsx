@@ -864,18 +864,17 @@ const topbarEntry: ComponentEntry = {
   id: 'topbar',
   name: 'TopBar',
   group: 'layout',
-  notes: 'Props: title, subtitle?, right?, canBeDM?, hasNotif?, backHref?, roleDefault?.',
+  notes: 'Props: title, subtitle?, right?, canBeDM?, backHref?, roleDefault?.',
   propsSchema: {
     title:    { kind: 'string',  default: 'Inicio', label: 'Title' },
     subtitle: { kind: 'string',  label: 'Subtitle (optional)' },
-    hasNotif: { kind: 'boolean', default: false,    label: 'Has Notification' },
     backHref: { kind: 'string',  label: 'Back href (optional)' },
     canBeDM:  { kind: 'boolean', default: false,    label: 'Can Be DM' },
   },
   matrixMode: 'list',
   explicitCombos: [
     { title: 'Inicio',              canBeDM: false },
-    { title: 'Campañas',            subtitle: '3 activas', hasNotif: true,  canBeDM: false },
+    { title: 'Campañas',            subtitle: '3 activas',                  canBeDM: false },
     { title: 'Ficha de Personaje',  backHref: '/personajes',                canBeDM: false },
     { title: 'Inicio',              canBeDM: true,        roleDefault: 'player' },
   ],
@@ -884,7 +883,6 @@ const topbarEntry: ComponentEntry = {
       <TopBar
         title={p.title as string}
         subtitle={p.subtitle as string | undefined}
-        hasNotif={p.hasNotif as boolean | undefined}
         backHref={p.backHref as string | undefined}
         canBeDM={p.canBeDM as boolean}
         roleDefault={p.roleDefault as 'player' | 'dm' | undefined}

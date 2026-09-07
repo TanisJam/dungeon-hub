@@ -41,6 +41,16 @@ export function ShopCurationEditor({
   const [forSale, setForSale] = useState<Set<string>>(new Set(initialForSale));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [query, setQuery] = useState('');
+
+  // The mundane catalog runs to hundreds of items; rendering them all made this
+  // an ~18k-px scroll on mobile. Filter client-side and cap what we paint so the
+  // DM searches instead of scrolling.
+  const CAP = 60;
+  const q = query.trim().toLowerCase();
+  const filtered = q ? items.filter((it) => it.name.toLowerCase().includes(q)) : items;
+  const visible = filtered.slice(0, CAP);
+  const hiddenCount = filtered.length - visible.length;
 
   function handleEnabledToggle(next: boolean) {
     const previous = enabled;
@@ -98,29 +108,58 @@ export function ShopCurationEditor({
       {items.length === 0 ? (
         <p className="text-sm text-ink-mute">No hay ítems mundanos en este mundo.</p>
       ) : (
-        <ul className="divide-y divide-line rounded-md border border-line bg-white">
-          {items.map((item) => {
-            const key = itemKey(item);
-            return (
-              <li key={key} className="flex min-h-[44px] items-center px-3 py-2">
-                <label className="flex w-full items-center gap-3 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    checked={forSale.has(key)}
-                    disabled={isPending}
-                    onChange={(e) => handleItemToggle(item, e.target.checked)}
-                    aria-label={item.name}
-                    className="h-4 w-4 shrink-0"
-                  />
-                  <span className="flex-1 truncate">{item.name}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-ink-mute">
-                    {item.source}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <input
+              type="search"
+              inputMode="search"
+              placeholder="Buscar ítems…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Buscar ítems"
+              className="min-h-[44px] flex-1 rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
+            />
+            <span className="shrink-0 text-xs text-ink-mute">
+              {forSale.size} a la venta
+            </span>
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="px-1 py-6 text-center text-sm text-ink-soft">
+              Sin resultados para «{query.trim()}»
+            </p>
+          ) : (
+            <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+              {visible.map((item) => {
+                const key = itemKey(item);
+                return (
+                  <li key={key} className="flex min-h-[44px] items-center px-3 py-2">
+                    <label className="flex w-full items-center gap-3 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={forSale.has(key)}
+                        disabled={isPending}
+                        onChange={(e) => handleItemToggle(item, e.target.checked)}
+                        aria-label={item.name}
+                        className="h-4 w-4 shrink-0"
+                      />
+                      <span className="flex-1 truncate">{item.name}</span>
+                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-ink-mute">
+                        {item.source}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {hiddenCount > 0 && (
+            <p className="px-1 text-xs text-ink-mute">
+              Mostrando {visible.length} de {filtered.length} — afiná la búsqueda para ver el resto.
+            </p>
+          )}
+        </div>
       )}
 
       {error && (

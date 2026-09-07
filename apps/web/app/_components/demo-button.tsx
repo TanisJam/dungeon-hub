@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui';
+import { Icon } from '@/components/ui/icon';
 
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? 'demo@dungeon-hub.mnr.ar';
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? 'demo1234';
@@ -38,7 +39,13 @@ export function DemoButton({ redirectTo = '/inicio' }: { redirectTo?: string }) 
   return (
     <div className="mt-3 w-full">
       <Button tone="cta" size="md" onClick={handle} disabled={loading} className="w-full">
-        {loading ? 'Entrando al demo…' : '🎲 Iniciar demo'}
+        {loading ? (
+          'Entrando al demo…'
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="dice" size={16} /> Iniciar demo
+          </span>
+        )}
       </Button>
       <p className="mt-2 text-[11px] text-ink-mute">
         Cuenta de ejemplo con un mundo, personajes y bitácora ya poblados.

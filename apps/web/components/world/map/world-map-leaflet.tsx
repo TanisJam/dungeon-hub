@@ -245,7 +245,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
      * z-10 keeps the map above page content but below sheets (z-50).
      */
     <div
-      className="fixed inset-x-0 top-[120px] z-10"
+      className="fixed inset-x-0 top-[120px] z-10 md:left-[var(--sidebar-w)]"
       style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       data-testid="map-container"
     >
@@ -412,7 +412,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
           <button
             type="button"
             onClick={() => setDrawerOpen((v) => !v)}
-            className="fixed left-4 z-30 flex min-h-[44px] items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface shadow-xl"
+            className="fixed left-4 z-30 flex min-h-[44px] items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-surface shadow-xl md:left-[calc(var(--sidebar-w)+1rem)]"
             style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px) + 16px)' }}
             aria-label={drawerOpen ? 'Cerrar lista de puntos' : 'Abrir lista de puntos'}
             aria-expanded={drawerOpen}

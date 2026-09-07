@@ -8,14 +8,12 @@ import { DesktopSidebar } from './desktop-sidebar';
 type AppShellProps = {
   title: string;
   subtitle?: ReactNode;
-  /** When provided, overrides the topbar's default right cluster (role switcher + notif bell). */
+  /** When provided, overrides the topbar's default right cluster (the role switcher). */
   rightAction?: ReactNode;
   /** @deprecated v3 tabs are declarative; constructor is reachable via Personajes. Accepted for backwards compat. */
   constructorHref?: string;
   /** Show the role switcher pill in the topbar. Defaults false (ADR-C2, default-deny). */
   canBeDM?: boolean;
-  /** Render the unread dot on the notif bell. Defaults false. */
-  hasNotif?: boolean;
   /** Hide the morphing tabbar (e.g. wizard / full-bleed flows). Defaults true. */
   showTabBar?: boolean;
   /**
@@ -60,7 +58,6 @@ export function AppShell({
   subtitle,
   rightAction,
   canBeDM: canBeDMProp = false,
-  hasNotif = false,
   showTabBar = true,
   backHref,
   roleDefault = 'player',
@@ -82,7 +79,6 @@ export function AppShell({
             subtitle={subtitle}
             right={rightAction}
             canBeDM={canBeDM}
-            hasNotif={hasNotif}
             backHref={backHref}
             roleDefault={roleDefault}
             worldSwitcher={worldSwitcher}

@@ -55,6 +55,17 @@ export interface WorldEntityShellProps<TRow, TDetail> {
   ) => ReactNode;
   /** DM-only: delete a row. Called from delete button in detail sheet. */
   onDelete?: (row: TRow) => Promise<void>;
+  /**
+   * Title for the TRUE-empty state (no rows AND no active query). Distinct from a
+   * filtered no-match. Defaults to a generic line. Per-entity wrappers can pass a
+   * specific one (e.g. "Todavía no hay facciones").
+   */
+  emptyTitle?: string;
+  /**
+   * Hint under the empty title, shown to DMs only (they own the create FAB).
+   * Defaults to a pointer at the + button.
+   */
+  emptyHint?: string;
 }
 
 /**
@@ -72,6 +83,8 @@ export function WorldEntityShell<TRow, TDetail>({
   renderDetail,
   renderForm,
   onDelete,
+  emptyTitle,
+  emptyHint,
 }: WorldEntityShellProps<TRow, TDetail>) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -223,7 +236,24 @@ export function WorldEntityShell<TRow, TDetail>({
       {searching ? (
         <div className="px-4 py-8 text-center text-sm text-ink-soft">Buscando…</div>
       ) : results.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-ink-soft">Sin resultados</div>
+        query.trim() !== '' ? (
+          // Filtered no-match: concise is fine, the query is the context.
+          <div className="px-4 py-8 text-center text-sm text-ink-soft">
+            Sin resultados para «{query.trim()}»
+          </div>
+        ) : (
+          // True empty (nothing created yet): guide the user, and point DMs at the + FAB.
+          <div className="px-6 py-14 text-center">
+            <p className="font-display text-lg text-ink">
+              {emptyTitle ?? 'Todavía no hay nada acá'}
+            </p>
+            {isDM && (
+              <p className="mt-1.5 text-sm text-ink-soft">
+                {emptyHint ?? 'Tocá el botón + para crear el primero.'}
+              </p>
+            )}
+          </div>
+        )
       ) : (
         <ul className="divide-y divide-line">
           {results.map((row, i) => (

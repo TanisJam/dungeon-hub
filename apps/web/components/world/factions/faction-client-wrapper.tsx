@@ -123,6 +123,7 @@ export function FactionClientWrapper({
       total={initialFactions.length}
       effectiveView={effectiveView}
       searchPlaceholder="Buscar facciones…"
+      emptyTitle="Todavía no hay facciones"
       onSearch={onSearch}
       onLoadDetail={onLoadDetail}
       renderRow={renderRow}

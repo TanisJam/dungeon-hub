@@ -60,6 +60,7 @@ export default async function QuestsPage() {
       <AppShell
         title="Herramientas"
         subtitle="QUESTS"
+        roleDefault={effectiveView}
         worldSwitcher={worldSwitcher}
         callerRole={callerRole}
       >
@@ -89,6 +90,7 @@ export default async function QuestsPage() {
     <AppShell
       title="Herramientas"
       subtitle="QUESTS"
+      roleDefault={effectiveView}
       worldSwitcher={worldSwitcher}
       callerRole={callerRole}
     >
