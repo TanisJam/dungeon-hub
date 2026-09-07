@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Bootstrap Supabase self-hosted en infra/supabase/
-# Clona la versión oficial del docker-compose y copia los archivos necesarios.
-# Re-ejecutable: actualiza al último release.
+# Bootstrap Supabase self-hosted into infra/supabase/
+# Clones the pinned official docker-compose release and copies the required files.
+# Re-runnable: re-running updates to the pinned SUPABASE_REF.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMP_DIR=$(mktemp -d)
 SUPABASE_REPO="https://github.com/supabase/supabase.git"
-SUPABASE_REF="${SUPABASE_REF:-master}"
+# Pinned for reproducibility: an unpinned ref (e.g. "master") can pull a different
+# stack on every bootstrap run. Override with SUPABASE_REF=<tag|branch|sha> if needed.
+SUPABASE_REF="${SUPABASE_REF:-v1.26.08}"
 
 echo "📦 Bootstrapping Supabase self-hosted from ${SUPABASE_REPO}@${SUPABASE_REF}..."
 
@@ -44,7 +46,9 @@ echo "     (use 'pnpm gen:keys' from repo root to generate them)"
 echo "  4. docker compose up -d"
 echo ""
 echo "Services will be available at:"
-echo "  - Postgres:      localhost:5432"
+echo "  - Postgres (direct, via docker-compose.override.yml): localhost:5433"
+echo "    (this is what DATABASE_URL should point to for Drizzle DDL/migrations)"
+echo "  - Postgres (Supavisor pooler): localhost:5432"
 echo "  - Kong (API):    localhost:8000"
 echo "  - Studio:        localhost:3000"
 echo "  - GoTrue (Auth): localhost:9999 (via Kong: localhost:8000/auth/v1)"
