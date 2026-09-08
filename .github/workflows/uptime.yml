@@ -48,12 +48,20 @@ jobs:
           # Anything outside 2xx/401 means the gateway itself is down.
           check_supabase() { [ "$code" = "401" ] || [ "${code:0:1}" = "2" ]; }
 
+          # Storage must return actual image bytes. Checking the status code alone
+          # is not enough: a broken object store answers 200-shaped JSON errors, or
+          # a 500 whose JSON body the browser then drops as ERR_BLOCKED_BY_ORB, and
+          # the map silently renders with no tiles.
+          check_tile() { [ "$code" = "200" ] && printf '%s' "$ctype" | grep -qi '^image/'; }
+
           probe() {
             local label="$1" url="$2" predicate="$3"
-            local body code payload
+            local body meta code ctype payload
             for i in $(seq 1 "$ATTEMPTS"); do
-              body=$(curl -sS --max-time 20 -w '\n%{http_code}' "$url" 2>/dev/null) || body=""
-              code=$(printf '%s' "$body" | tail -n1)
+              body=$(curl -sS --max-time 20 -w '\n%{http_code} %{content_type}' "$url" 2>/dev/null) || body=""
+              meta=$(printf '%s' "$body" | tail -n1)
+              code=${meta%% *}
+              ctype=${meta#* }
               payload=$(printf '%s' "$body" | sed '$d')
               if "$predicate"; then
                 echo "ok    $label ($code)"
@@ -74,6 +82,12 @@ jobs:
 
           probe "supabase  https://dungeon-hub-supabase.mnr.ar" \
                 "https://dungeon-hub-supabase.mnr.ar" check_supabase || true
+
+          # One real map tile. The demo map is unusable without these, and this
+          # exact request was answering 500 while every other probe read healthy.
+          probe "tiles     world-maps/sword-coast/1/0/0.jpg" \
+                "https://dungeon-hub-supabase.mnr.ar/storage/v1/object/public/world-maps/sword-coast/1/0/0.jpg" \
+                check_tile || true
 
           if [ "${#failures[@]}" -gt 0 ]; then
             echo
