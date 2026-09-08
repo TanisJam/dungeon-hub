@@ -1,0 +1,86 @@
+# External uptime probe for the production stack.
+#
+# The web app is on Vercel, but the API, Supabase and Postgres run on a
+# home-lab VM behind a Cloudflare tunnel. This job runs on GitHub's network,
+# so it exercises the same public path a visitor does — tunnel included.
+#
+# On failure GitHub emails the repository owner. Deliberately no README badge:
+# the point is to find out before a visitor does, not to paint the front page
+# red while the home lab reboots.
+#
+# Known limits: GitHub disables scheduled workflows after 60 days without
+# repository activity, and cron runs can be delayed under load. This is a
+# cheap early warning, not an SLA monitor.
+
+name: uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe production endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check web, API and auth gateway
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Retry before declaring an outage so a single blip does not page.
+          ATTEMPTS=3
+          GAP=20
+          failures=()
+
+          # Health predicates. Each reads $code/$payload from its caller (probe).
+          check_web() { [ "$code" = "200" ]; }
+
+          # 200 alone is not enough: a reachable API with a dead database is an outage.
+          check_api() { [ "$code" = "200" ] && printf '%s' "$payload" | grep -q '"db":"up"'; }
+
+          # 401 is the healthy answer Kong gives an unauthenticated request.
+          # Anything outside 2xx/401 means the gateway itself is down.
+          check_supabase() { [ "$code" = "401" ] || [ "${code:0:1}" = "2" ]; }
+
+          probe() {
+            local label="$1" url="$2" predicate="$3"
+            local body code payload
+            for i in $(seq 1 "$ATTEMPTS"); do
+              body=$(curl -sS --max-time 20 -w '\n%{http_code}' "$url" 2>/dev/null) || body=""
+              code=$(printf '%s' "$body" | tail -n1)
+              payload=$(printf '%s' "$body" | sed '$d')
+              if "$predicate"; then
+                echo "ok    $label ($code)"
+                return 0
+              fi
+              echo "retry $label attempt $i/$ATTEMPTS (code=${code:-none})"
+              [ "$i" -lt "$ATTEMPTS" ] && sleep "$GAP"
+            done
+            failures+=("$label - last code=${code:-none} body=$(printf '%s' "$payload" | head -c 200)")
+            return 1
+          }
+
+          probe "web       https://dungeon-hub.mnr.ar" \
+                "https://dungeon-hub.mnr.ar" check_web || true
+
+          probe "api       https://dungeon-hub-api.mnr.ar/api/v1/health" \
+                "https://dungeon-hub-api.mnr.ar/api/v1/health" check_api || true
+
+          probe "supabase  https://dungeon-hub-supabase.mnr.ar" \
+                "https://dungeon-hub-supabase.mnr.ar" check_supabase || true
+
+          if [ "${#failures[@]}" -gt 0 ]; then
+            echo
+            echo "::error::${#failures[@]} endpoint(s) down"
+            for f in "${failures[@]}"; do echo "::error::$f"; done
+            exit 1
+          fi
+
+          echo
+          echo "All production endpoints healthy."
