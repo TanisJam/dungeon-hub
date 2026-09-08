@@ -108,6 +108,8 @@ import {
   resetClassResourcesForRest,
 } from '@dungeon-hub/domain/character/class-resources';
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
+import { validateImportEnvelope } from '@dungeon-hub/domain/character/import';
+import { importCharacter } from '../../use-cases/characters/import-character.js';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
 import { deriveCharacterModifiers } from '../../use-cases/characters/derive-character-modifiers.js';
@@ -226,6 +228,18 @@ const CreateBody = z.object({
   name: z.string().min(1).max(120),
   /** data libre por ahora — el constraint engine de Fase 1.4 le va a dar shape. */
   data: z.record(z.string(), z.unknown()).default({}),
+});
+
+/**
+ * Body for POST /characters/import. `envelope` is kept as `z.unknown()` here —
+ * its deep shape (schemaVersion, character sub-shape) is the domain's job
+ * (`validateImportEnvelope`, @dungeon-hub/domain/character/import), which
+ * reports a dedicated SCHEMA_VERSION_UNSUPPORTED issue that a plain Zod
+ * literal couldn't distinguish from a generic shape error.
+ */
+const ImportBody = z.object({
+  worldId: z.string().uuid(),
+  envelope: z.unknown(),
 });
 
 const UpdateBody = z.object({
@@ -773,6 +787,66 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       .returning();
 
     return reply.code(201).send(created);
+  });
+
+  // ---- POST /characters/import ----------------------------------------------
+  // Character JSON re-import — the inverse of GET /characters/:id/export.
+  // MVP §3.9. Privilege boundaries (design decisions, non-negotiable):
+  //   - `status` is ALWAYS forced to 'draft', regardless of what the envelope
+  //     claims. Honouring an exported 'active' would let anyone hand-edit
+  //     exported JSON to bypass the DM approval gate (see
+  //     packages/domain/src/character/approval/state-machine.ts).
+  //   - the target world is `body.worldId`, NOT `envelope.character.worldId`
+  //     — the envelope may name a world the importer cannot access.
+  //   - a brand-new character id is always minted; `envelope.character.id`
+  //     is never reused (would collide on re-import into the same DB).
+  // Same world invariants as POST /characters: world must exist, requester
+  // must be a worldMembers row.
+  // REQ-IMPORT-ROUTE-01–06.
+  app.post('/characters/import', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsedBody = ImportBody.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: parsedBody.error.issues });
+    }
+    const { worldId, envelope: rawEnvelope } = parsedBody.data;
+    const userId = request.user!.sub;
+
+    // Domain shape check + compendium reference extraction (pure).
+    const validated = validateImportEnvelope(rawEnvelope);
+    if (!validated.ok) {
+      return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: validated.issues });
+    }
+
+    // Verify the world exists.
+    const world = await loadWorldById(worldId);
+    if (!world) {
+      return reply.code(404).send({ error: 'NOT_FOUND' });
+    }
+
+    // Verify user is a world member (worldMembers is the single source of truth).
+    const worldMember = await db
+      .select({ role: worldMembers.role })
+      .from(worldMembers)
+      .where(and(eq(worldMembers.worldId, worldId), eq(worldMembers.userId, userId)))
+      .limit(1);
+    if (worldMember.length === 0) {
+      return reply.code(403).send({ error: 'NOT_WORLD_MEMBER', worldId });
+    }
+
+    // Resolve every compendium reference against this world's DB (batched),
+    // then persist. See import-character.ts for the privilege-boundary code.
+    const result = await importCharacter({
+      userId,
+      worldId,
+      envelope: validated.envelope,
+      refs: validated.refs,
+    });
+
+    if (!result.ok) {
+      return reply.code(400).send({ error: 'UNRESOLVED_REFS', issues: result.issues });
+    }
+
+    return reply.code(201).send(result.character);
   });
 
   // ---- GET /characters -----------------------------------------------------
