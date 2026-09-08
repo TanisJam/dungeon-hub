@@ -25,7 +25,7 @@ type ListEnvelope = { data: unknown[]; total: number } | null;
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ campaign?: string }>;
+  searchParams: Promise<{ campaign?: string; q?: string }>;
 }
 
 /**
@@ -40,7 +40,7 @@ export default async function CompendiumCategoryPage({
   searchParams,
 }: CategoryPageProps) {
   const { category } = await params;
-  const { campaign: campaignIdParam } = await searchParams;
+  const { campaign: campaignIdParam, q: initialQuery } = await searchParams;
 
   // ADR-2: validate category against registry — unknown slug → 404
   if (!(category in CATEGORY_CONFIG)) {
@@ -84,10 +84,15 @@ export default async function CompendiumCategoryPage({
 
   const { id: campaignId, worldId } = activeCampaign;
 
-  // SSR initial fetch — first 50 rows before hydration (REQ-CBROWSE-02)
+  // SSR initial fetch — first 50 rows before hydration (REQ-CBROWSE-02).
+  // REQ-BIB-SEARCH-05: an incoming ?q= (from the Biblioteca cross-category search sheet,
+  // which has no per-entry detail route to link to) prefilters this SSR fetch so the
+  // linked-to category browse opens already narrowed to the searched entry.
+  const trimmedInitialQuery = initialQuery?.trim() ?? '';
+  const qParam = trimmedInitialQuery ? `&q=${encodeURIComponent(trimmedInitialQuery)}` : '';
   const initialData = await api
     .get<ListEnvelope>(
-      `/compendium/${config.endpoint}?campaign=${campaignId}&limit=50&offset=0`,
+      `/compendium/${config.endpoint}?campaign=${campaignId}&limit=50&offset=0${qParam}`,
       token,
     )
     .catch(() => null);
@@ -104,6 +109,7 @@ export default async function CompendiumCategoryPage({
         accessToken={token}
         initialRows={initialRows}
         total={total}
+        initialQuery={trimmedInitialQuery}
       />
     </AppShell>
   );

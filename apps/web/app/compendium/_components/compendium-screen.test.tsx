@@ -1,7 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { CompendiumScreen } from './compendium-screen';
 import type { CategoryId } from './types';
+
+// CompendiumDemoIsland now hosts the real cross-category search sheet (REQ-BIB-SEARCH-01),
+// which pulls in the Server Action / Supabase server client chain — irrelevant to what this
+// suite verifies (screen layout/sections) and unsafe to import unmocked outside a request
+// context. Stubbed here the same way compendium-list.test.tsx stubs ./detail-sheet.
+vi.mock('./compendium-demo-island', () => ({
+  CompendiumDemoIsland: () => (
+    <button type="button" aria-label="Buscar en el compendium">
+      <span className="ph">Hechizo, item, monstruo…</span>
+      <span className="kbd hidden md:inline-flex">⌘K</span>
+    </button>
+  ),
+}));
 
 const defaultCounts: Record<CategoryId, number | '—' | '∞'> = {
   spells: 320,

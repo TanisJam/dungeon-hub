@@ -6,5 +6,6 @@ export { CompendiumRecentsList } from './compendium-recents-list';
 export { SpellDetailBody } from './spell-detail-body';
 export { SpellHeader } from './spell-header';
 export { CompendiumSearchTrigger } from './compendium-search-trigger';
+export { CompendiumSearchSheet } from './compendium-search-sheet';
 export { CompendiumDemoIsland } from './compendium-demo-island';
 export { CompendiumScreen } from './compendium-screen';

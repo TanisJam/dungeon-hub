@@ -31,6 +31,13 @@ interface CompendiumListProps {
   initialRows: unknown[];
   total: number;
   /**
+   * Initial search query, pre-populated from the SSR fetch (page.tsx already used it to
+   * fetch initialRows/total). REQ-BIB-SEARCH-05: lets the Biblioteca cross-category search
+   * sheet deep-link into a category browse pre-filtered to the entry it linked from, since
+   * this app has no separate per-entry detail route. Omitted → unchanged empty-query behavior.
+   */
+  initialQuery?: string;
+  /**
    * Extra per-call filters merged into activeFilters and forwarded to searchCompendium.
    * Callers that do not pass this prop receive the current behavior unchanged.
    * REQ-MERC-SURF-01, ADR-3: Mercado passes { magic: 'false' } to pin mundane-only.
@@ -59,6 +66,7 @@ export function CompendiumList({
   accessToken,
   initialRows,
   total: initialTotal,
+  initialQuery = '',
   extraFilters = {},
   shopContext,
 }: CompendiumListProps) {
@@ -67,7 +75,7 @@ export function CompendiumList({
   // Item type filter (#3.4) — items-only. Empty string = no filter.
   const showTypeFilter = category === 'items';
   const [typeFilter, setTypeFilter] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<unknown[]>(initialRows);
   const [totalCount, setTotalCount] = useState(initialTotal);
   const [offset, setOffset] = useState(initialRows.length);
