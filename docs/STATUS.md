@@ -1,6 +1,13 @@
 # dungeon-hub — System Status
 
-> Status: living document, last synced 2026-09-07 against the working tree (`docs/status-refresh` branch, HEAD `7251f05`). Supersedes the previous 2026-06-08 sync (engram #2055 + #1809) — that sync's route map was already wrong on its own sync date (see §3). Update when an SDD arc closes.
+> Status: living document, last synced 2026-09-08 against `main`. Supersedes the 2026-06-08 sync,
+> whose route map was already wrong on its own sync date (see §3).
+>
+> ⚠️ **This document describes `main`, which is not what production runs.** The web app deploys
+> automatically to Vercel, but the API is a manual build-and-swap on the home-lab VM and is
+> currently **three months behind** — its source dates to 11 June, 24 commits and +2929 lines back.
+> Every API-side row below is therefore "built", not "live". See §6 and
+> [`docs/onboarding/api-deploy.md`](./onboarding/api-deploy.md).
 
 ---
 
@@ -102,9 +109,45 @@ See `docs/ROADMAP.md §1` for the prioritized work plan. Summary (re-verified 20
 
 | Gap | Severity | Definition.md item |
 |---|---|---|
-| JSON re-import + config/NPC/world export (character export ✅ shipped; confirmed still no re-import endpoint) | **MVP blocker** | #3.9 |
+| Character re-import — **built, not deployed.** `POST /characters/import` merged 2026-09-08 (domain validator, batched reference resolution, forced `draft` status). It does not exist in production until the API is swapped. Web UI is written and open at PR #20, held back deliberately so the app does not ship a button that 404s. Still genuinely open: config/NPC/world export. | **MVP blocker until deployed** | #3.9 |
 | WM knowledge layer — feed completeness: rumor/adventure-board entity, sealing/debunking UI, feed entity tap-to-open, keyset pagination. (`NovedadesFeed` hookup and Mercado shipped 2026-09-03 — removed from this list.) | High | #3.10 |
 | Custom content via JSON upload | High | #3.8 |
-| Biblioteca (`/compendium`) cross-category search — same gap as the previous "Codex cross-category search"; the route was renamed, the gap was not fixed | Low | #3.4 |
-| **Map tiles return HTTP 500 in production** — the live map draws POIs over an empty background. `GET /storage/v1/object/public/world-maps/sword-coast/1/{x}/{y}.jpg` answers `500 {"error":"Internal"}` (browser reports `net::ERR_BLOCKED_BY_ORB`). Supabase Storage itself is healthy — a missing object still answers `404 not_found` — so the object rows exist but their bytes cannot be served. Home-lab data issue; re-uploading via `apps/api/scripts/upload-map-tiles.ts` is the likely fix. Verified live 2026-09-07. | **High — visible on the public demo** | #3.5 |
+| ~~Biblioteca cross-category search~~ — **shipped 2026-09-08.** Search sheet on the landing fans out one request per category across all 8 (the landing grid shows 6; items and monsters are searchable but not gridded). Verified live against production: `fire` returns Fireball under Hechizos and Fire Opal under Items in one sheet. Partial failure names the categories that could not be reached instead of blanking. | — | #3.4 |
+| ~~Map tiles 500 in production~~ — **fixed 2026-09-07.** Root cause was not missing files: all 1398 tiles were on the volume one directory level too deep (`<name>.jpg/<extra-uuid>/<version>` where Storage resolves `<name>.jpg/<version>`), so `FileBackend.getObject` raised `ENOENT` and the browser dropped the JSON error as `ERR_BLOCKED_BY_ORB`. The original tiles were extracted and re-uploaded via `apps/api/scripts/upload-map-tiles.ts` (1398/1398, 0 failures) rather than regenerated from source, which would have risked shifting POI alignment. Verified: tile serves `200 image/jpeg`, map renders with POIs in place. |  | #3.5 |
 | ~~Map mobile zoom buttons~~ — **not a gap.** Verified live 2026-09-07 at a 390px viewport: `.leaflet-control-zoom` renders with both buttons visible. The prior "waypoint visibility model still open" claim in this row was also wrong (a hybrid status-gate model already exists in the `pois` schema). Both dropped. | — | #3.5 |
+
+---
+
+## 6. Deployment State
+
+The two halves of this app ship by different routes, and only one of them is automatic.
+Keeping that straight matters: every row above describes `main`, and `main` is not what a
+visitor is talking to.
+
+| Piece | Deploys | Currently running |
+|---|---|---|
+| `apps/web` | Automatically, on push to `main` (Vercel) | Current with `main` |
+| `apps/api` | **Manually** — build an image on the home-lab VM and swap the container | **Source dated 11 June 2026** |
+| Supabase (Postgres, Auth, Storage, Kong) | Long-lived Docker Compose on the same VM | Schema current — 45 migrations, latest `0045` applied |
+
+**The API is 24 commits and +2929 lines behind `main`** across `apps/api` and `packages/domain`.
+Anything API-side merged since 11 June — the surprise action-gate adapter, character re-import —
+exists in the repository and not in production. A merged endpoint answers `404` to a visitor
+until the swap happens.
+
+The schema is *not* behind: migration `0045_engine_surprise_columns` is already applied
+(`encounter_combatants.surprised` and `.first_turn_acted` both exist), so closing the gap is a
+code-only deploy with no DDL.
+
+Procedure, rollback and the traps involved are in
+[`docs/onboarding/api-deploy.md`](./onboarding/api-deploy.md).
+
+### Monitoring
+
+`.github/workflows/uptime.yml` probes production every 15 minutes from GitHub's network — the
+same public path a visitor takes, tunnel included — and mails the owner on failure. It checks
+the web app, the API (requiring `"db":"up"`, not merely a 200), the Kong gateway, and one real
+map tile (requiring an `image/*` content type, not merely a 200).
+
+That last probe exists because the first version of this workflow read all-healthy while the
+map was rendering nothing: a gateway that answers says nothing about the objects behind it.
