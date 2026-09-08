@@ -1,6 +1,6 @@
 # dungeon-hub — System Status
 
-> Status: living document, last synced 2026-06-08 against engram #2055 (codex-ia-reframe arc) + #1809 (original gap-audit). Update when an SDD arc closes.
+> Status: living document, last synced 2026-09-07 against the working tree (`docs/status-refresh` branch, HEAD `7251f05`). Supersedes the previous 2026-06-08 sync (engram #2055 + #1809) — that sync's route map was already wrong on its own sync date (see §3). Update when an SDD arc closes.
 
 ---
 
@@ -9,7 +9,7 @@
 | Pillar | What | State |
 |---|---|---|
 | **A — Character system** | Builder, sheet, inventory, spells, XP, rest, level-up | ✅ Largely complete |
-| **B — World & knowledge system** | Codex, Bitácora/Crónica, map, DM tools, JSON portability | 🟡 Substantially advanced; Bitácora/knowledge system largely shipped. Remaining gaps: #3.10 feed completeness + #3.8/#3.9 portability. |
+| **B — World & knowledge system** | Biblioteca (formerly Codex), Bitácora, map, Mercado, DM tools, JSON portability | 🟡 Substantially advanced; Bitácora/knowledge system + Mercado shop shipped. Remaining gaps: #3.10 feed interactivity (adventure board, sealing UI, tap-to-open) + #3.8/#3.9 portability. Note: "Codex" as a route no longer exists (see §3) — reference browsing lives at `/compendium` (Biblioteca), DM tools at `/herramientas/*`. |
 
 ---
 
@@ -17,45 +17,58 @@
 
 | # | MVP Item | Status | Key files / routes | Notes |
 |---|---|---|---|---|
-| 3.1 | **Character builder + manager** | ✅ | `apps/web/app/characters/[id]/wizard/*/page.tsx`; approval: `apps/api/src/http/routes/characters.ts:1321`; level-up: `:2404`; domain: `packages/domain/src/character/{level-up,multiclass}/` | Wizard L1 full (stats/race/class/background/equipment/spells/review), approval flow, level-up L1–L14, multiclass. |
+| 3.1 | **Character builder + manager** | ✅ | `apps/web/app/characters/[id]/wizard/*/page.tsx`; approval: `apps/api/src/http/routes/characters.ts:1497` (was cited at `:1321`, drifted); level-up: `:2619` (was `:2404`); domain: `packages/domain/src/character/{level-up,multiclass}/` | Wizard L1 full (stats/race/class/background/equipment/spells/review), approval flow, level-up L1–L14, multiclass. Line citations re-verified 2026-09-07. |
 | 3.2 | **Character sheet — view + edit + save** | ✅ | `apps/web/app/characters/[id]/page.tsx`; sheet tabs: resumen/habilidades/hechizos/recursos/inventario/notas | Inventory CRUD, spell add/remove+prep, XP, HP edit, rest, encumbrance. Notes tab exists; save path confirmed via PATCH. |
-| 3.3 | **Codex — content coverage** | ✅ | `apps/web/app/compendium/_components/data.ts:7-14`; API: `compendium.ts:551` (feats), `:826` (conditions) | 8 of 8 categories browsable. Feats + Conditions shipped 2026-06-05 (direct web wiring; `FeatRowView`/`ConditionRowView` + `FeatHeader`/`ConditionHeader` + two grid cards `Dotes`/`Estados`). Closes #3.3. |
-| 3.4 | **Codex — navigation, filters, search** | 🟡 | `apps/web/app/compendium/[category]/_components/compendium-list.tsx`; API filters: `compendium.ts:348-423` (spells), `:621` (monsters) | Name search on all 8; spells filter by class/level/school/ritual/concentration; monsters by CR/type/size; item type filter ✅ shipped 2026-06-05. **No cross-category search from landing** (P4b, deferred). |
-| 3.5 | **Map — zoom + waypoints** | 🟡 | `apps/web/components/world/map/world-map-leaflet.tsx`; POI actions: `actions.ts:266,308,328` | Leaflet map with zoom range; POIs are full waypoints (create/place/edit/move/delete/status). **Mobile gap: `zoomControl` not explicitly enabled** — CRS.Simple disables Leaflet default +/– buttons. Pinch-zoom works. Waypoint shared-vs-private visibility model still open. |
+| 3.3 | **Biblioteca (formerly "Codex") — content coverage** | ✅ | `apps/web/app/compendium/_components/data.ts:7-14` (6-card landing grid); registry: `apps/web/app/compendium/[category]/_config/registry.ts:48` (`CATEGORY_CONFIG`, 8 entries); API: `compendium.ts:587` (feats, was cited at `:551`), `:862` (conditions, was `:826`) | 8 of 8 categories browsable via `/compendium/[category]`; the landing grid (`/compendium`) intentionally shows only 6 (items + monsters moved out per codex-ia-reframe W1). Feats + Conditions shipped 2026-06-05. Closes #3.3. Line citations re-verified 2026-09-07. |
+| 3.4 | **Biblioteca — navigation, filters, search** | 🟡 | `apps/web/app/compendium/[category]/_components/compendium-list.tsx`; API filters: `compendium.ts:361-424` (spells, was `:348-423`), `:696` (monsters, was `:621`) | Name search on all 8; spells filter by class/level/school/ritual/concentration; monsters by CR/type/size; item type filter ✅ shipped 2026-06-05. **Still no cross-category search from landing** (P4b, deferred) — confirmed unchanged 2026-09-07. |
+| 3.5 | **Map — zoom + waypoints** | 🟡 | `apps/web/components/world/map/world-map-leaflet.tsx`; POI actions: `apps/web/app/mapa/actions.ts:275` (createPoi), `:317` (updatePoi), `:337` (deletePoi) — was cited at `actions.ts:266,308,328`, drifted | Leaflet map with zoom range; POIs are full waypoints (create/place/edit/move/delete/status). **Correction**: the waypoint shared-vs-private visibility model is NOT open — it is already implemented as a hybrid status-gate model in the `pois` table (`apps/api/src/infra/db/schema.ts:459-465`, shipped with `poi-world-level`, 2026-06-03, i.e. before even the previous sync): DM sees all incl. `dmNotes`; players see `status != 'unknown'`, never `dmNotes`. The old "still open" note was wrong. Separately, the "map mobile zoom buttons" gap is **closed and was never real**: verified live on 2026-09-07 against production at a 390px mobile viewport, `.leaflet-control-zoom` renders with both `+`/`-` buttons visible. The old note's causal claim ("CRS.Simple disables the default buttons") does not match Leaflet's behaviour and had no code support. **New defect found in the same check**: the map renders no tiles in production. `GET /storage/v1/object/public/world-maps/sword-coast/1/{x}/{y}.jpg` returns **HTTP 500** `{"error":"Internal"}`, which the browser then drops as `net::ERR_BLOCKED_BY_ORB` (a JSON error body cannot satisfy an `<img>` request). This is a home-lab data problem, not a code one: a genuinely absent object returns a clean `404 not_found`, so the object rows exist while their bytes cannot be served. Re-running `apps/api/scripts/upload-map-tiles.ts` is the likely remedy. |
 | 3.6 | **DM — campaigns with invited players** | ✅ | `apps/api/src/http/routes/campaigns.ts`; `apps/web/app/campanas/[id]/page.tsx` | Campaign CRUD + session management + invite flow + session play-loop all shipped. Invite-link mechanism (`campaign_invite_tokens`, archive #1877). Session UI shipped (#1916). Role model fixed (#1908–#1929). |
 | 3.7 | **DM — manage world content** | ✅ | `components/world/{npcs,factions,journal}/`; world events, hexes, POIs all CRUD wired | NPCs + factions + world events + locations/hexes + POIs + journal + quests all ✅. Quests shipped 2026-06-05 (migration 0038, archive #1895). |
 | 3.8 | **DM — create custom content** | 🔴 | `packages/compendium-import/src/index.ts` (CLI only) | Server-side enforcement exists (`rulesProfile`, `disabledEntities`, `modifierDefinitions`). **No DM-facing UI to add homebrew or upload JSON.** Import is CLI-only. DEC-1 (locked 2026-06-04): MVP path is JSON upload, not visual authoring. |
-| 3.9 | **Import / export via JSON** | 🟡 | `apps/api/src/http/routes/characters.ts` (export endpoint); `apps/web/app/characters/[id]/` (danger-zone island) | Character export ✅ shipped 2026-06-05 (archive #1885, `GET /characters/:id/export`, versioned `schemaVersion:1` envelope). **Remaining**: character re-import (slug algorithm alignment needed first); config/NPC/world export. |
-| 3.10 | **West Marches knowledge layer** | 🟡 | `apps/web/app/bitacora/`; `/codex`; `/mapa`; DB: `world_events`, `journal_entries`, `character_knowledge`, `bitacora_pages`, `guild_contributions` | Substantially advanced via codex-ia-reframe arc (archives #1971–#2055). **Shipped**: player write-path (guild contributions + tags + unified feed + share-personal-page-to-guild, migration 0041–0044); Bitácora personal (Conocidos + Páginas + tags); character codex covers monsters + NPCs + factions + locations (uuid-bridge W5a/W5b); guild feed renders linked-entity cards (non-interactive). **Remaining**: `NovedadesFeed` backend hookup; rumor/adventure-board entity; sealing/debunking UI completeness; feed entity tap-to-open; Mercado (deferred arc, per #1960); keyset pagination. |
+| 3.9 | **Import / export via JSON** | 🟡 | `apps/api/src/http/routes/characters.ts:1281` (`GET /characters/:id/export`); `apps/web/app/characters/[id]/_export-button.tsx` (was described as a "danger-zone island" — no such naming exists in the code) | Character export ✅ shipped 2026-06-05 (archive #1885, versioned `schemaVersion:1` envelope). **Confirmed still true 2026-09-07**: no re-import endpoint exists anywhere in `characters.ts`. **Remaining**: character re-import (slug algorithm alignment needed first); config/NPC/world export. |
+| 3.10 | **West Marches knowledge layer** | 🟡 | `apps/web/app/bitacora/`; `apps/web/app/compendium/` (Biblioteca, formerly `/codex`); `apps/web/app/mercado/` + `apps/web/app/herramientas/tienda/`; `apps/web/app/mapa/`; DB: `world_events`, `journal_entries`, `character_knowledge`, `bitacora_pages`, `guild_contributions` | Substantially advanced via codex-ia-reframe arc (archives #1971–#2055), plus more shipped since. **Newly shipped (since 2026-06-08)**: `NovedadesFeed` wired to the real `aggregateGuildFeed` backend via `apps/web/components/inicio/feed-to-novedad.ts` (2026-09-03) — closes the prior "feed hookup" gap; Mercado shop — player browse+buy at `/mercado`, DM curation at `/herramientas/tienda`, `POST /characters/:id/shop/buy` (`characters.ts:3009`) (2026-09-03) — closes the prior "Mercado deferred" gap. **Previously shipped** (already reflected before this sync): player write-path (guild contributions + tags + unified feed + share-personal-page-to-guild); Bitácora personal (Conocidos + Páginas + tags); character codex covers monsters + NPCs + factions + locations. **Still open, confirmed 2026-09-07**: rumor/adventure-board entity (`guild_contributions.sealedStatus` gives a confirmed/debunked lifecycle but there is no dedicated board surface); sealing/debunking UI (`POST /contributions/:id/seal` exists server-side; no web Server Action calls it — the feed only renders the sealed badge read-only); feed entity tap-to-open (linked-entity card is explicitly non-interactive per its own comment in `feed-card.tsx`); keyset pagination (`aggregate-guild-feed.ts` is still offset-based). |
 | 3.11 | **Discord bot (read-only)** | ✅ | `apps/bot/src/commands/` (15 cmds) + `index.ts` registry | `/spell /feat /item /race /class /monster /session /world /lore /map /character /link /unlink /whoami /mi-hoja` — all wired (autocomplete + embeds + API). Read-only; bot writes are post-MVP. (Gap-audit #1809 wrongly said "only /mi-hoja" — corrected per engram #1810.) |
 
 ---
 
 ## 3. Route Map (apps/web/app)
 
+> Re-verified 2026-09-07 by enumerating every `apps/web/app/**/page.tsx` on disk (`fd -t f page.tsx apps/web/app`) and reconciling each row against it. **`/codex` and `/codex/[kind]` were removed** — this is the error the previous sync's own header date should have caught (see below).
+
 | Route | Status | Notes |
 |---|---|---|
-| `/inicio` | ✅ | DM/Player dashboard, wired to real API |
+| `/` | ✅ | Public landing; redirects to `/inicio` when authenticated. Has a demo-mode CTA backed by `apps/api/scripts/seed-demo.ts`. |
+| `/inicio` | ✅ | DM/Player dashboard, wired to real API. Novedades panel now wired to the real guild feed (`feed-to-novedad.ts`, 2026-09-03) — previously hardcoded empty. |
+| `/dashboard` | ✅ | Account-level landing (character roster + campaigns), pre-world-selection. Missing from the previous route map despite being the redirect target for `/settings`, wizard flows, and character creation, and the entry point for most Playwright E2E specs. |
+| `/personajes` | ✅ | World-scoped character roster with status filter chips; desktop-sidebar nav item (not in the mobile 5-tab bar). Missing from the previous route map. |
+| `/characters/new` | ✅ | Character creation entry point. |
 | `/characters/[id]/wizard/*` | ✅ | Full 7-step wizard |
-| `/characters/[id]` | ✅ | Sheet with 6 tabs |
+| `/characters/[id]` | ✅ | Sheet with 6 tabs (resumen/habilidades/hechizos/recursos/inventario/notas); `notas` also hosts the personal Bitácora (Conocidos + Páginas) |
 | `/characters/[id]/level-up` | ✅ | Level-up flow L1–L14 + multiclass |
-| `/compendium` | ✅ | Landing grid (6 real + 1 disabled) |
-| `/compendium/[category]` | ✅ | 8 of 8 categories browsable (feats + conditions shipped 2026-06-05) |
-| `/codex` | ✅ | Role-aware dispatch (DM→facciones/npcs, Player→grid) |
-| `/codex/[kind]` | 🟡 | Player scoped-list: monsters + NPCs + factions + locations (uuid-bridge W5a/W5b). Quests tab present. |
+| `/compendium` | ✅ | "Biblioteca" landing grid (6 real + 1 disabled). Renamed in nav from "Codex"; URL path unchanged. |
+| `/compendium/[category]` | ✅ | 8 of 8 categories browsable (`CATEGORY_CONFIG`: spells, items, races, classes, backgrounds, monsters, feats, conditions) |
+| `/mercado` | ✅ | **New since the previous sync** (shipped 2026-09-03). Player-facing shop: browse + buy mundane items the DM has marked for-sale. |
+| `/herramientas` | ✅ | **New since the previous sync.** DM-tools index; redirects to `/herramientas/facciones`. Replaces the deleted `/codex` DM surfaces. |
+| `/herramientas/facciones` | ✅ | Moved from `/codex` (deleted 2026-06-06). |
+| `/herramientas/npcs` | ✅ | Moved from `/codex`. |
+| `/herramientas/quests` | ✅ | Moved from `/codex/quests`. |
+| `/herramientas/tienda` | ✅ | **New since the previous sync** (2026-09-03). DM shop curation (for-sale allowlist). |
 | `/mapa` | ✅ | Leaflet tile map + POI CRUD |
-| `/campanas` + `/campanas/[id]` | ✅ | Campaign CRUD + invite flow + session play-loop |
+| `/campanas` + `/campanas/[id]` + `/campanas/new` | ✅ | Campaign CRUD + invite flow + session play-loop |
+| `/campanas/[id]/sessions/[sid]` | ✅ | Session detail (roster + event timeline) |
+| `/invite/[token]` | ✅ | Campaign invite accept screen. Real, live route — missing from the previous route map. |
 | `/bitacora` | 🟡 | Guild feed (contributions + journal + events unified; tag filter; Aportar FAB). Route renamed from `/cronica` (barrido-final). API URL `/worlds/:id/cronica-feed` kept. |
 | `/bitacora/eventos` + `/bitacora/notas` | ✅ | Timeline + journal (DM write-path). Former `/cronica/*` routes, renamed. |
-| `/encuentros` | ✅ (frozen) | Combat tracker V3 — **paused, not in MVP** |
+| `/encuentros` | ✅ (frozen) | Combat tracker — **paused, not in MVP**. See "Also found" below: engine/API work on this track continued well past the documented 2026-06-04 freeze date. |
 | `/worlds/[id]` | ✅ | World roster + DM approval panel |
 | `/link/[token]` | ✅ | Discord–user binding |
+| ~~`/codex`~~ / ~~`/codex/[kind]`~~ | **removed** | Deleted 2026-06-06 (`feat(web): delete /codex tree + /characters/[id]/codex + update E2E specs`, commit `b892e74`) — two days *before* the previous sync's own "2026-06-08" date, and confirmed absent today (`fd -t d -d 1 . apps/web/app` has no `codex`; live `/codex` 404s). Reference browsing moved to `/compendium` (Biblioteca); DM tools moved to `/herramientas/*`; world-knowledge browsing (monsters/NPCs/factions/locations) lives in character `Conocidos` (personal Bitácora) instead of a `[kind]` route. The previous doc's claim that `/codex` was a shipped, role-aware-dispatch route was wrong on the day it was written, not just stale. |
 
 ---
 
 ## 4. What Shipped Recently (post-2026-05-26)
 
-These arcs shipped after the original MVP roadmap was declared "complete" (2026-05-26) and have no prior disk trail.
+These arcs shipped after the original MVP roadmap was declared "complete" (2026-05-26) and have no prior disk trail. Table extended 2026-09-07 with everything shipped since the previous 2026-06-08 sync (see `git log --since=2026-06-08 --oneline`, 109 commits) — rows below the `background language validation fix` row are new to this sync.
 
 | Arc | Shipped | What it delivered | MVP area |
 |---|---|---|---|
@@ -71,17 +84,27 @@ These arcs shipped after the original MVP roadmap was declared "complete" (2026-
 | `web-combat-pass-turn` (Slice C1) | 2026-06-03 | PassTurnButton + TurnBanner advance | combat (frozen) |
 | `web-combat-attack` (Slice C2) | 2026-06-04 | AttackSheet + weapon attack vs NPC | combat (frozen) |
 | background language validation fix | 2026-06-04 | Injects `worldRefData` into background write-path | #3.1 builder |
+| `/codex` deletion + `/herramientas` split | 2026-06-06 | Deleted `/codex` tree; DM tools (facciones/npcs/quests) moved to `/herramientas/*`; Biblioteca grid narrowed to library-only categories | IA cleanup / #3.10 |
+| Combat engine batches B5–B10 | 2026-06-09 – 2026-06-12 | Ability checks, initiative roll, rage DSL rewrite, contest/grapple/shove, surprise gate — substantial engine feature work continued well after the documented 2026-06-04 "freeze" decision (see report) | combat (frozen track) |
+| Mercado shop (Wave 3) | 2026-09-03 | Shop curation (DM, `/herramientas/tienda`), buy UI (player, `/mercado`), `purchaseItems` currency logic, `shopCuration` rules-profile flag, for-sale allowlist | #3.10 WM knowledge (closes "Mercado deferred") |
+| Guild feed → home Novedades wiring | 2026-09-03 | `feed-to-novedad.ts` wires the already-shipped `aggregateGuildFeed` backend into `/inicio`'s Novedades panel (previously hardcoded empty) | #3.10 WM knowledge |
+| UX consistency + desktop shell | 2026-09-03 | Desktop persistent sidebar (`DesktopSidebar`), line-icon polish, scroll-fade affordance, enriched landing marketing page, 404/dead-route/placeholder cleanup | cross-cutting UX |
+| Demo/dev tooling | 2026-09-03/04 | `apps/api/scripts/seed-demo.ts` (demo world + map POIs), `apps/api/scripts/upload-map-tiles.ts` (Supabase Storage tile uploader) | dev/operator experience |
+| Surprise first-turn action-gate adapter | 2026-09-04 | IO adapter for the pure `isSurprisedFirstTurn` predicate; drops redundant inline gate blocks from the frozen combat/encounters route | combat (frozen track) |
+| Resilience pass | 2026-09-07 | Root/route error boundaries (`app/error.tsx`, `app/global-error.tsx`), fail-open Supabase auth-check middleware, API request timeouts + typed `ApiNetworkError` | cross-cutting reliability |
+| Reproducible setup pass | 2026-09-07 | Restored `infra/supabase/docker-compose.override.yml`, pinned `SUPABASE_REF`, corrected env templates, added a "Known setup gaps" README section | dev/operator experience |
 
 ---
 
 ## 5. Known Gaps / Not Yet Built
 
-See `docs/ROADMAP.md §1` for the prioritized work plan. Summary:
+See `docs/ROADMAP.md §1` for the prioritized work plan. Summary (re-verified 2026-09-07):
 
 | Gap | Severity | Definition.md item |
 |---|---|---|
-| JSON re-import + config/NPC/world export (character export ✅ shipped) | **MVP blocker** | #3.9 |
-| WM knowledge layer — feed completeness (NovedadesFeed hookup, rumor entity, sealing/debunking UI, feed entity tap-to-open) | High | #3.10 |
+| JSON re-import + config/NPC/world export (character export ✅ shipped; confirmed still no re-import endpoint) | **MVP blocker** | #3.9 |
+| WM knowledge layer — feed completeness: rumor/adventure-board entity, sealing/debunking UI, feed entity tap-to-open, keyset pagination. (`NovedadesFeed` hookup and Mercado shipped 2026-09-03 — removed from this list.) | High | #3.10 |
 | Custom content via JSON upload | High | #3.8 |
-| Codex cross-category search | Low | #3.4 |
-| Map mobile zoom buttons + waypoint visibility model | Low | #3.5 |
+| Biblioteca (`/compendium`) cross-category search — same gap as the previous "Codex cross-category search"; the route was renamed, the gap was not fixed | Low | #3.4 |
+| **Map tiles return HTTP 500 in production** — the live map draws POIs over an empty background. `GET /storage/v1/object/public/world-maps/sword-coast/1/{x}/{y}.jpg` answers `500 {"error":"Internal"}` (browser reports `net::ERR_BLOCKED_BY_ORB`). Supabase Storage itself is healthy — a missing object still answers `404 not_found` — so the object rows exist but their bytes cannot be served. Home-lab data issue; re-uploading via `apps/api/scripts/upload-map-tiles.ts` is the likely fix. Verified live 2026-09-07. | **High — visible on the public demo** | #3.5 |
+| ~~Map mobile zoom buttons~~ — **not a gap.** Verified live 2026-09-07 at a 390px viewport: `.leaflet-control-zoom` renders with both buttons visible. The prior "waypoint visibility model still open" claim in this row was also wrong (a hybrid status-gate model already exists in the `pois` schema). Both dropped. | — | #3.5 |
