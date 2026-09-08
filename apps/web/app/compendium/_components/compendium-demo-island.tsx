@@ -1,32 +1,30 @@
 'use client';
 
-// REQ-CBROWSE-10: CompendiumSearchTrigger no-op replaced with an honest Link
-// to the spells browse (default category). ADR-7.
-// If no campaignId, renders a non-navigating trigger (still not a no-op — shows intent).
+// REQ-BIB-SEARCH-01: the search trigger now opens the real cross-category search sheet
+// instead of the honest-Link no-op from REQ-CBROWSE-10. This completes the original
+// intent CompendiumSearchTrigger was scaffolded for ("opens the spell detail sheet") —
+// it just took the real search implementation to make opening a sheet honest.
 
-import Link from 'next/link';
+import { useState } from 'react';
+import { CompendiumSearchTrigger } from './compendium-search-trigger';
+import { CompendiumSearchSheet } from './compendium-search-sheet';
 
 interface CompendiumDemoIslandProps {
-  /** Active campaign UUID for the search trigger href. REQ-CBROWSE-10. */
+  /** Active campaign UUID — threaded to the search sheet's scope. REQ-CBROWSE-05. */
   campaignId: string | null;
 }
 
 /**
- * CompendiumDemoIsland — converts the old no-op search trigger to a real nav link.
- * REQ-CBROWSE-10: trigger MUST NOT remain a no-op after this change lands.
- * ADR-7: honest minimal V1 = navigate to /compendium/spells?campaign=...
+ * CompendiumDemoIsland — client island hosting the Biblioteca search trigger + sheet.
+ * REQ-BIB-SEARCH-01: tap-to-open (mobile-first §2), tap-outside/Escape-to-close via V3Sheet.
  */
 export function CompendiumDemoIsland({ campaignId }: CompendiumDemoIslandProps) {
-  const href = campaignId ? `/compendium/spells?campaign=${campaignId}` : '/compendium/spells';
+  const [open, setOpen] = useState(false);
 
   return (
-    <Link
-      href={href}
-      className="compendium-init-search"
-      aria-label="Buscar en el compendium"
-    >
-      <span className="ph">Hechizo, item, monstruo…</span>
-      <span className="kbd hidden md:inline-flex">⌘K</span>
-    </Link>
+    <>
+      <CompendiumSearchTrigger onOpen={() => setOpen(true)} />
+      <CompendiumSearchSheet open={open} onClose={() => setOpen(false)} campaignId={campaignId} />
+    </>
   );
 }

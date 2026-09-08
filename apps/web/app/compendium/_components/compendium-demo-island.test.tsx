@@ -1,38 +1,51 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent, screen } from '@testing-library/react';
 import { CompendiumDemoIsland } from './compendium-demo-island';
 
+// Mock V3Sheet — renders children only when open (matches DetailSheet's test convention).
+vi.mock('@/components/ui', () => ({
+  Icon: () => null,
+  V3Sheet: vi.fn(({ open, children, title }: { open: boolean; children: React.ReactNode; title?: string }) =>
+    open ? (
+      <div role="dialog" aria-label={title}>
+        {children}
+      </div>
+    ) : null,
+  ),
+}));
+
+// The sheet's own search behavior is covered by compendium-search-sheet.test.tsx —
+// here it is enough that the trigger mounts/opens it.
+vi.mock('../actions', () => ({ searchAllCategories: vi.fn() }));
+vi.mock('../[category]/_config/registry', () => ({ CATEGORY_CONFIG: {} }));
+
 describe('CompendiumDemoIsland', () => {
-  it('WCP-SEARCH-06 / REQ-CBROWSE-10: renders search trigger link with aria-label', () => {
+  it('WCP-SEARCH-06: renders the search trigger button with aria-label', () => {
     const { getByLabelText } = render(<CompendiumDemoIsland campaignId={null} />);
     expect(getByLabelText('Buscar en el compendium')).toBeTruthy();
   });
 
-  it('REQ-CBROWSE-10: renders as a Link (anchor) — not a no-op button', () => {
-    const { container } = render(<CompendiumDemoIsland campaignId={null} />);
-    // REQ-CBROWSE-10: trigger must NOT be a no-op; it should be an <a> element
-    const anchor = container.querySelector('a');
-    expect(anchor).not.toBeNull();
+  it('the trigger is a button (opens the search sheet in place, not a navigating link)', () => {
+    const { getByLabelText } = render(<CompendiumDemoIsland campaignId={null} />);
+    expect(getByLabelText('Buscar en el compendium').tagName).toBe('BUTTON');
   });
 
-  it('REQ-CBROWSE-10: href points to /compendium/spells?campaign=... when campaignId given', () => {
-    const { container } = render(
-      <CompendiumDemoIsland campaignId="a1b2c3d4-e5f6-7890-abcd-ef1234567890" />,
-    );
-    const anchor = container.querySelector('a');
-    expect(anchor?.getAttribute('href')).toContain('/compendium/spells');
-    expect(anchor?.getAttribute('href')).toContain('campaign=');
+  it('does NOT render the search sheet dialog by default', () => {
+    render(<CompendiumDemoIsland campaignId={null} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('does NOT render a spell detail sheet by default', () => {
-    const { container } = render(<CompendiumDemoIsland campaignId={null} />);
-    const dialog = container.querySelector('[role="dialog"]');
-    expect(dialog).toBeNull();
+  it('REQ-BIB-SEARCH-01: tapping the trigger opens the search sheet', () => {
+    const { getByLabelText } = render(<CompendiumDemoIsland campaignId={null} />);
+    fireEvent.click(getByLabelText('Buscar en el compendium'));
+    expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
-  it('does NOT render fake "Bola de fuego" recents entry', () => {
-    const { queryByText } = render(<CompendiumDemoIsland campaignId={null} />);
-    expect(queryByText('Bola de fuego')).toBeNull();
+  it('without an active campaign, the opened sheet explains a campaign is required', () => {
+    const { getByLabelText } = render(<CompendiumDemoIsland campaignId={null} />);
+    fireEvent.click(getByLabelText('Buscar en el compendium'));
+    expect(screen.getByText('Seleccioná una campaña para buscar en la Biblioteca.')).toBeTruthy();
   });
 
   it('ux-p2-consistency Fix 2: ⌘K kbd hint is hidden on mobile (hidden base, md:inline-flex)', () => {

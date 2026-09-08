@@ -18,7 +18,7 @@ export function CompendiumSearchTrigger({ onOpen }: CompendiumSearchTriggerProps
       aria-label="Buscar en el compendium"
     >
       <Icon name="eye" size={14} />
-      <span className="ph">Hechizo, item, monstruo, lore…</span>
+      <span className="ph">Hechizo, item, monstruo…</span>
       <span className="kbd hidden md:inline-flex">⌘K</span>
     </button>
   );
