@@ -149,4 +149,5 @@ pnpm typecheck
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Remaining work and priority order |
 | [`CLAUDE.md`](./CLAUDE.md) | Project conventions for code, testing, architecture, and AI agents |
 | [`docs/onboarding/`](./docs/onboarding/) | Operator checklist, DM onboarding, E2E setup |
+| [`docs/onboarding/api-deploy.md`](./docs/onboarding/api-deploy.md) | Deploying the API — manual, and **not** covered by the Vercel deploy |
 | [`docs/manuals/dsl.md`](./docs/manuals/dsl.md) | Compendium entity DSL reference |
