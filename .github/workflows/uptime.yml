@@ -54,15 +54,24 @@ jobs:
           # the map silently renders with no tiles.
           check_tile() { [ "$code" = "200" ] && printf '%s' "$ctype" | grep -qi '^image/'; }
 
+          # $4 = "body" to capture the response body. Omit it and the body is
+          # discarded: a tile is binary JPEG, and capturing it through command
+          # substitution both wastes the transfer and makes bash warn about
+          # ignored null bytes on every run.
           probe() {
-            local label="$1" url="$2" predicate="$3"
+            local label="$1" url="$2" predicate="$3" want_body="${4:-}"
             local body meta code ctype payload
             for i in $(seq 1 "$ATTEMPTS"); do
-              body=$(curl -sS --max-time 20 -w '\n%{http_code} %{content_type}' "$url" 2>/dev/null) || body=""
+              if [ "$want_body" = "body" ]; then
+                body=$(curl -sS --max-time 20 -w '\n%{http_code} %{content_type}' "$url" 2>/dev/null) || body=""
+                payload=$(printf '%s' "$body" | sed '$d')
+              else
+                body=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code} %{content_type}' "$url" 2>/dev/null) || body=""
+                payload=""
+              fi
               meta=$(printf '%s' "$body" | tail -n1)
               code=${meta%% *}
               ctype=${meta#* }
-              payload=$(printf '%s' "$body" | sed '$d')
               if "$predicate"; then
                 echo "ok    $label ($code)"
                 return 0
@@ -77,8 +86,9 @@ jobs:
           probe "web       https://dungeon-hub.mnr.ar" \
                 "https://dungeon-hub.mnr.ar" check_web || true
 
+          # The only probe that inspects the body: it must see "db":"up".
           probe "api       https://dungeon-hub-api.mnr.ar/api/v1/health" \
-                "https://dungeon-hub-api.mnr.ar/api/v1/health" check_api || true
+                "https://dungeon-hub-api.mnr.ar/api/v1/health" check_api body || true
 
           probe "supabase  https://dungeon-hub-supabase.mnr.ar" \
                 "https://dungeon-hub-supabase.mnr.ar" check_supabase || true
