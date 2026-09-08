@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { api } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 
 // Generic enough to cover both SpellOptionsResponse shapes.
 // SpellKnownSectionEditor uses { availableSpells: AvailableSpell[] }
@@ -58,7 +59,7 @@ export function useSpellOptions<T = unknown>(
       } catch (err) {
         setFetchState({
           status: 'error',
-          message: err instanceof Error ? err.message : 'Error al cargar hechizos.',
+          message: getErrorMessage(err, 'Error al cargar hechizos.'),
         });
       }
     })();

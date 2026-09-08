@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { networkErrorMessage } from '@/lib/error-message';
 import type { EncounterActionResult } from '@/app/encuentros/actions';
 
 const IdSchema = z.string().uuid();
@@ -53,7 +54,7 @@ export async function activateRage(
     const msg =
       err instanceof ApiError
         ? (err.body as { error?: string } | null)?.error
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -99,7 +100,7 @@ export async function deactivateRage(
     const msg =
       err instanceof ApiError
         ? (err.body as { error?: string } | null)?.error
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -147,7 +148,7 @@ export async function passTurn(
     const msg =
       err instanceof ApiError
         ? (err.body as { error?: string } | null)?.error
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -191,7 +192,7 @@ export async function useResource(
     const msg =
       err instanceof ApiError
         ? (err.body as { message?: string } | null)?.message
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -235,7 +236,7 @@ export async function restoreResource(
     const msg =
       err instanceof ApiError
         ? (err.body as { message?: string } | null)?.message
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -276,7 +277,7 @@ export async function shortRest(
     const msg =
       err instanceof ApiError
         ? (err.body as { message?: string } | null)?.message
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -365,7 +366,7 @@ export async function attackApplyAction(
     const msg =
       err instanceof ApiError
         ? (err.body as { error?: string } | null)?.error
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 
@@ -403,7 +404,7 @@ export async function longRest(
     const msg =
       err instanceof ApiError
         ? (err.body as { message?: string } | null)?.message
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 

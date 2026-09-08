@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { Button } from '@/components/ui';
 import { slugify } from '@/components/compendium/slugify';
 import type { CharacterExportEnvelope } from '@/lib/sheet-types';
@@ -60,9 +61,7 @@ export function ExportButton({ characterId, characterName }: Props) {
         err.body &&
         'error' in err.body
           ? String((err.body as { error: unknown }).error)
-          : err instanceof Error
-            ? err.message
-            : 'Error al exportar';
+          : getErrorMessage(err, 'Error al exportar');
       setError(msg);
       setState('error');
     }

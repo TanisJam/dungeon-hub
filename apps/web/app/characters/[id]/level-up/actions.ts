@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage, networkErrorClause } from '@/lib/error-message';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -112,7 +113,7 @@ export async function submitLevelUp(
         : apiBody?.error ?? `API ${err.status}`;
       return { ok: false, error: message, issues: apiBody?.issues };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   // ---- Phase 2: PUT /classes/:slug/spells (if spell picks present) ------------
@@ -126,12 +127,14 @@ export async function submitLevelUp(
       );
     } catch (err) {
       // Phase 1 already succeeded — character is leveled up. Return partial success.
+      // `code` is rendered directly in the SuccessScreen banner (see _flow.tsx), so
+      // an ApiNetworkError gets a short Spanish clause instead of the raw constant.
       const code = err instanceof ApiError
         ? String((err.body as { error?: string } | null)?.error ?? err.status)
-        : 'SPELLS_SAVE_FAILED';
+        : (networkErrorClause(err) ?? 'SPELLS_SAVE_FAILED');
       const message = err instanceof ApiError
         ? String((err.body as { message?: string } | null)?.message ?? 'Error al guardar hechizos')
-        : (err instanceof Error ? err.message : 'Error desconocido');
+        : getErrorMessage(err);
       revalidatePath(`/characters/${characterId}`);
       return { ok: 'partial', summary, spellsError: { code, message } };
     }
@@ -224,9 +227,11 @@ export async function retrySaveSpells(
     revalidatePath(`/characters/${characterId}`);
     return { ok: true };
   } catch (err) {
+    // `error` is rendered directly (see handleRetrySpells in _flow.tsx), so an
+    // ApiNetworkError gets a short Spanish clause instead of the raw constant.
     const code = err instanceof ApiError
       ? String((err.body as { error?: string } | null)?.error ?? err.status)
-      : 'SPELLS_SAVE_FAILED';
+      : (networkErrorClause(err) ?? 'SPELLS_SAVE_FAILED');
     return { ok: false, error: code };
   }
 }

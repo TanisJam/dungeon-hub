@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import type { InventoryDetailResponse } from '@/lib/sheet-types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,7 +39,7 @@ export async function useSpellSlot(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -66,7 +67,7 @@ export async function longRest(characterId: string): Promise<SlotActionState> {
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -93,7 +94,7 @@ export async function shortRest(characterId: string): Promise<SlotActionState> {
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -132,7 +133,7 @@ export async function useClassResource(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -164,7 +165,7 @@ export async function restoreClassResource(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -247,7 +248,7 @@ export async function addInventoryItem(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -291,7 +292,7 @@ export async function updateInventoryItem(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -329,7 +330,7 @@ export async function removeInventoryItem(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -366,7 +367,7 @@ export async function approveCharacter(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -400,7 +401,7 @@ export async function rejectCharacter(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -433,7 +434,7 @@ export async function grantXp(characterId: string, award: number): Promise<Grant
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -464,7 +465,7 @@ export async function grantGold(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -500,7 +501,7 @@ export async function grantItem(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -525,7 +526,7 @@ export async function deleteCharacter(characterId: string): Promise<DeleteState>
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath('/characters');
@@ -572,7 +573,7 @@ export async function fetchInventoryDetail(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `Error ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 }
 
@@ -613,7 +614,7 @@ export async function grantKnowledge(
       const body = err.body as { message?: string; error?: string } | null;
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -671,7 +672,7 @@ export async function createBitacoraPage(
         issues: body?.issues,
       };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -710,7 +711,7 @@ export async function updateBitacoraPage(
         issues: body?.issues,
       };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -743,7 +744,7 @@ export async function deleteBitacoraPage(
       const body = err.body as { error?: string } | null;
       return { ok: false, error: body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 
   revalidatePath(`/characters/${characterId}`);
@@ -790,6 +791,6 @@ export async function shareBitacoraPage(
       const body = err.body as { error?: string } | null;
       return { ok: false, error: body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Error desconocido' };
+    return { ok: false, error: getErrorMessage(err) };
   }
 }

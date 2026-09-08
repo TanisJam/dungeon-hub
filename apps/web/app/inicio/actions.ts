@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { networkErrorMessage } from '@/lib/error-message';
 
 const IdSchema = z.string().uuid();
 
@@ -19,7 +20,7 @@ export async function approveFichaFromInicio(id: string): Promise<FichaActionRes
   try {
     await api.post(`/characters/${id}/approve`, {}, session.access_token);
   } catch (err) {
-    const msg = err instanceof ApiError ? (err.body as { message?: string } | null)?.message : undefined;
+    const msg = err instanceof ApiError ? (err.body as { message?: string } | null)?.message : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
   revalidatePath('/inicio');
@@ -34,7 +35,7 @@ export async function rejectFichaFromInicio(id: string): Promise<FichaActionResu
   try {
     await api.post(`/characters/${id}/reject`, {}, session.access_token);
   } catch (err) {
-    const msg = err instanceof ApiError ? (err.body as { message?: string } | null)?.message : undefined;
+    const msg = err instanceof ApiError ? (err.body as { message?: string } | null)?.message : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
   revalidatePath('/inicio');

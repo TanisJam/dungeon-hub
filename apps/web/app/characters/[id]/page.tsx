@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import type { SheetResponse, CharacterStatus } from '@/lib/sheet-types';
 import { AppShell } from '@/components/layout/app-shell';
 import { Pill } from '@/components/ui';
@@ -82,7 +83,9 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
     return (
       <AppShell title="Ficha" constructorHref="/characters/new">
         <div className="py-10 text-center">
-          <p className="text-sm font-semibold text-ink">Error al cargar la ficha.</p>
+          <p className="text-sm font-semibold text-ink">
+            {getErrorMessage(err, 'Error al cargar la ficha.')}
+          </p>
         </div>
       </AppShell>
     );

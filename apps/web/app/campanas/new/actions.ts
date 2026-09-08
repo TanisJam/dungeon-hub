@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 
 export type CreateState = { error: string | null };
 
@@ -36,7 +37,7 @@ export async function createCampaign(
       const body = err.body as { message?: string; error?: string } | null;
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: getErrorMessage(err, 'Unknown error') };
   }
 
   redirect(`/campanas/${created.id}`);
