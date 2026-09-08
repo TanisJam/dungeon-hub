@@ -12,6 +12,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { AppShell } from '@/components/layout/app-shell';
 import { Card } from '@/components/ui';
 import { StatusTabs } from './_components/status-tabs';
@@ -71,7 +72,9 @@ export default async function WorldLandingPage({ params, searchParams }: Props) 
     return (
       <AppShell title="Mundo" constructorHref="/characters/new">
         <div className="py-10 text-center">
-          <p className="text-sm font-semibold text-ink">Error al cargar el mundo.</p>
+          <p className="text-sm font-semibold text-ink">
+            {getErrorMessage(err, 'Error al cargar el mundo.')}
+          </p>
         </div>
       </AppShell>
     );

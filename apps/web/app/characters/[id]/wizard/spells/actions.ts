@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { formatValidationIssues } from '@/lib/issue-messages';
+import { getErrorMessage } from '@/lib/error-message';
 
 type SpellRef = { slug: string; source: string };
 
@@ -46,7 +47,7 @@ export async function saveSpellsForClass(payload: SpellPayload): Promise<SaveSpe
       }
       return { ok: false, error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : 'Unknown error' };
+    return { ok: false, error: getErrorMessage(err, 'Unknown error') };
   }
 
   return { ok: true };

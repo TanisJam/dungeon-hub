@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import type { EquipmentSelections } from '@dungeon-hub/domain/character/starting-equipment';
 
 export type PublishState = { error: string | null; success: boolean };
@@ -64,7 +65,7 @@ export async function publishCharacter(
       const body = err.body as { message?: string; error?: string } | null;
       return { error: body?.message ?? body?.error ?? `API ${err.status}`, success: false };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error', success: false };
+    return { error: getErrorMessage(err, 'Unknown error'), success: false };
   }
 
   return { error: null, success: true };
@@ -85,6 +86,6 @@ export async function updateCharacterName(
       const body = err.body as { message?: string } | null;
       return { error: body?.message ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: getErrorMessage(err, 'Unknown error') };
   }
 }

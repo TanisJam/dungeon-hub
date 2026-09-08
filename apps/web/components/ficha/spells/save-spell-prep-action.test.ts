@@ -32,6 +32,13 @@ vi.mock('@/lib/api', () => ({
       this.body = body;
     }
   },
+  ApiNetworkError: class ApiNetworkError extends Error {
+    kind: 'timeout' | 'network';
+    constructor(kind: 'timeout' | 'network', message: string) {
+      super(message);
+      this.kind = kind;
+    }
+  },
 }));
 
 import { revalidatePath } from 'next/cache';

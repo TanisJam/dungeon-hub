@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { SignOutButton } from '@/app/_components/sign-out-button';
 import { AppShell } from '@/components/layout/app-shell';
 import { IdentityHeader } from './_identity-header';
@@ -88,7 +89,9 @@ export default async function DashboardPage() {
 
 function FatalError({ error }: { error: unknown }) {
   const message =
-    error instanceof ApiError ? `API ${error.status}: ${error.message}` : String(error);
+    error instanceof ApiError
+      ? `API ${error.status}: ${error.message}`
+      : getErrorMessage(error, String(error));
   return (
     <AppShell title="Dungeon Hub" subtitle="TU GREMIO">
       <div className="py-12 text-center">

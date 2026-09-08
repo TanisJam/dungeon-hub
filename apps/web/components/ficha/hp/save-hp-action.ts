@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 
 export type SaveHpResult =
   | { ok: true }
@@ -54,7 +55,7 @@ export async function saveHp(input: {
     return {
       ok: false,
       error: 'unknown',
-      message: err instanceof Error ? err.message : 'Error desconocido.',
+      message: getErrorMessage(err, 'Error desconocido.'),
     };
   }
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { networkErrorMessage } from '@/lib/error-message';
 
 const IdSchema = z.string().uuid();
 
@@ -37,7 +38,7 @@ export async function advanceEncounterTurn(
     const msg =
       err instanceof ApiError
         ? (err.body as { message?: string } | null)?.message
-        : undefined;
+        : networkErrorMessage(err);
     return { ok: false, code: 'API_ERROR', message: msg };
   }
 

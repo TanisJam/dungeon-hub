@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { redirect } from 'next/navigation';
 import type { EquipmentSelections } from '@dungeon-hub/domain/character/starting-equipment';
 import type { EquipmentType } from '@dungeon-hub/domain/character/starting-equipment';
@@ -64,7 +65,7 @@ export async function saveEquipmentSelections(
       const body = err.body as { message?: string; error?: string } | null;
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: getErrorMessage(err, 'Unknown error') };
   }
 
   redirect(`/characters/${characterId}/wizard/spells`);

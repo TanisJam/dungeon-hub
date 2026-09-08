@@ -39,6 +39,13 @@ vi.mock('@/lib/api', () => ({
       }),
     ),
   },
+  ApiNetworkError: class ApiNetworkError extends Error {
+    kind: 'timeout' | 'network';
+    constructor(kind: 'timeout' | 'network', message: string) {
+      super(message);
+      this.kind = kind;
+    }
+  },
 }));
 
 import { api } from '@/lib/api';

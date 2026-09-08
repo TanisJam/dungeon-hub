@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { Button } from '@/components/ui';
 
 export function ConfirmLinkButton({ token }: { token: string }) {
@@ -25,7 +26,7 @@ export function ConfirmLinkButton({ token }: { token: string }) {
       const msg =
         err instanceof ApiError && typeof err.body === 'object' && err.body && 'message' in err.body
           ? String((err.body as { message: unknown }).message)
-          : err instanceof Error ? err.message : 'Unknown error';
+          : getErrorMessage(err, 'Unknown error');
       setError(msg);
       setState('error');
     }

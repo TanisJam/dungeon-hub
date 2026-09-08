@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { formatValidationIssues } from '@/lib/issue-messages';
+import { getErrorMessage } from '@/lib/error-message';
 
 export type RaceState = { error: string | null };
 
@@ -61,7 +62,7 @@ export async function saveRace(
       }
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: getErrorMessage(err, 'Unknown error') };
   }
 
   redirect(`/characters/${characterId}/wizard/class`);

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 
 type Method = 'standard-array' | 'point-buy' | 'roll';
 
@@ -66,7 +67,7 @@ export async function saveAtributos(
     return {
       ok: false,
       error: 'unknown',
-      message: err instanceof Error ? err.message : 'Error desconocido.',
+      message: getErrorMessage(err, 'Error desconocido.'),
     };
   }
 

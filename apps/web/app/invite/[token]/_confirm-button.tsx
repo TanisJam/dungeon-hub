@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import { Button } from '@/components/ui';
 
 export function ConfirmInviteButton({ token }: { token: string }) {
@@ -33,9 +34,7 @@ export function ConfirmInviteButton({ token }: { token: string }) {
         err.body &&
         'error' in err.body
           ? String((err.body as { error: unknown }).error)
-          : err instanceof Error
-            ? err.message
-            : 'Error desconocido';
+          : getErrorMessage(err);
       setError(msg);
       setState('error');
     }

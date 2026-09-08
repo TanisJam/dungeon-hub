@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 import type { SheetResponse } from '@/lib/sheet-types';
 import { AppShell } from '@/components/layout/app-shell';
 import { LevelUpFlow } from './_flow';
@@ -85,7 +86,9 @@ export default async function LevelUpPage({ params }: Props) {
     if (err instanceof ApiError && err.status === 404) notFound();
     return (
       <AppShell title="Subir nivel" backHref={`/characters/${id}`} showTabBar={false}>
-        <p className="py-10 text-center text-sm text-ink-mute">Error al cargar el personaje.</p>
+        <p className="py-10 text-center text-sm text-ink-mute">
+          {getErrorMessage(err, 'Error al cargar el personaje.')}
+        </p>
       </AppShell>
     );
   }

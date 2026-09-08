@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError } from '@/lib/api';
 import { formatValidationIssues } from '@/lib/issue-messages';
+import { getErrorMessage } from '@/lib/error-message';
 import type { Customization } from '@dungeon-hub/domain/character/background';
 
 export type BackgroundState = { error: string | null };
@@ -36,7 +37,7 @@ export async function saveBackground(
       }
       return { error: body?.message ?? body?.error ?? `API ${err.status}` };
     }
-    return { error: err instanceof Error ? err.message : 'Unknown error' };
+    return { error: getErrorMessage(err, 'Unknown error') };
   }
 
   redirect(`/characters/${characterId}/wizard/equipment`);
