@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * FeedCard — renders one normalized FeedItem in the unified guild bitácora feed.
  *
@@ -9,8 +11,19 @@
  * tolerance: debunked rows render degraded — never hidden, never crash (gc-invariants #1808).
  * Tags: compact chips, display-only (non-interactive on the card).
  * Min 44px tap target per mobile-first convention (CLAUDE.md §2).
+ *
+ * Seal controls (bitacora-gremio-sealing #3.10): DM-only "Confirmar" / "Refutar"
+ * buttons, gated on `effectiveView === 'dm'` — the same server-derived view
+ * flag every other DM-only affordance in this app threads through props (see
+ * EncuentrosListView, EventClientWrapper). The gate here is purely cosmetic:
+ * POST /contributions/:id/seal re-checks world-GM access itself and returns
+ * 403 regardless of what the client believes. Re-sealing is allowed
+ * (last-write-wins); un-sealing is NOT offered — the API has no way to clear
+ * a seal (see sealContribution in app/bitacora/actions.ts).
  */
 
+import { useState, useTransition } from 'react';
+import { sealContribution } from '@/app/bitacora/actions';
 import type { FeedItem, FeedSource } from '@/app/bitacora/actions';
 import { Pill } from '@/components/ui';
 
@@ -68,11 +81,38 @@ function snippet(text: string | null, maxLen = 120): string {
 
 interface FeedCardProps {
   item: FeedItem;
+  /** Server-derived DM/player view flag (REQ-WIS-08). Defaults to 'player' — seal
+   *  controls stay hidden unless a caller explicitly threads the DM view through. */
+  effectiveView?: 'dm' | 'player';
 }
 
-export function FeedCard({ item }: FeedCardProps) {
-  const isDebunked = item.sealedStatus === 'debunked';
-  const isConfirmed = item.sealedStatus === 'confirmed';
+export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
+  const isGm = effectiveView === 'dm';
+
+  // Local override so a successful seal reflects immediately without waiting
+  // for the parent list to re-fetch. `undefined` = defer to `item.sealedStatus`.
+  const [sealOverride, setSealOverride] = useState<'confirmed' | 'debunked' | undefined>(
+    undefined,
+  );
+  const [sealError, setSealError] = useState<string | null>(null);
+  const [isSealing, startSeal] = useTransition();
+
+  const sealedStatus = sealOverride ?? item.sealedStatus ?? null;
+  const isDebunked = sealedStatus === 'debunked';
+  const isConfirmed = sealedStatus === 'confirmed';
+
+  function handleSeal(next: 'confirmed' | 'debunked') {
+    if (isSealing) return;
+    setSealError(null);
+    startSeal(async () => {
+      const result = await sealContribution(item.id, next);
+      if (result.ok) {
+        setSealOverride(result.data.sealedStatus);
+      } else {
+        setSealError(result.error);
+      }
+    });
+  }
 
   return (
     <article className="relative w-full rounded-lg border border-line bg-paper px-4 py-3 flex flex-col gap-2 min-h-[44px]">
@@ -147,6 +187,41 @@ export function FeedCard({ item }: FeedCardProps) {
           <span className="truncate text-sm font-medium text-ink">{item.refEntityName}</span>
         </div>
       ) : null}
+
+      {/* DM-only seal controls (bitacora-gremio-sealing #3.10, REQ-CK-NOTE-07).
+          Cosmetic gate only — POST /contributions/:id/seal re-checks world-GM
+          access server-side and returns 403 for anyone else. Re-seal allowed
+          (last-write-wins); no "quitar sello" control — the API does not
+          accept clearing a seal (see sealContribution doc comment). */}
+      {isGm && (
+        <div className="flex flex-col gap-1.5 border-t border-line pt-2" aria-label="Sellar aporte">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              aria-pressed={isConfirmed}
+              disabled={isSealing || isConfirmed}
+              onClick={() => handleSeal('confirmed')}
+              className="min-h-[44px] flex-1 rounded-md border border-success/50 bg-success-soft px-3 py-2 text-xs font-semibold text-success transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSealing ? 'Confirmando…' : 'Confirmar'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={isDebunked}
+              disabled={isSealing || isDebunked}
+              onClick={() => handleSeal('debunked')}
+              className="min-h-[44px] flex-1 rounded-md border border-danger/50 bg-danger-soft px-3 py-2 text-xs font-semibold text-danger transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSealing ? 'Refutando…' : 'Refutar'}
+            </button>
+          </div>
+          {sealError && (
+            <p role="alert" className="text-[10px] font-medium text-danger">
+              {sealError}
+            </p>
+          )}
+        </div>
+      )}
     </article>
   );
 }
