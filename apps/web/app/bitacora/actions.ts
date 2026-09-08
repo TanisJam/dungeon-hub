@@ -8,6 +8,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { api, ApiError, ApiNetworkError } from '@/lib/api';
+import { getErrorMessage } from '@/lib/error-message';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -410,5 +411,74 @@ export async function listGuildBitacoraFeed(
     return res;
   } catch {
     return { rows: [], pageCount: 0, nextOffset: null };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// sealContribution — world-GM marks a guild contribution confirmed|debunked.
+// bitacora-gremio-sealing (#3.10). POST /contributions/:id/seal (API since
+// 2026-06-05). Server enforces GM-only + validates the transition (canSeal /
+// applySeal, packages/domain/src/world/contribution) — this action only
+// relays the call and translates the response into user-facing copy.
+//
+// Un-sealing is NOT offered: the API's SealBody Zod schema only accepts
+// 'confirmed' | 'debunked' (apps/api/src/http/routes/contributions.ts) and the
+// domain applySeal signature has no null branch, so there is no way to clear
+// a seal today. Re-sealing (confirmed -> debunked or vice-versa) IS supported
+// — last-write-wins per REQ-CK-NOTE-07.
+// ---------------------------------------------------------------------------
+
+export type SealedStatus = 'confirmed' | 'debunked';
+
+export interface SealContributionResult {
+  id: string;
+  sealedStatus: SealedStatus;
+  sealedBy: string | null;
+  sealedAt: string | null;
+}
+
+export async function sealContribution(
+  contributionId: string,
+  sealedStatus: SealedStatus,
+): Promise<ActionResult<SealContributionResult>> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'No autenticado.', status: 401 };
+
+  try {
+    const updated = await api.post<SealContributionResult>(
+      `/contributions/${contributionId}/seal`,
+      { sealedStatus },
+      token,
+    );
+    revalidatePath('/bitacora');
+    return { ok: true, data: updated };
+  } catch (err) {
+    if (err instanceof ApiError) {
+      if (err.status === 403) {
+        return {
+          ok: false,
+          error: 'No tenés permisos de DM para sellar este aporte.',
+          status: 403,
+        };
+      }
+      if (err.status === 404) {
+        return { ok: false, error: 'Este aporte ya no existe.', status: 404 };
+      }
+      if (err.status === 400) {
+        return {
+          ok: false,
+          error: 'No se pudo sellar el aporte: datos inválidos.',
+          status: 400,
+        };
+      }
+      return {
+        ok: false,
+        error: 'No se pudo sellar el aporte. Probá de nuevo en unos segundos.',
+        status: err.status,
+      };
+    }
+    // ApiNetworkError (or anything unexpected) — getErrorMessage() surfaces the
+    // "no se pudo conectar" / "tardó demasiado" copy from lib/error-message.ts.
+    return { ok: false, error: getErrorMessage(err) };
   }
 }

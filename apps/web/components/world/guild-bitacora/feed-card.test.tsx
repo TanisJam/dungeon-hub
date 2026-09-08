@@ -15,10 +15,21 @@
  */
 
 import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+
+// Mock the Server Action — sealContribution is the only value FeedCard pulls
+// from this module at runtime (FeedItem/FeedSource are type-only imports,
+// erased at compile time, so they need no mock counterpart here).
+vi.mock('@/app/bitacora/actions', () => ({
+  sealContribution: vi.fn(),
+}));
+
 import { FeedCard } from './feed-card';
+import { sealContribution } from '@/app/bitacora/actions';
 import type { FeedItem } from '@/app/bitacora/actions';
+
+const mockedSealContribution = vi.mocked(sealContribution);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -104,5 +115,80 @@ describe('FeedCard — linked-entity card', () => {
 
     expect(screen.getByText('Bestiario')).toBeTruthy();
     expect(screen.getByText('Goblin')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seal controls (bitacora-gremio-sealing #3.10) — DM-only Confirmar/Refutar.
+// ---------------------------------------------------------------------------
+
+const unsealedFeedItem: FeedItem = {
+  ...baseFeedItem,
+  id: 'contrib-001',
+  sealedStatus: null,
+};
+
+describe('FeedCard — seal controls', () => {
+  beforeEach(() => {
+    mockedSealContribution.mockReset();
+  });
+
+  it('hides seal controls for a player (effectiveView omitted defaults to player)', () => {
+    render(<FeedCard item={unsealedFeedItem} />);
+
+    expect(screen.queryByText('Confirmar')).toBeNull();
+    expect(screen.queryByText('Refutar')).toBeNull();
+  });
+
+  it('hides seal controls when effectiveView="player" explicitly', () => {
+    render(<FeedCard item={unsealedFeedItem} effectiveView="player" />);
+
+    expect(screen.queryByText('Confirmar')).toBeNull();
+    expect(screen.queryByText('Refutar')).toBeNull();
+  });
+
+  it('shows seal controls for a DM (effectiveView="dm")', () => {
+    render(<FeedCard item={unsealedFeedItem} effectiveView="dm" />);
+
+    expect(screen.getByText('Confirmar')).toBeTruthy();
+    expect(screen.getByText('Refutar')).toBeTruthy();
+  });
+
+  it('a successful seal updates the displayed status pill', async () => {
+    mockedSealContribution.mockResolvedValue({
+      ok: true,
+      data: { id: 'contrib-001', sealedStatus: 'confirmed', sealedBy: 'dm-user', sealedAt: '2026-06-08T12:00:00.000Z' },
+    });
+
+    render(<FeedCard item={unsealedFeedItem} effectiveView="dm" />);
+
+    expect(screen.queryByText('Confirmado')).toBeNull();
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Confirmado')).toBeTruthy();
+    });
+    expect(mockedSealContribution).toHaveBeenCalledWith('contrib-001', 'confirmed');
+  });
+
+  it('a 403 response surfaces its message instead of failing silently', async () => {
+    mockedSealContribution.mockResolvedValue({
+      ok: false,
+      error: 'No tenés permisos de DM para sellar este aporte.',
+      status: 403,
+    });
+
+    render(<FeedCard item={unsealedFeedItem} effectiveView="dm" />);
+
+    fireEvent.click(screen.getByText('Confirmar'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No tenés permisos de DM para sellar este aporte.'),
+      ).toBeTruthy();
+    });
+    // No optimistic update on failure — status pill must not appear.
+    expect(screen.queryByText('Confirmado')).toBeNull();
   });
 });

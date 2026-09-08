@@ -117,7 +117,7 @@ export function GuildBitacoraFeed({
       ) : (
         <div className="flex flex-col gap-2">
           {items.map((item) => (
-            <FeedCard key={item.id} item={item} />
+            <FeedCard key={item.id} item={item} effectiveView={effectiveView} />
           ))}
         </div>
       )}
