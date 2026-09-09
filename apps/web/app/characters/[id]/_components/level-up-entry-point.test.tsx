@@ -10,7 +10,6 @@
  *   - active + owner who is ALSO the world's GM → shown (regression: owner==gm case)
  */
 
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LevelUpEntryPoint } from './level-up-entry-point';

@@ -1,13 +1,4 @@
-/**
- * Component tests for CurrencyStrip.
- *
- * Reqs: WIVLS-CURRENCY-01 (spec #1063)
- * PHB p.143 — Money: pp / gp / ep / sp / cp denomination table.
- * Design DA5: per-metal tints are inline hex in JSX, NOT new CSS tokens.
- *
- * RED FIRST: tests written before component exists.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CurrencyStrip } from './currency-strip.js';

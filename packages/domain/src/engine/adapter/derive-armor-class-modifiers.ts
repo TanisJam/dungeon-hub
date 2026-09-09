@@ -69,7 +69,7 @@ export interface ArmorClassModifierResult {
 /** 5etools type codes for armor categories. */
 const LIGHT_ARMOR_TYPE = 'LA';
 const MEDIUM_ARMOR_TYPE = 'MA';
-const HEAVY_ARMOR_TYPE = 'HA';
+const _HEAVY_ARMOR_TYPE = 'HA';
 
 let _instanceCounter = 0;
 function nextId(prefix: string): ModifierInstanceId {

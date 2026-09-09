@@ -5,7 +5,7 @@
  * Accordion: extraction is behavior-preserving — name, badge, and description remain visible.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { PoiRow } from '@/app/mapa/actions';
 import { PoiDetail } from './poi-detail';

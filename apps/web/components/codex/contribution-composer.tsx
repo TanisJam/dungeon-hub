@@ -135,7 +135,7 @@ function ComposerForm({ worldId, refEntityKind, refEntityId, onClose, onSuccess 
         </label>
         <textarea
           id="contribution-body"
-          autoFocus
+          data-autofocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Escribí tu nota…"

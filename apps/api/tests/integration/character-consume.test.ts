@@ -15,7 +15,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('POST /characters/:id/inventory/:instanceId/consume', () => {
   let alice: TestUser;
   let bob: TestUser;
-  let aliceCampaignId: string;
+  let _aliceCampaignId: string;
   let aliceWorldId: string;
   let aliceCharId: string;
 
@@ -32,7 +32,7 @@ describe('POST /characters/:id/inventory/:instanceId/consume', () => {
         payload: { name: 'Consume Campaign' },
       })
       .then((r) => r.json());
-    aliceCampaignId = consumeCampaign.id;
+    _aliceCampaignId = consumeCampaign.id;
     aliceWorldId = consumeCampaign.worldId;
 
     aliceCharId = (

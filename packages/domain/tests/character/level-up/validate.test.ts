@@ -163,7 +163,7 @@ const XP_300 = 300;    // just hit L2 threshold
 const XP_900 = 900;    // just hit L3 threshold
 const XP_2700 = 2700;  // just hit L4 threshold
 const XP_14000 = 14000; // just hit L6 threshold
-const XP_6500 = 6500;   // just hit L5 threshold
+const _XP_6500 = 6500;   // just hit L5 threshold
 
 function makeProfile(overrides: Partial<RulesProfile['variantRules']> = {}): RulesProfile {
   return {

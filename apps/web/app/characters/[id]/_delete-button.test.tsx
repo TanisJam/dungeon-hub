@@ -1,13 +1,5 @@
-/**
- * Unit tests for DeleteCharacterButton component.
- *
- * T-1: renders button with character name accessible label
- * T-2: clicking button opens confirm dialog
- * T-3: clicking "Cancelar" closes dialog without calling the action
- * T-4: clicking "Eliminar" in dialog calls deleteCharacter action
- */
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import { DeleteCharacterButton } from './_delete-button';

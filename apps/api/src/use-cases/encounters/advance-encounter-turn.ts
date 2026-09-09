@@ -5,7 +5,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
-import { encounters, encounterCombatants, encounterCombatantConditions } from '../../infra/db/schema.js';
+import { encounters, encounterCombatants } from '../../infra/db/schema.js';
 import { advanceTurn } from '@dungeon-hub/domain/encounter';
 import { loadEncounter, type LoadedEncounter } from './load-encounter.js';
 

@@ -1,13 +1,4 @@
-/**
- * Component tests for RestActions — Short Rest + Long Rest at sheet header.
- *
- * Short rest: PHB p.186 + p.107 — restores warlock pact slots only.
- * Long rest: PHB p.186 — restores HP + half hit dice + all spell slots.
- *
- * Long rest is a destructive-feeling action (resets HP, hit dice, slots), so the
- * button MUST surface a window.confirm() before firing the action.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RestActions } from './_rest-actions';

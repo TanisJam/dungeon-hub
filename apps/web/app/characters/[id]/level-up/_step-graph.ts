@@ -170,6 +170,6 @@ export function currentStepIndex(state: FlowState, ctx: FlowCtx): number {
 /**
  * True when the user is on 'review' step.
  */
-export function isComplete(state: FlowState, ctx: FlowCtx): boolean {
+export function isComplete(state: FlowState, _ctx: FlowCtx): boolean {
   return state.step === 'review';
 }

@@ -21,13 +21,13 @@ import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 
 // Magic rarities as stored in raw JSONB (WITH SPACE for "very rare" — pre-flight verified).
-const MAGIC_RARITIES = ['common', 'uncommon', 'rare', 'very rare', 'legendary', 'artifact'];
+const _MAGIC_RARITIES = ['common', 'uncommon', 'rare', 'very rare', 'legendary', 'artifact'];
 // Magic item type codes (from deriveV3Type domain heuristic).
-const MAGIC_TYPE_CODES = ['RD', 'ST', 'WD', 'RG'];
+const _MAGIC_TYPE_CODES = ['RD', 'ST', 'WD', 'RG'];
 
 describe('GET /compendium/items — ?magic= filter (REQ-MERC-API-01, REQ-MERC-API-02)', () => {
   let user: TestUser;
-  let campaignId: string;
+  let _campaignId: string;
   let worldId: string;
 
   beforeAll(async () => {
@@ -43,7 +43,7 @@ describe('GET /compendium/items — ?magic= filter (REQ-MERC-API-01, REQ-MERC-AP
       throw new Error(`Failed to create test campaign: ${res.statusCode} ${res.body}`);
     }
     const campaign = res.json();
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
     worldId = campaign.worldId;
   });
 

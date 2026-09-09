@@ -1,14 +1,4 @@
-/**
- * Tests for QuestDetailBody — STRICT TDD (RED first).
- *
- * Reqs: WIQD-BODY-01 (spec #1077)
- * Design: DCE1 (RSC), DC4 (only via v3TypeOverride==='quest'), DC6 (stub CTAs)
- *
- * House rule §1.2: quest items are DM-assigned — no PHB cite.
- * ERC3: quest items require v3TypeOverride='quest'; without it, render as derived type.
- * ERC5: quest name ellipsis at 375px — handled via CSS (globals.css .qn).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QuestDetailBody } from './quest-detail-body';

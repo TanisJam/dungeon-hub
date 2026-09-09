@@ -1,18 +1,4 @@
-/**
- * Tests for TopBar — backHref prop, worldSwitcher prop, and AppShell forwarding.
- *
- * T1: backHref present + canBeDM=true → arrow-left Link at /personajes; RoleSwitcher PRESENT.
- *     (SDD ficha-dm-affordances inverts old T1 — overrides design README §State management)
- * T2: backHref absent + canBeDM=true → RoleSwitcher present; no back link.
- * T3: backHref present + right prop → both back arrow (left) and right content render.
- * T4: AppShell with backHref + canBeDM=true → TopBar renders back link AND RoleSwitcher.
- *     (SDD ficha-dm-affordances inverts old T4)
- * T5: AppShell without backHref → TopBar renders RoleSwitcher (no back link).
- * T6: backHref present + canBeDM=false → RoleSwitcher NOT rendered.
- * T8: worldSwitcher prop present → renders switcher node in left slot (REQ-WIS-03).
- * T9: worldSwitcher absent + no backHref → renders CrowMark fallback (REQ-WIS-03).
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

@@ -16,8 +16,8 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
   let outsider: TestUser;
   let campaignId: string;
   let worldId: string;
-  let aliceCharId: string;
-  let bobCharId: string;
+  let _aliceCharId: string;
+  let _bobCharId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -41,8 +41,8 @@ describe('sessions — Slice 4 (complete + rewards)', () => {
     await addCampaignAndWorldMember(campaignId, alice.id, 'player');
     await addCampaignAndWorldMember(campaignId, bob.id, 'player');
 
-    aliceCharId = await makeChar(alice, 'Alice');
-    bobCharId = await makeChar(bob, 'Bob');
+    _aliceCharId = await makeChar(alice, 'Alice');
+    _bobCharId = await makeChar(bob, 'Bob');
   });
 
   afterAll(async () => {

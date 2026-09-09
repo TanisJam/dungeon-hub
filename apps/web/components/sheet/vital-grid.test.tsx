@@ -1,16 +1,4 @@
-/**
- * Tests for VitalGrid — ficha-* class assertions + hpEditorSlot slot threading.
- *
- * T1: HP tile has class ficha-vital-hp.
- * T2: AC tile has class ficha-vital-ac.
- * T3: hpEditorSlot provided → slot renders inside HP tile.
- * T4: no hpEditorSlot → HP editor absent.
- *
- * NOTE: VitalGrid is now a pure presentational component — HP editor gating moved to
- * HpEditorSlot (client component) + DmAwareAffordances. VitalGrid accepts an
- * optional `hpEditorSlot` ReactNode rendered inside the HP cell. (FIX B)
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

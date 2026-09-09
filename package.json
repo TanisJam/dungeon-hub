@@ -12,16 +12,18 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
+    "lint": "biome check .",
     "gen:keys": "node scripts/gen-keys.mjs",
     "supabase:bootstrap": "./infra/supabase/bootstrap.sh",
     "supabase:up": "cd infra/supabase && docker compose up -d",
     "supabase:down": "cd infra/supabase && docker compose down",
-    "supabase:logs": "cd infra/supabase && docker compose logs -f"
+    "supabase:logs": "cd infra/supabase && docker compose logs -f",
+    "lint:fix": "biome check --write ."
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
+    "@biomejs/biome": "2.5.12",
+    "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
-    "@types/node": "^22.10.5"
+    "typescript": "^5.7.2"
   }
 }

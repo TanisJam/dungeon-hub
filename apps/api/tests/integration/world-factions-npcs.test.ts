@@ -94,7 +94,7 @@ describe('world — factions + npcs + reputation', () => {
     return res.json();
   }
 
-  async function createCharacter(wId: string, userId: string, token: string): Promise<string> {
+  async function createCharacter(wId: string, _userId: string, token: string): Promise<string> {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'POST',

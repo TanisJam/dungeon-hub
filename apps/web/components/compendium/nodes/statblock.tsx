@@ -9,12 +9,12 @@ import { slugify } from '../slugify';
 export function StatblockNodeView({ node }: { node: StatblockNode }) {
   const kind = node.tag || 'creature';
   return (
-    <a
+    <span
       data-compendium-ref={`${kind}|${slugify(node.name)}|${node.source}`}
       className="italic text-ink-soft underline cursor-help"
     >
       {node.name}
-    </a>
+    </span>
   );
 }
 
@@ -25,11 +25,11 @@ export function StatblockInlineNodeView({ node }: { node: StatblockInlineNode })
   }
   const kind = node.tag || 'creature';
   return (
-    <a
+    <span
       data-compendium-ref={`${kind}|${slugify(node.name)}|${node.source}`}
       className="italic text-ink-soft underline cursor-help"
     >
       {node.name}
-    </a>
+    </span>
   );
 }

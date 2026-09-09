@@ -1,26 +1,4 @@
-/**
- * Race picker unit tests: subrace-required pill + preflight + detail panel hint
- *
- * Tests:
- * W-1: Base race entries that require subrace show amber pill 'requiere sublinaje'
- * W-2: Non-required base race entries (Human, Half-Elf) do NOT show the pill
- *      Note: Dragonborn DOES require subrace (ancestry, PHB p.32–34 RAW) — it IS in W-1
- * W-3: Subrace entries (Hill Dwarf, Mountain Dwarf) do NOT show the pill
- * W-4: Clicking Siguiente with a required-subrace base race selected → inline error
- * W-5: Clicking Siguiente with Hill Dwarf subrace selected + fixed ASIs → saveRace IS called
- * W-6: Detail panel for base Dwarf shows hint paragraph
- *
- * Phase C backfill (race-variant-human-feat-skill):
- * W-C1: RaceSkillPicker renders N skill buttons when race has skillProficiencies:[{any:N}]
- * W-C2: RaceSkillPicker enforces the count — clicking N skills disables the rest
- * W-C3: RaceFeatPicker renders a searchable list of feats
- * W-C4: RaceFeatPicker filter narrows the visible feats
- * W-C5: RaceDetailPanel renders BOTH pickers for Variant Human (feat + skill)
- * W-C6: RaceDetailPanel renders ONLY SkillPicker for Half-Elf (skill, no feat)
- * W-C7: handleContinue preflight blocks when featChoice is missing for feat-required race
- * W-C8: handleContinue preflight blocks when skillChoices count is wrong
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

@@ -17,7 +17,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
  */
 describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5)', () => {
   let user: TestUser;
-  let campaignId: string;
+  let _campaignId: string;
   let worldId: string;
 
   beforeAll(async () => {
@@ -32,7 +32,7 @@ describe('GET /characters/:id/sheet — race weapon/armor proficiencies (Batch 5
         payload: { name: 'Race Profs Test Campaign' },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
     worldId = campaign.worldId;
   });
 

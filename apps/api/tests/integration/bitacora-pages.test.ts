@@ -142,8 +142,8 @@ describe('bitácora pages CRUD routes', () => {
   // ── GET /characters/:id/bitacora/pages ──────────────────────────────────────
 
   describe('GET /characters/:id/bitacora/pages', () => {
-    let page1Id: string;
-    let page2Id: string;
+    let _page1Id: string;
+    let _page2Id: string;
     let refPageId: string; // page with a monster ref (for ?refKey=/?refKind= filter test)
 
     beforeAll(async () => {
@@ -155,7 +155,7 @@ describe('bitácora pages CRUD routes', () => {
         headers: { authorization: `Bearer ${player.accessToken}` },
         payload: { body: 'Monster page', tags: ['monsters'], refs: [] },
       });
-      page1Id = r1.json<{ page: { id: string } }>().page.id;
+      _page1Id = r1.json<{ page: { id: string } }>().page.id;
 
       const r2 = await app.inject({
         method: 'POST',
@@ -163,7 +163,7 @@ describe('bitácora pages CRUD routes', () => {
         headers: { authorization: `Bearer ${player.accessToken}` },
         payload: { body: 'Lore page', tags: ['lore'], refs: [] },
       });
-      page2Id = r2.json<{ page: { id: string } }>().page.id;
+      _page2Id = r2.json<{ page: { id: string } }>().page.id;
 
       // Page with a specific monster ref for ?refKey=/?refKind= filter test (REQ-BP-API-02)
       const r3 = await app.inject({

@@ -2,7 +2,6 @@
 // RED step: written BEFORE the components exist; each test must fail on first run.
 // PHB 2014 references cited per-section.
 
-import React from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 

@@ -1,12 +1,4 @@
-/**
- * Tests for ArmorDetailBody.
- *
- * Reqs: WIAD-BODY-01 (spec #1070)
- * Design: DBE3 (design #1071) — RSC body.
- *
- * PHB p.144-145 — Armor table (AC formula, Stealth disadvantage, STR min).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ArmorDetailBody } from './armor-detail-body';

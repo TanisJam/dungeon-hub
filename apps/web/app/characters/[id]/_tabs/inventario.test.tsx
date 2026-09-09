@@ -1,21 +1,4 @@
-/**
- * Component tests for InventarioTab — v3 layout (migrated C10).
- *
- * Coverage (spec #1063 — inventory-v3-list Slice A + spec #1070 — inventory-v3-simple Slice B):
- *   - WIVS-SCOPE-01: .inventory-init outer wrapper present.
- *   - WIVLS-CURRENCY-01: currency strip rendered.
- *   - WIVLS-WEIGHT-01: weight bar (progressbar role) with correct values.
- *   - WIVLS-EMPTY-01: empty state when inventory is empty.
- *   - WIVLS-ROWS-01: item names visible in grouped rows.
- *   - STR warning banner rendered when sheet.warnings contains INSUFFICIENT_STRENGTH_FOR_ARMOR.
- *   - Equip round-trip (Slice B path): row tap → sheet opens → equip chip → calls updateInventoryItem.
- *   - Delete round-trip (Slice B path): row tap → sheet opens → footer button → calls removeInventoryItem.
- *   - Picker open: clicking "Agregar ítem" opens the modal.
- *
- * Server actions are mocked — pure render-layer tests.
- * Slice B: EquipToggle + DeleteButton moved from sr-only list to detail sheet (ER10 migration).
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type {

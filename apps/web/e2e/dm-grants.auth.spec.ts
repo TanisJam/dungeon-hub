@@ -117,7 +117,7 @@ test.describe('DM grants — E2E happy path (iPhone SE 375px)', () => {
     });
 
     // ---- Step 8: Verify XP incremented (best-effort) ----
-    if (xpBefore !== null && !isNaN(xpBefore)) {
+    if (xpBefore !== null && !Number.isNaN(xpBefore)) {
       const xpAfter = parseInt((await xpLocator.textContent()) ?? '0', 10);
       expect(xpAfter).toBeGreaterThan(xpBefore);
     }

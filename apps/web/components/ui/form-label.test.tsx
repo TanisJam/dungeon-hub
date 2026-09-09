@@ -1,13 +1,4 @@
-/**
- * Unit tests for FormLabel component — B1 (web-component-catalog)
- *
- * T1: renders children as label text
- * T2: renders asterisk wrapped in aria-hidden span when required=true
- * T3: does NOT render asterisk when required is absent
- * T4: does NOT render asterisk when required=false
- * T5 (round-trip REQ-B1-09): htmlFor attribute is set correctly
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FormLabel } from './form-label';

@@ -43,7 +43,7 @@ test.describe('DM panel mobile smoke @ 375px (iPhone SE)', () => {
 
     // ---- /worlds/[id] world landing ----
     // Status tabs visible.
-    const tabsRegion = page.getByRole('tablist').or(
+    const _tabsRegion = page.getByRole('tablist').or(
       page.locator('[data-testid="status-tabs"]'),
     );
     // Either role or fallback selector — but at minimum the three tab labels.

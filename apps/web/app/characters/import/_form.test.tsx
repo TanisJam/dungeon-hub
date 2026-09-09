@@ -1,12 +1,4 @@
-/**
- * Unit tests for ImportCharacterForm.
- *
- * Covers (per task spec): a malformed file rejected client-side, the
- * UNRESOLVED_REFS error rendering every reference, and the success path.
- * A couple of extra scenarios (world auto-select, submit gating) mirror the
- * sibling ../new/_form.test.tsx conventions.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ImportCharacterForm } from './_form';

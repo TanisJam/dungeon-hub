@@ -18,7 +18,7 @@
  * These MUST be ignored — only lowercase a, b, c, _ are PHB slots.
  */
 
-import { parseItemRef, slugify } from '../../compendium/slugify.js';
+import { parseItemRef } from '../../compendium/slugify.js';
 import type {
   BackgroundStartingEquipment,
   ClassStartingEquipment,
@@ -120,7 +120,6 @@ export interface ParsedBackgroundEquipment {
 
 /** PHB choice slot keys — lowercase only. Uppercase = XPHB, ignored. */
 const PHB_CHOICE_SLOTS = ['a', 'b', 'c'] as const;
-type PhbChoiceSlot = (typeof PHB_CHOICE_SLOTS)[number];
 
 /**
  * Parse a single ItemRef into a ParsedRef.

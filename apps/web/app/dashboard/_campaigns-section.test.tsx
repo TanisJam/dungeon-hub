@@ -1,11 +1,4 @@
-/**
- * CampaignsSection — DM "Master" pill link to /worlds/[id].
- *
- * SDD dm-session-panel (spec #857) — REQ-DWL-MASTER-CLICKABLE.
- *   - GM rows wrap the pill in a <Link href="/worlds/<worldId>">
- *   - Player rows render the pill without a /worlds link
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

@@ -20,7 +20,7 @@ interface CompendiumScreenProps {
  * WCS-SCOPE-01: outer .compendium-init wrapper.
  * Composes: search trigger (via island), category grid, curated row, recents empty state.
  */
-export function CompendiumScreen({ counts, campaignName, campaignId, worldId }: CompendiumScreenProps) {
+export function CompendiumScreen({ counts, campaignName, campaignId }: CompendiumScreenProps) {
   return (
     <div className="compendium-init">
       {/* Client island: search trigger */}

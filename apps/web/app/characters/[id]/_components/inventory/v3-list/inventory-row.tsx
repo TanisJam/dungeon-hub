@@ -45,7 +45,7 @@ export function InventoryRow({ item, characterId: _characterId }: InventoryRowPr
       <div className="ic-cell">
         <span aria-hidden="true">{V3_ICONS[item.v3Type] ?? '◈'}</span>
         {item.equipped && (
-          <span className="equipped-flag" aria-label="Equipado">Eq</span>
+          <span className="equipped-flag" role="img" aria-label="Equipado">Eq</span>
         )}
       </div>
 

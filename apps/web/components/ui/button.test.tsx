@@ -1,13 +1,4 @@
-/**
- * Unit tests for Button component — fullWidth prop
- *
- * T1: renders children text
- * T2: fullWidth adds w-full to className
- * T3: fullWidth adds min-h-[44px] to className
- * T4: WITHOUT fullWidth, className does NOT contain w-full
- * T5: fullWidth composes with tone and caller className (e.g. tone="ghost" + className="mt-2")
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Button } from './button';

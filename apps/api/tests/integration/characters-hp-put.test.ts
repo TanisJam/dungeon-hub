@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
-import { addCampaignAndWorldMember, addWorldMember } from '../helpers/add-world-member.js';
+import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
 
 /**
  * Integration tests for PUT /characters/:id/hp

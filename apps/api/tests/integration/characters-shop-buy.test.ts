@@ -27,7 +27,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 describe('POST /characters/:id/shop/buy', () => {
   let alice: TestUser; // owner
   let bob: TestUser; // outsider
-  let aliceCampaignId: string;
+  let _aliceCampaignId: string;
   let aliceWorldId: string;
 
   let longswordCostCp: number;
@@ -45,7 +45,7 @@ describe('POST /characters/:id/shop/buy', () => {
         payload: { name: 'Shop Buy Campaign' },
       })
       .then((r) => r.json());
-    aliceCampaignId = campaign.id;
+    _aliceCampaignId = campaign.id;
     aliceWorldId = campaign.worldId;
 
     const itemRes = await app

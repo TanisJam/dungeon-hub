@@ -1,11 +1,4 @@
-/**
- * Unit tests: NoPicksPanel
- *
- * Tests:
- * - T-1: too-early variant → shows class message
- * - T-2: non-caster variant → shows non-caster message
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

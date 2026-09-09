@@ -104,7 +104,6 @@ export function KnowledgeGrantSection({
               <button
                 key={key}
                 type="button"
-                role="button"
                 aria-pressed={selected}
                 onClick={() => toggleEntity(entity)}
                 className={[

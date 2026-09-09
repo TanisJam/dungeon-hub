@@ -452,7 +452,7 @@ test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
     // ── Step 4: DM creates encounter — Barbarian on initiative 20 (goes first) ─
     // Put the Barbarian first so it starts as currentCombatant immediately.
     let encounterId: string;
-    let encVersion: number;
+    let _encVersion: number;
     try {
       const enc = await apiCall<{ id: string; version: number }>('POST', '/api/v1/encounters', dmJwt, {
         campaignId,
@@ -477,7 +477,7 @@ test.describe('REQ-WCR-E2E-01: Barbarian Rage flow @ 375px', () => {
         ],
       });
       encounterId = enc.id;
-      encVersion = enc.version;
+      _encVersion = enc.version;
     } catch (err) {
       test.skip(true, `Could not create encounter: ${err}`);
       return;

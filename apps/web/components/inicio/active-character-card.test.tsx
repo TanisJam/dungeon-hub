@@ -1,12 +1,4 @@
-/**
- * Unit tests for ActiveCharacterCard component.
- *
- * T1: Renders portrait initial "B", name "Brann Cuervosombrío", lineage "Semielfo · Bardo 3" (ACTIVE-01).
- * T2: Renders 3 Pill elements with text "HP 21/24", "AC 13", "Init +3" (ACTIVE-01 — positive init sign).
- * T3: Link element has href="/characters/mock-char-1" (ACTIVE-02).
- * T4: HP pill renders "HP 0/32" when hp="0/32" — downed character still shows pill (ACTIVE-01 edge case).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ActiveCharacterCard } from './active-character-card';

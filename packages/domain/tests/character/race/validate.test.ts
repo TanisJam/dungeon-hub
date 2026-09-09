@@ -419,7 +419,7 @@ const PHB_HUMAN: RaceCompendiumData = {
   source: 'PHB',
   ability: [{ str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }],
 };
-const PHB_HALF_ORC: RaceCompendiumData = {
+const _PHB_HALF_ORC: RaceCompendiumData = {
   slug: 'half-orc',
   source: 'PHB',
   ability: [{ str: 2, con: 1 }],
@@ -669,14 +669,14 @@ const PHB_HUMAN_BASE: RaceCompendiumData = {
 };
 
 /** Human para Variant Human SIN ability (el subrace puede tener choose) */
-const PHB_HUMAN_NO_ABILITY: RaceCompendiumData = {
+const _PHB_HUMAN_NO_ABILITY: RaceCompendiumData = {
   slug: 'human',
   source: 'PHB',
   ability: null,
 };
 
 /** Variant Human subrace sin ASI fijo (MPMM mode para simplificar test) */
-const PHB_VARIANT_HUMAN_MPMM: SubraceCompendiumData = {
+const _PHB_VARIANT_HUMAN_MPMM: SubraceCompendiumData = {
   slug: 'variant-human',
   source: 'PHB',
   parentSlug: 'human',

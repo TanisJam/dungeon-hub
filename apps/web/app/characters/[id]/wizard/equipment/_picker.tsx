@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { rollStartingGold } from '@dungeon-hub/domain/character/starting-equipment';
 import type {
   ParsedClassEquipment,
@@ -77,6 +77,14 @@ function CategoryPickerInline({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [empty, setEmpty] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the search box when the picker is revealed by a user click — a
+  // programmatic focus() call (not the autoFocus JSX prop, lint/a11y/noAutofocus)
+  // so it only fires on this user-initiated reveal, never on page load.
+  useEffect(() => {
+    if (open) searchInputRef.current?.focus();
+  }, [open]);
 
   async function loadItems(q?: string) {
     setLoading(true);
@@ -120,6 +128,7 @@ function CategoryPickerInline({
         <div className="rounded-md border border-accent-soft bg-paper">
           <div className="flex items-center gap-2 p-2 border-b border-line">
             <input
+              ref={searchInputRef}
               type="search"
               placeholder={`Buscar ${equipmentTypeLabel(equipmentType)}…`}
               value={query}
@@ -127,7 +136,6 @@ function CategoryPickerInline({
                 setQuery(e.target.value);
               }}
               className="flex-1 rounded border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
-              autoFocus
             />
             <button
               type="button"
@@ -359,7 +367,7 @@ export function EquipmentPicker({
 
     if (classPath === 'gold') {
       const parsed = parseInt(goldValue, 10);
-      if (!goldValue.trim() || isNaN(parsed) || parsed < 0) {
+      if (!goldValue.trim() || Number.isNaN(parsed) || parsed < 0) {
         setError('Ingresá un valor de oro válido (número entero no negativo).');
         return;
       }

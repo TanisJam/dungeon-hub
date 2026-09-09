@@ -1,11 +1,4 @@
-/**
- * Component tests for RecursosTab.
- * Covers REQ-BRD-WEB-LABEL + REQ-BRD-WEB-DIE-BADGE from
- * sdd/class-resource-bardic-inspiration/spec (#930).
- *
- * PHB p.53-54 — Bardic Inspiration label + die-size table.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { RecursosTab } from './recursos';

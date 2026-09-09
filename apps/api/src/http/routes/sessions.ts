@@ -14,7 +14,7 @@ import {
   addItemToInventory,
   type InventoryItem,
 } from '@dungeon-hub/domain/character/inventory';
-import { loadItemData, loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
+import { loadItemDataMany } from '../../use-cases/characters/load-item-data.js';
 import {
   attachCurrentPlayers,
   attachParticipants,

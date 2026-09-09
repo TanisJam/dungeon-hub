@@ -8,13 +8,13 @@ function refAttr(html: string): string | null {
 }
 
 describe('statblock nodes', () => {
-  it('renders <a> link with data-compendium-ref', () => {
+  it('renders link-styled span with data-compendium-ref', () => {
     const { container } = render(
       <EntryNodeRenderer
         entry={{ type: 'statblock', tag: 'creature', name: 'Goblin', source: 'MM' }}
       />,
     );
-    expect(container.querySelector('a')).not.toBeNull();
+    expect(container.querySelector('span[data-compendium-ref]')).not.toBeNull();
     expect(refAttr(container.innerHTML)).toBe('creature|goblin|MM');
     expect(container.textContent).toBe('Goblin');
   });

@@ -24,7 +24,7 @@
  * Design ref: sdd/engine-forced-check-3a/design — ADR-5, ADR-4, ADR-3, ADR-2.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, encounterCombatantConditions } from '../../infra/db/schema.js';
 import {

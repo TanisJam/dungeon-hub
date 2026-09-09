@@ -1,18 +1,4 @@
-/**
- * DmGrantPanel — visibility gate, tab switching, submit flow, inline errors.
- *
- * SDD dm-session-grants (spec #867):
- *   REQ-CDG-DM-PANEL-VISIBILITY: only gm sees trigger button
- *   REQ-CDG-DM-PANEL-INTERACTION: tab switching, modal open/close
- *   REQ-CDG-XP-FORM: submit pending state, success → close, error → stays open
- *   REQ-CDG-GOLD-FORM: 5 coin inputs → grantGold with non-zero coins only
- *   REQ-CDG-ITEM-FORM: debounced typeahead → grantItem
- *
- * SDD character-codex (spec #1626):
- *   REQ-CK-WEB-01: Bestiario tab — (a) present for gm; (b) absent for player;
- *                  (c) NO statblock in player bestiary DOM for ungranted monsters.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 

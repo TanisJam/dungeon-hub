@@ -53,7 +53,7 @@ export function RestActions({ charId }: RestActionsProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2" aria-label="Acciones de descanso">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Acciones de descanso">
         <button
           type="button"
           onClick={handleShort}

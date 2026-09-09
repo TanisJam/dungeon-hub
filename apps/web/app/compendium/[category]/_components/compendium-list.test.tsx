@@ -1,10 +1,4 @@
-/**
- * CompendiumList — item type filter (#3.4).
- * The filter is items-only; selecting a type calls searchCompendium with { type }.
- *
- * NOTE: afterEach(cleanup) is global (vitest.setup.ts) — do NOT re-add.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 

@@ -118,7 +118,6 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
       {/* overflow-y-auto is on the <ul> ONLY — body scroll is NOT locked.   */}
       {/* ------------------------------------------------------------------ */}
       <ul
-        role="list"
         className="flex-1 overflow-y-auto"
         style={{ paddingBottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       >
@@ -127,7 +126,7 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
             No hay puntos de interés
           </li>
         ) : (
-          pois.map((poi) => <PoiRow key={poi.id} poi={poi} onFlyTo={onFlyTo} />)
+          pois.map((poi) => <PoiListRow key={poi.id} poi={poi} onFlyTo={onFlyTo} />)
         )}
       </ul>
     </div>
@@ -135,7 +134,9 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
 }
 
 // ---------------------------------------------------------------------------
-// PoiRow — single POI list item (placed or null-coord)
+// PoiListRow — single POI list item (placed or null-coord)
+// Named distinctly from the imported PoiRow type (data row shape) to avoid
+// shadowing it — the two are unrelated concepts that happened to share a name.
 // ---------------------------------------------------------------------------
 
 interface PoiRowProps {
@@ -143,7 +144,7 @@ interface PoiRowProps {
   onFlyTo: (poi: PoiRow) => void;
 }
 
-function PoiRow({ poi, onFlyTo }: PoiRowProps) {
+function PoiListRow({ poi, onFlyTo }: PoiRowProps) {
   const hasCoords = poi.worldX != null && poi.worldY != null;
 
   const badge = (

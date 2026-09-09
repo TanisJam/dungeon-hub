@@ -1,14 +1,4 @@
-/**
- * Tests for SpellsStep — level-up spell selection step.
- *
- * REQ-CLU-SPL-STEP-CONDITION: shown only when step-graph includes 'spells'.
- * REQ-CLU-SPL-DOMAIN-VALIDATION: CTA gated by validateSpellsPick from domain.
- * REQ-CLU-XCUT-MOBILE: sticky CTA ≥44px, scroll area above.
- *
- * Data source: availableSpells prop (client-fetched by _flow.tsx, passed as prop).
- * limits prop: computed server-side in page.tsx via computeSpellLimits at toLevel.
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SpellsStep } from './_spells-step';

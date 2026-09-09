@@ -1,8 +1,4 @@
-/**
- * Test for /herramientas index redirect.
- * Redirects to the first HERRAMIENTAS_SUBNAV_ITEMS entry (/herramientas/facciones).
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }));

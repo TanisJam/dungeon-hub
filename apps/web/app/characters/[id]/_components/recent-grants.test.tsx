@@ -1,12 +1,4 @@
-/**
- * RecentGrants — component tests.
- *
- * REQ-CRG-WIDGET (sdd/inventory-d4-d6 spec #889):
- *   - with events: renders rows with human labels
- *   - empty state: "Sin grants recientes."
- *   - non-viewer (callerRole=null): renders null
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { act } from 'react';

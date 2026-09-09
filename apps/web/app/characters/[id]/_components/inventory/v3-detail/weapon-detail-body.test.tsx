@@ -1,12 +1,4 @@
-/**
- * Tests for WeaponDetailBody + RollAttackStubButton.
- *
- * Reqs: WIWD-BODY-01 (spec #1070)
- * Design: DBE3, DBE4 (design #1071)
- *
- * PHB p.194 — attack roll formula; PHB p.149 — Weapons table.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { WeaponDetailBody } from './weapon-detail-body';

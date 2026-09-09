@@ -52,7 +52,6 @@ interface SpellPrepEditorProps {
 export function SpellPrepEditor({
   characterId,
   classSlug,
-  classSource,
   availableSpells,
   subclassGrantedSlugs,
   knownUniverseSlugs,
@@ -86,7 +85,7 @@ export function SpellPrepEditor({
 
   const counterTone = overLimit ? 'danger' : atLimit ? 'amber' : 'success';
 
-  function handleToggle(slug: string, source: string) {
+  function handleToggle(slug: string, _source: string) {
     setPreparedSlugs((prev) => {
       const next = new Set(prev);
       if (next.has(slug)) {

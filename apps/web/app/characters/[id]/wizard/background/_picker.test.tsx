@@ -1,13 +1,4 @@
-/**
- * Picker unit tests: BackgroundPicker sub-components
- *
- * Tests:
- * - B.4: MultiSelectChoose tool-choose block (existing)
- * - B.3: MixedPoolPicker (3 radio options, sub-pickers, 375px)
- * - B.5: EquipmentPicker (coin toggle, package selection, a/b radio, _ slot items)
- * - B.7: FeaturePicker (filter input narrows select, persist slug)
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
@@ -217,7 +208,7 @@ describe('MixedPoolPicker — 3 radio options render', () => {
 
 describe('MixedPoolPicker — selecting lang1tool1 shows sub-pickers', () => {
   it('renders language and tool MultiSelectChoose when lang1tool1 is selected', () => {
-    const shape = MIXED_POOL_SHAPES[1]; // lang1tool1
+    const _shape = MIXED_POOL_SHAPES[1]; // lang1tool1
     render(
       <MixedPoolPicker
         shapes={MIXED_POOL_SHAPES}

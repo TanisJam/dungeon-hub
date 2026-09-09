@@ -4,7 +4,6 @@
 // BROWSE-UNCHANGED-01 (header portion).
 // afterEach(cleanup) is global (apps/web/vitest.setup.ts) — do NOT re-add.
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 

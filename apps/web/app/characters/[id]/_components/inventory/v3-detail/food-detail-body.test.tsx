@@ -1,13 +1,4 @@
-/**
- * Tests for FoodDetailBody — optimistic decrement (DB4).
- *
- * Reqs: WIFD-BODY-01 (spec #1070)
- * Design: DBE3, DB4 (design #1071) — 'use client' owns local servings state.
- *
- * PHB p.185 — Food & Water (1 lb per ration per day).
- * PHB p.153 — Rations.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FoodDetailBody } from './food-detail-body';

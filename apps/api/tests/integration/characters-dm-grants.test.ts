@@ -19,7 +19,7 @@ describe('DM grant endpoints — gold + item', () => {
   let dmWorldB: TestUser;   // GM of a different world
   let campaignId: string;
   let worldId: string;
-  let campaignBId: string;
+  let _campaignBId: string;
   let characterId: string;  // owned by player, in worldId
 
   beforeAll(async () => {
@@ -50,7 +50,7 @@ describe('DM grant endpoints — gold + item', () => {
         payload: { name: 'DM Grants Campaign B' },
       })
       .then((r) => r.json());
-    campaignBId = campaignB.id;
+    _campaignBId = campaignB.id;
 
     const { addCampaignAndWorldMember } = await import('../helpers/add-world-member.js');
     await addCampaignAndWorldMember(campaignId, player.id, 'player');

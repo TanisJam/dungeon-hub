@@ -16,7 +16,6 @@
  * and confirmed as 404 failures against the unimplemented route.
  */
 
-import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';

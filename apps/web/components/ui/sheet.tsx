@@ -115,6 +115,13 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
         className="fixed inset-0 z-50 bg-paper/80 backdrop-blur-sm"
       />
       {/* Panel */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: the onClick below is a guard,
+          not an action — it stops clicks inside the panel reaching a clickable ancestor,
+          since React portals bubble through the React tree rather than the DOM tree.
+          The keyboard affordances this rule asks for already exist: Escape closes and
+          Tab wraps, both wired to a document-level keydown listener in this component.
+          An onKeyDown here would stop those events reaching that listener and break
+          both; a no-op one would silence the rule without adding anything. */}
       <div
         ref={panelRef}
         role="dialog"

@@ -77,7 +77,6 @@ function PersonajeCardCatalog({
   char,
   worldName,
   highlight = false,
-  activeCharacterId,
 }: {
   char: FixtureChar;
   worldName?: string;

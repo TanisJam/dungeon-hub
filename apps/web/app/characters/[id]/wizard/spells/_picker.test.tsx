@@ -1,22 +1,4 @@
-/**
- * Component tests for SpellsPickerProps — school decode + R/C/M badges + filter chips + collapse.
- *
- * REQ-SP02-WEB-SCHOOL-DECODE: titleCase(spell.school) → decodeSchool(spell.school)
- * REQ-SP02-WEB-BADGES: R/C/M badge presence for ritual/concentration/componentsM
- * REQ-SP03-FILTER-RITUAL: Ritual chip narrows visible spells (spec #689 SP03-S1)
- * REQ-SP03-FILTER-CONCENTRATION: Concentration chip narrows visible spells (spec #689 SP03-S2)
- * REQ-SP03-COLLAPSE-DEFAULT: Lowest non-empty level open, others closed (spec #689 SP03-S5,S6)
- * REQ-SP03-COUNTER-CONSISTENCY: Counters read selection sets, not filtered rows (spec #689 SP03-S8)
- *
- * Spec #680, Scenario SP02-S7:
- *   GIVEN a spell with school "V" (Evocation) and ritual=true, concentration=true
- *   WHEN the SpellRow renders
- *   THEN school text reads "Evocation" (not "V")
- *   AND "R" badge is visible, "C" badge is visible
- *
- * Mobile-first: badges are single-char (R/C/M) to fit at 375px.
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

@@ -469,7 +469,7 @@ describe('REST-02: HP gate + item recharge (PHB p.186 + p.141)', () => {
   async function patchInventoryWithItem(
     slug: string,
     charges: number,
-    maxCharges: number,
+    _maxCharges: number,
   ): Promise<void> {
     const { db } = await import('../../src/infra/db/client.js');
     const { characters } = await import('../../src/infra/db/schema.js');

@@ -17,7 +17,6 @@
  * Assertion style: uses .toBeTruthy() / .toBeNull() (no @testing-library/jest-dom).
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { NpcDetailView } from './npc-detail';

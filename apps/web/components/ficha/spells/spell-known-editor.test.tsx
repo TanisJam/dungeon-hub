@@ -1,14 +1,4 @@
-/**
- * Tests for SpellKnownEditor — DM-only toggle list for 'known' spells.
- *
- * T1: Renders only non-cantrip spells (level>0 filtered out cantrips defensively).
- * T2: Toggling a spell adds/removes it from the selection.
- * T3: Selected count is displayed.
- * T4: Guardar calls saveSpellKnown with selected slugs.
- *
- * Spec: sdd/ficha-dm-affordances #995 — SpellKnownEditor Component
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 

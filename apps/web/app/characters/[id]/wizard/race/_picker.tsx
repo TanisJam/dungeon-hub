@@ -5,7 +5,6 @@ import {
   ABILITY_KEYS,
   effectiveAsiSlots,
   formatAsisSummary,
-  formatLanguages,
   formatSize,
   formatSpeed,
   extractTraits,

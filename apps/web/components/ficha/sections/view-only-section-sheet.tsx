@@ -61,7 +61,9 @@ export function ViewOnlySectionSheet({
 
   return (
     <V3Sheet open={open} onClose={onClose} title={title} labelledBy={ariaLabel}>
-      <div aria-label={ariaLabel}>
+      {/* V3Sheet already wires the dialog's accessible name via aria-labelledby
+          (labelledBy above) — this wrapper carries no separate label. */}
+      <div>
         {/* Section read-only body */}
         <div className="font-sans text-sm text-ink mb-4">{currentDisplay}</div>
 

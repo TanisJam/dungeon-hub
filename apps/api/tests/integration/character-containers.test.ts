@@ -14,7 +14,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
  */
 describe('inventory containers — POST/PATCH/DELETE con containerId', () => {
   let alice: TestUser;
-  let aliceCampaignId: string;
+  let _aliceCampaignId: string;
   let aliceWorldId: string;
   let aliceCharId: string;
 
@@ -30,7 +30,7 @@ describe('inventory containers — POST/PATCH/DELETE con containerId', () => {
         payload: { name: 'Container Campaign' },
       })
       .then((r) => r.json());
-    aliceCampaignId = containerCampaign.id;
+    _aliceCampaignId = containerCampaign.id;
     aliceWorldId = containerCampaign.worldId;
 
     aliceCharId = (

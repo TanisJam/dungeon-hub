@@ -155,7 +155,6 @@ export type { SpellsPickIssue };
 // ── Main Component ──────────────────────────────────────────────────────────
 
 export function SpellsPicker({
-  classSlug,
   limits,
   availableSpells,
   subclassGrantedSlugs,

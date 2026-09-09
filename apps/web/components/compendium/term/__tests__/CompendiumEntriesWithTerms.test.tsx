@@ -1,13 +1,4 @@
-/**
- * C.1 — Integration tests for CompendiumEntriesWithTerms wrapper.
- *
- * Verifies:
- * - Renders CompendiumEntries inside TermProvider
- * - Hover over [data-compendium-ref] span opens dialog (mock resolver path)
- * - Empty entries array does not crash
- * - mockMode bypasses fetch (no real network)
- */
-import React from 'react';
+
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   render,
@@ -15,7 +6,6 @@ import {
   fireEvent,
   act,
   cleanup,
-  findByRole,
 } from '@testing-library/react';
 import { CompendiumEntriesWithTerms } from '../CompendiumEntriesWithTerms';
 import { createMockResolver } from '../mock';

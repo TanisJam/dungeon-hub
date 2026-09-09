@@ -1,15 +1,4 @@
-/**
- * Unit tests for QuickActions component.
- *
- * Biblioteca W1 — REQ-NAV-02: Mesa absorbed into Inicio QuickActions.
- * Player QuickActions now includes a link to /campanas (Mesa entry).
- *
- * T1: Exactly 4 <a> elements rendered within the grid (QUICK-01 updated).
- * T2: Each link has correct href and label text (QUICK-02 updated).
- * T3: Each tile renders an SVG icon element (QUICK-02).
- * T4: /campanas link present (Mesa absorption — REQ-NAV-02).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QuickActions } from './quick-actions';

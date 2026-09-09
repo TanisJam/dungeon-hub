@@ -11,7 +11,7 @@ import { resolveWeaponAttack, type WeaponAttackInput } from './resolve-weapon-at
 import { createInMemoryRegistry } from '../registry/query.js';
 import { buildBlessModifiers } from '../rules/bless.js';
 import { buildOnHitDamageRider } from '../rules/on-hit-damage-rider.js';
-import { hasRollMode, and, query, weaponKind, hasCondition } from '../predicate/ast.js';
+import { hasRollMode } from '../predicate/ast.js';
 import { compileRule } from '../authoring/compile.js';
 import { rageRuleDoc } from '../rules-authored/rage.js';
 import type { ModifierInstance, ModifierInstanceId } from '../registry/types.js';

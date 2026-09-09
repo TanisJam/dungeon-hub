@@ -119,7 +119,7 @@ describe('engine-resist-immunity — Petrified resistance/immunity + forced-chec
   };
 
   /** Override damageType on a weapon item in inventory (for poison-type tests). */
-  const setWeaponDamageType = async (charId: string, instanceId: string, damageType: string): Promise<void> => {
+  const _setWeaponDamageType = async (charId: string, instanceId: string, damageType: string): Promise<void> => {
     const { db } = await import('../../src/infra/db/client.js');
     const { characters } = await import('../../src/infra/db/schema.js');
     const { eq } = await import('drizzle-orm');

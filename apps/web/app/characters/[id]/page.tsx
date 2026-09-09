@@ -91,7 +91,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
     );
   }
 
-  const { character, sheet, currentHp, inventory, inventoryEnriched } = data;
+  const { character, sheet, currentHp, inventoryEnriched } = data;
 
   // Draft → redirect to wizard
   if (character.status === 'draft') {

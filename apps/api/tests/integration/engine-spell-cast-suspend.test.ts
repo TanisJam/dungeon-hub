@@ -676,7 +676,7 @@ describe('engine-spell-cast-suspend — POST /encounters/:id/actions/cast-spell 
       await setSlotsUsed(casterCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
       await setSlotsUsed(defenderCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-      const { encounterId, casterCombatantId, defenderCombatantId, version } =
+      const { encounterId, defenderCombatantId, version } =
         await makeFreshCastEncounter('SC-T6 reaction reset');
 
       // Manually mark defender reaction_used=true (simulates defender reacted this round).

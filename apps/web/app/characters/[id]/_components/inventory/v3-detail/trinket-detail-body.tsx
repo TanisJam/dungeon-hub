@@ -34,13 +34,13 @@ export function TrinketDetailBody({ detail }: TrinketDetailBodyProps) {
 
       {/* DC6: Disabled ghost CTA stubs — no onClick (RSC event-handler rule) */}
       <div className="inventory-init-detail-actions" style={{ marginTop: '14px' }}>
-        <button disabled className="btn-ghost" aria-label="Regalar">
+        <button type="button" disabled className="btn-ghost" aria-label="Regalar">
           Regalar
         </button>
-        <button disabled className="btn-ghost" aria-label="Anotar memoria">
+        <button type="button" disabled className="btn-ghost" aria-label="Anotar memoria">
           Anotar memoria
         </button>
-        <button disabled className="btn-ghost" aria-label="Mostrar al grupo">
+        <button type="button" disabled className="btn-ghost" aria-label="Mostrar al grupo">
           Mostrar al grupo
         </button>
       </div>

@@ -26,7 +26,7 @@ let worldPlayer: TestUser; // world_members(role='player') in W — must be deni
 let noMember: TestUser;    // no world or campaign membership at all
 
 let worldId: string;       // world W (owns the campaign)
-let worldId2: string;      // world W2 (different world — cross-world isolation)
+let _worldId2: string;      // world W2 (different world — cross-world isolation)
 let campaignId: string;    // campaign in world W
 
 beforeAll(async () => {
@@ -56,7 +56,7 @@ beforeAll(async () => {
   await addWorldMember(worldId, worldPlayer.id, 'player');
 
   // World W2: crossWorldGm is GM of a completely separate world
-  ({ worldId: worldId2 } = await createWorldWithGm(crossWorldGm.id, { name: 'Other World W2' }));
+  ({ worldId: _worldId2 } = await createWorldWithGm(crossWorldGm.id, { name: 'Other World W2' }));
   // CRITICAL: crossWorldGm has NO membership in world W or campaign
 });
 

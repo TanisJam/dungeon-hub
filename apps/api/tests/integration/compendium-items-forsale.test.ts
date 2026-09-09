@@ -53,7 +53,7 @@ describe('GET /compendium/items — ?forSale= filter (REQ-CURATION-LIST-01..03)'
   let user: TestUser;
   let curatedCampaignId: string;
   let curatedWorldId: string;
-  let defaultCampaignId: string;
+  let _defaultCampaignId: string;
   let defaultWorldId: string;
 
   beforeAll(async () => {
@@ -83,7 +83,7 @@ describe('GET /compendium/items — ?forSale= filter (REQ-CURATION-LIST-01..03)'
         payload: { name: 'ForSale Default Campaign' },
       })
       .then((r) => r.json());
-    defaultCampaignId = defaultCampaign.id;
+    _defaultCampaignId = defaultCampaign.id;
     defaultWorldId = defaultCampaign.worldId;
   });
 

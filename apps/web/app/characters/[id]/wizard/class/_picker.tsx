@@ -93,7 +93,7 @@ export function ClassPicker({
     [selected],
   );
 
-  const subclassOptions: SubclassRow[] = useMemo(() => {
+  const _subclassOptions: SubclassRow[] = useMemo(() => {
     if (!selected || !needsSubclass) return [];
     return subclassesByClass[`${selected.slug}|${selected.source}`] ?? [];
   }, [selected, needsSubclass, subclassesByClass]);

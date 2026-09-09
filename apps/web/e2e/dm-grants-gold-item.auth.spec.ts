@@ -83,7 +83,7 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
         const gpCell = coinCells.nth(3);
         const gpText = await gpCell.textContent().catch(() => '0');
         const parsed = parseInt((gpText ?? '').replace(/\D+/g, '') || '0', 10);
-        if (!isNaN(parsed)) goldBefore = parsed;
+        if (!Number.isNaN(parsed)) goldBefore = parsed;
       }
     }
 
@@ -226,7 +226,7 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
     }
 
     // ---- Step 10: Assert longsword visible in inventory ----
-    const inventorySection = page.locator('[class*="space-y"]').filter({ hasText: /longsword/i }).first();
+    const _inventorySection = page.locator('[class*="space-y"]').filter({ hasText: /longsword/i }).first();
     // Broad approach: just check for text anywhere in the page inventory area.
     await expect(page.getByText(/longsword/i).first()).toBeVisible({ timeout: 8_000 });
 

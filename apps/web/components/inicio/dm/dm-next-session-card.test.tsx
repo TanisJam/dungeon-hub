@@ -1,12 +1,4 @@
-/**
- * Tests for DMNextSessionCard component
- *
- * REQ-IDM-NEXT-SESSION-CARD-04: renders Dirigís pill, title, player/session pills
- * REQ-IDM-CSS-SCOPED-08: root element has class inicio-camp-dm-bg
- *
- * Note: tagline and pendingQuests are optional (no backend source) — tested separately below.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { DMNextSessionCard } from './dm-next-session-card';

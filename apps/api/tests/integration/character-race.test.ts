@@ -379,7 +379,7 @@ describe('RACE_SUBRACE_REQUIRED — gate + read-path tolerance', () => {
 describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => {
   let user: TestUser;
   let characterId: string;
-  let campaignId: string;
+  let _campaignId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -393,7 +393,7 @@ describe('PUT /characters/:id/race — Variant Human feat + skill picks', () => 
         payload: { name: 'VH Feat Test Campaign' },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
 
     const character = await app
       .inject({
@@ -1202,7 +1202,7 @@ async function insertBatch6TestRows(): Promise<void> {
 describe('Racial additional spells — Batch 6 (race-additional-spells)', () => {
   let user: TestUser;
   let characterId: string;
-  let campaignId: string;
+  let _campaignId: string;
 
   beforeAll(async () => {
     // Insert dedicated test-only rows so we never mutate the shared elf--high / tiefling rows.
@@ -1219,7 +1219,7 @@ describe('Racial additional spells — Batch 6 (race-additional-spells)', () => 
         payload: { name: 'Racial Spells Test Campaign' },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
 
     const character = await app
       .inject({

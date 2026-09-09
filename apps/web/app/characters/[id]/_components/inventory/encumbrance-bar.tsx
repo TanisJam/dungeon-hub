@@ -47,7 +47,7 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
   const pct = max > 0 ? Math.min(100, Math.round((weight / max) * 100)) : 0;
 
   return (
-    <div className="space-y-2" aria-label="Capacidad de carga">
+    <div className="space-y-2" role="group" aria-label="Capacidad de carga">
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
           Carga

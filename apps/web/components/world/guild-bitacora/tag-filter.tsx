@@ -46,6 +46,7 @@ export function TagFilter({ activeTag, onTagChange }: TagFilterProps) {
     <div
       className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scroll-smooth scroll-fade-r"
       style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+      role="group"
       aria-label="Filtro por etiqueta"
     >
       {/* "Todo" chip — deselects active tag */}

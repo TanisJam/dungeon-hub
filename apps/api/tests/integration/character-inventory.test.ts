@@ -17,11 +17,11 @@ describe('inventory — POST / DELETE', () => {
   let alice: TestUser; // owner martial
   let mallory: TestUser; // owner wizard
   let bob: TestUser; // outsider
-  let aliceCampaignId: string;
+  let _aliceCampaignId: string;
   let aliceWorldId: string;
   let aliceCharId: string;
   let malloryCharId: string;
-  let malloryCampaignId: string;
+  let _malloryCampaignId: string;
   let malloryWorldId: string;
 
   beforeAll(async () => {
@@ -39,7 +39,7 @@ describe('inventory — POST / DELETE', () => {
         payload: { name: 'Alice Campaign' },
       })
       .then((r) => r.json());
-    aliceCampaignId = aliceCampaign.id;
+    _aliceCampaignId = aliceCampaign.id;
     aliceWorldId = aliceCampaign.worldId;
 
     aliceCharId = (
@@ -83,7 +83,7 @@ describe('inventory — POST / DELETE', () => {
         payload: { name: 'Mallory Campaign' },
       })
       .then((r) => r.json());
-    malloryCampaignId = malloryCampaign.id;
+    _malloryCampaignId = malloryCampaign.id;
     malloryWorldId = malloryCampaign.worldId;
 
     malloryCharId = (

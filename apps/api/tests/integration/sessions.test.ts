@@ -17,7 +17,7 @@ describe('sessions — Slice 1', () => {
   let outsider: TestUser;
   let campaignId: string;
   let worldId: string;
-  let otherCampaignId: string;
+  let _otherCampaignId: string;
   let otherWorldId: string;
   let aliceCharId: string;
   let bobCharId: string;
@@ -78,7 +78,7 @@ describe('sessions — Slice 1', () => {
         payload: { name: 'Other Campaign' },
       })
       .then((r) => r.json());
-    otherCampaignId = otherCampaign.id;
+    _otherCampaignId = otherCampaign.id;
     otherWorldId = otherCampaign.worldId;
     aliceOtherCampaignCharId = (
       await app

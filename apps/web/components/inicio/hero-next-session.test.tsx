@@ -1,13 +1,4 @@
-/**
- * Unit tests for HeroNextSession component.
- *
- * T1: Renders eyebrow "Próxima sesión", campaign name, tagline,
- *     daysToSession number, and Pill text "Sesión 8" (sessions: 7 → next is 8).
- * T2: Root <section> element has class inicio-hero-bg.
- * T3: Countdown number <span> has class inicio-stat-glow.
- * T4: daysToSession=0 renders "0" in the number span (edge case — HERO-01).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HeroNextSession } from './hero-next-session';

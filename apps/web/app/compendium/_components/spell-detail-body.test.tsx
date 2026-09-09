@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { SpellDetailBody } from './spell-detail-body';

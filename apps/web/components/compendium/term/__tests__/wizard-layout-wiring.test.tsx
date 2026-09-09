@@ -1,23 +1,4 @@
-/**
- * D.2 — Wizard layout TermProvider wiring contract tests.
- *
- * The wizard layout (app/characters/[id]/wizard/layout.tsx) is a Next.js 15
- * async server component that mounts TermProvider. Because vitest's include
- * pattern covers `components/**` and `lib/**` only (not `app/**`), we cannot
- * render the layout directly. Instead we test the WIRING CONTRACT — that:
- *
- *   1. TermProvider accepts session access_token + worldId (real props)
- *   2. When those props are present, hover interactions work (live path)
- *   3. When accessToken is null (no session / logged-out), refs are inert
- *
- * These tests mirror exactly what the layout wires up.
- *
- * Note: This is documented as a manual integration verification step per task D.2,
- * because full server component rendering requires mocking next/headers and cookies()
- * which is outside this project's vitest scope. The unit tests below validate the
- * TermProvider contract the layout relies on.
- */
-import React from 'react';
+
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { TermProvider } from '../TermProvider';

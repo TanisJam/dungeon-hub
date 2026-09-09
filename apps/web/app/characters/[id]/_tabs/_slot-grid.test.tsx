@@ -1,14 +1,4 @@
-/**
- * Component tests for SlotGrid + PactSlotGrid (SP-05).
- * REQ-SP05-UX-CONSUME, REQ-SP05-UX-BUBBLE-STATE.
- *
- * Rest buttons (short/long) are tested in _rest-actions.test.tsx — they live at
- * the sheet header, not in the hechizos tab.
- *
- * PHB p.201 — tapping filled bubble consumes a slot.
- * PHB p.107 — pact slot uses separate pool.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SlotGrid, PactSlotGrid } from './_slot-grid';
@@ -18,8 +8,6 @@ vi.mock('../actions', () => ({
   useSpellSlot: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
-// Import after mock to get the mocked versions.
-import * as actions from '../actions';
 
 beforeEach(() => {
   vi.clearAllMocks();

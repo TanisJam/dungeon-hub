@@ -1,12 +1,4 @@
-/**
- * Tests for TrinketDetailBody — STRICT TDD (RED first).
- *
- * Reqs: WITD-BODY-01 (spec #1077)
- * Design: DCE1 (RSC), DC6 (stub CTAs — no onClick)
- *
- * PHB p.161: Trinkets table — no mechanical effect. Exists for narrative only.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TrinketDetailBody } from './trinket-detail-body';

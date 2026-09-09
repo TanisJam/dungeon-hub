@@ -1,10 +1,4 @@
-/**
- * Tests for InventoryDetailShell — STRICT TDD (RED first).
- *
- * Reqs: WIDS-SHELL-01 (spec #1070), WIMD-BODY-01 WIBD-BODY-01 WITD-BODY-01 WIQD-BODY-01 (spec #1077)
- * Design: DBE1, DBE3, DBE4 (design #1071), DCE2 (exhaustive switch — Slice C)
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { InventoryDetailShell } from './inventory-detail-shell';

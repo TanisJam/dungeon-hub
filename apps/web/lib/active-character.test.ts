@@ -68,7 +68,7 @@ const CHAR_B = {
   hpMax: 24,
 };
 
-const CHAR_RETIRED = {
+const _CHAR_RETIRED = {
   id: 'char-retired',
   worldId: 'world-1',
   name: 'Gareth Old',

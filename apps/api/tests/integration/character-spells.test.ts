@@ -8,7 +8,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
  */
 describe('PUT /characters/:id/classes/:classSlug/spells', () => {
   let user: TestUser;
-  let campaignId: string;
+  let _campaignId: string;
   let worldId: string;
   let wizardCharId: string;
   let wizardL4AsiCharId: string;
@@ -28,7 +28,7 @@ describe('PUT /characters/:id/classes/:classSlug/spells', () => {
         payload: { name: 'Spells Test' },
       })
       .then((r) => r.json());
-    campaignId = spellsCampaign.id;
+    _campaignId = spellsCampaign.id;
     worldId = spellsCampaign.worldId; // C5
 
     // Wizard L1 con INT 15 (mod 2) → prep limit = 3.

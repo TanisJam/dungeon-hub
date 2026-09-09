@@ -257,7 +257,7 @@ describe('engine-timeline-duration — duration filter + startRound write (Slice
 
       // Seed a Bless modifier_instances row directly with start_round=0
       // and a duration of 1 minute (10 rounds, PHB p.181).
-      const blessToken = randomUUID();
+      const _blessToken = randomUUID();
       const instanceId = randomUUID();
 
       // NOTE: the instance MUST NOT have 'concentration-ends' in endsOn,

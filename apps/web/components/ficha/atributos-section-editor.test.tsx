@@ -8,8 +8,6 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// Mock createPortal for V3Sheet
-import { createPortal } from 'react-dom';
 vi.mock('react-dom', async () => {
   const actual = await vi.importActual<typeof import('react-dom')>('react-dom');
   return {

@@ -2,7 +2,6 @@
 // REQ PRICE-ROW-01, BROWSE-UNCHANGED-01 (row portion).
 // afterEach(cleanup) is global (apps/web/vitest.setup.ts) — do NOT re-add.
 
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { ItemRowView } from './row-views';

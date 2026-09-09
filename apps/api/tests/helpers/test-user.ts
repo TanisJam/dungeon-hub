@@ -20,7 +20,7 @@ export interface TestUser {
 export async function createTestUser(): Promise<TestUser> {
   const password = 'test-password-strong-123!';
 
-  async function retryFetch(label: string, fn: () => Promise<Response>, maxTries = 3): Promise<Response> {
+  async function retryFetch(_label: string, fn: () => Promise<Response>, maxTries = 3): Promise<Response> {
     for (let i = 0; i < maxTries; i++) {
       const res = await fn();
       if (res.ok || res.status < 500) return res; // ok or client-error → no point retrying

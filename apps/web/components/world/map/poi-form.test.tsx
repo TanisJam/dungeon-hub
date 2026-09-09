@@ -6,7 +6,6 @@
  * afterEach(cleanup) is GLOBAL via vitest.setup.ts — do NOT re-add here.
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { PoiForm } from './poi-form';

@@ -134,8 +134,8 @@ describe('hexes — world-scoped (world-first-model Slice 1)', () => {
   describe('GET /worlds/:worldId/hexes + visibility', () => {
     let worldId2: string;
     let hUnexp: string;
-    let hRumored: string;
-    let hExpl: string;
+    let _hRumored: string;
+    let _hExpl: string;
 
     beforeAll(async () => {
       const result = await createWorldWithGm(dm.id);
@@ -169,7 +169,7 @@ describe('hexes — world-scoped (world-first-model Slice 1)', () => {
           },
         })
         .then((r) => r.json());
-      hRumored = r.id;
+      _hRumored = r.id;
 
       const e = await app
         .inject({
@@ -179,7 +179,7 @@ describe('hexes — world-scoped (world-first-model Slice 1)', () => {
           payload: { q: 2, r: 0, name: 'Explored Hex', status: 'explored' },
         })
         .then((r) => r.json());
-      hExpl = e.id;
+      _hExpl = e.id;
     });
 
     it('GM sees all 3 hexes (including unexplored + dmNotes)', async () => {

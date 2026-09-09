@@ -34,7 +34,7 @@ vi.mock('@/components/campanas/sessions/session-list', () => ({
   }) => (
     <div data-testid="session-list" data-caller-role={callerRole}>
       {sessions.length === 0 && <span>No hay sesiones aún</span>}
-      {callerRole === 'gm' && <button aria-label="Nueva sesión">+</button>}
+      {callerRole === 'gm' && <button type="button" aria-label="Nueva sesión">+</button>}
       {activeParticipantCharIds.map((id: string) => (
         <span key={id} data-testid="active-char">{id}</span>
       ))}

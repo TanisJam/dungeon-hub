@@ -1,11 +1,4 @@
-/**
- * a11y tests for the term hover system.
- *
- * B.3 — tabIndex on supported-kind spans, role=dialog on open card, Escape dismisses.
- * B.6 — No raw color utilities (bg-gray-, text-blue-, etc.) in HoverCard className output.
- * TERM-A11Y — keyboard-open path: focusin on a tabIndex=0 span opens the HoverCard.
- */
-import React from 'react';
+
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { SUPPORTED_KINDS } from '../registry';
@@ -164,6 +157,7 @@ describe('TermProvider — keyboard-open via focusin (tabIndex=0 span)', () => {
         <span
           data-compendium-ref="spell|fireball|PHB"
           data-testid="ref"
+          role="button"
           tabIndex={0}
         >
           fireball

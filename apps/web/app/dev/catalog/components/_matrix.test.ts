@@ -9,7 +9,7 @@ function makeEntry(overrides: Partial<ComponentEntry>): ComponentEntry {
     name: 'Test',
     group: 'ui',
     propsSchema: {},
-    render: (p) => null,
+    render: (_p) => null,
     ...overrides,
   };
 }

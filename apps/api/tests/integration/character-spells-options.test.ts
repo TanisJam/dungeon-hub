@@ -16,7 +16,7 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
   let wizardL4AsiCharId: string;
   let clericSubclassCharId: string;
   // Subclass discovered at runtime from the compendium
-  let discoveredClericSubclassSlug: string | null = null;
+  let _discoveredClericSubclassSlug: string | null = null;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -61,7 +61,7 @@ describe('GET /characters/:id/classes/:classSlug/spells/options', () => {
       null;
 
     if (lightDomain) {
-      discoveredClericSubclassSlug = lightDomain.slug;
+      _discoveredClericSubclassSlug = lightDomain.slug;
       clericSubclassCharId = await setupChar(
         'Cleric Subclass',
         'cleric',

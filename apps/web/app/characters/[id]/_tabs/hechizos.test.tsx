@@ -1,15 +1,4 @@
-/**
- * Component tests for HechizosTab — spell list rendering (SP-04).
- *
- * REQ-SP04-09: R/C/M badges per spell row — shared SpellBadges component
- * REQ-SP04-10: Per-class section layout — Trucos / Preparados / Conocidos labels
- * REQ-SP04-11: Empty state — "Sin hechizos seleccionados"
- * REQ-SP04-12: Multiclass — separate sections, no merging
- * REQ-SP04-13: Mobile-first (375px) — structural validation via test
- *
- * PHB ch.10 p.201 — Casting Spells
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { CharacterSheet, SpellSheetRef, ClassSpellSummary } from '@/lib/sheet-types';
@@ -123,7 +112,7 @@ function makeClericSummary(overrides: Partial<ClassSpellSummary> = {}): ClassSpe
   };
 }
 
-function makeSorcererSummary(overrides: Partial<ClassSpellSummary> = {}): ClassSpellSummary {
+function _makeSorcererSummary(overrides: Partial<ClassSpellSummary> = {}): ClassSpellSummary {
   return {
     classSlug: 'sorcerer',
     classSource: 'PHB',

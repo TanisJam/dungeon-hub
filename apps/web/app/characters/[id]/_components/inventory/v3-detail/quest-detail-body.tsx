@@ -38,6 +38,7 @@ export function QuestDetailBody({ detail }: QuestDetailBodyProps) {
       {/* DC6: Disabled CTA stubs — no onClick (RSC event-handler rule) */}
       <div className="inventory-init-detail-actions" style={{ marginTop: '14px' }}>
         <button
+          type="button"
           disabled
           className="inventory-init-detail-use-big"
           data-stub="true"
@@ -46,6 +47,7 @@ export function QuestDetailBody({ detail }: QuestDetailBodyProps) {
           Ver quest
         </button>
         <button
+          type="button"
           disabled
           className="btn-ghost"
           data-stub="true"

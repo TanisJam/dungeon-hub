@@ -1,13 +1,6 @@
-/**
- * Component tests for InventoryRow.
- *
- * Reqs: WIVLS-ROWS-01 (spec #1063)
- * PHB p.149 — Weapons table (weapon type rendering).
- * DMG p.135 — Rarity (rarity glow CSS class).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { InventoryRow } from './inventory-row.js';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 

@@ -47,7 +47,7 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
   };
 
   /** Read conditions for a combatant from DB. */
-  const getConditions = async (combatantId: string): Promise<Array<{ conditionName: string }>> => {
+  const _getConditions = async (combatantId: string): Promise<Array<{ conditionName: string }>> => {
     const { db } = await import('../../src/infra/db/client.js');
     const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
     const { eq } = await import('drizzle-orm');
@@ -417,7 +417,7 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
     //   On confirmed miss → assert condition exists (primary assertion).
     //   On nat-20 crit hit → condition still exists (secondary assertion — still correct).
     //   Either way, the condition MUST be in the DB after the first reckless:true call.
-    const { encounterId, barbarianCombatantId, npcCombatantId } = await makeFreshEncounter('RECK-T7', { npcAc: 30 });
+    const {  } = await makeFreshEncounter('RECK-T7', { npcAc: 30 });
 
     // Loop until confirmed miss (nat-20 crit would still hit at ac=30; re-create encounter and retry).
     let done = false;

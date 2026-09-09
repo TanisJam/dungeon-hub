@@ -1,15 +1,4 @@
-/**
- * Tests for SpellPrepEditor — SPELL-PREP-02 through SPELL-PREP-08.
- *
- * T1: Subclass-granted rows render as disabled with "Siempre preparado" label (SPELL-PREP-03).
- * T2: Counter shows "{n}/{max} preparados" with green tone (under limit, SPELL-PREP-04).
- * T3: At-limit — amber hint + "Límite alcanzado" + unchecked rows disabled (SPELL-PREP-04).
- * T4: Checking a spell increments counter (SPELL-PREP-04).
- * T5: Cantrips never appear in list (SPELL-PREP-05).
- * T6: Empty spell list → hint text "Aprendé hechizos al subir de nivel" (SPELL-PREP-02).
- * T7: initialPrepared exceeding prepLimit doesn't crash.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

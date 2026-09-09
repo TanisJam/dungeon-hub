@@ -117,7 +117,7 @@ const DEFAULT_SUBCLASS_UNLOCK = 3;
  */
 export function validateLevelUp(input: LevelUpInput): LevelUpResult {
   const issues: LevelUpIssue[] = [];
-  const { rulesProfile, character, body, classData, subclassData, serverRoll } = input;
+  const { character, body } = input;
 
   const existingClasses = character.classes ?? [];
   const currentTotal = existingClasses.reduce((sum, c) => sum + c.level, 0);
@@ -170,11 +170,11 @@ export function validateLevelUp(input: LevelUpInput): LevelUpResult {
 function validateSameClassBranch(
   input: LevelUpInput,
   existingClasses: AppliedClass[],
-  currentTotal: number,
+  _currentTotal: number,
   targetTotal: number,
   issues: LevelUpIssue[],
 ): LevelUpResult {
-  const { rulesProfile, character, body, classData, subclassData, serverRoll, featData } = input;
+  const { character, body, classData, serverRoll, featData } = input;
   if (body.kind !== 'same-class') return { ok: false, issues };
 
   // ---- 4a) Must own the class ----------------------------------------------
@@ -334,7 +334,7 @@ function validateSameClassBranch(
 function validateNewClassBranch(
   input: LevelUpInput,
   existingClasses: AppliedClass[],
-  currentTotal: number,
+  _currentTotal: number,
   targetTotal: number,
   issues: LevelUpIssue[],
 ): LevelUpResult {

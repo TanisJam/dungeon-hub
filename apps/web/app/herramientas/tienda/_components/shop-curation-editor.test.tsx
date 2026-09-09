@@ -7,7 +7,6 @@
 // toggles something, so mocking the module here is enough — no need to
 // mock '@/lib/supabase/server' separately.
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 

@@ -1,11 +1,4 @@
-/**
- * Component tests for EquippedSlotsGrid.
- *
- * Reqs: WIVLS-EQUIPPED-01 (spec #1063)
- * Design D1 (proposal #1062): Acces. slot ALWAYS renders as dashed "vacío" — never resolved.
- * Design DA10 (design #1064): aria-disabled="true" on Acces. slot button.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EquippedSlotsGrid } from './equipped-slots-grid.js';
@@ -31,7 +24,7 @@ function makeWeapon(overrides: Partial<EnrichedInventoryItem> = {}): EnrichedInv
   };
 }
 
-const NO_ITEMS: EnrichedInventoryItem[] = [];
+const _NO_ITEMS: EnrichedInventoryItem[] = [];
 
 describe('EquippedSlotsGrid — WIVLS-EQUIPPED-01', () => {
   it('8.2 equipped weapon with equipHand="main" fills the Princ. slot', () => {
