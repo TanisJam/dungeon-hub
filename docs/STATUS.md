@@ -172,6 +172,17 @@ and accessibility. `a11y/useValidAriaRole` is deliberately excluded: this codeba
 a domain prop meaning DM-versus-player, which that rule misreads as an ARIA role, and "fixing" its
 26 reports would mean breaking working code.
 
+The 53 Playwright specs are **not** in CI yet, and that is deliberate. They had never
+run anywhere either — their README asks a developer to start Supabase, the API and the web
+in three terminals by hand — so `scripts/e2e-stack.sh` now does all of it and tears it down
+after. First complete run, 2026-09-09: **105 passed, 12 failed, 2 flaky** in 25 minutes.
+
+The 12 are UI assertions — "element not found", `toBeVisible`, `toHaveURL` — which is what
+specs look like after months of the UI moving underneath them without anything running them,
+though real defects may be mixed in; they need reading one at a time. Wiring the job before
+they are fixed would give the repository a check that is red on arrival, which is how the
+no-op `lint` script earned its irrelevance. It goes in once they are green.
+
 A second job, `api integration`, runs the other 119 `apps/api` files — the ones that talk to a
 live GoTrue + Postgres. `scripts/test-stack.sh` stands up a throwaway Postgres plus GoTrue pinned
 to the version production runs, migrates, applies the custom SQL, imports the compendium and tears

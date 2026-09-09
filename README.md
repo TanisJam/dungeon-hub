@@ -141,7 +141,14 @@ pnpm --filter @dungeon-hub/api test:unit
 ./scripts/fetch-5etools.sh
 ./scripts/test-stack.sh pnpm --filter @dungeon-hub/api test
 
-# E2E (Playwright — full stack must be running)
+# E2E (Playwright). scripts/e2e-stack.sh starts everything the specs need —
+# Postgres, GoTrue, the API, the web app — seeds the fixture users, runs the
+# suite and tears it all down. Takes ~25 min: workers:1, fullyParallel:false.
+./scripts/e2e-stack.sh                          # every spec
+./scripts/e2e-stack.sh --project=chromium-public
+./scripts/e2e-stack.sh e2e/mapa.auth.spec.ts    # one file
+
+# Against a stack you are already running yourself, per apps/web/e2e/README.md:
 pnpm --filter @dungeon-hub/web test:e2e
 
 # Typecheck (use this instead of build for verification)
