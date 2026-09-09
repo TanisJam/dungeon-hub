@@ -80,6 +80,15 @@ async function putSpells(
 // PART A — DM Hero HP max + role toggle
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Playwright's default per-test budget is 30s, and this block asks for more than
+// that on its own: its explicit waits sum to ~60s (15 + 10 + 10 + 5 + 10 + 5 + 5). It only ever passed when every
+// one of them returned near-instantly, which is not a property a test should
+// depend on — a slow first paint made it fail looking like a role bug rather
+// than a clock. Give it a budget consistent with what it actually waits for.
+// The waits themselves are unchanged; nothing is being given more slack than it
+// already asked for.
+test.describe.configure({ timeout: 90_000 });
+
 test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
   test('GM+owner sets hp.max via API → 200; role toggle hides/shows DM affordances', async ({
     browser,
@@ -174,6 +183,15 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // PART A2 — REPRODUCE user bug: default load (NO switch click), HP editor in DM
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Playwright's default per-test budget is 30s, and this block asks for more than
+// that on its own: its explicit waits sum to ~60s (15 + 15 + 30). It only ever passed when every
+// one of them returned near-instantly, which is not a property a test should
+// depend on — a slow first paint made it fail looking like a role bug rather
+// than a clock. Give it a budget consistent with what it actually waits for.
+// The waits themselves are unchanged; nothing is being given more slack than it
+// already asked for.
+test.describe.configure({ timeout: 90_000 });
 
 test.describe('J6A2 — GM+owner default load: HP editor must be in DM mode without clicking the switch', () => {
   test('on first load (default dm), Otorgar shows AND HP máximo is editable (no read-only hint)', async ({
