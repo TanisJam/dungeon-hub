@@ -3,7 +3,11 @@
  *
  * REQ-MERC-SURF-01: /mercado route, world-scoped via getActiveCharacter.
  * REQ-MERC-SURF-02: empty states (no active character, no mundane items).
- * REQ-MERC-BROWSE-01: browse-only — no buy/add/equip affordance.
+ * REQ-MERC-BROWSE-01 (SUPERSEDED): this surface was browse-only at Wave 3. The
+ *   market-shop-buy-ui arc then threaded the buy affordance through here — see
+ *   `shopContext={{ characterId }}` below, which is exactly what renders the
+ *   Comprar control. The old line survived the change and claimed the opposite
+ *   of what the same file does.
  * ADR-3: mirrors /compendium/[category]/page.tsx pattern; pinned to items + magic=false.
  *
  * Scope resolution: uses getActiveCharacter(token) → worldId (world-scoped, player-facing).
