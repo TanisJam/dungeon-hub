@@ -96,8 +96,15 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
           await expect(chip).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 });
         }).toPass({ timeout: 15_000 });
       }
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
+      // Retried until the URL actually changes. Unlike the skill chips above,
+      // "Siguiente" is safe to click twice — navigating is idempotent, and a
+      // click that lands before the island hydrates does nothing at all. Without
+      // this the failure reads "still on /wizard/class" with no hint that the
+      // click never reached a handler.
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 3_000 });
+      }).toPass({ timeout: 20_000 });
       await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
     });
 
