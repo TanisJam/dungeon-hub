@@ -33,7 +33,12 @@ test.describe('dashboard (authenticated)', () => {
   });
 
   test('AccountMenu sign-out is reachable from the shell nav', async ({ page }) => {
-    await page.goto('/inicio', { waitUntil: 'domcontentloaded' });
+    // networkidle, not domcontentloaded: AccountMenu is a client island whose
+    // open state lives in useState, so the trigger paints from the server HTML
+    // but its onClick does nothing until React hydrates. Clicking that early is
+    // a silent no-op and the sheet never opens — measured, this spec fails on
+    // every attempt under domcontentloaded and passes under networkidle.
+    await page.goto('/inicio', { waitUntil: 'networkidle' });
     await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
     // AccountMenu trigger — TopBar right cluster, aria-label="Cuenta"
