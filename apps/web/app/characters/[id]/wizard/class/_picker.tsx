@@ -280,6 +280,11 @@ function ClassDetailInline({
                   key={s}
                   type="button"
                   onClick={() => toggleSkill(s)}
+                  // A toggle whose only "on" signal is a background colour is not
+                  // announced at all: a screen-reader user hears "Acrobatics,
+                  // button" whether it is picked or not. aria-pressed is what makes
+                  // the state part of the control rather than part of the paint.
+                  aria-pressed={isOn}
                   disabled={disabled}
                   title={isLocked ? 'Ya otorgada por tu trasfondo' : undefined}
                   className={[
