@@ -59,3 +59,44 @@ jobs:
 
       - name: Test api (unit-only, no live infra)
         run: pnpm --filter @dungeon-hub/api test:unit
+
+  # The other 119 apps/api test files live here rather than in `verify`: they need
+  # a real Postgres and a real GoTrue, so they cost a container stack and a 112 MB
+  # dataset. Splitting them keeps the fast lane fast and makes it obvious from the
+  # check name which kind of failure you are looking at.
+  integration:
+    name: api integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.7.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The 5etools dataset is not committed and not a submodule. Cached on the
+      # upstream ref so the ~112 MB clone happens once, not on every run.
+      - name: Cache the 5etools dataset
+        uses: actions/cache@v4
+        with:
+          path: data/5etools
+          key: 5etools-${{ hashFiles('scripts/fetch-5etools.sh') }}
+
+      - name: Fetch the 5etools dataset
+        run: ./scripts/fetch-5etools.sh
+
+      # Brings up Postgres + GoTrue, migrates, applies the custom SQL, imports the
+      # compendium, runs the suite, and tears the stack down on exit.
+      - name: Run the integration suite
+        run: ./scripts/test-stack.sh pnpm --filter @dungeon-hub/api test
