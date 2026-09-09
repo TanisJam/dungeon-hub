@@ -63,9 +63,9 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
   ] = await Promise.all([
     importRaces(dataDir, warnings),
     importClassesAndSubclasses(dataDir, warnings),
-    importBackgrounds(dataDir),
+    importBackgrounds(dataDir, warnings),
     importSpells(dataDir),
-    importItems(dataDir),
+    importItems(dataDir, warnings),
     importFeats(dataDir),
     importOptionalFeatures(dataDir),
     importMonsters(dataDir, warnings),
