@@ -11,8 +11,8 @@ import { describe, it, expect } from 'vitest';
 import { HERRAMIENTAS_SUBNAV_ITEMS } from './subnav-items';
 
 describe('HERRAMIENTAS_SUBNAV_ITEMS', () => {
-  it('HERRAMIENTAS-S1: has exactly 4 entries (Compendio pill removed, Tienda added)', () => {
-    expect(HERRAMIENTAS_SUBNAV_ITEMS).toHaveLength(4);
+  it('HERRAMIENTAS-S1: has exactly 5 entries (Compendio pill removed, Tienda + Contenido added)', () => {
+    expect(HERRAMIENTAS_SUBNAV_ITEMS).toHaveLength(5);
   });
 
   it('HERRAMIENTAS-S1: does NOT contain a Compendio entry (DM uses Biblioteca tab)', () => {
@@ -42,6 +42,12 @@ describe('HERRAMIENTAS_SUBNAV_ITEMS', () => {
     const item = HERRAMIENTAS_SUBNAV_ITEMS.find((i) => i.href === '/herramientas/tienda');
     expect(item).toBeTruthy();
     expect(item!.label).toBe('Tienda');
+  });
+
+  it('MVP #3.8: contains Contenido entry with href /herramientas/contenido', () => {
+    const item = HERRAMIENTAS_SUBNAV_ITEMS.find((i) => i.href === '/herramientas/contenido');
+    expect(item).toBeTruthy();
+    expect(item!.label).toBe('Contenido');
   });
 
   it('no /codex/* hrefs remain — all updated to /herramientas/*', () => {
