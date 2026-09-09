@@ -274,6 +274,36 @@ export type PerformWeaponAttackApplyResult =
 // ── perform-weapon-attack-apply ────────────────────────────────────────────────
 
 /**
+ * B-10 (REQ-RAGE-09, PHB p.48): mark the attacker as having attacked a hostile
+ * creature since its last turn.
+ *
+ * Rage ends early when the barbarian's "turn ends and you haven't attacked a
+ * hostile creature since your last turn or taken damage since then". The trigger
+ * is the ATTACK, not the hit — a swing that misses still keeps the rage alive.
+ * That is why this is called on the miss path too, where there is no transaction
+ * and no version bump (REQ-APPLY-FLOW-02 keeps a miss a no-op for encounter state;
+ * this ledger flag is per-combatant bookkeeping, not versioned encounter state).
+ *
+ * Hostility approximation: attacker.kind !== target.kind (pc->npc or npc->pc).
+ * Written unconditionally (1 extra column) — harmless when the attacker is not raging.
+ */
+async function markAttackedHostile(
+  exec: Pick<typeof db, 'update'>,
+  attackerId: string,
+  encounterId: string,
+): Promise<void> {
+  await exec
+    .update(encounterCombatants)
+    .set({ ragedAttackedHostile: true })
+    .where(
+      and(
+        eq(encounterCombatants.id, attackerId),
+        eq(encounterCombatants.encounterId, encounterId),
+      ),
+    );
+}
+
+/**
  * Applies a weapon attack atomically following the 12-step flow (ADR-4):
  *
  *  1. Load encounter + version pre-check
@@ -285,7 +315,8 @@ export type PerformWeaponAttackApplyResult =
  *  7. resolveWeaponAttack → damage expression + toHit + rollMode
  *  8. resolveTargetAc → AC (NO_TARGET_AC → early-return 400)
  *  9. rollToHit(toHit.value, targetAc, rollMode.mode, cryptoRng) → toHitResult
- * 10. Early-return on miss (no rollDamageBreakdown, no applyDamage, no tx)
+ * 10. Early-return on miss (no rollDamageBreakdown, no applyDamage, no tx) —
+ *     marks the Rage ledger first: PHB p.48 counts the attack, not the hit
  * 11. rollDamageBreakdown(damage.dice, damage.breakdown, crit, cryptoRng)
  * 12. applyDamage → newHp; tx: UPDATE hp + CAS version bump
  *
@@ -671,6 +702,14 @@ export async function performWeaponAttackApply(
   // No HP mutation; no version bump; miss is a no-op mutation.
   // PHB p.85: ki is only spent on a HIT — no ki decrement on miss (REQ-SS-MISS-01).
   if (!toHitResult.hit) {
+    // The attack still happened. PHB p.48 keys Rage's early end on having
+    // ATTACKED a hostile creature, not on having hit one — returning here without
+    // marking the ledger ended the rage of any barbarian who missed every swing.
+    // Standalone write: the miss path deliberately opens no transaction and bumps
+    // no version (REQ-APPLY-FLOW-02).
+    if (attackerCombatant.kind !== targetCombatant.kind) {
+      await markAttackedHostile(db, attackerId, encounterId);
+    }
     return {
       ok: true,
       hit: false,
@@ -899,19 +938,10 @@ export async function performWeaponAttackApply(
       return false;
     }
 
-    // B-10: set raged_attacked_hostile=true on ATTACKER when target is opposite kind (REQ-RAGE-09).
-    // Hostility approximation: attacker.kind !== target.kind (pc→npc or npc→pc).
-    // Write unconditionally (1 extra column) — harmless when not raging.
+    // B-10 (REQ-RAGE-09): the hit path marks the ledger inside the tx, so a CAS
+    // rollback un-marks it along with the damage.
     if (attackerCombatant.kind !== targetCombatant.kind) {
-      await tx
-        .update(encounterCombatants)
-        .set({ ragedAttackedHostile: true })
-        .where(
-          and(
-            eq(encounterCombatants.id, attackerId),
-            eq(encounterCombatants.encounterId, encounterId),
-          ),
-        );
+      await markAttackedHostile(tx, attackerId, encounterId);
     }
 
     // B-12: 0-HP auto-end — DELETE 'Raging' in the 0-HP branch (REQ-RAGE-08).
