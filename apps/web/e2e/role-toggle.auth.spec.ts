@@ -32,7 +32,15 @@ test('role toggle (single button) switches view + player view reaches character'
   await expect(dmSubtitle).toHaveCount(0, { timeout: 10_000 });
   await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('Atajos')).toBeVisible();
-  await expect(page.locator('a[href^="/personajes"], a[href^="/characters/"]').first()).toBeVisible();
+  // Filtered to visible: DesktopSidebar renders its own /personajes link, and at
+  // this 390px viewport it is in the DOM but hidden. Unfiltered, .first() picks
+  // that one and the assertion fails on an element the design never meant to show
+  // here. The point of the check is that the player view reaches a character from
+  // a phone, so the link has to be one a thumb could actually reach.
+  await expect(
+    page.locator('a[href^="/personajes"], a[href^="/characters/"]').filter({ visible: true }).first(),
+    'player view must expose a reachable character link at 390px',
+  ).toBeVisible();
 
   // Tap again → back to DM view
   await roleSwitcher.click();

@@ -23,8 +23,22 @@ const inactiveClasses: Record<ToggleChipTone, string> = {
   secondary: 'border-line text-ink-mute bg-transparent',
 };
 
-const BASE =
-  'inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors hover:brightness-110 active:translate-y-px';
+// The button is the TAP TARGET; the span is the pill you see.
+//
+// Splitting them is what lets the chip stay visually compact while still meeting
+// the 44px minimum this codebase applies everywhere else (global-error.tsx,
+// not-found.tsx, _campaigns-section.tsx, and REQ-CLU-SUB-UI-MOBILE in
+// subclass-picker.tsx). Before this, the whole control measured 21.5px tall —
+// under half the minimum, on an app whose primary surface is a phone
+// (CLAUDE.md §2). Putting min-h-[44px] on the pill itself would have stretched a
+// 9px-text capsule to 44px and wrecked it; an ::after overlay would have fixed
+// the real hit area but not the measured height, so a11y checks would still read
+// it as too small. A transparent 44px button around the pill fixes both.
+const HIT_AREA =
+  'inline-flex min-h-[44px] items-center justify-center bg-transparent p-0 hover:brightness-110 active:translate-y-px';
+
+const PILL =
+  'inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors';
 
 export function ToggleChip({
   tone = 'accent',
@@ -46,9 +60,9 @@ export function ToggleChip({
       aria-pressed={ariaPressed}
       aria-label={ariaLabel}
       title={title}
-      className={`${BASE} ${toneState}${extra}`}
+      className={`${HIT_AREA}${extra}`}
     >
-      {children}
+      <span className={`${PILL} ${toneState}`}>{children}</span>
     </button>
   );
 }
