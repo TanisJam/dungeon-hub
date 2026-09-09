@@ -228,7 +228,13 @@ test.describe('J6A2 — GM+owner default load: HP editor must be in DM mode with
       const maxInput = dmPage.getByRole('spinbutton', { name: 'HP máximo' });
       await expect(async () => {
         if (!(await maxInput.isVisible().catch(() => false))) {
-          await dmPage.getByRole('button', { name: 'Editar HP' }).click().catch(() => {});
+          // No .catch here. Swallowing this made the loop a diagnostic black hole:
+          // when the click failed the retry just spun for 30s and reported only
+          // "timeout exceeded while waiting on the predicate", with nothing about
+          // what actually went wrong. A retry loop that hides its own failures
+          // cannot tell you whether the app or the test is at fault. Removing it is
+          // what finally surfaced the reason below.
+          await dmPage.getByRole('button', { name: 'Editar HP' }).click({ timeout: 3_000 });
         }
         await expect(maxInput, 'HP máximo must be editable in DM mode').toBeEditable({
           timeout: 3_000,
