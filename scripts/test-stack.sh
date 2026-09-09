@@ -29,9 +29,12 @@ if ! docker info >/dev/null 2>&1; then
   fi
 fi
 
-# Obviously-fake secret. GoTrue signs with it, the API verifies with it, and the
-# anon/service-role JWTs below are signed with it — all three must agree.
-export TEST_JWT_SECRET='dungeon-hub-integration-test-secret-not-a-real-one'
+# Generated per run, never written down. GoTrue signs with it, the API verifies
+# with it, and the anon/service-role JWTs below are signed with it — all three
+# must agree, and nothing outside this process needs to know it. Generating it
+# beats a fixed literal twice over: there is no credential in the repository for
+# a scanner to flag, and no value that could be copied into anything real.
+export TEST_JWT_SECRET="$(node -e 'console.log(require("node:crypto").randomBytes(32).toString("hex"))')"
 
 # Built after the secret is exported: sudo resets the environment, so the
 # variable has to be named on the sudo line for compose interpolation to see it.
