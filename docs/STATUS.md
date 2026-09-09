@@ -1,13 +1,14 @@
 # dungeon-hub — System Status
 
-> Status: living document, last synced 2026-09-08 against `main`. Supersedes the 2026-06-08 sync,
-> whose route map was already wrong on its own sync date (see §3).
+> Status: living document, last synced 2026-09-09 against `main`. Supersedes the 2026-09-08 sync,
+> whose §2 rows had already drifted behind its own §5 (sealing UI, map tiles) on the day it was written.
 >
-> ⚠️ **This document describes `main`, which is not what production runs.** The web app deploys
-> automatically to Vercel, but the API is a manual build-and-swap on the home-lab VM and is
-> currently **three months behind** — its source dates to 11 June, 24 commits and +2929 lines back.
-> Every API-side row below is therefore "built", not "live". See §6 and
-> [`docs/onboarding/api-deploy.md`](./onboarding/api-deploy.md).
+> **Production now runs `main`.** The API was swapped on 2026-09-09, ending a three-month drift in
+> which its source dated to 11 June. Both halves are current: Vercel deploys `apps/web` on every push,
+> and the API image was rebuilt from `main` and verified before the swap. Rows below describe `main`,
+> and for the first time in this document's history that is also what a visitor talks to. See §6 and
+> [`docs/onboarding/api-deploy.md`](./onboarding/api-deploy.md) — the API deploy is still manual, so
+> this alignment is a fact about today, not a property of the system.
 
 ---
 
@@ -28,12 +29,12 @@
 | 3.2 | **Character sheet — view + edit + save** | ✅ | `apps/web/app/characters/[id]/page.tsx`; sheet tabs: resumen/habilidades/hechizos/recursos/inventario/notas | Inventory CRUD, spell add/remove+prep, XP, HP edit, rest, encumbrance. Notes tab exists; save path confirmed via PATCH. |
 | 3.3 | **Biblioteca (formerly "Codex") — content coverage** | ✅ | `apps/web/app/compendium/_components/data.ts:7-14` (6-card landing grid); registry: `apps/web/app/compendium/[category]/_config/registry.ts:48` (`CATEGORY_CONFIG`, 8 entries); API: `compendium.ts:587` (feats, was cited at `:551`), `:862` (conditions, was `:826`) | 8 of 8 categories browsable via `/compendium/[category]`; the landing grid (`/compendium`) intentionally shows only 6 (items + monsters moved out per codex-ia-reframe W1). Feats + Conditions shipped 2026-06-05. Closes #3.3. Line citations re-verified 2026-09-07. |
 | 3.4 | **Biblioteca — navigation, filters, search** | ✅ | `apps/web/app/compendium/[category]/_components/compendium-list.tsx`; API filters: `compendium.ts:361-424` (spells, was `:348-423`), `:696` (monsters, was `:621`) | Name search on all 8; spells filter by class/level/school/ritual/concentration; monsters by CR/type/size; item type filter ✅ shipped 2026-06-05. Cross-category search from the landing ✅ shipped 2026-09-08 (search sheet fanning out across all 8 categories). Closes this row. |
-| 3.5 | **Map — zoom + waypoints** | 🟡 | `apps/web/components/world/map/world-map-leaflet.tsx`; POI actions: `apps/web/app/mapa/actions.ts:275` (createPoi), `:317` (updatePoi), `:337` (deletePoi) — was cited at `actions.ts:266,308,328`, drifted | Leaflet map with zoom range; POIs are full waypoints (create/place/edit/move/delete/status). **Correction**: the waypoint shared-vs-private visibility model is NOT open — it is already implemented as a hybrid status-gate model in the `pois` table (`apps/api/src/infra/db/schema.ts:459-465`, shipped with `poi-world-level`, 2026-06-03, i.e. before even the previous sync): DM sees all incl. `dmNotes`; players see `status != 'unknown'`, never `dmNotes`. The old "still open" note was wrong. Separately, the "map mobile zoom buttons" gap is **closed and was never real**: verified live on 2026-09-07 against production at a 390px mobile viewport, `.leaflet-control-zoom` renders with both `+`/`-` buttons visible. The old note's causal claim ("CRS.Simple disables the default buttons") does not match Leaflet's behaviour and had no code support. **New defect found in the same check**: the map renders no tiles in production. `GET /storage/v1/object/public/world-maps/sword-coast/1/{x}/{y}.jpg` returns **HTTP 500** `{"error":"Internal"}`, which the browser then drops as `net::ERR_BLOCKED_BY_ORB` (a JSON error body cannot satisfy an `<img>` request). This is a home-lab data problem, not a code one: a genuinely absent object returns a clean `404 not_found`, so the object rows exist while their bytes cannot be served. Re-running `apps/api/scripts/upload-map-tiles.ts` is the likely remedy. |
+| 3.5 | **Map — zoom + waypoints** | 🟡 | `apps/web/components/world/map/world-map-leaflet.tsx`; POI actions: `apps/web/app/mapa/actions.ts:275` (createPoi), `:317` (updatePoi), `:337` (deletePoi) — was cited at `actions.ts:266,308,328`, drifted | Leaflet map with zoom range; POIs are full waypoints (create/place/edit/move/delete/status). **Correction**: the waypoint shared-vs-private visibility model is NOT open — it is already implemented as a hybrid status-gate model in the `pois` table (`apps/api/src/infra/db/schema.ts:459-465`, shipped with `poi-world-level`, 2026-06-03, i.e. before even the previous sync): DM sees all incl. `dmNotes`; players see `status != 'unknown'`, never `dmNotes`. The old "still open" note was wrong. Separately, the "map mobile zoom buttons" gap is **closed and was never real**: verified live on 2026-09-07 against production at a 390px mobile viewport, `.leaflet-control-zoom` renders with both `+`/`-` buttons visible. The old note's causal claim ("CRS.Simple disables the default buttons") does not match Leaflet's behaviour and had no code support. **A defect found in the same check has since been fixed** (2026-09-07): the map rendered no tiles because all 1398 objects sat one directory level too deep on the volume, so Storage raised `ENOENT` and the browser dropped the JSON error body as `ERR_BLOCKED_BY_ORB`. Re-uploaded via `apps/api/scripts/upload-map-tiles.ts`. Re-verified 2026-09-09 by sampling the pyramid across z=0..3: every in-grid tile serves `200 image/jpeg`, and out-of-grid coordinates return a clean `not_found` as they should. |
 | 3.6 | **DM — campaigns with invited players** | ✅ | `apps/api/src/http/routes/campaigns.ts`; `apps/web/app/campanas/[id]/page.tsx` | Campaign CRUD + session management + invite flow + session play-loop all shipped. Invite-link mechanism (`campaign_invite_tokens`, archive #1877). Session UI shipped (#1916). Role model fixed (#1908–#1929). |
 | 3.7 | **DM — manage world content** | ✅ | `components/world/{npcs,factions,journal}/`; world events, hexes, POIs all CRUD wired | NPCs + factions + world events + locations/hexes + POIs + journal + quests all ✅. Quests shipped 2026-06-05 (migration 0038, archive #1895). |
 | 3.8 | **DM — create custom content** | 🔴 | `packages/compendium-import/src/index.ts` (CLI only) | Server-side enforcement exists (`rulesProfile`, `disabledEntities`, `modifierDefinitions`). **No DM-facing UI to add homebrew or upload JSON.** Import is CLI-only. DEC-1 (locked 2026-06-04): MVP path is JSON upload, not visual authoring. |
-| 3.9 | **Import / export via JSON** | 🟡 | `apps/api/src/http/routes/characters.ts:1281` (`GET /characters/:id/export`); `apps/web/app/characters/[id]/_export-button.tsx` (was described as a "danger-zone island" — no such naming exists in the code) | Character export ✅ shipped 2026-06-05 (archive #1885, versioned `schemaVersion:1` envelope). **Confirmed still true 2026-09-07**: no re-import endpoint exists anywhere in `characters.ts`. **Remaining**: character re-import (slug algorithm alignment needed first); config/NPC/world export. |
-| 3.10 | **West Marches knowledge layer** | 🟡 | `apps/web/app/bitacora/`; `apps/web/app/compendium/` (Biblioteca, formerly `/codex`); `apps/web/app/mercado/` + `apps/web/app/herramientas/tienda/`; `apps/web/app/mapa/`; DB: `world_events`, `journal_entries`, `character_knowledge`, `bitacora_pages`, `guild_contributions` | Substantially advanced via codex-ia-reframe arc (archives #1971–#2055), plus more shipped since. **Newly shipped (since 2026-06-08)**: `NovedadesFeed` wired to the real `aggregateGuildFeed` backend via `apps/web/components/inicio/feed-to-novedad.ts` (2026-09-03) — closes the prior "feed hookup" gap; Mercado shop — player browse+buy at `/mercado`, DM curation at `/herramientas/tienda`, `POST /characters/:id/shop/buy` (`characters.ts:3009`) (2026-09-03) — closes the prior "Mercado deferred" gap. **Previously shipped** (already reflected before this sync): player write-path (guild contributions + tags + unified feed + share-personal-page-to-guild); Bitácora personal (Conocidos + Páginas + tags); character codex covers monsters + NPCs + factions + locations. **Still open, confirmed 2026-09-07**: rumor/adventure-board entity (`guild_contributions.sealedStatus` gives a confirmed/debunked lifecycle but there is no dedicated board surface); sealing/debunking UI (`POST /contributions/:id/seal` exists server-side; no web Server Action calls it — the feed only renders the sealed badge read-only); feed entity tap-to-open (linked-entity card is explicitly non-interactive per its own comment in `feed-card.tsx`); keyset pagination (`aggregate-guild-feed.ts` is still offset-based). |
+| 3.9 | **Import / export via JSON** | 🟡 | `apps/api/src/http/routes/characters.ts:1281` (`GET /characters/:id/export`); `apps/web/app/characters/[id]/_export-button.tsx` (was described as a "danger-zone island" — no such naming exists in the code) | Character export ✅ shipped 2026-06-05 (archive #1885, versioned `schemaVersion:1` envelope). **Character re-import shipped and is live**: `POST /characters/import` (`characters.ts:806`) merged 2026-09-08 and reached production with the 2026-09-09 API swap; the web UI (`/characters/import`) merged as PR #20 the same day. Verified against production: the endpoint answers `401` unauthenticated where it answered `404` before the swap, and the page redirects to `/` for anonymous visitors instead of 404ing. **Remaining**: config/NPC/world export — only `GET /characters/:id/export` exists. |
+| 3.10 | **West Marches knowledge layer** | 🟡 | `apps/web/app/bitacora/`; `apps/web/app/compendium/` (Biblioteca, formerly `/codex`); `apps/web/app/mercado/` + `apps/web/app/herramientas/tienda/`; `apps/web/app/mapa/`; DB: `world_events`, `journal_entries`, `character_knowledge`, `bitacora_pages`, `guild_contributions` | Substantially advanced via codex-ia-reframe arc (archives #1971–#2055), plus more shipped since. **Newly shipped (since 2026-06-08)**: `NovedadesFeed` wired to the real `aggregateGuildFeed` backend via `apps/web/components/inicio/feed-to-novedad.ts` (2026-09-03) — closes the prior "feed hookup" gap; Mercado shop — player browse+buy at `/mercado`, DM curation at `/herramientas/tienda`, `POST /characters/:id/shop/buy` (`characters.ts:3009`) (2026-09-03) — closes the prior "Mercado deferred" gap. **Previously shipped** (already reflected before this sync): player write-path (guild contributions + tags + unified feed + share-personal-page-to-guild); Bitácora personal (Conocidos + Páginas + tags); character codex covers monsters + NPCs + factions + locations. **Still open, re-verified 2026-09-09** (sealing/debunking UI dropped from this list — `sealContribution` in `app/bitacora/actions.ts:440` is wired and called from `feed-card.tsx`): rumor/adventure-board entity (`guild_contributions.sealedStatus` gives a confirmed/debunked lifecycle but there is no dedicated board surface); feed entity tap-to-open (linked-entity card is explicitly non-interactive per its own comment in `feed-card.tsx`); keyset pagination (`aggregate-guild-feed.ts` is still offset-based). |
 | 3.11 | **Discord bot (read-only)** | ✅ | `apps/bot/src/commands/` (15 cmds) + `index.ts` registry | `/spell /feat /item /race /class /monster /session /world /lore /map /character /link /unlink /whoami /mi-hoja` — all wired (autocomplete + embeds + API). Read-only; bot writes are post-MVP. (Gap-audit #1809 wrongly said "only /mi-hoja" — corrected per engram #1810.) |
 
 ---
@@ -100,6 +101,8 @@ These arcs shipped after the original MVP roadmap was declared "complete" (2026-
 | Surprise first-turn action-gate adapter | 2026-09-04 | IO adapter for the pure `isSurprisedFirstTurn` predicate; drops redundant inline gate blocks from the frozen combat/encounters route | combat (frozen track) |
 | Resilience pass | 2026-09-07 | Root/route error boundaries (`app/error.tsx`, `app/global-error.tsx`), fail-open Supabase auth-check middleware, API request timeouts + typed `ApiNetworkError` | cross-cutting reliability |
 | Reproducible setup pass | 2026-09-07 | Restored `infra/supabase/docker-compose.override.yml`, pinned `SUPABASE_REF`, corrected env templates, added a "Known setup gaps" README section | dev/operator experience |
+| API swap + character import UI | 2026-09-09 | Rebuilt the API image from `main`, verified it against the production database in an unrouted container, and promoted it — ending the three-month drift. PR #20 then released the `/characters/import` UI that had been held back so the app would not ship a button that 404s | #3.9 / deploy |
+| Test infrastructure pass | 2026-09-09 | Restored `localStorage` in the jsdom test environment (Node 26 defines the global as `undefined`, and vitest skips copying jsdom names already present on the Node global); skip-on-absent guard for the 5etools races block; an API unit lane that runs without live infra; `.nvmrc`; and the first CI workflow this repo has ever had, running 3936 tests on every PR | dev/operator experience |
 
 ---
 
@@ -109,7 +112,7 @@ See `docs/ROADMAP.md §1` for the prioritized work plan. Summary (re-verified 20
 
 | Gap | Severity | Definition.md item |
 |---|---|---|
-| Character re-import — **built, not deployed.** `POST /characters/import` merged 2026-09-08 (domain validator, batched reference resolution, forced `draft` status). It does not exist in production until the API is swapped. Web UI is written and open at PR #20, held back deliberately so the app does not ship a button that 404s. Still genuinely open: config/NPC/world export. | **MVP blocker until deployed** | #3.9 |
+| ~~Character re-import — built, not deployed~~ — **shipped and live 2026-09-09.** `POST /characters/import` (domain validator, batched reference resolution, forced `draft` status) reached production with the API swap, and PR #20 released the web UI it was waiting on. The end-to-end flow — upload a `.json`, land as a draft awaiting DM approval — has NOT been exercised against production yet; it needs an authenticated session. Still genuinely open: config/NPC/world export. | — | #3.9 |
 | WM knowledge layer — feed completeness: rumor/adventure-board entity, feed entity tap-to-open, keyset pagination. (Sealing/debunking UI ✅ shipped 2026-09-08 — the API had been live since 2026-06-05 with nothing calling it; DMs can now confirm or refute a contribution from the feed.) (`NovedadesFeed` hookup and Mercado shipped 2026-09-03 — removed from this list.) | High | #3.10 |
 | Custom content via JSON upload | High | #3.8 |
 | ~~Biblioteca cross-category search~~ — **shipped 2026-09-08.** Search sheet on the landing fans out one request per category across all 8 (the landing grid shows 6; items and monsters are searchable but not gridded). Verified live against production: `fire` returns Fireball under Hechizos and Fire Opal under Items in one sheet. Partial failure names the categories that could not be reached instead of blanking. | — | #3.4 |
@@ -121,23 +124,23 @@ See `docs/ROADMAP.md §1` for the prioritized work plan. Summary (re-verified 20
 ## 6. Deployment State
 
 The two halves of this app ship by different routes, and only one of them is automatic.
-Keeping that straight matters: every row above describes `main`, and `main` is not what a
-visitor is talking to.
+Keeping that straight matters: the web half re-deploys itself and the API half does not, so the
+two can drift apart silently — and did, for three months.
 
 | Piece | Deploys | Currently running |
 |---|---|---|
 | `apps/web` | Automatically, on push to `main` (Vercel) | Current with `main` |
-| `apps/api` | **Manually** — build an image on the home-lab VM and swap the container | **Source dated 11 June 2026** |
+| `apps/api` | **Manually** — build an image on the home-lab VM and swap the container | Current with `main` (swapped 2026-09-09) |
 | Supabase (Postgres, Auth, Storage, Kong) | Long-lived Docker Compose on the same VM | Schema current — 45 migrations, latest `0045` applied |
 
-**The API is 24 commits and +2929 lines behind `main`** across `apps/api` and `packages/domain`.
-Anything API-side merged since 11 June — the surprise action-gate adapter, character re-import —
-exists in the repository and not in production. A merged endpoint answers `404` to a visitor
-until the swap happens.
+**The API was 24 commits and +2929 lines behind `main`** across `apps/api` and `packages/domain`
+until 2026-09-09. The swap closed that: the image was rebuilt from `main`, verified against the
+production database in a container without Traefik labels, and only then promoted. Proof it took
+hold: `POST /characters/import` answered `404` before and answers `401` after.
 
-The schema is *not* behind: migration `0045_engine_surprise_columns` is already applied
-(`encounter_combatants.surprised` and `.first_turn_acted` both exist), so closing the gap is a
-code-only deploy with no DDL.
+The schema was never behind: migration `0045_engine_surprise_columns` was already applied
+(`encounter_combatants.surprised` and `.first_turn_acted` both exist), so the swap was a
+code-only deploy with no DDL. Verified before promoting: 45 applied, 45 in `meta/_journal.json`.
 
 Procedure, rollback and the traps involved are in
 [`docs/onboarding/api-deploy.md`](./onboarding/api-deploy.md).
@@ -151,3 +154,14 @@ map tile (requiring an `image/*` content type, not merely a 200).
 
 That last probe exists because the first version of this workflow read all-healthy while the
 map was rendering nothing: a gateway that answers says nothing about the objects behind it.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`: `pnpm -r typecheck`
+followed by the four suites that need no provisioned infrastructure, plus the API's unit lane —
+3936 tests in total. Before 2026-09-09 the repository had no CI running tests at all; `uptime.yml`
+was the only workflow, and it watches production rather than the diff.
+
+What it does **not** cover is worth stating plainly: the 119 files in `apps/api/tests/integration`
+talk to a live GoTrue + Postgres and are skipped, so a green run says nothing about the API's HTTP
+surface. Closing that would mean standing up a throwaway Supabase stack in the job.
