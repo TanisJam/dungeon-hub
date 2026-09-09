@@ -6,7 +6,7 @@
  *   (a) Mercado tab present and navigable from TabBar.
  *   (b) Item list renders ≥1 row.
  *   (c) No row shows a magic rarity label (mundane-only filter is active).
- *   (d) Tap item row → DetailSheet opens with item name (browse-only, no buy button).
+ *   (d) Tap item row → DetailSheet opens with item name and the Comprar control.
  *   (e) Tap outside the open DetailSheet → sheet dismisses.
  *
  * Pre-requisites:
@@ -81,9 +81,9 @@ test.describe('Mercado browse + detail round-trip @ 375px (REQ-MERC-E2E-01)', ()
   });
 
   // -------------------------------------------------------------------------
-  // Scenario (d): tap first item row → DetailSheet opens with item name → no buy button
+  // Scenario (d): tap first item row → DetailSheet opens with item name → Comprar control
   // -------------------------------------------------------------------------
-  test('(d) tap item row → DetailSheet opens with item name and no buy button', async ({ page }) => {
+  test('(d) tap item row → DetailSheet opens with item name and the Comprar control', async ({ page }) => {
     await page.goto('/mercado', { timeout: 120_000, waitUntil: 'domcontentloaded' });
 
     // Skip if empty state (no active character).
@@ -123,10 +123,15 @@ test.describe('Mercado browse + detail round-trip @ 375px (REQ-MERC-E2E-01)', ()
     const dialogText = await dialog.textContent();
     expect(dialogText?.trim().length, 'Dialog must contain item data (name via ItemHeader)').toBeGreaterThan(0);
 
-    // REQ-MERC-BROWSE-01: no buy / add / equip button must be visible.
-    // Check for common buy/add action labels in the dialog.
-    const buyButton = dialog.getByRole('button', { name: /comprar|buy|agregar|add|equipar|equip/i });
-    await expect(buyButton, 'No buy/add/equip button must appear in browse-only Mercado detail').toBeHidden();
+    // The Comprar control MUST be here. REQ-MERC-BROWSE-01 made this surface
+    // browse-only at Wave 3, and the market-shop-buy-ui arc superseded it —
+    // /mercado threads shopContext into the list, which is what renders this
+    // button. This spec asserted the old requirement long after the new one
+    // shipped, and nothing caught it because the suite was never run.
+    await expect(
+      dialog.getByRole('button', { name: 'Comprar' }),
+      'Mercado detail must offer the Comprar control (market-shop-buy-ui)',
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   // -------------------------------------------------------------------------
