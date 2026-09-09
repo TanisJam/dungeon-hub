@@ -32,7 +32,6 @@ pnpm --filter @dungeon-hub/api db:migrate
 # journal on purpose — e.g. triggers, NULLS NOT DISTINCT unique indexes). Apply
 # each in order; all are idempotent.
 for f in apps/api/drizzle/custom/0001-auth-mirror-trigger.sql \
-         apps/api/drizzle/custom/0002-hexes-unique-nulls-not-distinct.sql \
          apps/api/drizzle/custom/0003-hexes-unique-world-nulls-not-distinct.sql; do
   sudo docker exec -i supabase-db psql -U postgres -d postgres < "$f"
 done
@@ -40,7 +39,7 @@ done
 
 - [ ] `db:migrate` completes with `No migrations pending` (or applies pending ones cleanly).
 - [ ] All custom SQL files apply without errors (idempotent: re-running prints `already exists` / `function already exists` and exits 0).
-- [ ] Note: `0002`/`0003` rewrite the hexes unique index (`0003` is the world-scoped version that supersedes `0002` after the world-first-model change). Applying both in order is safe — `0003` drops the old index and creates the world-keyed one.
+- [ ] Note: `0003` rewrites the hexes unique index to be world-scoped. It also drops the pre-world-first index by its old name, so it is safe on a database that predates the change. Its predecessor `0002` was deleted: it indexed `hexes.campaign_id`, a column migration `0031` drops, so it could not apply to any database and broke this loop partway through.
 - [ ] In Supabase Studio → SQL editor: `SELECT COUNT(*) FROM public.users;` returns 0 (or your existing count).
 
 ### G1.3 — Compendium import
@@ -195,7 +194,6 @@ sudo docker exec supabase-db pg_restore -U postgres -d postgres --no-owner --no-
 
 # 4. Re-apply the custom SQL files if needed (not tracked by db:migrate)
 for f in apps/api/drizzle/custom/0001-auth-mirror-trigger.sql \
-         apps/api/drizzle/custom/0002-hexes-unique-nulls-not-distinct.sql \
          apps/api/drizzle/custom/0003-hexes-unique-world-nulls-not-distinct.sql; do
   sudo docker exec -i supabase-db psql -U postgres -d postgres < "$f"
 done

@@ -68,6 +68,9 @@ describe('GET /characters/:id/sheet — ficha completa de un High Elf Wizard 1',
         payload: {
           race: { slug: 'elf', source: 'PHB' },
           subrace: { slug: 'elf--high', source: 'PHB' },
+          // High Elf grants a wizard cantrip; without it the race write gate
+          // refuses with RACE_CANTRIP_REQUIRED.
+          raceCantrip: { slug: 'fire-bolt', source: 'phb' },
           languageChoices: ['dwarvish'],
         },
       }),
@@ -795,6 +798,9 @@ describe('GET /characters/:id/sheet — REQ-AS-CONTRACT-01: sheet.abilityScores 
         payload: {
           race: { slug: 'elf', source: 'PHB' },
           subrace: { slug: 'elf--high', source: 'PHB' },
+          // High Elf grants a wizard cantrip; without it the race write gate
+          // refuses with RACE_CANTRIP_REQUIRED.
+          raceCantrip: { slug: 'fire-bolt', source: 'phb' },
           languageChoices: ['draconic'],
         },
       }),

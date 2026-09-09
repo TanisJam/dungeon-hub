@@ -29,6 +29,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
+import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
 import {
   rollDamageBreakdown,
   type RngFn,
@@ -96,6 +97,8 @@ export type PerformSpellHealResult =
   | { ok: false; code: 'SLOT_NOT_AVAILABLE' }
   // engine-incapacitated-gating — REQ-INC-04 (PHB p.290: can't take actions).
   | { ok: false; code: 'ACTOR_INCAPACITATED' }
+  // engine-surprise-round1 (REQ-SUR-S2-02, PHB p.189 — actions blocked while surprised)
+  | { ok: false; code: 'ACTOR_SURPRISED' }
   // engine-action-economy: budget exhausted (REQ-AE-02, REQ-AE-03).
   // Cure Wounds = action (PHB p.230); Healing Word = bonus action (PHB p.250).
   | { ok: false; code: 'ACTION_ALREADY_USED' }
@@ -110,6 +113,9 @@ export type PerformSpellHealResult =
  *  2. Load healer combatant → NOT_FOUND 'attacker'
  *  3. Turn guard (currentCombatantId ≠ healerCombatantId → NOT_YOUR_TURN)
  *  4. Healer-is-PC guard (characterId null → HEALER_NOT_SPELLCASTER)
+ *  4a. Incapacitated gate → ACTOR_INCAPACITATED
+ *  4a.1. Surprised gate (REQ-SUR-S2-02, PHB p.189) → ACTOR_SURPRISED
+ *  4b. Action / bonus-action budget gate → ACTION_ALREADY_USED / BONUS_ACTION_ALREADY_USED
  *  5. Load target combatant (id, hpCurrent, hpMax, encounterId) → NOT_FOUND 'target'
  *  6. Load healer character row → compute sheet → resolve spellcasting mod → HEALER_NOT_SPELLCASTER
  *     Also read slotsMax + slotsUsed for consumeSpellSlot.
@@ -180,6 +186,13 @@ export async function performSpellHeal(
   // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
   if (await isCombatantIncapacitated(healerCombatantId)) {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
+  // ── Step 4a.1: Surprised gate (REQ-SUR-S2-02, PHB p.189 — can't act on first surprised turn) ──
+  // Fail-fast AFTER incap gate, BEFORE action/bonus-action budget gate (ADR-3.2 version→turn→incap→SURPRISE ladder).
+  // No RNG involved — surprise gating is deterministic state-based check.
+  if (await isCombatantSurprisedFirstTurn(healerCombatantId)) {
+    return { ok: false, code: 'ACTOR_SURPRISED' };
   }
 
   // ── Step 4b: Action / bonus-action budget gate (REQ-AE-02, REQ-AE-03) ─────────

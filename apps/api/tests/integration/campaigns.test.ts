@@ -247,9 +247,13 @@ describe('campaigns', () => {
 
       it('(a) no worldId → creates new world+campaign (existing atomic path preserved)', async () => {
         const app = await getTestApp();
-        const countBefore = await (await import('../../src/infra/db/client.js')).db
-          .select()
-          .from((await import('../../src/infra/db/schema.js')).worlds);
+        const { db } = await import('../../src/infra/db/client.js');
+        const { worlds } = await import('../../src/infra/db/schema.js');
+        const { eq } = await import('drizzle-orm');
+        // Count only gmUser's worlds — same reason (b) below does: an unfiltered count
+        // races against the other forks under maxForks:4, which create and delete worlds
+        // of their own between these two reads.
+        const countBefore = await db.select().from(worlds).where(eq(worlds.ownerUserId, gmUser.id));
 
         const res = await app.inject({
           method: 'POST',
@@ -265,9 +269,7 @@ describe('campaigns', () => {
         // A NEW world must have been created (different from existingWorldId)
         expect(body.worldId).not.toBe(existingWorldId);
 
-        const countAfter = await (await import('../../src/infra/db/client.js')).db
-          .select()
-          .from((await import('../../src/infra/db/schema.js')).worlds);
+        const countAfter = await db.select().from(worlds).where(eq(worlds.ownerUserId, gmUser.id));
         expect(countAfter.length).toBeGreaterThan(countBefore.length);
       });
 

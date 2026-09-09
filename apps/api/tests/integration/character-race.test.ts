@@ -49,6 +49,9 @@ describe('PUT /characters/:id/race', () => {
       payload: {
         race: { slug: 'elf', source: 'PHB' },
         subrace: { slug: 'elf--high', source: 'PHB' },
+        // High Elf grants a wizard cantrip; the write gate rejects the PUT with
+        // RACE_CANTRIP_REQUIRED without it (A-1 below asserts that refusal).
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
         languageChoices: ['dwarvish'],
       },
     });
@@ -147,6 +150,9 @@ describe('PUT /characters/:id/race', () => {
       payload: {
         race: { slug: 'elf', source: 'PHB' },
         subrace: { slug: 'elf--high', source: 'PHB' },
+        // High Elf grants a wizard cantrip; the write gate rejects the PUT with
+        // RACE_CANTRIP_REQUIRED without it (A-1 below asserts that refusal).
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
         languageChoices: ['dwarvish'],
       },
     });
@@ -161,6 +167,9 @@ describe('PUT /characters/:id/race', () => {
       payload: {
         race: { slug: 'elf', source: 'PHB' },
         subrace: { slug: 'elf--high', source: 'PHB' },
+        // High Elf grants a wizard cantrip; the write gate rejects the PUT with
+        // RACE_CANTRIP_REQUIRED without it (A-1 below asserts that refusal).
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
         appliedAsis: [
           { ability: 'str', bonus: 2, source: 'race' },
           { ability: 'cha', bonus: 1, source: 'subrace' },
@@ -1039,6 +1048,9 @@ describe('Darkvision — PHB Batch 4 (race-darkvision-grant)', () => {
       payload: {
         race: { slug: 'elf', source: 'PHB' },
         subrace: { slug: 'elf--high', source: 'PHB' },
+        // High Elf grants a wizard cantrip; the write gate rejects the PUT with
+        // RACE_CANTRIP_REQUIRED without it (A-1 below asserts that refusal).
+        raceCantrip: { slug: 'fire-bolt', source: 'phb' },
         languageChoices: ['dwarvish'],
       },
     });

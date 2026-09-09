@@ -162,6 +162,21 @@ followed by the four suites that need no provisioned infrastructure, plus the AP
 3936 tests in total. Before 2026-09-09 the repository had no CI running tests at all; `uptime.yml`
 was the only workflow, and it watches production rather than the diff.
 
-What it does **not** cover is worth stating plainly: the 119 files in `apps/api/tests/integration`
-talk to a live GoTrue + Postgres and are skipped, so a green run says nothing about the API's HTTP
-surface. Closing that would mean standing up a throwaway Supabase stack in the job.
+A second job, `api integration`, runs the other 119 `apps/api` files — the ones that talk to a
+live GoTrue + Postgres. `scripts/test-stack.sh` stands up a throwaway Postgres plus GoTrue pinned
+to the version production runs, migrates, applies the custom SQL, imports the compendium and tears
+the stack down; `scripts/fetch-5etools.sh` supplies the dataset, which is cached in CI. 1461 tests.
+
+Standing that suite up for the first time immediately paid for itself. It had never run anywhere —
+not on a fresh clone, not in CI — and it was hiding two real defects and a dead migration:
+
+- **The surprise action-gate was missing from both spell paths.** `ACTOR_SURPRISED`
+  (REQ-SUR-S2-02/03, PHB p.189) was wired into rage, contest and weapon-attack but never into
+  `perform-cast-spell-apply` or `perform-spell-heal` — `git log -S` confirms it was never there.
+  A surprised combatant could cast and heal on their first turn. Tests SUR-S2-02c/02d/03b had
+  asserted otherwise since the day they were written.
+- **`custom/0002-hexes-unique-nulls-not-distinct.sql` could not apply to any database.** It indexes
+  `hexes.campaign_id`, a column migration `0031` drops; `0003` supersedes it. Following the
+  documented setup steps in order failed on it every time. Deleted.
+- Five race/sheet tests still sent High Elf without `raceCantrip`, predating the gate added in
+  `c89ab66` (2026-05-24).
