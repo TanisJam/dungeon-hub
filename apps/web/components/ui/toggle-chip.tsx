@@ -27,8 +27,8 @@ const inactiveClasses: Record<ToggleChipTone, string> = {
 //
 // Splitting them is what lets the chip stay visually compact while still meeting
 // the 44px minimum this codebase applies everywhere else (global-error.tsx,
-// not-found.tsx, _campaigns-section.tsx, and REQ-CLU-SUB-UI-MOBILE in
-// subclass-picker.tsx). Before this, the whole control measured 21.5px tall —
+// not-found.tsx, and REQ-CLU-SUB-UI-MOBILE in subclass-picker.tsx). Before
+// this, the whole control measured 21.5px tall —
 // under half the minimum, on an app whose primary surface is a phone
 // (CLAUDE.md §2). Putting min-h-[44px] on the pill itself would have stretched a
 // 9px-text capsule to 44px and wrecked it; an ::after overlay would have fixed

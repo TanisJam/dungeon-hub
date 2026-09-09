@@ -17,7 +17,7 @@ test.describe('character builder wizard', () => {
     const charName = `E2E Char ${Date.now()}`;
 
     await test.step('navigate to new character form', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/);
     });
@@ -139,9 +139,11 @@ test.describe('character builder wizard', () => {
       await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
-    await test.step('dashboard shows new character as pending', async () => {
-      await page.goto('/dashboard');
-      const charCard = page.locator('li').filter({ hasText: charName });
+    await test.step('/personajes shows new character as pending', async () => {
+      await page.goto('/personajes');
+      // PersonajeCard wraps each roster entry in <div data-character-card>
+      // (no <li> — /personajes renders cards in a plain flex column).
+      const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
       await expect(charCard).toContainText('Pendiente');
     });

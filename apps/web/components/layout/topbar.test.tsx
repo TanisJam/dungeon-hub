@@ -12,6 +12,12 @@ vi.mock('@/components/ui/crow-mark', () => ({
   CrowMark: () => <div data-testid="crow-mark">CrowMark</div>,
 }));
 
+// Mock AccountMenu — it depends on SignOutButton (useRouter + supabase client),
+// neither of which is the focus of these TopBar tests.
+vi.mock('@/components/layout/account-menu', () => ({
+  AccountMenu: () => <div data-testid="account-menu">AccountMenu</div>,
+}));
+
 // Mock next/navigation — TabBar uses usePathname.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
@@ -57,6 +63,30 @@ describe('TopBar', () => {
     );
     expect(screen.getByLabelText('Volver')).toBeTruthy();
     expect(screen.getByTestId('right-content')).toBeTruthy();
+  });
+
+  // Regression guard: the account menu holds the app's only sign-out control.
+  // While it lived inside the `right ?? ...` fallback, every page passing
+  // rightAction lost it — including /characters/[id], a primary tab destination.
+  // That is the exact hole the navigability audit reported, so it must survive
+  // a page supplying its own right cluster.
+  it('T7: right prop supplied → AccountMenu still renders alongside it', () => {
+    render(
+      <TopBar title="Ficha" right={<span data-testid="right-content">Activo</span>} />,
+    );
+    expect(screen.getByTestId('right-content')).toBeTruthy();
+    expect(screen.getByTestId('account-menu')).toBeTruthy();
+  });
+
+  it('T8: right prop supplied → it still replaces the RoleSwitcher', () => {
+    render(
+      <TopBar
+        title="Ficha"
+        canBeDM
+        right={<span data-testid="right-content">Activo</span>}
+      />,
+    );
+    expect(screen.queryByTestId('role-switcher')).toBeNull();
   });
 
   it('T6: backHref present + canBeDM=false → RoleSwitcher NOT rendered', () => {

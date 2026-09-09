@@ -23,9 +23,9 @@ test.describe('Level-up spells step condition @ 375px', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('Bard level-up triggers spells step; picking a spell enables submit', async ({ page }) => {
-    // ---- Step 1: Dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Bard character eligible for level-up ----
     const allHrefs = await page
@@ -176,9 +176,9 @@ test.describe('Level-up spells step condition @ 375px', () => {
     // cantripsDelta > 0 only at L4 and L10. At any other level, NO spells step.
     // We look for a Cleric at any eligible level, then assert the spells step is absent.
 
-    // ---- Step 1: Dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Cleric character ----
     const allHrefs = await page

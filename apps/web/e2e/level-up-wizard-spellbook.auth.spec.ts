@@ -30,9 +30,9 @@ test.describe('Level-up Wizard L1→L2 — subclass + spellbook + back-nav @ 375
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('Wizard L1→L2: subclass step then spells step, back-nav from review lands on spells', async ({ page }) => {
-    // ---- Step 1: Dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Wizard L1 character without subclass ----
     const allHrefs = await page

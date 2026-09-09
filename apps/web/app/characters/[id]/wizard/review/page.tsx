@@ -359,7 +359,7 @@ export default async function ReviewStepPage({ params }: Props) {
         {alreadyActive ? (
           <Card variant="surface" className="flex items-center justify-between p-4">
             <p className="text-sm text-primary-deep">✓ Este personaje ya está activo.</p>
-            <Link href="/dashboard" className="text-sm text-primary-deep hover:underline">
+            <Link href="/inicio" className="text-sm text-primary-deep hover:underline">
               Inicio →
             </Link>
           </Card>

@@ -11,7 +11,8 @@ import { test, expect } from '@playwright/test';
  *   - apps/web/.../worlds/[id]/_components/character-row.test.tsx
  *   - apps/web/.../worlds/[id]/_components/status-tabs.test.tsx
  *   - apps/web/.../characters/[id]/_components/approval-actions.test.tsx
- *   - apps/web/.../dashboard/_campaigns-section.test.tsx
+ *   - apps/web/.../mesa/page.test.tsx (Aprobaciones link — the CampaignsSection
+ *     "Master pill" GM entry point moved here from /dashboard)
  *
  * This spec proves the pages LOAD at 375px end-to-end through the auth user
  * who owns "E2E Test Campaign (World)" as GM.
@@ -19,22 +20,29 @@ import { test, expect } from '@playwright/test';
 test.describe('DM panel mobile smoke @ 375px (iPhone SE)', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
-  test('dashboard Master pill → /worlds/[id] tabs + list → approval buttons', async ({
+  test('Mesa Aprobaciones link → /worlds/[id] tabs + list → approval buttons', async ({
     page,
   }) => {
-    // ---- Dashboard: tap Master pill ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 5_000 });
-
-    // The auth user owns "E2E Test Campaign" — they should also be gm of its
-    // world. The GM-pill is wrapped in <Link href="/worlds/..."> with a
-    // Spanish aria-label "Abrir panel de maestro de <campaign>".
-    const masterPill = page.locator('a[href^="/worlds/"]').first();
-    const masterVisible = await masterPill.isVisible({ timeout: 5_000 }).catch(() => false);
+    // ---- /mesa: tap Aprobaciones link ----
+    // /mesa is the DM hub (was reachable only via /dashboard's "Master pill").
+    // It default-denies (notFound → 404) when effectiveView !== 'dm', so a
+    // non-GM auth user gets a 404 response instead of the a[href^="/worlds/"]
+    // link that used to gate this test — check the response status instead.
+    const mesaResponse = await page.goto('/mesa');
+    const isGm = mesaResponse !== null && mesaResponse.status() !== 404;
     test.skip(
-      !masterVisible,
+      !isGm,
       'No /worlds/[id] link visible — test user is not GM of any campaign world.',
     );
+
+    // Page-loaded sentinel — /mesa's AppShell h1 title replaces the old
+    // dashboard "Jugador" IdentityHeader text.
+    await expect(page.getByRole('heading', { name: 'Mesa', exact: true })).toBeVisible({ timeout: 5_000 });
+
+    // The auth user owns "E2E Test Campaign" — they should also be gm of its
+    // world. /mesa's "Aprobaciones" link is <Link href="/worlds/...">.
+    const masterPill = page.locator('a[href^="/worlds/"]').first();
+    await expect(masterPill).toBeVisible({ timeout: 5_000 });
 
     const worldHref = await masterPill.getAttribute('href');
     if (!worldHref) throw new Error('masterPill missing href');

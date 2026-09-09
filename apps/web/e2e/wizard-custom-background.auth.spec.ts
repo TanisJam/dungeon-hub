@@ -22,7 +22,7 @@ const CUSTOM_BG_LABEL = 'Custom Background';
 // ---------------------------------------------------------------------------
 
 async function createCharacterAndReachBackground(page: Page, charName: string) {
-  await page.goto('/dashboard');
+  await page.goto('/personajes');
   await page.locator('a[href="/characters/new"]').first().click();
   await expect(page).toHaveURL(/\/characters\/new$/);
 
@@ -132,9 +132,11 @@ test.describe('Custom Background — full wizard E2E', () => {
     await page.getByRole('link', { name: /ir al perfil/i }).click();
     await expect(page).toHaveURL(/\/characters\/.+/, { timeout: 10_000 });
 
-    // Dashboard muestra el char
-    await page.goto('/dashboard');
-    const charCard = page.locator('li').filter({ hasText: charName });
+    // /personajes muestra el char
+    await page.goto('/personajes');
+    // PersonajeCard wraps each roster entry in <div data-character-card>
+    // (no <li> — /personajes renders cards in a plain flex column).
+    const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
     await expect(charCard).toBeVisible();
   });
 

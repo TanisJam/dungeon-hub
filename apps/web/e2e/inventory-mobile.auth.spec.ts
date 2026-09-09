@@ -20,7 +20,7 @@ test.describe('inventory mobile smoke @ 375px (iPhone SE)', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('inventory tab renders + picker opens at 375px', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/personajes');
 
     // Collect all char hrefs (uuid-shaped, skip /characters/new).
     const allHrefs = await page

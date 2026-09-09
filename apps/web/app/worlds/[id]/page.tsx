@@ -6,7 +6,7 @@
  * parallel via the api helper, and renders a mobile-first segmented control
  * + vertical list. Default tab: Pendientes (status=pending_approval).
  *
- * Non-member → 403 from api → redirect to /dashboard.
+ * Non-member → 403 from api → redirect to /inicio.
  * Mobile-first: 375px viewport scrolls vertically only, all tap targets ≥44px.
  */
 import { redirect, notFound } from 'next/navigation';
@@ -67,7 +67,7 @@ export default async function WorldLandingPage({ params, searchParams }: Props) 
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.status === 404) notFound();
-      if (err.status === 403) redirect('/dashboard');
+      if (err.status === 403) redirect('/inicio');
     }
     return (
       <AppShell title="Mundo" constructorHref="/characters/new">

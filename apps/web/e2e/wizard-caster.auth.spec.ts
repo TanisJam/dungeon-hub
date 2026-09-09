@@ -52,7 +52,7 @@
  *
  * 6. Publish flow end-to-end: after completing all 6 steps for a caster, clicking
  *    Publicar on /review succeeds, shows the PublishedSplash, and clicking
- *    "Ir al perfil" redirects to /characters/:id. The dashboard shows the
+ *    "Ir al perfil" redirects to /characters/:id. /personajes shows the
  *    character as "Pendiente".
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -66,7 +66,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
     const charName = `E2E Wizard ${Date.now()}`;
 
     await test.step('navigate to new character form', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
     });
@@ -242,9 +242,11 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
-    await test.step('dashboard muestra el personaje Wizard como pendiente', async () => {
-      await page.goto('/dashboard');
-      const charCard = page.locator('li').filter({ hasText: charName });
+    await test.step('/personajes muestra el personaje Wizard como pendiente', async () => {
+      await page.goto('/personajes');
+      // PersonajeCard wraps each roster entry in <div data-character-card>
+      // (no <li> — /personajes renders cards in a plain flex column).
+      const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
       await expect(charCard).toContainText('Pendiente');
     });

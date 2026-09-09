@@ -27,7 +27,7 @@ test.describe('equipment wizard step — gold path (REQ-SEQUIP-06, REQ-SEQUIP-11
     // ── Create character and reach /wizard/equipment ──────────────────────
 
     await test.step('create character and reach /wizard/equipment', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
 

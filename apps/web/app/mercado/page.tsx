@@ -14,6 +14,7 @@
  * This is distinct from the /compendium browser which is campaign-scoped.
  * SSR fetches first 50 mundane items; CompendiumList island handles search/pagination.
  */
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
@@ -44,12 +45,20 @@ export default async function MercadoPage() {
   // REQ-MERC-SURF-01, ADR-3: world scope (player-facing catalog, not campaign-scoped).
   const activeCharacter = await getActiveCharacter(token);
 
-  // No active character → empty state (REQ-MERC-SURF-02, Scenario: no active campaign)
+  // No active character → empty state with a way out (REQ-MERC-SURF-02,
+  // Scenario: no active campaign). Navigability-audit fix: this used to be a
+  // dead end with no CTA or link — now it points at /personajes to pick one.
   if (!activeCharacter) {
     return (
       <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
-        <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-sm text-ink-soft">
           <p>Seleccioná un personaje para ver el Mercado.</p>
+          <Link
+            href="/personajes"
+            className="flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-4 py-2.5 font-sans text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent"
+          >
+            Ver mis personajes
+          </Link>
         </div>
       </AppShell>
     );

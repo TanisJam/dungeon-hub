@@ -21,7 +21,7 @@ export default async function NewCharacterPage() {
 
   const exitLink = (
     <Link
-      href="/dashboard"
+      href="/inicio"
       className="text-xs font-semibold text-ink-mute hover:text-ink transition-colors"
     >
       ← Salir
