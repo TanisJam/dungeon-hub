@@ -63,12 +63,12 @@
       "**/*.tsx",
       "**/*.mts",
       "**/*.cts",
-      "!**/node_modules/**",
-      "!**/.next/**",
-      "!**/dist/**",
-      "!**/drizzle/**",
-      "!**/data/**",
-      "!**/.codegraph/**"
+      "!**/node_modules",
+      "!**/.next",
+      "!**/dist",
+      "!**/drizzle",
+      "!**/data",
+      "!**/.codegraph"
     ]
   }
 }

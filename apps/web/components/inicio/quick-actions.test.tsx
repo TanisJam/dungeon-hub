@@ -4,10 +4,10 @@ import { render, screen } from '@testing-library/react';
 import { QuickActions } from './quick-actions';
 
 describe('QuickActions', () => {
-  it('T1: renders exactly 4 link elements (added Mesa/Campañas)', () => {
+  it('T1: renders exactly 5 link elements (added Tablero)', () => {
     render(<QuickActions />);
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
   });
 
   it('T2: each link has the correct href and label text', () => {
@@ -26,12 +26,18 @@ describe('QuickActions', () => {
   it('T3: each tile renders an SVG icon element', () => {
     const { container } = render(<QuickActions />);
     const svgs = container.querySelectorAll('svg');
-    expect(svgs.length).toBe(4);
+    expect(svgs.length).toBe(5);
   });
 
   it('T4: /campanas link present (Mesa absorption — REQ-NAV-02)', () => {
     render(<QuickActions />);
     const campañasLink = screen.getByRole('link', { name: /Mesa|Campañas/i });
     expect(campañasLink.getAttribute('href')).toBe('/campanas');
+  });
+
+  it('T5: /tablero link present (Tablero de anuncios entry point)', () => {
+    render(<QuickActions />);
+    const tableroLink = screen.getByRole('link', { name: /Tablero/i });
+    expect(tableroLink.getAttribute('href')).toBe('/tablero');
   });
 });
