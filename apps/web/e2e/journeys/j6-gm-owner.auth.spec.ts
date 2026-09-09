@@ -150,9 +150,20 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       // ── UI FLOW (the REAL user path): set HP max via the editor in DM mode ──
       // This is what the user actually does — NOT a direct API call. Reproduces
       // "no puedo pasar el máximo como DM".
-      await dmPage.getByRole('button', { name: 'Editar HP' }).click();
+      // The pencil is server-rendered inside a client island: it is clickable before
+      // React attaches its onClick, so a bare click can land on nothing and the sheet
+      // never opens — the click still reports success. Retry until the editor is
+      // actually there, guarded on it being closed so a retry never re-toggles it.
+      // Same shape as J6A2 below.
       const maxInput = dmPage.getByRole('spinbutton', { name: 'HP máximo' });
-      await expect(maxInput, 'max input must be editable in DM mode').toBeEditable({ timeout: 5_000 });
+      await expect(async () => {
+        if (!(await maxInput.isVisible().catch(() => false))) {
+          await dmPage.getByRole('button', { name: 'Editar HP' }).click({ timeout: 3_000 });
+        }
+        await expect(maxInput, 'max input must be editable in DM mode').toBeEditable({
+          timeout: 3_000,
+        });
+      }).toPass({ timeout: 30_000 });
       await maxInput.fill('27');
       await dmPage.getByRole('button', { name: /^guardar$/i }).click();
       // No "Sin permiso." error, and the new max persists (API-authoritative).

@@ -75,8 +75,13 @@ export function StatCell({
   const valueSizeClass = size === 'compact' ? 'text-lg' : 'text-2xl';
 
   // ── Compose container className ───────────────────────────────────────
+  // `relative` scopes any absolutely-positioned slot content (footer, value) to the
+  // cell. Without it such a child escapes to the initial containing block: the HP
+  // edit pencil rendered at the page's top-right corner, underneath the sticky
+  // topbar, where it was neither visible nor tappable. No visual effect on its own
+  // — `position: relative` with no offsets and no z-index creates no stacking context.
   const containerClasses = [
-    'flex flex-col items-center text-center rounded-md px-3 py-4',
+    'relative flex flex-col items-center text-center rounded-md px-3 py-4',
     accentGlowClass,
     surfaceClasses,
     isNull ? nullBorderClasses : '',

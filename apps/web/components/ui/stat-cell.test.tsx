@@ -91,4 +91,16 @@ describe('StatCell', () => {
     );
     expect(screen.getByTestId('footer-slot')).toBeTruthy();
   });
+
+  // Regression: the footer slot hosts absolutely-positioned content (the HP edit
+  // pencil, via HpEditorSlot). With no positioning context on the cell, that child
+  // resolved against the initial containing block and rendered at the page corner,
+  // underneath the sticky topbar — invisible and untappable. Covered end-to-end by
+  // journeys/j6-gm-owner (J6A2); asserted here at the atom, where the mistake is made.
+  it('T10: container is a positioning context, so absolute footer content stays in the cell', () => {
+    const { container } = render(
+      <StatCell label="PG" value={20} footer={<div className="absolute top-1 right-1">slot</div>} />,
+    );
+    expect(container.firstElementChild?.className).toContain('relative');
+  });
 });
