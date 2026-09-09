@@ -7,6 +7,9 @@ const actions = [
   { href: '/characters/new', icon: 'plus' as const,    label: 'Crear PJ'    },
   // Biblioteca W1 — Mesa tab removed; /campanas still reachable via Inicio (REQ-NAV-02).
   { href: '/campanas',       icon: 'compass' as const, label: 'Mesa'         },
+  // Tablero de anuncios — player-facing board of quests on offer. Fifth item
+  // wraps to a second row in the grid-cols-4 grid below; that's fine as-is.
+  { href: '/tablero',        icon: 'star' as const,    label: 'Tablero'      },
 ];
 
 export function QuickActions() {
