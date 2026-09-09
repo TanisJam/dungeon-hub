@@ -109,6 +109,7 @@ import {
 } from '@dungeon-hub/domain/character/class-resources';
 import { validateCharacterTransition } from '@dungeon-hub/domain/character/approval';
 import { validateImportEnvelope } from '@dungeon-hub/domain/character/import';
+import { slugify as slugifyForFilename } from '@dungeon-hub/compendium-import/slugify';
 import { importCharacter } from '../../use-cases/characters/import-character.js';
 import { resolveActorRole } from '../../use-cases/characters/resolve-actor-role.js';
 import { assertWritableForEdit } from '../../use-cases/characters/assert-writable.js';
@@ -137,7 +138,9 @@ import {
   type EntityId,
   type AbilityScoreModifierInput,
 } from '@dungeon-hub/domain/engine';
-import { slugifyForFilename } from './_slug.js';
+// Shared with the web download button and the compendium importer: one algorithm,
+// so an exported filename cannot disagree with itself across the two halves of
+// the app. REQ-EXP-SLUG-01/02/03.
 
 /**
  * Envelope returned by GET /characters/:id/export.
