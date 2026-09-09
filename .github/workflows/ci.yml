@@ -85,10 +85,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The 5etools dataset is not committed and not a submodule. Cached on the
-      # upstream ref so the ~112 MB clone happens once, not on every run.
+      # The 5etools dataset is not committed and not a submodule. Keying on the
+      # fetch script's contents is exact rather than approximate: the upstream
+      # commit is pinned inside that script, so bumping the pin — the only thing
+      # that changes the dataset — busts the cache, and nothing else does.
       - name: Cache the 5etools dataset
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/5etools
           key: 5etools-${{ hashFiles('scripts/fetch-5etools.sh') }}

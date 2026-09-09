@@ -18,7 +18,9 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - '54322:5432'
+      # Bound to loopback: the password is a known constant, so this must not be
+      # reachable from the rest of the network while a developer has it up.
+      - '127.0.0.1:54322:5432'
     volumes:
       - ./init-auth-schema.sql:/docker-entrypoint-initdb.d/00-auth-schema.sql:ro
     healthcheck:
@@ -60,7 +62,7 @@ services:
     volumes:
       - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - '54321:8000'
+      - '127.0.0.1:54321:8000'
     healthcheck:
       # 127.0.0.1, not localhost: /etc/hosts maps localhost to ::1 too, busybox wget
       # tries IPv6 first, and nginx listens only on IPv4 — so localhost here fails

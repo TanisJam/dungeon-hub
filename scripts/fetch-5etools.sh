@@ -13,9 +13,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${REPO_ROOT}/data/5etools"
 UPSTREAM="https://github.com/5etools-mirror-3/5etools-src.git"
-# Pinned to a branch rather than a tag: the mirror does not tag releases. Override
-# with FIVEETOOLS_REF=<branch|tag|sha> to reproduce an older dataset.
-REF="${FIVEETOOLS_REF:-main}"
+# Pinned to a commit, not to `main`. The mirror publishes no tags, and this runs in
+# CI on every pull request — following a third-party branch would mean the dataset
+# under our tests could change without a commit here saying so. Bumping it is a
+# deliberate act. Override with FIVEETOOLS_REF=<branch|tag|sha> for a one-off.
+REF="${FIVEETOOLS_REF:-e5d052071b635f58cc8006e9727053eaf78ea8f9}"
 
 if [ -d "${DEST}/data" ] && [ -f "${DEST}/data/races.json" ]; then
   echo "✅ data/5etools/data already present — nothing to do."
@@ -27,9 +29,13 @@ TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
 echo "📦 Fetching the 5etools dataset from ${UPSTREAM}@${REF}..."
-git clone --depth 1 --branch "${REF}" --filter=blob:none --sparse \
-  "${UPSTREAM}" "${TEMP_DIR}/src" 2>&1 | tail -2
-git -C "${TEMP_DIR}/src" sparse-checkout set data >/dev/null
+# --branch takes a branch or tag, never a SHA, so init + fetch the exact ref instead.
+git init -q "${TEMP_DIR}/src"
+git -C "${TEMP_DIR}/src" remote add origin "${UPSTREAM}"
+git -C "${TEMP_DIR}/src" config extensions.partialClone origin
+git -C "${TEMP_DIR}/src" sparse-checkout set --cone data
+git -C "${TEMP_DIR}/src" fetch -q --depth 1 --filter=blob:none origin "${REF}"
+git -C "${TEMP_DIR}/src" checkout -q FETCH_HEAD
 
 # reader.ts expects the standard layout: data/races.json, data/items.json,
 # data/class/class-*.json, data/spells/, data/bestiary/, …
