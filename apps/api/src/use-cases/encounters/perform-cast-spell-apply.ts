@@ -35,6 +35,7 @@ import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters, encounterCombatantConditions } from '../../infra/db/schema.js';
 import { isCombatantIncapacitated } from './load-combatant-incapacitated.js';
 import { isCombatantRaging } from './load-combatant-raging.js';
+import { isCombatantSurprisedFirstTurn } from './is-combatant-surprised-first-turn.js';
 import {
   rollMagicMissile,
   type RngFn,
@@ -142,6 +143,8 @@ export type PerformCastSpellApplyResult =
   | { ok: false; code: 'MULTI_TARGET_NOT_SUPPORTED' }
   // engine-incapacitated-gating — REQ-INC-03 (PHB p.290: can't take actions).
   | { ok: false; code: 'ACTOR_INCAPACITATED' }
+  // engine-surprise-round1 (REQ-SUR-S2-02, PHB p.189 — actions blocked while surprised)
+  | { ok: false; code: 'ACTOR_SURPRISED' }
   // engine-action-economy: caster's action budget exhausted for this turn (REQ-AE-02, PHB p.257).
   | { ok: false; code: 'ACTION_ALREADY_USED' }
   // engine-rage: caster is Raging — can't cast spells while raging (REQ-RAGE-06, PHB p.48).
@@ -157,6 +160,10 @@ export type PerformCastSpellApplyResult =
  *   2. Load caster combatant → NOT_FOUND 'attacker'
  *   3. Turn guard (currentCombatantId ≠ casterId → NOT_YOUR_TURN)
  *   4. Caster-is-PC guard (characterId null → CASTER_NOT_SPELLCASTER)
+ *   4a. Incapacitated gate → ACTOR_INCAPACITATED
+ *   4a.1. Surprised gate (REQ-SUR-S2-02, PHB p.189) → ACTOR_SURPRISED
+ *   4b. Action budget gate → ACTION_ALREADY_USED
+ *   4c. Raging gate (REQ-RAGE-06) → ACTOR_RAGING
  *   5. Single-target guard (targets.length !== 1 → MULTI_TARGET_NOT_SUPPORTED, REQ-SC-03)
  *   6. Load target combatant → NOT_FOUND 'target'
  *   7. Load caster character + consumeSpellSlot PRE-CHECK (fail-fast) → INSUFFICIENT_SLOT
@@ -223,6 +230,13 @@ export async function performCastSpellApply(
   // Server-authority: gate computed from DB-loaded conditions, never client-supplied.
   if (await isCombatantIncapacitated(casterId)) {
     return { ok: false, code: 'ACTOR_INCAPACITATED' };
+  }
+
+  // ── Step 4a.1: Surprised gate (REQ-SUR-S2-02, PHB p.189 — can't act on first surprised turn) ──
+  // Fail-fast AFTER incap gate, BEFORE action budget gate (ADR-3.2 version→turn→incap→SURPRISE ladder).
+  // No RNG involved — surprise gating is deterministic state-based check.
+  if (await isCombatantSurprisedFirstTurn(casterId)) {
+    return { ok: false, code: 'ACTOR_SURPRISED' };
   }
 
   // ── Step 4b: Action budget gate (REQ-AE-02, PHB p.257 — casting costs the action) ──
