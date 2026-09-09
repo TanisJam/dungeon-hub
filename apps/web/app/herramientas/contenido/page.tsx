@@ -10,6 +10,7 @@ import { V3Empty } from '@/components/ui';
 import { HERRAMIENTAS_SUBNAV_ITEMS } from '../_components/subnav-items';
 import { HomebrewUploadForm } from './_form';
 import { ExportWorldButton } from './_export-world-button';
+import { apiSupportsHomebrew } from './_api-supports-homebrew';
 
 /**
  * Contenido — DM page for custom content via JSON upload, items only
@@ -66,6 +67,12 @@ export default async function ContenidoPage() {
     );
   }
 
+  // Hybrid deploy: the UI can reach production before the endpoints it calls.
+  // No token means the probe cannot run — treat that as "supported" and let the
+  // page render, the same way an unreachable API does. Hiding a section over a
+  // missing session would be answering the wrong question.
+  const supported = token ? await apiSupportsHomebrew(aw.id, token) : true;
+
   return (
     <AppShell
       title="Herramientas"
@@ -76,16 +83,39 @@ export default async function ContenidoPage() {
     >
       <SubNav items={HERRAMIENTAS_SUBNAV_ITEMS} activePath="/herramientas/contenido" />
       <div className="px-4 py-4 space-y-6">
-        <HomebrewUploadForm worldId={aw.id} sourceCode={homebrewSourceCode(aw.id)} />
+        {supported ? (
+          <>
+            <HomebrewUploadForm worldId={aw.id} sourceCode={homebrewSourceCode(aw.id)} />
 
-        <div className="space-y-2 border-t border-line pt-6">
-          <h2 className="text-sm font-semibold text-ink">Exportar mundo</h2>
-          <p className="text-xs text-ink-mute">
-            Descargá un respaldo completo de tu mundo (NPCs, facciones, misiones, hexágonos,
-            puntos de interés y bitácora) en un archivo JSON.
-          </p>
-          <ExportWorldButton worldId={aw.id} />
-        </div>
+            <div className="space-y-2 border-t border-line pt-6">
+              <h2 className="text-sm font-semibold text-ink">Exportar mundo</h2>
+              <p className="text-xs text-ink-mute">
+                Descargá un respaldo completo de tu mundo (NPCs, facciones, misiones, hexágonos,
+                puntos de interés y bitácora) en un archivo JSON.
+              </p>
+              <ExportWorldButton worldId={aw.id} />
+            </div>
+          </>
+        ) : (
+          /* Rather than render a form and a button that both answer 404. The web
+             app deploys itself; the API does not (docs/onboarding/api-deploy.md),
+             so this page can arrive before its endpoints do. When they land, this
+             branch stops rendering on its own — no flag to remember to flip. */
+          <div
+            role="status"
+            className="rounded-md border border-line bg-surface px-4 py-6 text-center"
+          >
+            <p className="text-sm font-semibold text-ink">Esta sección todavía no está disponible</p>
+            <p className="mt-2 text-xs text-ink-mute">
+              Subir contenido propio y exportar el mundo necesitan una versión del API más nueva
+              que la que está corriendo. El código ya está en <code>main</code>; falta desplegar el
+              API, que se despliega a mano.
+            </p>
+            <p className="mt-2 text-xs text-ink-mute">
+              Mientras tanto podés seguir usando el resto de Herramientas.
+            </p>
+          </div>
+        )}
       </div>
     </AppShell>
   );
