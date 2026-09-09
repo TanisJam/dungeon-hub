@@ -7,6 +7,7 @@
  * in its unnamed subrace).
  */
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { classifyUnnamedSubrace, importRaces } from './races.js';
@@ -96,11 +97,14 @@ describe('classifyUnnamedSubrace — unnamed subrace disposition', () => {
 
 // ---------------------------------------------------------------------------
 // Integration: real races.json — verify the 5 unnamed-subrace stubs are
-// handled correctly end-to-end. Reads the actual 5etools data file shipped
-// with this repo.
+// handled correctly end-to-end. Reads the real 5etools data file from
+// `data/5etools/data/`, which is fetched separately and not committed.
 // ---------------------------------------------------------------------------
 
-describe('importRaces — real 5etools data integration', () => {
+// Skip-on-absent: this block skips cleanly when that directory is missing — the
+// same guard seed-pack.smoke.test.ts already uses. Without it a fresh clone
+// fails these seven tests on ENOENT.
+describe.skipIf(!existsSync(DATA_DIR))('importRaces — real 5etools data integration', () => {
   it('emits zero rows with placeholder name "${raceName} Variant" (was the bug)', async () => {
     const warnings: string[] = [];
     const rows = await importRaces(DATA_DIR, warnings);
