@@ -84,8 +84,18 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
         .filter({ hasText: 'PHB' })
         .first()
         .click();
-      await page.getByRole('button', { name: 'Acrobatics', exact: true }).first().click();
-      await page.getByRole('button', { name: 'Survival', exact: true }).first().click();
+      // Confirm each pick registered before making the next one. These chips are
+      // TOGGLES, so a blind retry would deselect rather than repair — and a click
+      // that lands before the island hydrates does nothing at all, which then
+      // fails one step later as "still on /wizard/class" with no hint that a skill
+      // was the cause. Asserting the state also checks the control reports it.
+      for (const skill of ['Acrobatics', 'Survival']) {
+        const chip = page.getByRole('button', { name: skill, exact: true }).first();
+        await expect(async () => {
+          if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
+          await expect(chip).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 });
+        }).toPass({ timeout: 15_000 });
+      }
       await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 10_000 });
       await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });

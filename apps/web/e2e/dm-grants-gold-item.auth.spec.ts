@@ -269,8 +269,13 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
     const currencyGrid = page.locator('[aria-label="Monedas"]');
     await expect(currencyGrid).toBeVisible({ timeout: 5_000 });
 
-    // Denomination labels: MC, MP, ME, MO, PP
-    for (const label of ['MC', 'MP', 'ME', 'MO', 'PP']) {
+    // Denomination labels: pp, gp, sp, cp — the PHB abbreviations the component
+    // actually renders. The spec asked for Spanish ones (MC/MP/ME/MO/PP) and for
+    // five of them; CurrencyStrip settled on four in English, with electrum
+    // de-emphasized on purpose (its own docblock: "PHB p.143 — Money: pp / gp /
+    // sp / cp shown; EP de-emphasized (design DA5)"). The spec predates that
+    // decision and had never run to notice.
+    for (const label of ['pp', 'gp', 'sp', 'cp']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 3_000 });
     }
 
