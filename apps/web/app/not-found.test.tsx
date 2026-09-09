@@ -1,11 +1,4 @@
-/**
- * Tests for the branded 404 page (REQ-UXP1-404-01).
- *
- * T1: Spanish heading present, default Next.js copy absent.
- * T2: Link back home (href="/inicio") present.
- * T3: Container uses dark-theme tokens (bg-paper|text-ink|border-line).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import NotFound from './not-found';

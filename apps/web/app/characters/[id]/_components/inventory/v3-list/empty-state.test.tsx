@@ -1,14 +1,4 @@
-/**
- * Component tests for EmptyState.
- *
- * Reqs: WIVLS-EMPTY-01 (spec #1063), WID4-CHIPS-01 (spec #1077)
- * Design: DA9 (Slice A deferred); DCE4 (Slice C: book + quest now enabled with real copy).
- *
- * a11y lock (REQ-INV-A11Y-SINGLE-CTA): CTA must be a real <button>, not <p role="button">,
- * and its accessible name must be DISTINCT from the "+ Agregar ítem" Picker button so
- * getByRole('button', { name }) never matches two elements (strict-mode safe).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EmptyState } from './empty-state.js';

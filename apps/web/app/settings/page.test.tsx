@@ -1,7 +1,4 @@
-/**
- * Test for /settings index redirect to /dashboard (account preferences live there).
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }));

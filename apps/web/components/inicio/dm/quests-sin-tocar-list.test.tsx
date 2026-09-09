@@ -1,9 +1,4 @@
-/**
- * Tests for QuestsSinTocarList component
- *
- * REQ-IDM-QUESTS-LIST-06: section heading, N rows with title + lastChange, icon-cell present
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { QuestsSinTocarList } from './quests-sin-tocar-list';

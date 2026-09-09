@@ -560,7 +560,7 @@ describe('engine-incapacitated-gating — Incapacitated action/reaction gate (PH
           hpMax: 20,
         },
       ];
-      const { encounterId, wizardCombatantId, npcCombatantId, extraCombatants } = await makeFreshEncounter(
+      const { encounterId, wizardCombatantId, extraCombatants } = await makeFreshEncounter(
         'INC-T6 incap defender resolve',
         extras,
       );

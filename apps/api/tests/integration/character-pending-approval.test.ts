@@ -13,7 +13,7 @@ import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-u
 // ---------------------------------------------------------------------------
 describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
   let alice: TestUser;
-  let campaignId: string;
+  let _campaignId: string;
   let worldId: string;
 
   beforeAll(async () => {
@@ -28,7 +28,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
         payload: { name: "Alice's Campaign" },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
     worldId = campaign.worldId;
   });
 
@@ -177,7 +177,7 @@ describe('D.1 + D.3 — pending_approval enum + transition guard', () => {
 // ---------------------------------------------------------------------------
 describe('D.2 — GET /characters status filter', () => {
   let alice: TestUser;
-  let campaignId: string;
+  let _campaignId: string;
   let worldId: string;
   let draftId: string;
   let activeId: string;
@@ -195,7 +195,7 @@ describe('D.2 — GET /characters status filter', () => {
         payload: { name: "Alice's Filter Campaign" },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
     worldId = campaign.worldId;
 
     // Create a draft character

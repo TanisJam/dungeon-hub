@@ -1,17 +1,4 @@
-/**
- * app-shell-caller-role.test.tsx — AppShell/RoleSwitcher gating via callerRole.
- *
- * WT-DPPM-A-03: callerRole='player' → RoleSwitcher NOT rendered.
- * WT-DPPM-A-04: callerRole absent/undefined → canBeDM defaults false → toggle NOT rendered.
- *   ADR-C2 (Slice C): canBeDMProp default is now FALSE (flipped from true). When callerRole
- *   is undefined AND canBeDM is omitted, the pill is hidden by default (safe default-deny).
- * WT-DPPM-A-05: callerRole='gm' → RoleSwitcher IS rendered (regression guard).
- *
- * ADR-A5 / ADR-C2: default flipped to false in Slice C (REQ-DPPMC-SHELL-02).
- * SDD: dm-player-play-model Slice A (REQ-DPPM-A-RS-01..03, SC-RS-01..03) +
- *      Slice C (WT-DPPMC-C2, REQ-DPPMC-SHELL-02).
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

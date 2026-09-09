@@ -1,18 +1,4 @@
-/**
- * Tests for ProgressBar atom — unifies the track+fill progress bars
- * (sheet-hero XP, vital-grid HP, codex discovery) — D2 batch-1 finding #1840 f2.
- *
- * T1: renders role="progressbar" with aria-valuenow/min/max
- * T2: fill width = round(value/max*100)%
- * T3: clamps fill at 100% when value > max
- * T4: max<=0 → 0% (no division by zero)
- * T5: tone="arcane" → gradient fill class
- * T6: tone defaults to accent → bg-accent fill
- * T7: height="sm" → h-1 track; default (md) → h-1.5
- * T8: trackClassName + className applied to the track element
- * T9: ariaLabel applied to the progressbar element
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ProgressBar } from './progress-bar';

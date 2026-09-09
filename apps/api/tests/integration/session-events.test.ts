@@ -12,8 +12,8 @@ describe('sessions — Slice 2 (events)', () => {
   let outsider: TestUser;
   let campaignId: string;
   let worldId: string;
-  let aliceCharId: string;
-  let bobCharId: string;
+  let _aliceCharId: string;
+  let _bobCharId: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -37,7 +37,7 @@ describe('sessions — Slice 2 (events)', () => {
     await addCampaignAndWorldMember(campaignId, alice.id, 'player');
     await addCampaignAndWorldMember(campaignId, bob.id, 'player');
 
-    aliceCharId = (
+    _aliceCharId = (
       await app
         .inject({
           method: 'POST',
@@ -47,7 +47,7 @@ describe('sessions — Slice 2 (events)', () => {
         })
         .then((r) => r.json())
     ).id;
-    bobCharId = (
+    _bobCharId = (
       await app
         .inject({
           method: 'POST',

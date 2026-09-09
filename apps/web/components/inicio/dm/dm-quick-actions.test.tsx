@@ -1,13 +1,4 @@
-/**
- * Tests for DMQuickActions component
- *
- * Biblioteca W1 — REQ-NAV-02, REQ-DMTOOLS-01:
- *   - DM QuickActions renders /campanas (Mesa absorbed into Inicio).
- *   - DM QuickActions renders /herramientas/facciones (Herramientas del DM entry).
- *
- * REQ-IDM-QUICK-ACTIONS-05: Iniciativa Link to /encuentros, NPC + Loot as stub buttons with aria-disabled.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { DMQuickActions } from './dm-quick-actions';

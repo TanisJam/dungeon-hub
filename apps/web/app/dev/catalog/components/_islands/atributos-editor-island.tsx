@@ -38,7 +38,7 @@ export function AtributosEditorIsland({ currentStats, statusLocked, isDm }: Prop
 
   function handleChange(key: keyof AbilityScores, value: string) {
     const num = parseInt(value, 10);
-    if (!isNaN(num)) setScores((prev) => ({ ...prev, [key]: num }));
+    if (!Number.isNaN(num)) setScores((prev) => ({ ...prev, [key]: num }));
   }
 
   function handleSubmit(e: React.FormEvent) {

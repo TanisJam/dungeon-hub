@@ -1,19 +1,13 @@
-/**
- * TermProvider state machine tests.
- * Tests event delegation, fetch dedup, auth guard, and keyboard dismissal.
- *
- * Uses fake timers to advance open/close delays without real waits.
- */
-import React from 'react';
+
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { TermProvider } from '../TermProvider';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSpan(kind: string, slug: string, source = 'PHB'): HTMLSpanElement {
+function _makeSpan(kind: string, slug: string, source = 'PHB'): HTMLSpanElement {
   const span = document.createElement('span');
   span.setAttribute('data-compendium-ref', `${kind}|${slug}|${source}`);
   return span;

@@ -1,13 +1,4 @@
-/**
- * Unit tests for V3Empty component.
- *
- * T1: renders title prop as visible text.
- * T2: renders optional sub prop when provided; absent when omitted.
- * T3: renders an Icon element (glyph container present with aria-hidden svg).
- * T4 (codex-rehome ADR-5): renders CTA link when cta prop provided; 44px tap-target.
- * T5 (codex-rehome ADR-5): no CTA rendered when cta prop is omitted.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { V3Empty } from './empty';

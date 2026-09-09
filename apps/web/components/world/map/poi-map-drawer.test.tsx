@@ -42,7 +42,7 @@ function makePoi(overrides: Partial<PoiRow> = {}): PoiRow {
   };
 }
 
-const noop = vi.fn();
+const _noop = vi.fn();
 
 function renderDrawer(props: Partial<Parameters<typeof PoiMapDrawer>[0]> = {}) {
   const defaults = {

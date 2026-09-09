@@ -1,19 +1,4 @@
-/**
- * Unit tests for StatCell atom — strict TDD (RED then GREEN)
- *
- * T1: renders label text and value
- * T2: size="compact" → value span has text-lg; default → text-2xl
- * T3: surface="paper" → container has bg-paper-soft and NOT border-line;
- *     default surface → has border-line
- * T4: value={null} → renders "—" and container has border-dashed
- * T5: onClick provided → renders a <button>; without onClick → no button role
- * T6: selected → className contains border-accent-deep
- * T7: accent="teal" → has class ficha-vital-ac AND still border-line (layered);
- *     accent="peach" → has ficha-vital-hp and does NOT emit bg-surface
- * T8: string sub renders in a span; node sub (pass <span data-testid="node-sub"/>) renders the node
- * T9: footer node renders
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { StatCell } from './stat-cell';

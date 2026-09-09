@@ -86,6 +86,10 @@ export function InventoryDetailIsland({ characterId, children }: InventoryDetail
   return (
     <div
       className="inventory-init-detail-root"
+      // Non-interactive delegation root (DBE1, see file doc comment) — the only
+      // clicks it ever sees originate from the real <button data-instance-id>
+      // rows it wraps, which are already natively keyboard-accessible.
+      role="none"
       onClick={handleDelegatedClick}
     >
       {children}

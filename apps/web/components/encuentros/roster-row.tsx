@@ -58,11 +58,13 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
               <span
                 data-action-economy
                 className="flex gap-1 text-xs text-ink-soft"
+                role="group"
                 aria-label="Economía de turno"
               >
                 <span
                   title="Acción"
                   className={c.actionUsed ? 'opacity-40' : 'opacity-100'}
+                  role="img"
                   aria-label={c.actionUsed ? 'Acción usada' : 'Acción disponible'}
                 >
                   A
@@ -70,6 +72,7 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
                 <span
                   title="Acción adicional"
                   className={c.bonusActionUsed ? 'opacity-40' : 'opacity-100'}
+                  role="img"
                   aria-label={c.bonusActionUsed ? 'Acción adicional usada' : 'Acción adicional disponible'}
                 >
                   B
@@ -77,6 +80,7 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
                 <span
                   title="Reacción"
                   className={c.reactionUsed ? 'opacity-40' : 'opacity-100'}
+                  role="img"
                   aria-label={c.reactionUsed ? 'Reacción usada' : 'Reacción disponible'}
                 >
                   R
@@ -84,6 +88,7 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
                 <span
                   title="Ataques restantes"
                   data-attacks-remaining
+                  role="img"
                   aria-label={`${c.attacksRemaining} ataques restantes`}
                 >
                   ⚔{c.attacksRemaining}

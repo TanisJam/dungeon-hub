@@ -54,7 +54,6 @@ import {
   computeSpellSlots,
   SPELLCASTING_ABILITY,
 } from '@dungeon-hub/domain/character/spellcasting';
-import { applyDamage } from '@dungeon-hub/domain/encounter';
 import { computeCharacterSheet } from '@dungeon-hub/domain/character/sheet';
 import { abilityModifier } from '@dungeon-hub/domain/character/multiclass';
 import { resolveCounterspell, type RngFn } from '@dungeon-hub/domain/engine';

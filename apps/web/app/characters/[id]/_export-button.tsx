@@ -15,7 +15,7 @@ interface Props {
 
 type State = 'idle' | 'loading' | 'error';
 
-export function ExportButton({ characterId, characterName }: Props) {
+export function ExportButton({ characterId }: Props) {
   const [state, setState] = useState<State>('idle');
   const [error, setError] = useState<string | null>(null);
 

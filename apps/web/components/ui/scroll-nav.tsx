@@ -15,7 +15,7 @@
  * no scroll) — structurally incompatible with ScrollNav.
  */
 
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 type As = 'div' | 'nav';
 

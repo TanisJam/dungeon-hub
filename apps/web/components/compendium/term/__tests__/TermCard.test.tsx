@@ -1,10 +1,4 @@
-/**
- * Direct unit tests for TermCard.
- *
- * TERM-RENDER — loading skeleton, ok entry, and error state.
- * No provider needed — TermCard is a pure presentational component.
- */
-import React from 'react';
+
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TermCard } from '../TermCard';

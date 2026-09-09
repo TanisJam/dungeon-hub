@@ -1,16 +1,4 @@
-/**
- * Tests for CharacterPortrait atom.
- *
- * T1: renders the initial derived from name
- * T2: size='md' (default) — applies personajes-portrait CSS class (no hardcoded hex)
- * T3: size='sm' — applies pendientes-portrait CSS class
- * T4: empty/whitespace name → renders '?'
- * T5: passes additional className to the root element
- * T6: size='md' renders w-[72px] sizing class
- * T7: size='sm' does NOT have w-[72px] (uses pendientes-portrait fixed 48px)
- * T8: data-portrait-size attribute matches the size prop (for test targeting)
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CharacterPortrait } from './character-portrait';

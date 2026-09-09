@@ -1,18 +1,4 @@
-/**
- * Tests for ListRow atom.
- *
- * T1: renders title text
- * T2: renders optional subtitle text
- * T3: title-only (no subtitle) — subtitle element absent
- * T4: passes className to root element
- * T5: trailing slot renders arbitrary ReactNode (e.g. a Pill)
- * T6: no trailing — trailing slot absent
- * T7: title truncation — root contains a truncate class on the title span
- * T8: subtitle truncation — subtitle span contains truncate when present
- * T9: root has py-2 (flat divider spacing)
- * T10: root has flex items-center justify-between gap-2
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ListRow } from './list-row';

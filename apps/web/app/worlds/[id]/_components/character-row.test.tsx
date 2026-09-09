@@ -1,10 +1,4 @@
-/**
- * CharacterRow — DM world landing character card row.
- *
- * REQ-WDCL-WEB-LANDING (spec #857) — name, owner username, class+level, status pill,
- * link to /characters/[id], tap target ≥44px (we enforce ≥64px via min-h-[64px]).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

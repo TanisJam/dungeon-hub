@@ -7,7 +7,6 @@
 // "Application error" page. Client component per Next.js error.tsx contract.
 
 import { useEffect } from 'react';
-import Link from 'next/link';
 import { Button, CrowMark, Icon } from '@/components/ui';
 
 export default function Error({

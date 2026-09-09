@@ -7,13 +7,15 @@ import type {
 import { slugify } from '../slugify';
 
 function refLink(kind: string, name: string, source: string) {
+  // Link-styled span (not a real <a> — no href, no navigation), matching the
+  // data-compendium-ref convention in tags/reference.tsx (lint/a11y/useValidAnchor).
   return (
-    <a
+    <span
       data-compendium-ref={`${kind}|${slugify(name)}|${source}`}
       className="italic text-ink-soft underline cursor-help"
     >
       {name}
-    </a>
+    </span>
   );
 }
 

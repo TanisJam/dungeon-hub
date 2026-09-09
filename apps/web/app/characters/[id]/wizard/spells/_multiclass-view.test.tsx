@@ -1,14 +1,4 @@
-/**
- * Component tests for MulticlassSpellsView and TabBar.
- *
- * REQ-SP06-LOOP-CASTERS: renders one tab per caster class (2+ classes)
- * REQ-SP06-TAB-ACTIVE: switching tabs preserves picks on inactive tab
- * REQ-SP06-TAB-BADGE-INCOMPLETE: incomplete dot appears/clears per validateSpellsPick
- * REQ-SP06-SEQUENTIAL-SAVE: Siguiente triggers sequential save per class then proceedToReview
- * REQ-SP06-SEQUENTIAL-SAVE (failure): save failure switches active tab to failing class + shows error
- * REQ-SP06-SINGLE-CASTER-NO-TAB-BAR: SinglePickerView renders no tab element
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 

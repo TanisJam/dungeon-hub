@@ -1,19 +1,4 @@
-/**
- * LevelUpFlow — component tests for the 6-step level-up stepper.
- *
- * Closes W1 from SDD multiclass-class-step verify-report (#884).
- *
- * Tests cover:
- *   T1: ModeStep renders 2 options when multiclassingEnabled=true, 1 option when false.
- *   T2: Same-class branch with single owned class — class-picker shows the class and
- *       clicking it advances to HP step (no auto-skip: flow always visits ClassStep).
- *   T3: HP step with method='roll' → submit calls submitLevelUp with hp.method='roll'.
- *   T4: ASI-feat step rendered when target class level is an ASI level (isAsiLevel=true);
- *       ASI tab is default; submit disabled until delta sum === 2.
- *   T5: Review step → submit happy path calls submitLevelUp and shows success screen.
- *   T6: Submit error path → mocked error → inline alert shown, flow stays open.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 

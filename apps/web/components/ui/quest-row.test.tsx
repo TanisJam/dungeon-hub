@@ -1,16 +1,4 @@
-/**
- * Tests for QuestRow atom.
- *
- * T1: renders title text
- * T2: renders subtitle text (lastChange)
- * T3: icon cell (inicio-row-quest-ic class) is present
- * T4: chevron (›) is present
- * T5: root has rounded-xl bg-surface-raised (card-row style)
- * T6: root has data-quest-row attribute (for test targeting by parent tests)
- * T7: long title — title element has truncate class
- * T8: passes className to root element
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QuestRow } from './quest-row';

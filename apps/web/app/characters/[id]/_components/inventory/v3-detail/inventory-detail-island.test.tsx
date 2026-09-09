@@ -1,12 +1,4 @@
-/**
- * Tests for InventoryDetailIsland — event delegation + detail fetch + V3Sheet wiring.
- *
- * Reqs: WIDI-ISLAND-01 (spec #1070)
- * Design: DBE1, DBE2 (design #1071) — event delegation on single root.
- *
- * Uses RTL + vi.fn() mocking fetchInventoryDetail Server Action (FIX 2).
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { InventoryDetailIsland } from './inventory-detail-island';

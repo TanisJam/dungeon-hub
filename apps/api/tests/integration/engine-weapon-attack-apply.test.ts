@@ -881,7 +881,7 @@ describe('engine-weapon-attack-apply — POST /encounters/:id/actions/attack/app
       //
       // Pragmatic approach: insert via drizzle directly in the test helper.
       const { db: testDb } = await import('../../src/infra/db/client.js');
-      const { encounterCombatants: ec, encounters: enc } = await import('../../src/infra/db/schema.js');
+      const { encounterCombatants: ec } = await import('../../src/infra/db/schema.js');
       const { eq: drEq } = await import('drizzle-orm');
 
       const app = await getTestApp();

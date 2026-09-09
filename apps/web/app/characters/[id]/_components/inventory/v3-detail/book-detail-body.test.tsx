@@ -1,13 +1,4 @@
-/**
- * Tests for BookDetailBody — STRICT TDD (RED first).
- *
- * Reqs: WIBD-BODY-01 (spec #1077)
- * Design: DCE1 (RSC), DC3 (no persistence — pagesRead client-stubbed), DC6 (stub CTA)
- *
- * House rule (PHB p.114): "Leer durante descanso largo" is a house rule —
- * PHB only specifies spellbooks. Generic tome reading is not in PHB.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BookDetailBody } from './book-detail-body';

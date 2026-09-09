@@ -138,7 +138,7 @@ describe('codex-knowledge A-4: GET /characters/:id/knowledge/:kind — all 7 kin
       headers: { authorization: `Bearer ${player.accessToken}` },
     });
     expect(res.statusCode).toBe(400);
-    const body = res.json();
+    const _body = res.json();
     // Must be VALIDATION_FAILED or have issues
     // The current implementation uses Zod enum validation which returns 400
     expect(res.statusCode).toBe(400);

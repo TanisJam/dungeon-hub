@@ -272,7 +272,7 @@ test.describe('J6B — GM+owner: spell prep — full spellbook visible + prep pe
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
       // Should see the spellcasting card
-      const spellCard = dmPage.locator('[class*="card"], .rounded-md, section').filter({
+      const _spellCard = dmPage.locator('[class*="card"], .rounded-md, section').filter({
         has: dmPage.getByText(/wizard/i),
       }).first();
       // Actually look for a specific indicator: spell count or spell names

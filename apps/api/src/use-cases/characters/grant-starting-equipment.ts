@@ -29,7 +29,7 @@ import {
 } from '@dungeon-hub/domain/character/inventory';
 import { db } from '../../infra/db/client.js';
 import { characters, compendiumClasses, compendiumBackgrounds } from '../../infra/db/schema.js';
-import { loadItemData, loadItemDataMany } from './load-item-data.js';
+import { loadItemDataMany } from './load-item-data.js';
 import { and } from 'drizzle-orm';
 
 // ─── Result Types ─────────────────────────────────────────────────────────────

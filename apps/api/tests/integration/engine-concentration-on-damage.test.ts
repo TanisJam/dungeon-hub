@@ -32,7 +32,7 @@ import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { db } from '../../src/infra/db/client.js';
-import { characterConcentration, characters } from '../../src/infra/db/schema.js';
+import { characterConcentration } from '../../src/infra/db/schema.js';
 import { randomUUID } from 'node:crypto';
 import {
   prepareConcentrationCheck,
@@ -102,7 +102,7 @@ const hasConcentrationRow = async (characterId: string): Promise<boolean> => {
 describe('prepare/resolveConcentrationCheck — guard branches + success/fail (B1c migration)', () => {
   let gm: TestUser;
   let worldId: string;
-  let campaignId: string;
+  let _campaignId: string;
   let pcCharId: string;
 
   beforeAll(async () => {
@@ -117,7 +117,7 @@ describe('prepare/resolveConcentrationCheck — guard branches + success/fail (B
         payload: { name: 'Conc-on-damage B1c test campaign' },
       })
       .then((r) => r.json());
-    campaignId = campaign.id;
+    _campaignId = campaign.id;
     worldId = campaign.worldId;
 
     pcCharId = await makeCharacter(app, gm.accessToken, worldId, 'Kyros (conc-damage test)');

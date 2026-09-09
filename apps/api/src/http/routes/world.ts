@@ -403,7 +403,7 @@ export const worldRoute: FastifyPluginAsync = async (app) => {
 
       const result = await attachNpcFaction(npcId, factionId);
       if (!result.ok) {
-        const firstIssue = result.issues[0];
+        const _firstIssue = result.issues[0];
         // PK duplicate is handled below; cross-world and not-found are 400.
         return reply.code(400).send({ error: 'VALIDATION_FAILED', issues: result.issues });
       }

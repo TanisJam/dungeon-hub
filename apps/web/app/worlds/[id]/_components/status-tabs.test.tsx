@@ -1,9 +1,4 @@
-/**
- * StatusTabs — DM world landing segmented control.
- *
- * REQ-WDCL-WEB-LANDING (spec #857) — tab → URL `?status=` round-trip.
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

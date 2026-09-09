@@ -101,7 +101,7 @@ describe('CharacterCard', () => {
       <CharacterCard
         href="/characters/1"
         name="Brann"
-        action={<button data-testid="action-btn">Action</button>}
+        action={<button type="button" data-testid="action-btn">Action</button>}
       >
         <span>content</span>
       </CharacterCard>,

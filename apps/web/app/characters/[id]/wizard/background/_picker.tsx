@@ -815,7 +815,6 @@ export function FeaturePicker({
       {/* Filter input */}
       <input
         type="search"
-        role="searchbox"
         placeholder="Filtrar característica…"
         value={filterQuery}
         onChange={(e) => setFilterQuery(e.target.value)}

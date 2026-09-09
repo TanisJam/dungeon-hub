@@ -11,7 +11,6 @@
  *   Component exists; tests exercise new coord fields + button introduced in Layer 4.
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { PoiAccordion } from './poi-accordion';

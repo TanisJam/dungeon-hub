@@ -1,13 +1,4 @@
-/**
- * Tests for ConsumableDetailBody — optimistic decrement (DB4).
- *
- * Reqs: WICD-BODY-01 (spec #1070)
- * Design: DBE3, DB4 (design #1071) — 'use client' owns local counter state.
- *
- * PHB p.153 — Adventuring Gear (potions, action to drink).
- * DMG p.139-140 — Charges.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ConsumableDetailBody } from './consumable-detail-body';

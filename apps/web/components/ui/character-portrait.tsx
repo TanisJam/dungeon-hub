@@ -56,6 +56,7 @@ export function CharacterPortrait({
         className={rootClass}
         data-portrait-size="hero"
         style={{ padding: '2px' }}
+        role="img"
         aria-label={ariaLabel}
       >
         <div className="ficha-portrait-inner flex h-full w-full items-center justify-center rounded-sm">
@@ -73,7 +74,7 @@ export function CharacterPortrait({
   const rootClass = [baseClasses, className].filter(Boolean).join(' ');
 
   return (
-    <div className={rootClass} data-portrait-size={size} aria-label={ariaLabel}>
+    <div className={rootClass} data-portrait-size={size} role="img" aria-label={ariaLabel}>
       {initial}
     </div>
   );

@@ -1,10 +1,4 @@
-/**
- * Tests for InventoryDetailHero — STRICT TDD (RED first).
- *
- * Reqs: WIDS-SHELL-01, WIE10-MIGRATE-01 (spec #1070)
- * Design: DBE1, DBE5 (design #1071)
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { InventoryDetailHero } from './inventory-detail-hero';

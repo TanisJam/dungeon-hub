@@ -1,17 +1,5 @@
-/**
- * EquipmentPicker component tests — Batch C
- *
- * Tests:
- * C.6 — Round-trip: render with stored selections → selections appear pre-populated
- * C.8a — Package-vs-gold toggle: selecting gold path hides choice rows, shows gold field + roll button
- * C.8b — Roll button: produces a value in [50, 200] for "5d4 × 10"
- * C.8c — Category key format: category pick generates "row{i}-{slot}-cat{j}" key
- * C.8d — Fixed items rendered read-only
- * C.8e — Gold field validates non-negative integer
- */
 
-import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type {
   ParsedClassEquipment,

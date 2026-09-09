@@ -226,7 +226,7 @@ describe('POST /characters/:id/classes/:classSlug/level-up', () => {
     // Wizard subclass unlock = L2. Ya elegimos al subir L1→L2 si se requería.
     // En L2→L3, no se reclama re-elección.
     // Para este test, primero hacemos L1→L2 con subclass (Wizard requiere a L2).
-    const app = await getTestApp();
+    const _app = await getTestApp();
     // No vamos a setear el wizard porque su subclass unlock es L2; el test
     // anterior es suficiente. Acá solo comprobamos el caso "no re-pide".
     expect(true).toBe(true);

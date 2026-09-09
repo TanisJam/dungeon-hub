@@ -1,12 +1,4 @@
-/**
- * Tests for SheetTabs — ficha-tab-active class assertions.
- *
- * T1: active tab link has class ficha-tab-active.
- * T2: inactive tabs do NOT have class ficha-tab-active.
- * T3: codex-rehome (Stage 2) — the "Códex" tab is re-homed to the main /codex
- *     menu tab (active-character scoped); it is NO LONGER in the sheet tab bar.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SheetTabs } from './sheet-tabs';

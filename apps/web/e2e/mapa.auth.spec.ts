@@ -153,7 +153,7 @@ test('DM expands a hex and POI accordion loads lazily', async ({ page }) => {
 
   // The expanded content area renders either "Cargando POIs…" or the POI list/empty state.
   // Wait for the loading state to resolve — the accordion div becomes visible.
-  const accordionContent = page.locator('[aria-expanded="true"]').locator('xpath=following-sibling::*');
+  const _accordionContent = page.locator('[aria-expanded="true"]').locator('xpath=following-sibling::*');
   // Verify the page doesn't crash (accordion stays in DOM)
   await expect(poiToggle).toBeVisible({ timeout: 5_000 });
 });

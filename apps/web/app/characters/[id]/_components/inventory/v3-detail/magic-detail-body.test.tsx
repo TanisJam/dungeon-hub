@@ -1,13 +1,4 @@
-/**
- * Tests for MagicDetailBody — STRICT TDD (RED first).
- *
- * Reqs: WIMD-BODY-01 (spec #1077)
- * Design: DCE1 (RSC), DC6 (stub CTAs — no onClick), DC2 (no compute fn)
- *
- * PHB p.136-138: Magic Items — Attunement.
- * PHB p.138: "You can attune to it over a short rest."
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MagicDetailBody } from './magic-detail-body';

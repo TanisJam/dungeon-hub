@@ -75,6 +75,7 @@ export function BookDetailBody({ detail }: BookDetailBodyProps) {
       {/* DC6 + DC3: Disabled CTA stub — no onClick, no persistence (house rule PHB p.114) */}
       <div className="inventory-init-detail-actions" style={{ marginTop: '14px' }}>
         <button
+          type="button"
           disabled
           className="inventory-init-detail-use-big"
           data-stub="true"

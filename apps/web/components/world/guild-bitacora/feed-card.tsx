@@ -194,7 +194,7 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
           (last-write-wins); no "quitar sello" control — the API does not
           accept clearing a seal (see sealContribution doc comment). */}
       {isGm && (
-        <div className="flex flex-col gap-1.5 border-t border-line pt-2" aria-label="Sellar aporte">
+        <div className="flex flex-col gap-1.5 border-t border-line pt-2" role="group" aria-label="Sellar aporte">
           <div className="flex gap-2">
             <button
               type="button"

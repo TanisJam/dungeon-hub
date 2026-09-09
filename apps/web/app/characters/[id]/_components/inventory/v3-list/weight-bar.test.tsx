@@ -1,13 +1,4 @@
-/**
- * Component tests for WeightBar.
- *
- * Reqs: WIVLS-WEIGHT-01 (spec #1063)
- * PHB p.176 — Lifting and Carrying: carry limit = STR × 15 lbs.
- * Design DA6: weight bar gradient uses existing --color-success → --color-accent tokens.
- *
- * RED FIRST: tests written before component exists.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { WeightBar } from './weight-bar.js';

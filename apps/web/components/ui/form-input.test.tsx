@@ -1,14 +1,6 @@
-/**
- * Unit tests for FormInput component — B1 (web-component-catalog)
- *
- * T1: renders <input> by default with min-h-[44px] class
- * T2: multiline=true renders <textarea> WITHOUT min-h-[44px]
- * T3: forwards value and onChange to underlying element
- * T4: forwards id prop to underlying element
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { FormInput } from './form-input';
 
 describe('FormInput', () => {

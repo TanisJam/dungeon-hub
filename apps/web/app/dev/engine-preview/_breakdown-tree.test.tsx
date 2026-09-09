@@ -1,12 +1,4 @@
-/**
- * _BreakdownTree — component tests (Strict TDD RED → GREEN)
- *
- * REQ-TREE-02: Component test covers value + all source labels.
- * Scenarios: "Component test — 2 sources + 1 nested child" (spec #1111).
- *
- * Note: afterEach(cleanup) is GLOBAL in vitest.setup.ts — do NOT re-add here.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

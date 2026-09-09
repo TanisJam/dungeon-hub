@@ -65,7 +65,7 @@ export function AtributosEditor({
 
   function handleChange(key: keyof AbilityScores, value: string) {
     const num = parseInt(value, 10);
-    if (!isNaN(num)) {
+    if (!Number.isNaN(num)) {
       setScores((prev) => ({ ...prev, [key]: num }));
     }
   }

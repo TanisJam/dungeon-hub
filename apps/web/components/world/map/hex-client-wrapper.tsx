@@ -91,7 +91,7 @@ export function HexClientWrapper({
   // Cache loaded POIs per hexId. This is a Map so re-expanding doesn't re-fetch.
   // The Map is stored in state so updates (after POI create/delete) propagate correctly.
   // REQ-MAP-01: listPois NOT called at page load.
-  const [poisCache, setPoisCache] = useState<Map<string, PoiRow[]>>(new Map());
+  const [_poisCache, setPoisCache] = useState<Map<string, PoiRow[]>>(new Map());
 
   // Called by PoiAccordion on first expand (or after mutation to refresh).
   // Uses cache if available; calls Server Action if not.

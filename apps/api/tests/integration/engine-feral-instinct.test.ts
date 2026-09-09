@@ -126,7 +126,7 @@ describe('engine-feral-instinct — POST /encounters/:id/actions/roll-initiative
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
+  const _expectOk = async (label: string, res: { statusCode: number; body: string }) => {
     if (res.statusCode !== 200 && res.statusCode !== 201) {
       throw new Error(`${label}: expected 200/201, got ${res.statusCode} — ${res.body}`);
     }

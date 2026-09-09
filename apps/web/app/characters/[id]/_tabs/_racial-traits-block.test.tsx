@@ -1,16 +1,4 @@
-/**
- * Component tests for RacialTraitsBlock.
- *
- * SCEN-RT-10: renders populated list — heading, trait names, text, source badges
- * SCEN-RT-11: empty list → renders nothing
- * SCEN-RT-12 (web): receives racialTraits=[] → renders nothing without throwing
- * Additional: multi-paragraph text renders with visible line breaks
- *
- * PHB citations:
- *   Fey Ancestry: PHB p.23 — Elf trait
- *   Mask of the Wild: PHB p.24 — Wood Elf subrace trait
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { RacialTraitsBlock } from './_racial-traits-block';

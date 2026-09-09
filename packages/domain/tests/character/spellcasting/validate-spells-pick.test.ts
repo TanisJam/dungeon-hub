@@ -23,7 +23,7 @@ function makeLimits(overrides: Partial<SpellLimitsView> = {}): SpellLimitsView {
   };
 }
 
-function makeSpells(...args: Array<[string, string]>): Array<{ slug: string; source: string }> {
+function _makeSpells(...args: Array<[string, string]>): Array<{ slug: string; source: string }> {
   return args.map(([slug, source]) => ({ slug, source }));
 }
 

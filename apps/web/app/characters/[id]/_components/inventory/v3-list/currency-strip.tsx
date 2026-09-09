@@ -23,7 +23,7 @@ const COINS: ReadonlyArray<{ key: keyof Currency; label: string; color: string }
 
 export function CurrencyStrip({ currency }: CurrencyStripProps) {
   return (
-    <div className="inventory-init-currency" aria-label="Monedas">
+    <div className="inventory-init-currency" role="group" aria-label="Monedas">
       {COINS.map(({ key, label, color }) => (
         <div key={key} className="coin">
           <span className="v" style={{ color }}>{currency[key] ?? 0}</span>

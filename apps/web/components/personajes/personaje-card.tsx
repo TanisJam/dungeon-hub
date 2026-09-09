@@ -24,7 +24,6 @@ export function PersonajeCard({
   char,
   worldName,
   highlight = false,
-  activeCharacterId,
 }: {
   char: RosterCharacter;
   worldName?: string;

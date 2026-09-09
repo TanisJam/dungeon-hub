@@ -1,10 +1,4 @@
-/**
- * Component tests for InventoryV3List.
- *
- * Reqs: WIVS-SCOPE-01, WED-CSS-SCOPED-06 (spec #1063)
- * Mirrors the WED-CSS-SCOPED-05 pattern from compendium-screen.test.tsx.
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { InventoryV3List } from './inventory-v3-list.js';

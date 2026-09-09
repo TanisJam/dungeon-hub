@@ -1,14 +1,4 @@
-/**
- * ApprovalActions — DM approve/reject/revert button matrix.
- *
- * SDD dm-session-panel (spec #857):
- *   REQ-CAU-APPROVE-BUTTON — gm + pending → "Aprobar" visible
- *   REQ-CAU-REJECT-BUTTON  — gm + pending → "Rechazar" visible
- *   REQ-CAU-REVERT-BUTTON  — gm + active  → "Devolver a borrador" visible
- *   Non-GM (player/null)   → nothing rendered
- *   GM + other statuses    → nothing rendered
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

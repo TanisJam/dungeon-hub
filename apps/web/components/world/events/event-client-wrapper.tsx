@@ -158,6 +158,7 @@ export function EventClientWrapper({
       {/* Tag filter chip row — REQ-CRO-02 */}
       {knownTags.length > 0 && (
         <div
+          role="group"
           aria-label="Filtrar por etiqueta"
           className="mb-3 flex flex-wrap gap-2"
         >

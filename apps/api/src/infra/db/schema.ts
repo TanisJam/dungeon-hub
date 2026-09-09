@@ -144,7 +144,7 @@ export const campaigns = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     status: text('status', { enum: ['active', 'archived'] }).notNull().default('active'),
   },
-  (t) => [check('campaigns_status_check', sql`status IN ('active', 'archived')`)],
+  (_t) => [check('campaigns_status_check', sql`status IN ('active', 'archived')`)],
 );
 
 // ---------------------------------------------------------------------------

@@ -1,12 +1,4 @@
-/**
- * Component tests for TypeFilterChips.
- *
- * Reqs: WIVLS-CHIPS-01 (spec #1063), WID4-CHIPS-01 (spec #1077)
- * Design DA1: filter state owned by TypeFilterChips client island.
- * Design DA8: CSS-only scroll (no JS carousel).
- * Design DCE4 (Slice C): DEFERRED_TYPES = empty set → Libros + Quest chips are now ENABLED.
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TypeFilterChips } from './type-filter-chips.js';

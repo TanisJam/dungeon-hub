@@ -1,13 +1,4 @@
-/**
- * Unit tests for NovedadesFeed component.
- *
- * T1: Renders SectionHead with "Novedades del gremio" (FEED-01).
- * T2: Items with fresh=true have class inicio-feed-dot on their dot span;
- *     items with fresh=false have bg-ink-mute and NOT inicio-feed-dot (FEED-01).
- * T3: All fresh=false items — no element has class inicio-feed-dot (FEED-01 scenario 2).
- * T4: items=[] → V3Empty is present and contains text "Sin novedades" (FEED-02).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NovedadesFeed } from './novedades-feed';

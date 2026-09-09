@@ -11,7 +11,6 @@
  * NOTE: afterEach(cleanup) global — do NOT re-add.
  */
 
-import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { EventTimeline } from './event-timeline';

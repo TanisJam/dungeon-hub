@@ -136,7 +136,7 @@ export async function resolveTargetSave(
 
   // Step 2: Compute character sheet for ability scores + proficiency bonus.
   // computeCharacterSheet gives us abilityScores[ability].score and proficiencyBonus.
-  const rawBaseStats = (charData['baseStats'] as Record<string, number> | undefined) ?? {};
+  const _rawBaseStats = (charData['baseStats'] as Record<string, number> | undefined) ?? {};
   const rawClasses = (charData['classes'] as Array<{ slug: string; level: number }> | undefined) ?? [];
 
   // Mirror build-attack-context.ts pattern: cast all charData fields as never.

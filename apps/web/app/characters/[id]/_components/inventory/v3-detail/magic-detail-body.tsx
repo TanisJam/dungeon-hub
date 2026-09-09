@@ -60,6 +60,7 @@ export function MagicDetailBody({ detail }: MagicDetailBodyProps) {
       {/* DC6: Disabled CTA stub — no onClick (RSC event-handler rule) */}
       <div className="inventory-init-detail-actions" style={{ marginTop: '14px' }}>
         <button
+          type="button"
           disabled
           className="inventory-init-detail-use-big secondary"
           data-stub="true"

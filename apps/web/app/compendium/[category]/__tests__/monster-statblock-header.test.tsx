@@ -2,7 +2,6 @@
 // RED step: written BEFORE the components exist; each test must fail on first run.
 // PHB 2014 MM p.166 (Goblin) and MM p.98 (Adult Red Dragon) used as fixtures.
 
-import React from 'react';
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 

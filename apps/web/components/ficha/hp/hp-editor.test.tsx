@@ -1,15 +1,4 @@
-/**
- * Tests for HPEditor — dual-mode HP form (player vs DM).
- *
- * T1: DM mode → all 3 inputs enabled + "DM Override" badge visible.
- * T2: Player mode → max input is read-only with hint text.
- * T3: Player mode → current + temp inputs are enabled.
- * T4: Submit calls saveHp with correct characterId and hp values.
- * T5: Save success → onClose called.
- *
- * Spec: sdd/ficha-dm-affordances #995 — HPEditor Component
- */
-import React from 'react';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 

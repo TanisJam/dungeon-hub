@@ -156,6 +156,7 @@ export function JournalClientWrapper({
       {/* Tag filter chip row — REQ-CRO-03 */}
       {knownTags.length > 0 && (
         <div
+          role="group"
           aria-label="Filtrar por etiqueta"
           className="mb-3 flex flex-wrap gap-2"
         >

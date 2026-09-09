@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import {
   campaignMembers,

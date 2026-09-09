@@ -8,7 +8,6 @@
  * REQ-BP-API-01, bitacora-personal SDD design #1975 §ADR-3.
  */
 
-import { eq, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { bitacoraPages } from '../../infra/db/schema.js';
 import { validateBitacoraPage } from '@dungeon-hub/domain/character/bitacora';

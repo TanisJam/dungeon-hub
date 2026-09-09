@@ -1,17 +1,4 @@
-/**
- * Unit tests for RacialSpellsBlock component.
- *
- * T-1: empty array → renders nothing (no section heading)
- * T-2: 1 cantrip → renders Cantrip group label + spell name
- * T-3: mixed frequencies → renders groups in correct order (Cantrip / Innate / Daily 1)
- * T-4: daily-1 spell → renders "1/descanso largo" badge
- *
- * PHB citations:
- *   - Tiefling Infernal Legacy: PHB p.42-43
- *   - High Elf cantrip: PHB p.23
- *   - Drow Magic: PHB p.24
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { RacialSpellsBlock } from './_racial-spells-block';

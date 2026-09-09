@@ -1,12 +1,4 @@
-/**
- * Unit tests for FormErrorAlert component — B1 (web-component-catalog)
- *
- * T1: renders nothing (null) when message is null
- * T2: renders role="alert" element when message is non-null
- * T3: rendered element contains the message text
- * T4: has bg-danger-soft token class (REQ-B1-04 — spec wins over design note)
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FormErrorAlert } from './form-error-alert';

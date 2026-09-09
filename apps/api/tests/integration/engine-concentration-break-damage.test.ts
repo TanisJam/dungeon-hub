@@ -23,7 +23,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
 import { db } from '../../src/infra/db/client.js';
@@ -45,7 +45,7 @@ const expectOk = async (label: string, res: { statusCode: number; body: string }
 };
 
 /** Get current hpCurrent for a combatant directly from DB. */
-const getCombatantHp = async (combatantId: string): Promise<number> => {
+const _getCombatantHp = async (combatantId: string): Promise<number> => {
   const [row] = await db
     .select({ hpCurrent: encounterCombatants.hpCurrent })
     .from(encounterCombatants)
@@ -688,7 +688,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
 
     // CBW-01: concentrating target + non-zero finalDamage → concentrationSave present.
     it('CBW-01: concentrating target + weapon hit → concentrationSave present (REQ-CB-01)', async () => {
-      const { encounterId, fighterCombatantId, npcCombatantId } = await makeWeaponEncounter({
+      const {  } = await makeWeaponEncounter({
         targetHp: 200,
         targetAc: 1,  // AC=1 → always hit (any positive d20 hits)
       });

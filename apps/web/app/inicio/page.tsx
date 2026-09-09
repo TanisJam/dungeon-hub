@@ -331,7 +331,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
     };
   }
 
-  const pendingCount = gmCampaign?.pendingFichas ?? fichasData.length;
+  const _pendingCount = gmCampaign?.pendingFichas ?? fichasData.length;
 
   return (
     <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm" callerRole={callerRole ?? undefined} worldSwitcher={worldSwitcher}>

@@ -1,11 +1,4 @@
-/**
- * Component test for ResumenTab — "Próximamente" placeholder removal (REQ-UXP1-PLACEHOLDER-01).
- *
- * Renders the exported ResumenTab with a minimal sheet whose identity.classes has ≥1 entry
- * (so RasgosSection renders), omitting characterId/characterStatus (keeps Identidad card
- * minimal — no pencil editors mounted). Asserts the placeholder copy is gone.
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import type { CharacterSheet } from '@/lib/sheet-types';

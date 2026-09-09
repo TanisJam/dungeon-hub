@@ -19,7 +19,6 @@ import { exhaustionEffectsFor } from './speed.js';
 import type { RaceInnateSpell } from '../race/types.js';
 import {
   buildWeightLookup,
-  carryingCapacity,
   coinWeight,
   evaluateEncumbrance,
   totalWeight,
@@ -283,7 +282,7 @@ export function computeCharacterSheet(input: ComputeInput): Omit<CharacterSheet,
   // REQ-AC-GATEB-01: computeArmorClass deleted. AC is engine-authoritative.
   // The route assembles sheet.armorClass and sheet.warnings from the engine path.
   // dexMod and conMod retained here — used by HP calculations below.
-  const dexMod = abilityModifier(effective.dex);
+  const _dexMod = abilityModifier(effective.dex);
   const conMod = abilityModifier(effective.con);
 
   // ---- HP ---------------------------------------------------------------

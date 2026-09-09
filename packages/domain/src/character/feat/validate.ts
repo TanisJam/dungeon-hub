@@ -1,7 +1,6 @@
 import { ABILITY_KEYS, type AbilityKey } from '../stats/types.js';
 import type { RulesProfile } from '../../rules-profile/types.js';
 import type {
-  AppliedFeat,
   CharacterFeatContext,
   FeatAbilityBlock,
   FeatCompendiumData,

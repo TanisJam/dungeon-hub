@@ -29,7 +29,7 @@
  * guild-feed-linked-entity-refs SDD spec REQ-GFLE-05/07, design ADR-4/ADR-6.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { compendiumMonsters } from '../../infra/db/schema.js';
 import { listNpcsInWorld, sanitizeNpcForRole } from './load-npc.js';

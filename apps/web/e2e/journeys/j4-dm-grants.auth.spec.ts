@@ -124,7 +124,7 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
       // ASSERT: XP increased (best-effort — only if we captured xpBefore)
-      if (hasXpTestId && xpBefore !== null && !isNaN(xpBefore)) {
+      if (hasXpTestId && xpBefore !== null && !Number.isNaN(xpBefore)) {
         const xpAfterEl = dmPage.locator('[data-testid="xp-current"]');
         const xpAfterVisible = await xpAfterEl.isVisible({ timeout: 3_000 }).catch(() => false);
         if (xpAfterVisible) {

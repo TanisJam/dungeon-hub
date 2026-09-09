@@ -13,7 +13,7 @@
  * SDD level-up-choices-completion (C4).
  */
 
-import { useState, useTransition, useEffect, useCallback } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   submitLevelUp,
@@ -24,7 +24,6 @@ import {
   type AppliedClassSpellsForAction,
 } from './actions';
 import {
-  buildActiveSteps,
   nextStep,
   prevStep,
   totalActiveSteps,
@@ -530,7 +529,6 @@ function NewClassStep({ onSelect }: { onSelect: (cls: ClassRef) => void }) {
 // ---- Step: HP ---------------------------------------------------------------
 
 function HpStep({
-  selectedClass,
   onContinue,
 }: {
   selectedClass: ClassRef;
@@ -698,7 +696,6 @@ function ReviewStep({
   state,
   isPending,
   onSubmit,
-  onBack,
 }: {
   state: FlowState;
   isPending: boolean;

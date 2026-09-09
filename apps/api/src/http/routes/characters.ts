@@ -135,7 +135,6 @@ import {
   deriveSkillProficiencies,
   type EvaluationContext,
   type EntityId,
-  type Breakdown,
   type AbilityScoreModifierInput,
 } from '@dungeon-hub/domain/engine';
 import { slugifyForFilename } from './_slug.js';

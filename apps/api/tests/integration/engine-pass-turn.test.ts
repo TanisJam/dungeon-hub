@@ -253,7 +253,7 @@ describe('engine-pass-turn — Auth Matrix (REQ-WCPT-API-01, REQ-WCPT-API-02, RE
   // ── WCPT-T1: GM → 200 (turn advances) ───────────────────────────────────────
 
   it('WCPT-T1: GM passes current turn → 200 and currentCombatantId advances', async () => {
-    const { encounterId, version, playerCombatantId, otherPcCombatantId } = await makeFreshEncounter('WCPT-T1');
+    const { encounterId, version, playerCombatantId } = await makeFreshEncounter('WCPT-T1');
 
     const result = await doPassTurn(gm.accessToken, encounterId, version);
     expect(result.statusCode, `Expected 200, got ${result.statusCode}: ${JSON.stringify(result.body)}`).toBe(200);
@@ -283,7 +283,7 @@ describe('engine-pass-turn — Auth Matrix (REQ-WCPT-API-01, REQ-WCPT-API-02, RE
   // ── WCPT-T3: Player (not their turn) → 403 FORBIDDEN ────────────────────────
 
   it('WCPT-T3: player calls pass-turn when it is not their turn → 403 FORBIDDEN', async () => {
-    const { encounterId, playerCombatantId } = await makeFreshEncounter('WCPT-T3');
+    const { encounterId } = await makeFreshEncounter('WCPT-T3');
 
     // Advance past player PC so otherPlayer PC is current.
     const version = await advanceUntil(encounterId, await (async () => {

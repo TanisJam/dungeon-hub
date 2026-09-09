@@ -129,6 +129,10 @@ function DmGrantModal({
   return (
     <div
       className="fixed inset-0 z-50 flex md:items-center md:justify-center md:bg-ink/40 md:p-4"
+      // Purely a positioning/backdrop wrapper — not a semantic interactive
+      // element. The click-outside-to-close it enables is a mouse-only
+      // convenience; ESC (handled above) is the keyboard-equivalent close path.
+      role="none"
       onMouseDown={(e) => {
         // Backdrop click closes on desktop. Mobile is fullscreen so no backdrop area.
         if (e.target === e.currentTarget) onClose();
@@ -230,7 +234,7 @@ function XpTab({ characterId, onClose }: { characterId: string; onClose: () => v
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = parseInt(award, 10);
-    if (isNaN(parsed)) {
+    if (Number.isNaN(parsed)) {
       setError('Ingresá un número entero válido.');
       return;
     }
@@ -304,7 +308,7 @@ function GoldTab({ characterId, onClose }: { characterId: string; onClose: () =>
       const raw = values[coin];
       if (raw !== undefined && raw !== '') {
         const n = parseInt(raw, 10);
-        if (!isNaN(n) && n !== 0) acc[coin] = n;
+        if (!Number.isNaN(n) && n !== 0) acc[coin] = n;
       }
       return acc;
     },
@@ -438,7 +442,7 @@ function ItemTab({
       return;
     }
     const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty < 1 || qty > 999) {
+    if (Number.isNaN(qty) || qty < 1 || qty > 999) {
       setError('La cantidad debe ser un número entre 1 y 999.');
       return;
     }

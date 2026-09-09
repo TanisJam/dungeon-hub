@@ -386,7 +386,7 @@ export function validateRaceSelection(input: ValidateRaceInput): RaceValidationR
   }
   if (issues.length > 0) return { ok: false, issues };
 
-  const raceHasChoose = raceBlocks.some((b) => b.choose !== null);
+  const _raceHasChoose = raceBlocks.some((b) => b.choose !== null);
   const subraceHasChoose = subraceBlocks.some((b) => b.choose !== null);
   const raceHasFixedOnly = raceBlocks.length > 0 && raceBlocks.every((b) => b.choose === null && b.fixed.length > 0);
   const raceIsEmpty = raceBlocks.length === 0;

@@ -20,7 +20,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { closeTestApp, getTestApp } from '../helpers/test-app.js';
 import { createTestUser, deleteTestUser, type TestUser } from '../helpers/test-user.js';
-import { addCampaignAndWorldMember } from '../helpers/add-world-member.js';
 import { db } from '../../src/infra/db/client.js';
 import { characterConcentration } from '../../src/infra/db/schema.js';
 import { randomUUID } from 'node:crypto';
@@ -35,9 +34,9 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
   let fighterCharId: string;
 
   // Shared encounter: fighter vs NPC goblin
-  let baseEncounterId: string;
+  let _baseEncounterId: string;
   let fighterCombatantId: string;
-  let npcCombatantId: string;
+  let _npcCombatantId: string;
 
   const expectOk = async (label: string, res: { statusCode: number; body: string }) => {
     if (res.statusCode !== 200 && res.statusCode !== 201) {
@@ -143,9 +142,9 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
       })
       .then((r) => r.json());
 
-    baseEncounterId = encounter.id;
+    _baseEncounterId = encounter.id;
     fighterCombatantId = encounter.currentCombatantId; // fighter has highest initiative
-    npcCombatantId = encounter.combatants.find(
+    _npcCombatantId = encounter.combatants.find(
       (c: { id: string }) => c.id !== fighterCombatantId,
     )?.id ?? '';
   });
@@ -772,7 +771,7 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
   // See packages/domain/src/engine/resolve/roll-mode.test.ts (7 existing unit tests cover PHB p.173).
 
   /** Barbarian character ID shared across DS-T and RAGE-T describe block. */
-  let barbarianCharId: string;
+  let _barbarianCharId: string;
 
   /**
    * makeBarbarianEncounter — creates a Barbarian character at the given level and an
@@ -797,7 +796,7 @@ describe('engine-forced-check — POST /encounters/:id/actions/forced-check', ()
     });
     expect(charRes.statusCode).toBe(201);
     const charId = charRes.json().id as string;
-    barbarianCharId = charId;
+    _barbarianCharId = charId;
 
     await expectOk(
       `${label}: set-stats`,

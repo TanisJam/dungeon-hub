@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react';
 
-// wizard/ components (presentational)
-import { StatTile } from '@/components/wizard/stat-tile';
 import { ReviewBanner } from '@/components/wizard/review-banner';
 import { NumberedReviewCard } from '@/components/wizard/numbered-review-card';
 import { PublishedSplash } from '@/components/wizard/published-splash';
@@ -46,7 +44,6 @@ import { ToggleChip } from '@/components/ui/toggle-chip';
 // layout/ components
 import { AppShell } from '@/components/layout/app-shell';
 import { TopBar } from '@/components/layout/topbar';
-import { NavProgress } from '@/components/layout/nav-progress';
 
 // form/ primitives
 import { FormLabel } from '@/components/ui/form-label';
@@ -633,11 +630,11 @@ const scrollNavEntry: ComponentEntry = {
       className: 'py-1',
       children: (
         <>
-          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold ficha-tab-active">Resumen</a>
-          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Habilidades</a>
-          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Hechizos</a>
-          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Recursos</a>
-          <a className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Inventario</a>
+          <span className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold ficha-tab-active">Resumen</span>
+          <span className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Habilidades</span>
+          <span className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Hechizos</span>
+          <span className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Recursos</span>
+          <span className="flex-shrink-0 rounded-pill px-3.5 py-1.5 text-xs font-semibold bg-surface border border-line text-ink-mute">Inventario</span>
         </>
       ),
     },
@@ -648,11 +645,11 @@ const scrollNavEntry: ComponentEntry = {
       className: 'pb-0.5',
       children: (
         <>
-          <a className="shrink-0 rounded-full border border-accent-deep personajes-chip-on px-2.5 py-1 text-[11px] font-semibold">Activos · 3</a>
-          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Pendientes · 1</a>
-          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Retirados</a>
-          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Borradores · 2</a>
-          <a className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Todos</a>
+          <span className="shrink-0 rounded-full border border-accent-deep personajes-chip-on px-2.5 py-1 text-[11px] font-semibold">Activos · 3</span>
+          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Pendientes · 1</span>
+          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Retirados</span>
+          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Borradores · 2</span>
+          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Todos</span>
         </>
       ),
     },

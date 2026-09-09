@@ -17,7 +17,6 @@
  * Assertion style: uses .toBeTruthy() / .toBeNull() (no @testing-library/jest-dom installed).
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { FactionClientWrapper } from './faction-client-wrapper';

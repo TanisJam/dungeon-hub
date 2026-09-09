@@ -128,7 +128,7 @@ test.describe('J2 — Player gameplay: inventory, rests, currency @ 375px', () =
       // ── Step 6: Verify item appears in inventory ─────────────────────────
       // After adding, the inventory list should show the item
       await p1Page.waitForTimeout(500); // allow revalidation
-      const inventoryText = await p1Page.locator('main').textContent({ timeout: 5_000 }).catch(() => '');
+      const _inventoryText = await p1Page.locator('main').textContent({ timeout: 5_000 }).catch(() => '');
       // Flexible: just assert the item name appears somewhere in the inventory area
       const itemVisible = await p1Page
         .getByText(/longsword/i)

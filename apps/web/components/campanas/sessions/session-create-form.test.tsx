@@ -11,7 +11,6 @@
  * Assertion style: uses .toBeTruthy() / .toBeNull() / toHaveBeenCalledWith (no jest-dom).
  */
 
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionCreateForm } from './session-create-form';

@@ -1,11 +1,4 @@
-/**
- * Tests for PendingFichasCard component
- *
- * REQ-IDM-PENDING-CARD-02: renders eyebrow, avatar stack, title, sub, CTA
- * REQ-PS-CARD-BUTTON-API-01: root is a <button> that fires onClick (post pendientes-sheet wiring)
- * REQ-IDM-CSS-SCOPED-08: root element has class inicio-pending-bg
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { PendingFichasCard } from './pending-fichas-card';

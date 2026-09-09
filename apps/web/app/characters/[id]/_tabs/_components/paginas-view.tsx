@@ -36,7 +36,7 @@ export interface BitacoraPageItem {
   sharedAt?: string | null;
 }
 
-const NPC_STATUS_LABELS: Record<string, string> = {
+const _NPC_STATUS_LABELS: Record<string, string> = {
   alive: 'Vivo',
   dead: 'Muerto',
   missing: 'Desaparecido',
@@ -261,7 +261,8 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
           {detailPage.sharedAt != null ? (
             // Already shared: show read-only Compartido badge (no re-share button)
             <div className="mt-2 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
-              <span className="text-green-600 text-sm" aria-label="Página compartida con el gremio">✓</span>
+              {/* Decorative checkmark — the adjacent text already conveys the status to SRs */}
+              <span className="text-green-600 text-sm" aria-hidden="true">✓</span>
               <span className="text-sm text-green-700 font-medium">Compartido con el gremio</span>
             </div>
           ) : confirmShare ? (

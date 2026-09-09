@@ -77,7 +77,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
   };
 
   /** Read HP of a combatant via GET encounter. */
-  const getCombatantHp = async (encounterId: string, combatantId: string): Promise<number> => {
+  const _getCombatantHp = async (encounterId: string, combatantId: string): Promise<number> => {
     const app = await getTestApp();
     const res = await app.inject({
       method: 'GET',
@@ -552,7 +552,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     const { db } = await import('../../src/infra/db/client.js');
     const { encounterCombatantConditions } = await import('../../src/infra/db/schema.js');
     const { and, eq } = await import('drizzle-orm');
-    const rows = await db
+    const _rows = await db
       .select({ turnsRemaining: encounterCombatantConditions.turnsRemaining })
       .from(encounterCombatantConditions)
       .where(
@@ -1098,7 +1098,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
   it('RAGE-T14: CROSS-TURN — took damage since last turn, no attack → Rage continues (REQ-RAGE-09)', async () => {
     await setRageUsed(barbarianCharId, 0);
 
-    const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+    const { encounterId, barbarianCombatantId, version } =
       await makeFreshEncounter('RAGE-T14', { npcAc: 1, npcHp: 200 });
 
     // Activate rage.
@@ -1133,7 +1133,7 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
   it('RAGE-T15: CROSS-TURN — neither attacked hostile nor took damage → Rage ends at turn-end (REQ-RAGE-09)', async () => {
     await setRageUsed(barbarianCharId, 0);
 
-    const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+    const { encounterId, barbarianCombatantId, version } =
       await makeFreshEncounter('RAGE-T15');
 
     // Activate rage.

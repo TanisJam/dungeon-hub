@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { ALL_SKILLS } from '@dungeon-hub/domain/character/sheet';
 import {
   ARTISANS_TOOLS,
-  GAMING_SETS,
   MUSICAL_INSTRUMENTS,
 } from '@dungeon-hub/domain/character/tool';
 import { parseBackground, deriveChoices, type BackgroundData, type BackgroundCompendiumData } from './_parsers';

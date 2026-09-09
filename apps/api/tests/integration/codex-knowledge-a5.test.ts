@@ -23,8 +23,8 @@ describe('codex-knowledge A-5: POST /sessions/:id/complete + knowledgeGrants[]',
   let player2: TestUser;
   let campaignId: string;
   let worldId: string;
-  let char1Id: string;
-  let char2Id: string;
+  let _char1Id: string;
+  let _char2Id: string;
 
   beforeAll(async () => {
     const app = await getTestApp();
@@ -45,8 +45,8 @@ describe('codex-knowledge A-5: POST /sessions/:id/complete + knowledgeGrants[]',
     await addCampaignAndWorldMember(campaignId, player1.id, 'player');
     await addCampaignAndWorldMember(campaignId, player2.id, 'player');
 
-    char1Id = await makeChar(player1, 'A5 Char1');
-    char2Id = await makeChar(player2, 'A5 Char2');
+    _char1Id = await makeChar(player1, 'A5 Char1');
+    _char2Id = await makeChar(player2, 'A5 Char2');
   });
 
   afterAll(async () => {

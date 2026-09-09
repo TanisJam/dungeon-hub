@@ -4,7 +4,7 @@ import { CompendiumRecentsList } from './compendium-recents-list';
 
 describe('CompendiumRecentsList', () => {
   it('renders honest empty state — no fake rows', () => {
-    const { getByText, queryByText } = render(<CompendiumRecentsList />);
+    const { getByText } = render(<CompendiumRecentsList />);
     expect(getByText('Aún no consultaste ninguna entrada.')).toBeTruthy();
   });
 

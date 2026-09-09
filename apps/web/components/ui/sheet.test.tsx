@@ -18,13 +18,13 @@
  *   T10: Shift+Tab from first focusable wraps to last.
  *   T11: focus restored to trigger element on close.
  */
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { V3Sheet } from './sheet';
 
 // Helper: wrapper component that controls open state
-function SheetWrapper({
+function _SheetWrapper({
   initialOpen = true,
   title = 'Test Sheet',
   children,
@@ -186,8 +186,8 @@ describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
   it('T8: focus moves to first focusable element on open', async () => {
     render(
       <V3Sheet open={true} onClose={vi.fn()} title="Focus Test">
-        <button>First Button</button>
-        <button>Second Button</button>
+        <button type="button">First Button</button>
+        <button type="button">Second Button</button>
       </V3Sheet>,
       { baseElement: document.body }
     );
@@ -203,8 +203,8 @@ describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
   it('T9: Tab from last focusable wraps to first', () => {
     render(
       <V3Sheet open={true} onClose={vi.fn()} title="Trap Test">
-        <button>Alpha</button>
-        <button>Beta</button>
+        <button type="button">Alpha</button>
+        <button type="button">Beta</button>
       </V3Sheet>,
       { baseElement: document.body }
     );
@@ -223,8 +223,8 @@ describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
   it('T10: Shift+Tab from first focusable wraps to last', () => {
     render(
       <V3Sheet open={true} onClose={vi.fn()} title="Trap Test">
-        <button>Alpha</button>
-        <button>Beta</button>
+        <button type="button">Alpha</button>
+        <button type="button">Beta</button>
       </V3Sheet>,
       { baseElement: document.body }
     );
@@ -243,7 +243,7 @@ describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
   it('T11: focus restored to trigger element on close', () => {
     const { rerender } = render(
       <V3Sheet open={true} onClose={vi.fn()} title="Restore Test">
-        <button>Inner</button>
+        <button type="button">Inner</button>
       </V3Sheet>,
       { baseElement: document.body }
     );
@@ -251,7 +251,7 @@ describe('V3Sheet — Cycle 3: focus trap + body lock', () => {
     // Sheet is open; now close it
     rerender(
       <V3Sheet open={false} onClose={vi.fn()} title="Restore Test">
-        <button>Inner</button>
+        <button type="button">Inner</button>
       </V3Sheet>
     );
 

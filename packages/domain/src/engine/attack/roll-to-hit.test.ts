@@ -24,7 +24,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { rollToHit } from './roll-to-hit.js';
-import type { RollToHitResult, RollMode } from './roll-to-hit.js';
+import type { RollToHitResult } from './roll-to-hit.js';
 import type { RngFn } from '../dice/roll.js';
 
 // ── Queue-backed deterministic RNG stub ──────────────────────────────────────

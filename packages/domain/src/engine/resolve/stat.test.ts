@@ -45,7 +45,7 @@ function makeNumModInstance(
   category: 'item' | 'status' | 'circumstance' | 'untyped',
   stat: StatKey,
   ownerId: EntityId = CHAR_ID,
-  targetId: EntityId = CHAR_ID,
+  _targetId: EntityId = CHAR_ID,
 ): ModifierInstance {
   const def: NumMod = { kind: 'num', op: 'add', value: amount, stat, category };
   return {

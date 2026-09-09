@@ -1,13 +1,4 @@
-/**
- * Tests for SheetHero — ficha-* class assertions.
- *
- * T1: hero container has class ficha-hero-bg.
- * T2: portrait ring container has class ficha-portrait-ring.
- * T3: classes prop shows all class pills for multiclass character (REQ-HERO-02, REQ-HERO-04).
- * T4: single-class regression — classes=[wizard L3 with subclass] produces same pills as
- *     classLabel-only path (REQ-HERO-08).
- */
-import React from 'react';
+
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { SheetHero } from './sheet-hero';

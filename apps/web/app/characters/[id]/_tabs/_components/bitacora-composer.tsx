@@ -19,7 +19,7 @@
 import { useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
 import { V3Sheet } from '@/components/ui';
-import { createBitacoraPage, updateBitacoraPage } from '../../actions';
+import { createBitacoraPage, updateBitacoraPage, type BitacoraPageState } from '../../actions';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -218,7 +218,7 @@ export function BitacoraComposer({
 
     const refs = selectedRef ? [selectedRef] : [];
 
-    let result;
+    let result: BitacoraPageState;
     if (isEditMode && editPage) {
       result = await updateBitacoraPage(characterId, editPage.id, {
         title: title.trim() || null,

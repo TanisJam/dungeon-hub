@@ -12,7 +12,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildOnHitDamageRider } from './on-hit-damage-rider.js';
 import type { EntityId } from '../types.js';
-import type { ModifierInstanceId } from '../registry/types.js';
 
 function eid(s: string): EntityId {
   return s as EntityId;

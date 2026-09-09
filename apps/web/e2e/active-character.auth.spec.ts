@@ -1,10 +1,4 @@
 import { test, expect } from '@playwright/test';
-import {
-  getJwt,
-  getFixtureWorldId,
-  seedJourneyCharacter,
-  FIXTURE_PASSWORD,
-} from './helpers/seed-journey-character';
 
 /**
  * active-character — E2E spec for the active-character lens cookie mechanism.
@@ -26,9 +20,9 @@ import {
 
 const MOBILE = { width: 375, height: 812 };
 const PLAYER1_AUTH = 'e2e/.auth/player1.json';
-const PLAYER1_EMAIL = 'player1@dh.test';
+const _PLAYER1_EMAIL = 'player1@dh.test';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const _API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 test.use({ viewport: MOBILE });
 

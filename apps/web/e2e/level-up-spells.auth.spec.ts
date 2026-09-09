@@ -82,7 +82,7 @@ test.describe('Level-up spells step condition @ 375px', () => {
     const isSubclassStep = await page.getByText(/colegio bardo/i).isVisible({ timeout: 2_000 }).catch(() => false);
     if (isSubclassStep) {
       // Pick first available college card
-      const collegeCards = page.locator('button').filter({ hasText: /.+/i });
+      const _collegeCards = page.locator('button').filter({ hasText: /.+/i });
       // The subclass cards will appear as buttons; pick the first non-CTA one
       // by looking for cards (not the continue button)
       const cards = page.locator('button[class*="border"]');

@@ -1,14 +1,4 @@
-/**
- * Tests for SubclassStep — level-up subclass selection step.
- *
- * REQ-CLU-SUB-UNLOCK-CONDITION: step renders subclass options from props.
- * REQ-CLU-SUB-UI-MOBILE: cards min-h-[80px], CTA min-h-[44px], tap-card pattern.
- * REQ-CLU-XCUT-MOBILE: 375px viewport verified via class assertions.
- *
- * Data source: rows prop (pre-fetched server-side in page.tsx, passed down).
- * No client fetch on mount.
- */
-import React from 'react';
+
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SubclassStep } from './_subclass-step';

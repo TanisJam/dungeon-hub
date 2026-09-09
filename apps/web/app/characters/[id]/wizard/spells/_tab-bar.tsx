@@ -39,6 +39,7 @@ export function TabBar({ tabs, activeSlug, onTabChange }: TabBarProps) {
             {!tab.isComplete && (
               <span
                 className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500 inline-block"
+                role="img"
                 aria-label="incomplete"
               />
             )}
