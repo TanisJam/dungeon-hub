@@ -103,6 +103,12 @@ function applyOneMod(
       target[targetKey] = arr;
       break;
     }
+    case 'prependArr': {
+      const arr = Array.isArray(current) ? current : [];
+      arr.unshift(...asItemsArray(op.items));
+      target[targetKey] = arr;
+      break;
+    }
     case 'insertArr': {
       const arr = Array.isArray(current) ? current : [];
       const rawIndex = op.index ?? arr.length;

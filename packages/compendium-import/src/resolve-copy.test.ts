@@ -68,6 +68,41 @@ describe('resolveCopies — appendArr', () => {
   });
 });
 
+describe('resolveCopies — prependArr', () => {
+  it('prepends items at the start of the target array', () => {
+    const base: Row = {
+      name: 'Base',
+      source: 'PHB',
+      entries: [{ name: 'Second', type: 'entries', entries: ['b'] }],
+    };
+    const copy: Row = {
+      name: 'Copy',
+      source: 'XGE',
+      _copy: {
+        name: 'Base',
+        source: 'PHB',
+        _mod: { entries: { mode: 'prependArr', items: { name: 'First', type: 'entries', entries: ['a'] } } },
+      },
+    };
+    const warnings: string[] = [];
+    const resolved = resolveAt([base, copy], warnings, 'test', 1);
+    expect(warnings).toEqual([]);
+    expect((resolved.entries as Array<{ name: string }>).map((e) => e.name)).toEqual(['First', 'Second']);
+    expect(resolved._copy).toBeUndefined();
+  });
+
+  it('keeps the order of an items array', () => {
+    const base: Row = { name: 'Base', source: 'PHB', entries: ['c'] };
+    const copy: Row = {
+      name: 'Copy',
+      source: 'XGE',
+      _copy: { name: 'Base', source: 'PHB', _mod: { entries: { mode: 'prependArr', items: ['a', 'b'] } } },
+    };
+    const resolved = resolveAt([base, copy], [], 'test', 1);
+    expect(resolved.entries).toEqual(['a', 'b', 'c']);
+  });
+});
+
 describe('resolveCopies — insertArr', () => {
   it('inserts at a positive index', () => {
     const base: Row = { name: 'Base', source: 'PHB', entries: ['a', 'b', 'c'] };
