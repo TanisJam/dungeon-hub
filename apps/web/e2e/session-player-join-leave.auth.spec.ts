@@ -32,6 +32,12 @@ const TEST_PASSWORD = process.env.TEST_USER_PASSWORD ?? 'e2e-test-pass-1234';
 
 test.use({ viewport: MOBILE });
 
+// Playwright's default per-test budget is 30s, and this test's explicit waits sum to
+// well over that on their own. It only ever passed because each one returned near-
+// instantly — not a property a test should depend on. Give it a budget consistent
+// with what it actually waits for; the waits themselves are unchanged.
+test.describe.configure({ timeout: 90_000 });
+
 test.describe('Player join + leave a session @ 375px', () => {
   let campaignId: string;
   let worldId: string;
@@ -171,10 +177,20 @@ test.describe('Player join + leave a session @ 375px', () => {
     await expect(unirmeBtn).toBeVisible({ timeout: 5_000 });
 
     // ── 3. Open the join sheet ────────────────────────────────────────────────
-    await unirmeBtn.click();
-
-    // The V3Sheet title "Elegí tu personaje" must be visible.
-    await expect(page.getByText('Elegí tu personaje')).toBeVisible({ timeout: 5_000 });
+    // "Unirme" is server-rendered, so it is visible and clickable before React
+    // attaches its onClick — under `next dev` that window is wide enough that the
+    // first click lands on nothing and the sheet never opens. The click reports
+    // success either way, which is why this looked like a product bug.
+    //
+    // Retry until the sheet is actually open, guarded on it being closed: an
+    // unguarded retry would click the trigger again after it worked.
+    const joinSheetTitle = page.getByText('Elegí tu personaje');
+    await expect(async () => {
+      if (!(await joinSheetTitle.isVisible().catch(() => false))) {
+        await unirmeBtn.click({ timeout: 3_000 });
+      }
+      await expect(joinSheetTitle).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
 
     // ── 4. Select the character and confirm ───────────────────────────────────
     // The character card button in the sheet contains the character name.
@@ -193,7 +209,7 @@ test.describe('Player join + leave a session @ 375px', () => {
 
     // ── 5. Session card shows "En sesión" + "Salir" ───────────────────────────
     // Wait for the join sheet to close.
-    await expect(page.getByText('Elegí tu personaje')).toHaveCount(0, { timeout: 10_000 });
+    await expect(joinSheetTitle).toHaveCount(0, { timeout: 10_000 });
 
     // After joining, the page revalidates (revalidatePath called by joinSession action).
     // The server re-fetches GET /sessions?campaignId=X which now includes a participants
