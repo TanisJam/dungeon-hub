@@ -131,6 +131,7 @@ export default function ComponentsPage() {
                   {/* Variant matrix — each combo in its own Frame375 */}
                   <div className="space-y-2">
                     {combos.map((combo, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: dev-only catalog page — combos is a hardcoded registry entry, never reordered; i disambiguates a possible duplicate label.
                       <Frame375 key={`${combo.label}-${i}`} label={combo.label}>
                         <div className="p-3">
                           {entry.render(entry.fixedProps

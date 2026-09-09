@@ -40,7 +40,9 @@ describe('buildBlessModifiers — attack-roll breakdown (PHB 219)', () => {
     const token = 'bless-token-1';
 
     const instances = buildBlessModifiers(casterId, targets, token);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     for (const targetId of targets) {
       const ctx = makeCtx(targetId);
@@ -60,7 +62,9 @@ describe('buildBlessModifiers — attack-roll breakdown (PHB 219)', () => {
     const token = 'bless-token-2';
 
     const instances = buildBlessModifiers(casterId, targets, token);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     for (const targetId of targets) {
       const ctx = makeCtx(targetId);
@@ -80,7 +84,9 @@ describe('buildBlessModifiers — attack-roll breakdown (PHB 219)', () => {
     const token = 'bless-token-3';
 
     const instances = buildBlessModifiers(casterId, targets, token);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Confirm Bless is active for each target BEFORE concentration ends
     for (const targetId of targets) {
@@ -110,7 +116,9 @@ describe('buildBlessModifiers — attack-roll breakdown (PHB 219)', () => {
 
     // Only bless A
     const instances = buildBlessModifiers(casterId, [targetA], token);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctxB = makeCtx(targetB);
     const resultB = resolveStat(targetB, 'attack-roll', 0, ctxB, registry);
@@ -129,14 +137,18 @@ describe('buildBlessModifiers — round-trip serialization (PHB 219)', () => {
     const token = 'bless-round-trip';
 
     const instances = buildBlessModifiers(casterId, targets, token);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Serialize + reload into a fresh registry
     const serialized = JSON.stringify(instances);
     const reloaded: typeof instances = JSON.parse(serialized) as typeof instances;
 
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst) => freshRegistry.register(inst));
+    reloaded.forEach((inst) => {
+      freshRegistry.register(inst);
+    });
 
     for (const targetId of targets) {
       const ctx = makeCtx(targetId);

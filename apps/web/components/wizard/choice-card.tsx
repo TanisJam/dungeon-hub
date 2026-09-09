@@ -111,6 +111,7 @@ export function ChoiceCard({
           {resolvedPills && resolvedPills.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {resolvedPills.map((p, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static per-card metadata pills passed via props — fixed for the card's lifetime, no unique id, labels aren't guaranteed unique.
                 <Pill key={i} tone={p.tone ?? 'stone'} size="sm">
                   {p.label}
                 </Pill>

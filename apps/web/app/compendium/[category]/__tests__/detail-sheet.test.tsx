@@ -1,7 +1,7 @@
 // Tests for DetailSheet generic component. ADR-4, REQ-CBROWSE-06.
 // Verifies: loading state, V3Sheet open, CompendiumEntriesWithTerms called with entries.
 
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 

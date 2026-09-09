@@ -18,28 +18,9 @@
  *   T10: Shift+Tab from first focusable wraps to last.
  *   T11: focus restored to trigger element on close.
  */
-import React, { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { V3Sheet } from './sheet';
-
-// Helper: wrapper component that controls open state
-function _SheetWrapper({
-  initialOpen = true,
-  title = 'Test Sheet',
-  children,
-}: {
-  initialOpen?: boolean;
-  title?: string;
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(initialOpen);
-  return (
-    <V3Sheet open={open} onClose={() => setOpen(false)} title={title}>
-      {children ?? <p>Sheet content</p>}
-    </V3Sheet>
-  );
-}
 
 // ─── Cycle 1: Rendering + a11y ────────────────────────────────────────────────
 

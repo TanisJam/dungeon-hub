@@ -166,7 +166,7 @@ export async function performContest(
 
   // ── Step 2: Load attacker + defender combatants ───────────────────────────────
 
-  let resolvedAttackerCombatantId = attackerCombatantId;
+  const resolvedAttackerCombatantId = attackerCombatantId;
   let resolvedDefenderCombatantId = defenderCombatantId;
 
   // Escape: grappler is resolved from appliedByCombatantId — the escaper is attackerCombatantId.

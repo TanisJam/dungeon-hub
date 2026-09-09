@@ -77,7 +77,9 @@ describe('buildWildShapeModifiers — physical stat substitution (PHB 66)', () =
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(charId);
     // END-TO-END via resolveStat (registry substitution path — Phase 4)
@@ -117,7 +119,9 @@ describe('buildWildShapeModifiers — INT retention (PHB 66)', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(charId);
     // INT: should retain self value (14), not beast value (3)
@@ -152,7 +156,9 @@ describe('buildWildShapeModifiers — max(self,beast) skill policy (PHB 66)', ()
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(charId);
     const skillResult = resolveStat(
@@ -212,7 +218,9 @@ describe('buildWildShapeModifiers — revert at 0 HP (PHB 66)', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Confirm beast STR active
     const ctx = makeCtx(charId);
@@ -242,7 +250,9 @@ describe('buildWildShapeModifiers — round-trip serialization (PHB 66)', () => 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Serialize instances
     const serialized = JSON.stringify(result.instances);
@@ -250,7 +260,9 @@ describe('buildWildShapeModifiers — round-trip serialization (PHB 66)', () => 
 
     // Fresh registry with reloaded instances
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst) => freshRegistry.register(inst));
+    reloaded.forEach((inst) => {
+      freshRegistry.register(inst);
+    });
 
     const ctx = makeCtx(charId);
     const strResult = resolveStat(charId, 'str', DRUID_STATS.str, ctx, freshRegistry);

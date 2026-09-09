@@ -113,6 +113,7 @@ export function LevelUpFlow({
 
   // Fetch spell options when the spells step becomes active.
   // Clears previous results when class changes (different slug → different pool).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally depends on the slug, not the selectedClass object identity — re-running on every object reference change (same slug) would over-fetch.
   useEffect(() => {
     if (state.step !== 'spells' || !state.selectedClass) return;
     const { slug } = state.selectedClass;

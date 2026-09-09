@@ -4,7 +4,7 @@
  * T1: Pencil button with aria-label "Editar atributos" is present.
  * T2: Click pencil → V3Sheet content becomes visible (dialog rendered).
  */
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 

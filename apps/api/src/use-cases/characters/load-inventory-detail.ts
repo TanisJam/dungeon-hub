@@ -178,7 +178,7 @@ export type InventoryDetailResponse =
 export function parseInventoryMetadata(
   notes: string | null | undefined,
 ): { book?: BookMetadata; quest?: QuestMetadata } | null {
-  if (!notes || !notes.trim().startsWith('{')) return null;
+  if (!notes?.trim().startsWith('{')) return null;
   try {
     return JSON.parse(notes) as { book?: BookMetadata; quest?: QuestMetadata };
   } catch {

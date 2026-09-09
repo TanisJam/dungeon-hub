@@ -11,8 +11,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock: next/headers
 // ---------------------------------------------------------------------------
 
-let mockCharacterCookie: string | undefined = undefined;
-let mockWorldCookie: string | undefined = undefined;
+let mockCharacterCookie: string | undefined ;
+let mockWorldCookie: string | undefined ;
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({

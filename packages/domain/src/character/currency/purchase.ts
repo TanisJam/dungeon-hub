@@ -1,4 +1,4 @@
-import { type Currency } from '../sheet/types.js';
+import type { Currency } from '../sheet/types.js';
 
 /**
  * PHB p.143 — coin conversion table (copper-piece base unit):

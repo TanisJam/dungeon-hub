@@ -5,7 +5,7 @@
  * T2: Clicking pencil opens V3Sheet (dialog visible).
  * T3: Loading state shown while options fetch is in-flight.
  */
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 

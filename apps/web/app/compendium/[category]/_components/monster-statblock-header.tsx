@@ -180,6 +180,7 @@ function Section({ title, items, testId }: SectionProps) {
         <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">{title}</div>
         <div className="space-y-2">
           {items.map((item, idx) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static monster statblock content fetched once per page — no unique id field, never reordered.
             <div key={idx}>
               <span className="text-xs font-semibold text-ink">{item.name}. </span>
               <span className="text-xs text-ink-soft">

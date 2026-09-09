@@ -236,7 +236,9 @@ describe('Archetype 7 — Wild Shape active (composition proof, NOT live sheet d
     );
     expect(wsResult.ok).toBe(true);
     if (!wsResult.ok) return;
-    wsResult.instances.forEach((inst) => registry.register(inst));
+    wsResult.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Also register ASI mods (druid has none in this fixture)
     const asiMods = deriveAbilityScoreModifiers({}, charId);

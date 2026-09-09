@@ -20,7 +20,7 @@
  * V3Sheet is mocked to a simple inline wrapper to avoid portal + DOM issues in jsdom.
  */
 
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { JoinSheet } from './join-sheet';

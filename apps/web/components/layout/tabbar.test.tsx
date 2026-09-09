@@ -2,7 +2,7 @@
  * TabBar — 5-tab world-scoped navigation tests (REQ-NAV-01, REQ-MERC-NAV-01).
  * Updated for mercado Wave 3: 4-tab → 5-tab (Inicio·Mapa·Biblioteca·Mercado·Bitácora).
  */
-import React from 'react';
+import type React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

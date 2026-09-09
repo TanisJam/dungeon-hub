@@ -25,6 +25,7 @@ export default function CompendiumPreviewPage() {
       </header>
 
       {SAMPLES.map((sample, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: dev-only QA page, blocked in production — SAMPLES is a hardcoded fixture array, never reordered.
         <section key={i} className="space-y-2">
           <h2 className="font-display text-lg font-semibold text-ink">{sample.label}</h2>
           {sample.notes ? <p className="text-sm text-ink-mute italic">{sample.notes}</p> : null}

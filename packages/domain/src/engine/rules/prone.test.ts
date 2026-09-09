@@ -41,7 +41,9 @@ describe('buildProneModifiers — self attack-roll (PHB 292)', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Resolve the prone creature's own attack roll
     const ctx: EvaluationContext = {
@@ -72,7 +74,9 @@ describe('buildProneModifiers — attacker advantage (PHB 292)', () => {
     const result = buildProneModifiers(proneId, () => PRONE_CONDITION_DEF);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Attacker context: melee, 5ft range
     const ctx: EvaluationContext = {
@@ -100,7 +104,9 @@ describe('buildProneModifiers — attacker advantage (PHB 292)', () => {
     const result = buildProneModifiers(proneId, () => PRONE_CONDITION_DEF);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Attacker context: ranged, 30ft
     const ctx: EvaluationContext = {
@@ -132,7 +138,9 @@ describe('buildProneModifiers — 5e cancellation (PHB 173)', () => {
     const result = buildProneModifiers(proneId, () => PRONE_CONDITION_DEF);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    result.instances.forEach((inst) => registry.register(inst));
+    result.instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // Also register an external advantage source (e.g. Reckless Attack)
     registry.register({

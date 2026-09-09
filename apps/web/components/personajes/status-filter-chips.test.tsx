@@ -40,7 +40,9 @@ describe('StatusFilterChips', () => {
     // others should not
     links
       .filter((l) => l.getAttribute('href') !== '/personajes?status=active')
-      .forEach((l) => expect(l.className).not.toContain('personajes-chip-on'));
+      .forEach((l) => {
+        expect(l.className).not.toContain('personajes-chip-on');
+      });
   });
 
   it('shows counts in Activos and Pendientes labels', () => {

@@ -13,6 +13,7 @@ export function EntriesNodeView({ node }: { node: EntriesNode }) {
         <h4 className="font-display text-ink font-semibold">{node.name}.</h4>
       ) : null}
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </section>

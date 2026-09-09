@@ -2,7 +2,7 @@
 // Covers: grouping by category, partial failure (results + failure notice together),
 // debounce/cancellation (stale-drop), empty-result state, and the minimum-query-length gate.
 
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 

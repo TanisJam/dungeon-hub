@@ -3,7 +3,7 @@
  * (REQ-DSHELL-SIDEBAR-01, REQ-DSHELL-ACTIVE-01, REQ-DSHELL-VIS-01).
  * Mirrors TabBar's 7-destination world nav, but for the md+ desktop shell.
  */
-import React from 'react';
+import type React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

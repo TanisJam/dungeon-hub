@@ -29,6 +29,7 @@ export function GalleryNodeView({ node }: { node: GalleryNode }) {
   return (
     <div className="grid gap-2">
       {node.images.map((img, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <ImageNodeView key={i} node={img} />
       ))}
     </div>

@@ -468,7 +468,7 @@ describe('engine-hex — POST /encounters/:id/actions/attack/apply (Hex +1d6 nec
 
       // ── Part A: Caster A attacks → Hex MUST fire ─────────────────────────────
       // Retry until hit (nat-1 auto-miss possible even at AC=1 — PHB p.194).
-      let encVersionA = fresh.version;
+      const encVersionA = fresh.version;
       const hitBodyA = await retryUntilHit(
         encounterId,
         casterCombatantId,

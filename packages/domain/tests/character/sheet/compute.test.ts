@@ -8,7 +8,7 @@ import type {
   RaceSheetData,
   AbilityScoreView,
 } from '../../../src/character/sheet/types.js';
-import { ABILITY_KEYS } from '../../../src/character/stats/types.js';
+import type { ABILITY_KEYS } from '../../../src/character/stats/types.js';
 
 describe('proficiencyBonus por nivel total', () => {
   it.each([

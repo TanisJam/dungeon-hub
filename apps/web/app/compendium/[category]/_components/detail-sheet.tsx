@@ -52,6 +52,8 @@ export function DetailSheet({
   const rowRecord = row as Record<string, unknown>;
   const displayName = (rowRecord.name as string | undefined) ?? '…';
 
+  // scope is a stable value-object from RSC — JSON.stringify prevents stale closure issues.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: value-compares scope via JSON.stringify instead of tracking its object identity.
   useEffect(() => {
     if (!open) {
       // Reset when closed so next open gets a fresh fetch
@@ -90,8 +92,6 @@ export function DetailSheet({
       });
 
     return () => { cancelled = true; };
-  // scope is a stable value-object from RSC — JSON.stringify prevents stale closure issues.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, category, JSON.stringify(scope), rowRecord.slug, rowRecord.source]);
 
   const detailRecord = detail as Record<string, unknown> | null;

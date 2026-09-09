@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/characters/test-id/wizard/spells',
 }));
 
-import { SpellsPickerProps, SpellsPicker } from './_picker';
+import { type SpellsPickerProps, SpellsPicker } from './_picker';
 
 const makeLimits = (overrides = {}) => ({
   cantripsKnown: 2,

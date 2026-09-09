@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import Link from 'next/link';
 import { V3Sheet } from '@/components/ui/sheet';
 import type { CharacterStatus } from '@/lib/sheet-types';

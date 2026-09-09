@@ -55,10 +55,9 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
 
             {/* REQ-WCO-WEB-04: action economy indicators for own row only */}
             {isOwn && (
-              <span
+              <fieldset
                 data-action-economy
                 className="flex gap-1 text-xs text-ink-soft"
-                role="group"
                 aria-label="Economía de turno"
               >
                 <span
@@ -93,7 +92,7 @@ export function RosterList({ combatants, currentCombatantId, ownCombatantId }: P
                 >
                   ⚔{c.attacksRemaining}
                 </span>
-              </span>
+              </fieldset>
             )}
           </li>
         );

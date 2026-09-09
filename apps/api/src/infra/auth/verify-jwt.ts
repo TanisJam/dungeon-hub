@@ -79,7 +79,7 @@ const supabaseAuthPlugin: FastifyPluginAsync = async (app) => {
       .limit(1);
     const requesterRow = requester[0];
 
-    if (!requesterRow || !requesterRow.canImpersonate) {
+    if (!requesterRow?.canImpersonate) {
       return reply.code(403).send({
         error: 'IMPERSONATION_NOT_ALLOWED',
         message: 'Tu account no tiene permiso para actuar en nombre de otros users',

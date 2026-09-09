@@ -9,7 +9,7 @@
 import { useEffect } from 'react';
 import { Button, CrowMark, Icon } from '@/components/ui';
 
-export default function Error({
+export default function RouteError({
   error,
   reset,
 }: {

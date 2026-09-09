@@ -25,6 +25,7 @@ export function ResourcePanelIsland({ characterId, encounterId, resources }: Pro
   });
 
   function handleUse(slug: string) {
+    // biome-ignore lint/correctness/useHookAtTopLevel: useResource is a Server Action (verb "use" = spend a resource), not a React hook.
     runAction(() => useResource(characterId, encounterId, slug));
   }
 

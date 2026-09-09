@@ -35,6 +35,7 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
     if (bubbleIdx >= max - used) return;
     if (isPending) return;
     startTransition(async () => {
+      // biome-ignore lint/correctness/useHookAtTopLevel: useSpellSlot is a Server Action (verb "use" = spend a slot), not a React hook.
       await useSpellSlot(charId, level, 'regular');
     });
   }
@@ -45,6 +46,7 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
         const isFilled = i < max - used;
         return (
           <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: bubbles have no data behind them — Array.from({length: max}) is just a positional count, i IS the slot's identity, and used only toggles fill state in place.
             key={i}
             type="button"
             aria-label={isFilled ? `Gastar slot nivel ${level}` : `Slot nivel ${level} gastado`}
@@ -97,6 +99,7 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
     if (bubbleIdx >= max - used) return;
     if (isPending) return;
     startTransition(async () => {
+      // biome-ignore lint/correctness/useHookAtTopLevel: useSpellSlot is a Server Action (verb "use" = spend a slot), not a React hook.
       await useSpellSlot(charId, pactLevel, 'pact');
     });
   }
@@ -107,6 +110,7 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
         const isFilled = i < max - used;
         return (
           <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: bubbles have no data behind them — Array.from({length: max}) is just a positional count, i IS the slot's identity, and used only toggles fill state in place.
             key={i}
             type="button"
             aria-label={isFilled ? `Gastar slot de pacto nivel ${pactLevel}` : `Slot de pacto nivel ${pactLevel} gastado`}

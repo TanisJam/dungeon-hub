@@ -141,7 +141,7 @@ export async function recordSessionEventForCharacter(args: {
   try {
     const { findCharacterActiveSession } = await import('./load-session.js');
     const bound = await findCharacterActiveSession(args.characterId);
-    if (!bound || bound.status !== 'active') return;
+    if (bound?.status !== 'active') return;
     await recordSessionEvent({
       sessionId: bound.sessionId,
       actorUserId: args.actorUserId,

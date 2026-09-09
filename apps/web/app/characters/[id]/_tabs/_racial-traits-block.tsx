@@ -37,6 +37,7 @@ export function RacialTraitsBlock({ traits }: RacialTraitsBlockProps) {
 
       <div className="space-y-4">
         {traits.map((trait, idx) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Server Component, static prop from the sheet fetch — traits has no unique id field and never reorders within a render; idx only disambiguates a same-named race+subrace trait pair.
           <TraitRow key={`${trait.name}-${idx}`} trait={trait} />
         ))}
       </div>

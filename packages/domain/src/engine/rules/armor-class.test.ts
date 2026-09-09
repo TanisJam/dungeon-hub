@@ -322,7 +322,7 @@ describe('Archetype 5 — Medium armor, scale mail ac:14 DEX +4 capped (REQ-AC-A
       charId,
     );
     const dexMod = mods.find((m) => m.label?.includes('DEX'));
-    expect((dexMod?.def as { value: number }).value).toBe(1);
+    expect((dexMod?.def as { value: number })?.value).toBe(1);
   });
 });
 
@@ -413,7 +413,7 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
     // Shield label MUST contain the name from item lite
     const shieldMod = mods.find((m) => m.label?.toLowerCase().includes('shield'));
     expect(shieldMod).toBeDefined();
-    expect((shieldMod?.def as { value: number }).value).toBe(2);
+    expect((shieldMod?.def as { value: number })?.value).toBe(2);
   });
 
   it('homebrew shield ac:3 emits NumMod +3 (not hardcoded +2)', () => {
@@ -431,7 +431,7 @@ describe('Archetype 7 — Scale mail ac:14 + shield ac:2, DEX +2 (REQ-AC-ADAPTER
       charId,
     );
     const shieldMod = mods.find((m) => m.label?.toLowerCase().includes('shield'));
-    expect((shieldMod?.def as { value: number }).value).toBe(3);
+    expect((shieldMod?.def as { value: number })?.value).toBe(3);
   });
 });
 

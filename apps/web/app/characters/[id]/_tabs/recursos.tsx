@@ -129,6 +129,7 @@ function ResourceRow({
           disabled={!canUse}
           onClick={() =>
             startTransition(async () => {
+              // biome-ignore lint/correctness/useHookAtTopLevel: useClassResource is a Server Action (verb "use" = spend a resource), not a React hook.
               await useClassResource(characterId, resource.slug, isPool ? useAmount : undefined);
             })
           }

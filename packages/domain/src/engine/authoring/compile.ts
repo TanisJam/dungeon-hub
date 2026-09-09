@@ -267,11 +267,11 @@ function buildSingleInstance(
  * @returns CompiledRule — { build, escaped, handlerRef? }
  */
 export function compileRule(rule: RuleDoc): CompiledRule {
-  const { id: ruleId, escape } = rule;
+  const { id: ruleId, escape: escapeHatch } = rule;
 
   // Escape-hatch rule: return stub + flag
-  if (escape !== undefined) {
-    const handlerRef = escape.handler;
+  if (escapeHatch !== undefined) {
+    const handlerRef = escapeHatch.handler;
     return {
       escaped: true,
       handlerRef,

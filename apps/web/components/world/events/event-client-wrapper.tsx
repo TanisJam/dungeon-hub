@@ -157,8 +157,7 @@ export function EventClientWrapper({
     <div>
       {/* Tag filter chip row — REQ-CRO-02 */}
       {knownTags.length > 0 && (
-        <div
-          role="group"
+        <fieldset
           aria-label="Filtrar por etiqueta"
           className="mb-3 flex flex-wrap gap-2"
         >
@@ -187,7 +186,7 @@ export function EventClientWrapper({
               Limpiar filtro ×
             </button>
           )}
-        </div>
+        </fieldset>
       )}
 
       <WorldEntityShell<EventRow, EventRow>

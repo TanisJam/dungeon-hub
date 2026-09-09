@@ -16,6 +16,7 @@ export function CompendiumEntries({ entries }: { entries: Entry[] | null | undef
   return (
     <div className="space-y-3">
       {entries.map((entry, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={entry} />
       ))}
     </div>
@@ -36,6 +37,7 @@ export function EntryNodeRenderer({ entry }: { entry: Entry }) {
     return (
       <>
         {entry.map((child, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
           <EntryNodeRenderer key={i} entry={child} />
         ))}
       </>

@@ -12,7 +12,7 @@ import { ApiError } from '@/lib/api';
 // Mock: next/headers
 // ---------------------------------------------------------------------------
 
-let mockCookieValue: string | undefined = undefined;
+let mockCookieValue: string | undefined ;
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({

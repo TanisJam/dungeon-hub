@@ -729,6 +729,7 @@ export function EquipmentPicker({
                   <p className="text-[10px] text-ink-mute">Siempre otorgado:</p>
                   <ul className="mt-1 space-y-0.5">
                     {selectedPackage.alwaysGranted.map((item, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: static equipment package text — fixed content for the selected package, no reorder/insert/remove; item strings aren't guaranteed unique.
                       <li key={i} className="text-xs">
                         {item}
                       </li>
@@ -758,6 +759,7 @@ export function EquipmentPicker({
                           />
                           <ul className="space-y-0.5">
                             {items.map((item, i) => (
+                              // biome-ignore lint/suspicious/noArrayIndexKey: static equipment package text — fixed content for the selected alternative slot, no reorder/insert/remove; item strings aren't guaranteed unique.
                               <li key={i} className="text-xs">
                                 {item}
                               </li>

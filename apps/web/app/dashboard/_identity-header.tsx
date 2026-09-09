@@ -35,7 +35,7 @@ export function IdentityHeader({
     <header className="flex items-center justify-between gap-4 py-4">
       <div className="flex items-center gap-3">
         {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // biome-ignore lint/performance/noImgElement: avatarUrl is an arbitrary OAuth-provider CDN URL (Discord/Google) — no fixed host to whitelist in next.config's images.remotePatterns.
           <img
             src={avatarUrl}
             alt=""

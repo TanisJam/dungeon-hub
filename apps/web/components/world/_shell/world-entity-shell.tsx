@@ -256,17 +256,22 @@ export function WorldEntityShell<TRow, TDetail>({
         )
       ) : (
         <ul className="divide-y divide-line">
-          {results.map((row, i) => (
-            <li key={i}>
-              <button
-                type="button"
-                className="min-h-[44px] w-full px-4 text-left transition-colors hover:bg-paper-soft"
-                onClick={() => handleRowTap(row)}
-              >
-                {renderRow(row)}
-              </button>
-            </li>
-          ))}
+          {results.map((row) => {
+            // Every TRow passed in by callers (FactionRow, QuestRow, NpcRow, EventRow,
+            // JournalRow, HexRow, ...) is a DB-backed row with a stable `id`.
+            const { id } = row as { id: string };
+            return (
+              <li key={id}>
+                <button
+                  type="button"
+                  className="min-h-[44px] w-full px-4 text-left transition-colors hover:bg-paper-soft"
+                  onClick={() => handleRowTap(row)}
+                >
+                  {renderRow(row)}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 

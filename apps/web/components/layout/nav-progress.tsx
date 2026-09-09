@@ -46,6 +46,7 @@ export function NavProgress() {
   }, []);
 
   // Stop: URL changed → navigation finished.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname/search aren't read in the body — they exist purely to re-trigger this effect when the URL settles, signalling "navigation finished".
   useEffect(() => {
     if (!startedRef.current) return;
     const t = window.setTimeout(() => {

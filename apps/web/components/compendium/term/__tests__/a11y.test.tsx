@@ -154,6 +154,9 @@ describe('TermProvider — keyboard-open via focusin (tabIndex=0 span)', () => {
         apiBaseUrl="http://api.test"
         mockMode={mockResolver}
       >
+        {/* A real <button> is exactly what this test must NOT render. It exercises the
+            span-with-tabIndex pattern tags/reference.tsx actually ships, so the a11y
+            contract is checked against the shipped markup, not a substitute for it. */}
         <span
           data-compendium-ref="spell|fireball|PHB"
           data-testid="ref"

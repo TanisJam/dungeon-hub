@@ -41,9 +41,7 @@ function IconPaths({ name }: { name: IconName }) {
       return <path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z" />;
     case 'sword':
       return (
-        <>
-          <path d="M14 4l6 6-3 3-3-3M14 4l-9 9 3 3 9-9M5 13l-2 4 2 2 4-2" />
-        </>
+        <path d="M14 4l6 6-3 3-3-3M14 4l-9 9 3 3 9-9M5 13l-2 4 2 2 4-2" />
       );
     case 'scroll':
       return (
@@ -81,9 +79,7 @@ function IconPaths({ name }: { name: IconName }) {
       return <path d="M12 3s4 4 4 8a4 4 0 11-8 0c0-2 1-3 1-3s-2 1-2 4a6 6 0 0012 0c0-5-7-9-7-9z" />;
     case 'bow':
       return (
-        <>
-          <path d="M4 20C4 12 12 4 20 4M4 20l16-16M6 18l3-3M15 9l3-3" />
-        </>
+        <path d="M4 20C4 12 12 4 20 4M4 20l16-16M6 18l3-3M15 9l3-3" />
       );
     case 'wand':
       return (
@@ -106,9 +102,7 @@ function IconPaths({ name }: { name: IconName }) {
       );
     case 'hammer':
       return (
-        <>
-          <path d="M14 4l6 6-3 3-6-6zM11 7L4 14l3 3 7-7" />
-        </>
+        <path d="M14 4l6 6-3 3-6-6zM11 7L4 14l3 3 7-7" />
       );
     case 'book':
       return (

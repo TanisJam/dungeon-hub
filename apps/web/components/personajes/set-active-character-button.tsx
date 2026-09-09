@@ -9,7 +9,7 @@ import { setActiveCharacter } from '@/app/set-active-character';
  * + router refresh. Defaults to the real `setActiveCharacter` + `router.refresh()`.
  */
 export type SetActiveCharacterActions = {
-  setActive: (characterId: string, worldId: string) => Promise<unknown> | void;
+  setActive: (characterId: string, worldId: string) => Promise<unknown> | undefined;
   /** Run after a successful activation (production: refresh the route). */
   onActivated: () => void;
 };

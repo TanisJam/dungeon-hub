@@ -22,7 +22,7 @@ export function deriveAsiLevels(
 
   for (const f of classFeatures) {
     const raw = typeof f === 'string' ? f : f.classFeature;
-    if (!raw || !raw.startsWith('Ability Score Improvement|')) continue;
+    if (!raw?.startsWith('Ability Score Improvement|')) continue;
     const parts = raw.split('|');
     const level = Number(parts[3]);
     if (Number.isFinite(level) && level >= 1 && level <= 20) {

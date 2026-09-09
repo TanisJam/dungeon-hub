@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mutable getter so each test can override the cookie value
-let mockCookieValue: { value: string } | undefined = undefined;
+let mockCookieValue: { value: string } | undefined ;
 
 vi.mock('next/headers', () => ({
   cookies: async () => ({

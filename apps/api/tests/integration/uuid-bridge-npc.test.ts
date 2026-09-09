@@ -151,7 +151,7 @@ describe('uuid-bridge-npc: NPC knowledge resolver + codex counts', () => {
 
       // Structural key absence — not just text absence
       for (const row of body.rows) {
-        expect(Object.prototype.hasOwnProperty.call(row, 'dmNotes')).toBe(false);
+        expect(Object.hasOwn(row, 'dmNotes')).toBe(false);
       }
 
       // Also assert the raw JSON string does not contain the dmNotes sentinel value

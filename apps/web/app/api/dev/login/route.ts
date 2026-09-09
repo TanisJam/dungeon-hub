@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options),
-        );
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
       },
     },
   });

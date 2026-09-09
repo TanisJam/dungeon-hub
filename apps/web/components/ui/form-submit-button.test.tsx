@@ -9,7 +9,8 @@
  * Round-trip test (REQ-B1-09 / §5):
  * T5: submit button is disabled while async onSubmit is in-flight
  */
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { FormLabel } from './form-label';

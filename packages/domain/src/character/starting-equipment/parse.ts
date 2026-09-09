@@ -202,7 +202,7 @@ function parseGoldAlternative(raw: string | undefined): { dice: string } | null 
   if (!raw) return null;
   // Match {@dice <expr>...} — capture everything after "@dice " up to first | or }
   const match = raw.match(/\{@dice ([^|}]+)/);
-  if (!match || !match[1]) return null;
+  if (!match?.[1]) return null;
   return { dice: match[1].trim() };
 }
 

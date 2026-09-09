@@ -53,6 +53,7 @@ function readStored(defaultRole: Role = 'player'): Role {
 export function useRole(defaultRole: Role = 'player'): [Role, (next: Role) => void] {
   const [role, setRoleState] = useState<Role>(defaultRole);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only hydration by design (see doc comment) — must not re-run and clobber a user-driven role change if the caller's defaultRole prop changes later.
   useEffect(() => {
     setRoleState(readStored(defaultRole));
     function onChange(e: Event) {
