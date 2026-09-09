@@ -128,6 +128,8 @@ need a live Postgres + GoTrue — 119 of its 126 files. There are two ways aroun
 
 ```bash
 # Everything that needs no container stack
+pnpm lint          # biome check .   — see biome.json for the rule set
+pnpm lint:fix      # applies the safe fixes
 pnpm -r typecheck
 pnpm --filter @dungeon-hub/domain test
 pnpm --filter @dungeon-hub/web test

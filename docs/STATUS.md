@@ -157,10 +157,20 @@ map was rendering nothing: a gateway that answers says nothing about the objects
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`: `pnpm -r typecheck`
-followed by the four suites that need no provisioned infrastructure, plus the API's unit lane —
-3936 tests in total. Before 2026-09-09 the repository had no CI running tests at all; `uptime.yml`
-was the only workflow, and it watches production rather than the diff.
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`: `pnpm lint`, then
+`pnpm -r typecheck`, then the four suites that need no provisioned infrastructure plus the API's
+unit lane — 3955 tests in total. Before 2026-09-09 the repository had no CI running tests at all;
+`uptime.yml` was the only workflow, and it watches production rather than the diff.
+
+`pnpm lint` is new too, and so is the linter behind it. The repository had none — the root
+`"lint": "pnpm -r lint"` recursed into workspaces that defined no such script, so it exited green
+without checking anything, which is worse than having no script at all. Biome now backs it, with a
+deliberately narrow rule set (`biome.json`): Biome's own recommended set reports 1139 errors here,
+but 982 of those are import ordering and 1095 are non-null assertions this codebase uses on
+purpose. What is enabled instead is unused code, a short list of `suspicious` correctness rules,
+and accessibility. `a11y/useValidAriaRole` is deliberately excluded: this codebase uses `role` as
+a domain prop meaning DM-versus-player, which that rule misreads as an ARIA role, and "fixing" its
+26 reports would mean breaking working code.
 
 A second job, `api integration`, runs the other 119 `apps/api` files — the ones that talk to a
 live GoTrue + Postgres. `scripts/test-stack.sh` stands up a throwaway Postgres plus GoTrue pinned

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "assist": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "error"
+      },
+      "suspicious": {
+        "noDoubleEquals": "error",
+        "noDuplicateCase": "error",
+        "noFallthroughSwitchClause": "error",
+        "noGlobalIsNan": "error",
+        "noImplicitAnyLet": "error",
+        "noRedeclare": "error",
+        "noSelfCompare": "error"
+      },
+      "a11y": {
+        "noAutofocus": "error",
+        "noNoninteractiveTabindex": "error",
+        "noRedundantRoles": "error",
+        "noStaticElementInteractions": "error",
+        "noSvgWithoutTitle": "error",
+        "useAriaPropsSupportedByRole": "error",
+        "useButtonType": "error",
+        "useKeyWithClickEvents": "error",
+        "useValidAnchor": "error"
+      }
+    }
+  },
+  "files": {
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mts",
+      "**/*.cts",
+      "!**/node_modules/**",
+      "!**/.next/**",
+      "!**/dist/**",
+      "!**/drizzle/**",
+      "!**/data/**",
+      "!**/.codegraph/**"
+    ]
+  }
+}
