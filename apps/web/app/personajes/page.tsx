@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { api, getMyWorlds } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
 import { V3Empty } from '@/components/ui/empty';
-import { PersonajeCard, StatusFilterChips, CreatePersonajeCTA } from '@/components/personajes';
+import { PersonajeCard, StatusFilterChips, CreatePersonajeCTA, ImportPersonajeCTA } from '@/components/personajes';
 import type { RosterCharacter } from '@/components/personajes/types';
 import { parseChip, filterByStatusChip, computeCounts } from '@/lib/personajes-filter';
 import { getActiveCharacter } from '@/lib/active-character';
@@ -77,6 +77,7 @@ export default async function PersonajesPage({
           </div>
         )}
         <CreatePersonajeCTA />
+        <ImportPersonajeCTA />
       </div>
     </AppShell>
   );
