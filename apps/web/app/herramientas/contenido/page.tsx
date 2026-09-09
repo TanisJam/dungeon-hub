@@ -9,6 +9,7 @@ import { SubNav } from '@/components/world/_shell/sub-nav';
 import { V3Empty } from '@/components/ui';
 import { HERRAMIENTAS_SUBNAV_ITEMS } from '../_components/subnav-items';
 import { HomebrewUploadForm } from './_form';
+import { ExportWorldButton } from './_export-world-button';
 
 /**
  * Contenido — DM page for custom content via JSON upload, items only
@@ -74,8 +75,17 @@ export default async function ContenidoPage() {
       callerRole={callerRole}
     >
       <SubNav items={HERRAMIENTAS_SUBNAV_ITEMS} activePath="/herramientas/contenido" />
-      <div className="px-4 py-4">
+      <div className="px-4 py-4 space-y-6">
         <HomebrewUploadForm worldId={aw.id} sourceCode={homebrewSourceCode(aw.id)} />
+
+        <div className="space-y-2 border-t border-line pt-6">
+          <h2 className="text-sm font-semibold text-ink">Exportar mundo</h2>
+          <p className="text-xs text-ink-mute">
+            Descargá un respaldo completo de tu mundo (NPCs, facciones, misiones, hexágonos,
+            puntos de interés y bitácora) en un archivo JSON.
+          </p>
+          <ExportWorldButton worldId={aw.id} />
+        </div>
       </div>
     </AppShell>
   );

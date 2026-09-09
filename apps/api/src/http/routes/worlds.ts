@@ -7,18 +7,23 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
+import { slugify as slugifyForFilename } from '@dungeon-hub/compendium-import/slugify';
 import { db } from '../../infra/db/client.js';
 import { worlds, worldMembers } from '../../infra/db/schema.js';
 import { loadWorldById } from '../../use-cases/campaigns/load-campaign.js';
 import { loadWorldRefData } from '../../use-cases/world/load-ref-data.js';
 import { listWorldCharacters } from '../../use-cases/worlds/list-world-characters.js';
 import { assertWorldGm } from '../../use-cases/auth/assert-world-gm.js';
+import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
+import { buildWorldExport } from '../../use-cases/worlds/export-world.js';
 
 const ListWorldsQuery = z.object({
   mine: z.coerce.number().int().optional(),
 });
 
 const WorldIdParams = z.object({ id: z.string().uuid() });
+
+const WorldExportParams = z.object({ worldId: z.string().uuid() });
 
 /**
  * Status filter for GET /worlds/:id/characters?status=...
@@ -223,5 +228,41 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
       .where(eq(worlds.id, id));
 
     return reply.send({ shopCuration });
+  });
+
+  // ---- GET /worlds/:worldId/export ------------------------------------------
+  // World JSON export — MVP #3.9's other half (character export already shipped
+  // at GET /characters/:id/export). GM-only: getWorldAccess must be 'gm', not
+  // just any worldMember — the export is the DM's own backup and deliberately
+  // includes DM-only material (dmNotes, visibility:'dm-only' rows) that must
+  // never reach a player. Mirrors the character export envelope shape and
+  // Content-Disposition/slug pattern (apps/api/src/http/routes/characters.ts).
+  // No fastify response schema — same rationale as the character export: a
+  // schema would strip fields it doesn't know about (jsonb rulesProfile, etc.).
+  app.get('/worlds/:worldId/export', { preHandler: app.authenticate }, async (request, reply) => {
+    const parsed = WorldExportParams.safeParse(request.params);
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: 'VALIDATION_FAILED',
+        issues: parsed.error.issues,
+      });
+    }
+    const { worldId } = parsed.data;
+    const userId = request.user!.sub;
+
+    const world = await loadWorldById(worldId);
+    if (!world) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const access = await getWorldAccess(worldId, userId);
+    if (access !== 'gm') {
+      return reply.code(403).send({ error: 'FORBIDDEN', message: 'Solo el DM puede exportar el mundo' });
+    }
+
+    const envelope = await buildWorldExport(worldId, world);
+
+    const slug = slugifyForFilename(world.name) || `world-${worldId}`;
+    reply.header('Content-Type', 'application/json');
+    reply.header('Content-Disposition', `attachment; filename="${slug}.json"`);
+    return reply.send(envelope);
   });
 };
