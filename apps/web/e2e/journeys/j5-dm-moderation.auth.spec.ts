@@ -93,16 +93,28 @@ test.describe('J5 — DM moderation: reject/return-to-draft + DM chrome @ 375px'
       // status 'draft' (characters.ts:1303). A single click; the suite-level
       // retries absorb a rare revalidatePath no-op (re-clicking here fires
       // concurrent rejects that race, so do NOT loop the click).
-      await rechazarBtn.click();
-
-      // ── Step 4: AUTHORITATIVE assertion — status transitions to 'draft' ──
-      // Poll the API (deterministic) rather than transient button visibility.
-      await expect
-        .poll(async () => getCharacterStatus(char.id, dmJwt), {
-          message: 'rejected character status should become "draft"',
-          timeout: 15_000,
-        })
-        .toBe('draft');
+      // ── Steps 3+4 together: click, then assert the AUTHORITATIVE state ───
+      // Re-clicking is guarded by the status read, which is what makes it safe
+      // despite the warning above: a second click only happens when the API still
+      // reports pending_approval after a full inner poll, i.e. when the previous
+      // click provably did nothing. It cannot race a real in-flight reject.
+      //
+      // It needs to be able to happen because a server-rendered button is visible
+      // and clickable before React attaches its handler — approval-actions.tsx
+      // lives under a 'use client' island — so under `next dev` the first click
+      // can land on markup with no onClick. Same window that made the Mercado and
+      // sessions sheets look broken.
+      await expect(async () => {
+        if ((await getCharacterStatus(char.id, dmJwt)) === 'pending_approval') {
+          await rechazarBtn.click();
+        }
+        await expect
+          .poll(async () => getCharacterStatus(char.id, dmJwt), {
+            message: 'rejected character status should become "draft"',
+            timeout: 8_000,
+          })
+          .toBe('draft');
+      }).toPass({ timeout: 25_000 });
 
       // ── Step 5: UI reflects the transition (best-effort, non-flaky) ─────
       // The Aprobar/Rechazar buttons only render for pending_approval, so after
