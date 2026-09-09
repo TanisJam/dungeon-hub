@@ -70,10 +70,20 @@ test.describe('DM session lifecycle @ 375px', () => {
     });
 
     // ── 2. Open the create-session sheet via the FAB ─────────────────────────
-    await page.getByRole('button', { name: 'Nueva sesión' }).click();
     // Wait for the V3Sheet dialog to open (portal-based, role=dialog).
     const createDialog = page.locator('[role="dialog"]').first();
-    await expect(createDialog).toBeVisible({ timeout: 10_000 });
+
+    // Retry the tap until the sheet actually opens. A server-rendered button is
+    // visible and clickable well before React attaches its handler, so a single
+    // click can land on markup that has no onClick yet and simply do nothing —
+    // under `next dev`, where hydration is slow, that window is wide. Both this
+    // list and the sessions FAB are 'use client' islands and both failed the same
+    // way, which is the signature of a platform race rather than a component bug.
+    // The assertion is unchanged: the dialog must still appear.
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Nueva sesión' }).click();
+      await expect(createDialog).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
 
     // Fill a unique title so this session is identifiable in the list.
     const sessionTitle = `Sesión E2E DM ${Date.now()}`;
