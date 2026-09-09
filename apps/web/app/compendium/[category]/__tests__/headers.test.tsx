@@ -44,6 +44,27 @@ const DWARF_FIXTURE = {
   },
 };
 
+// Dragonborn ancestry rows: synthesized subrace rows, PHB p.34 Draconic Ancestry
+// table. packages/compendium-import/src/importers/phb-dragonborn-ancestries.ts.
+const DRAGONBORN_BLACK_FIXTURE = {
+  slug: 'dragonborn--black',
+  source: 'PHB',
+  name: 'Black Dragonborn',
+  isSubrace: true,
+  parentSlug: 'dragonborn',
+  parentSource: 'PHB',
+  data: {
+    breathWeapon: {
+      damageType: 'acid',
+      shape: 'line',
+      size: '5 ft × 30 ft',
+      savingThrow: 'dex',
+    },
+    resist: ['acid'],
+    entries: [],
+  },
+};
+
 // Classes: full Drizzle row with data JSONB. PHB p.45-232.
 const BARBARIAN_FIXTURE = {
   slug: 'barbarian',
@@ -235,6 +256,34 @@ describe('RaceHeader — REQ-CBROWSE-07', () => {
     const field = container.querySelector('[data-field="asi"]');
     expect(field).toBeTruthy();
     expect(field?.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
+  it('renders neither breath weapon nor resistance for an ordinary race', async () => {
+    const { RaceHeader } = await import('../_components/race-header');
+    const { container } = render(<RaceHeader data={DWARF_FIXTURE} />);
+    expect(container.querySelector('[data-field="breath-weapon"]')).toBeNull();
+    expect(container.querySelector('[data-field="resist"]')).toBeNull();
+  });
+
+  it('renders breath weapon via data-field="breath-weapon" for a Dragonborn ancestry row', async () => {
+    // PHB p.34 — Black Dragonborn: acid, line, 5 ft × 30 ft, DEX save
+    const { RaceHeader } = await import('../_components/race-header');
+    const { container } = render(<RaceHeader data={DRAGONBORN_BLACK_FIXTURE} />);
+    const field = container.querySelector('[data-field="breath-weapon"]');
+    expect(field).toBeTruthy();
+    expect(field?.textContent).toContain('ácido');
+    expect(field?.textContent).toContain('línea');
+    expect(field?.textContent).toContain('5 ft × 30 ft');
+    expect(field?.textContent).toContain('DEX');
+  });
+
+  it('renders damage resistance via data-field="resist" for a Dragonborn ancestry row', async () => {
+    // PHB p.34 — Black Dragonborn resists acid damage
+    const { RaceHeader } = await import('../_components/race-header');
+    const { container } = render(<RaceHeader data={DRAGONBORN_BLACK_FIXTURE} />);
+    const field = container.querySelector('[data-field="resist"]');
+    expect(field).toBeTruthy();
+    expect(field?.textContent).toContain('ácido');
   });
 });
 

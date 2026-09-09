@@ -72,6 +72,70 @@ function asiLabel(ability: Array<Record<string, unknown>> | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// Damage type labels (Spanish) — PHB p.34 Draconic Ancestry table constrains
+// this to acid, cold, fire, lightning, poison. Unknown codes fall back to the
+// raw string rather than throwing (compendium-import/race/types.ts:20 notes
+// damageType is stored as `string`, not a union, for future-proofing).
+// ---------------------------------------------------------------------------
+const DAMAGE_TYPE_LABELS: Record<string, string> = {
+  acid: 'ácido',
+  cold: 'frío',
+  fire: 'fuego',
+  lightning: 'rayo',
+  poison: 'veneno',
+};
+
+function damageTypeLabel(damageType: string): string {
+  return DAMAGE_TYPE_LABELS[damageType.toLowerCase()] ?? damageType;
+}
+
+const BREATH_SHAPE_LABELS: Record<string, string> = {
+  line: 'línea',
+  cone: 'cono',
+};
+
+// ---------------------------------------------------------------------------
+// Breath weapon formatter — Dragonborn ancestry rows only (PHB p.34).
+// data.breathWeapon: { damageType, shape, size, savingThrow }. Defensive: any
+// missing/non-string field renders nothing rather than a partial/garbled row.
+// ---------------------------------------------------------------------------
+interface BreathWeaponData {
+  damageType?: unknown;
+  shape?: unknown;
+  size?: unknown;
+  savingThrow?: unknown;
+}
+
+function breathWeaponLabel(breathWeapon: BreathWeaponData | undefined): string | null {
+  if (!breathWeapon || typeof breathWeapon !== 'object') return null;
+  const { damageType, shape, size, savingThrow } = breathWeapon;
+  if (
+    typeof damageType !== 'string' ||
+    typeof shape !== 'string' ||
+    typeof size !== 'string' ||
+    typeof savingThrow !== 'string'
+  ) {
+    return null;
+  }
+  const shapeLabel = BREATH_SHAPE_LABELS[shape] ?? shape;
+  const saveLabel = ABILITY_LABELS[savingThrow] ?? savingThrow.toUpperCase();
+  return `${damageTypeLabel(damageType)}, ${shapeLabel} de ${size}, salvación de ${saveLabel}`;
+}
+
+// ---------------------------------------------------------------------------
+// Damage resistance formatter — Dragonborn ancestry rows only.
+// data.resist: string[] on synthesized ancestry rows. Some non-ancestry race
+// rows carry a `resist: [{ choose: {...} }]` shape upstream (unresolved
+// choice) — filtered out defensively rather than rendered as [object Object].
+// ---------------------------------------------------------------------------
+function resistLabel(resist: unknown): string | null {
+  if (!Array.isArray(resist) || resist.length === 0) return null;
+  const types = resist.filter((r): r is string => typeof r === 'string');
+  if (types.length === 0) return null;
+  return types.map(damageTypeLabel).join(', ');
+}
+
+// ---------------------------------------------------------------------------
 // MetaRow helper
 // ---------------------------------------------------------------------------
 
@@ -107,6 +171,10 @@ interface RaceDetailRow {
     ability?: Array<Record<string, unknown>>;
     darkvision?: number;
     entries?: unknown[];
+    /** Dragonborn ancestry rows only (PHB p.34) — dragonborn--black, --blue, etc. */
+    breathWeapon?: BreathWeaponData;
+    /** Dragonborn ancestry rows only (PHB p.34). */
+    resist?: unknown;
     [key: string]: unknown;
   };
 }
@@ -122,6 +190,9 @@ interface RaceHeaderProps {
  * PHB 2014 p.11-42 — race meta: size, speed, ability score increases.
  */
 export function RaceHeader({ data }: RaceHeaderProps) {
+  const breathWeapon = breathWeaponLabel(data.data.breathWeapon);
+  const resist = resistLabel(data.data.resist);
+
   return (
     <div className="compendium-init-detail race">
       <div className="name">{data.name}</div>
@@ -135,6 +206,12 @@ export function RaceHeader({ data }: RaceHeaderProps) {
         <MetaRow label="Mejoras de habilidad" value={asiLabel(data.data.ability)} field="asi" />
         {data.data.darkvision != null && (
           <MetaRow label="Visión en la oscuridad" value={`${data.data.darkvision} ft.`} field="darkvision" />
+        )}
+        {breathWeapon != null && (
+          <MetaRow label="Arma de aliento" value={breathWeapon} field="breath-weapon" />
+        )}
+        {resist != null && (
+          <MetaRow label="Resistencia al daño" value={resist} field="resist" />
         )}
       </div>
     </div>
