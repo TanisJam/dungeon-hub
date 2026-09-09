@@ -133,7 +133,10 @@ test.describe('Custom Background — full wizard E2E', () => {
     await expect(page).toHaveURL(/\/characters\/.+/, { timeout: 10_000 });
 
     // /personajes muestra el char
-    await page.goto('/personajes');
+    // /personajes defaults to the 'active' status chip (parseChip in
+    // lib/personajes-filter.ts), which filters out a just-published
+    // pending_approval character. Ask for the pending chip explicitly.
+    await page.goto('/personajes?status=pending');
     // PersonajeCard wraps each roster entry in <div data-character-card>
     // (no <li> — /personajes renders cards in a plain flex column).
     const charCard = page.locator('[data-character-card]').filter({ hasText: charName });

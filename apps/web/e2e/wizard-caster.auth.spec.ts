@@ -243,7 +243,10 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
     });
 
     await test.step('/personajes muestra el personaje Wizard como pendiente', async () => {
-      await page.goto('/personajes');
+      // /personajes defaults to the 'active' status chip (parseChip in
+      // lib/personajes-filter.ts), which filters out a just-published
+      // pending_approval character. Ask for the pending chip explicitly.
+      await page.goto('/personajes?status=pending');
       // PersonajeCard wraps each roster entry in <div data-character-card>
       // (no <li> — /personajes renders cards in a plain flex column).
       const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
