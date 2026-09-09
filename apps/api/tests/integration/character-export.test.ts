@@ -260,7 +260,10 @@ describe('GET /characters/:id/export', () => {
     expect(res.headers['content-disposition']).toBe('attachment; filename="aria-stormwind.json"');
   });
 
-  it('SCEN-SLUG-02: "Björn, the 2nd!" → "bj-rn-the-2nd.json"', async () => {
+  // The accent-stripped form, not the old `bj-rn`: the API's private slug copy never
+  // did the NFD decompose its own docstring described, so it disagreed with the web
+  // download button on every accented name. Both now use the one shared slugify.
+  it('SCEN-SLUG-02: "Björn, the 2nd!" → "bjorn-the-2nd.json"', async () => {
     const app = await getTestApp();
     const bjornChar = await app
       .inject({
@@ -277,7 +280,7 @@ describe('GET /characters/:id/export', () => {
       headers: { authorization: `Bearer ${owner.accessToken}` },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.headers['content-disposition']).toBe('attachment; filename="bj-rn-the-2nd.json"');
+    expect(res.headers['content-disposition']).toBe('attachment; filename="bjorn-the-2nd.json"');
   });
 
   it('SCEN-SLUG-03: blank/whitespace name falls back to character-<id>.json', async () => {
