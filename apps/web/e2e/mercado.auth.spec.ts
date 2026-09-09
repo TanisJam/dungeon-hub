@@ -98,12 +98,22 @@ test.describe('Mercado browse + detail round-trip @ 375px (REQ-MERC-E2E-01)', ()
     const firstRow = page.locator('ul button').first();
     await expect(firstRow).toBeVisible({ timeout: 30_000 });
 
-    // Tap the first item row to open DetailSheet.
-    await firstRow.click();
-
     // DetailSheet renders as role="dialog" (V3Sheet pattern from compendium browser).
     const dialog = page.getByRole('dialog');
-    await expect(dialog, 'DetailSheet must open after tapping an item row').toBeVisible({ timeout: 15_000 });
+
+    // Retry the tap until the sheet actually opens. A server-rendered button is
+    // visible and clickable well before React attaches its handler, so a single
+    // click can land on markup that has no onClick yet and simply do nothing —
+    // under `next dev`, where hydration is slow, that window is wide. Both this
+    // list and the sessions FAB are 'use client' islands and both failed the same
+    // way, which is the signature of a platform race rather than a component bug.
+    // The assertion is unchanged: the dialog must still appear.
+    await expect(async () => {
+      await firstRow.click();
+      await expect(dialog, 'DetailSheet must open after tapping an item row').toBeVisible({
+        timeout: 2_000,
+      });
+    }).toPass({ timeout: 20_000 });
 
     // Wait for the loading state to resolve (Cargando… disappears after detail fetch).
     await expect(page.locator('text=Cargando…')).toBeHidden({ timeout: 15_000 });
