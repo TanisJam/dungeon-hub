@@ -22,6 +22,31 @@ import { test, expect } from '@playwright/test';
  *   - auth.setup.ts has run (uses .auth/user.json)
  */
 
+// Every "Siguiente" click below is wrapped in a retry that waits for the URL to
+// actually change. The button is server-rendered, so it is clickable before React
+// attaches its handler: a click that lands in that window does nothing at all and
+// still reports success, and the failure then reads "still on /wizard/<previous>"
+// with no hint that the click never reached a handler.
+//
+// Retrying is safe here in a way it is not for the skill chips further down.
+// Navigating is idempotent; toggling is not.
+//
+// This spec walks six wizard steps. Guarding only the one that happened to fail
+// (PR #45 did exactly that) just moves the failure one step down — which is how
+// the spells step at the end started failing.
+//
+// The inner timeout is deliberately generous. Under `next dev` a wizard route can
+// take 10-20s to compile on first request, and a short inner window turns that into
+// a re-click loop that never lands: the predicate gives up while the navigation is
+// still compiling, clicks again, and starts over. That is what this spec did — it
+// failed at whichever step happened to be cold that run, which is why it looked
+// like a different bug each time. scripts/e2e-stack.sh now warms these routes, so
+// the wait should not be paid at all; the timeout is the belt to that suspenders.
+//
+// Playwright's default per-test budget is 30s and the waits here sum past it, so
+// the whole walk gets a budget consistent with what it asks for.
+test.describe.configure({ timeout: 180_000 });
+
 test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () => {
   test('SCEN-RT-13: Dwarf + Hill Dwarf sheet shows Rasgos raciales block with correct traits', async ({ page }) => {
     const charName = `E2E Dwarf Traits ${Date.now()}`;
@@ -53,8 +78,10 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await expect(page.getByRole('button', { name: /^siguiente/i })).toBeEnabled({
         timeout: 3000,
       });
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 10_000 });
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/race$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Linaje').first()).toBeVisible({ timeout: 5_000 });
     });
 
@@ -69,8 +96,10 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       // Select Hill Dwarf subrace card inside the expanded group.
       await page.getByRole('button', { name: /^hill dwarf/i }).click();
 
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 10_000 });
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/class$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Clase').first()).toBeVisible({ timeout: 5_000 });
     });
 
@@ -103,8 +132,8 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       // click never reached a handler.
       await expect(async () => {
         await page.getByRole('button', { name: /^siguiente/i }).click();
-        await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 3_000 });
-      }).toPass({ timeout: 20_000 });
+        await expect(page).toHaveURL(/\/wizard\/background$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Trasfondo').first()).toBeVisible({ timeout: 5_000 });
     });
 
@@ -121,8 +150,10 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
         .click();
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: 'Halfling', exact: true }).click();
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
     });
 
@@ -132,8 +163,10 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
     // see e2e/wizard.auth.spec.ts's "equipo: package path (default)" step.
     // -----------------------------------------------------------------------
     await test.step('equipment step: package path (default) → siguiente', async () => {
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });
 
@@ -141,8 +174,10 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
     // Step 5: Spells step — Fighter is non-caster → no-picks panel → next
     // -----------------------------------------------------------------------
     await test.step('spells step: non-caster panel → siguiente', async () => {
-      await page.getByRole('button', { name: /^siguiente/i }).click();
-      await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 10_000 });
+      await expect(async () => {
+        await page.getByRole('button', { name: /^siguiente/i }).click();
+        await expect(page).toHaveURL(/\/wizard\/review$/, { timeout: 15_000 });
+      }).toPass({ timeout: 60_000 });
       await expect(page.locator('text=Revisión').first()).toBeVisible({ timeout: 5_000 });
     });
 

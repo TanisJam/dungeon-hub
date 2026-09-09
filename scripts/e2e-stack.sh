@@ -113,8 +113,21 @@ wait_for "http://127.0.0.1:${WEB_PORT}" 'web' 90
 # alternative — running a production build — would be faster still, but /dev
 # returns notFound() outside development and dev-catalog.public.spec.ts covers it.
 echo "🔥 Warming routes (next dev compiles on first request)..."
-for route in / /inicio /dashboard /personajes /characters/new /compendium /bitacora /mapa /campanas /mercado /herramientas /dev /dev/catalog/tokens /dev/catalog/components /dev/catalog/diagnostics; do
+for route in / /inicio /dashboard /personajes /characters/new /compendium /bitacora /mapa /campanas /mercado /herramientas /tablero /dev /dev/catalog/tokens /dev/catalog/components /dev/catalog/diagnostics; do
   curl -sf -o /dev/null --max-time 90 "http://127.0.0.1:${WEB_PORT}${route}" || true
+done
+
+# The wizard steps too. next dev compiles per ROUTE PATTERN, not per URL, so a
+# throwaway id warms the pattern for every character the specs create afterwards.
+# These are the slowest routes in the app and every wizard spec walks all seven of
+# them; leaving them cold put a 10-to-20-second compile inside assertions written
+# for a warm server, which is what made sheet-racial-traits fail at whichever step
+# happened to be first that run. The request 404s at the data layer — irrelevant,
+# the compile is what we are paying for here, and it happens before the lookup.
+WARM_ID=00000000-0000-0000-0000-000000000000
+for step in stats race class background equipment spells review; do
+  curl -sf -o /dev/null --max-time 90 \
+    "http://127.0.0.1:${WEB_PORT}/characters/${WARM_ID}/wizard/${step}" || true
 done
 echo "   routes warm"
 
