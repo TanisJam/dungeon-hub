@@ -124,8 +124,10 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       await dmPage.goto(`/characters/${heroId}`, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
 
-      // The page should have role switcher since callerRole=gm
-      const roleSwitcher = dmPage.locator('[data-value]');
+      // The page should have role switcher since callerRole=gm. `data-value` was
+      // dropped when the ToggleChip atom was extracted (commit b79b794) in favor
+      // of aria-pressed; the button's title stays stable across DM/PJ state.
+      const roleSwitcher = dmPage.getByTitle('Cambiar vista DM / Jugador');
       await expect(roleSwitcher).toBeVisible({ timeout: 10_000 });
 
       // The role switcher is a single toggle button. Ensure DM mode: if the DM-only

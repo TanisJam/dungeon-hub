@@ -83,9 +83,12 @@ setup('ensure test user + sign in + save state', async ({ page }) => {
   const worldsRes = await fetch(`${API_URL}/api/v1/worlds?mine=1`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const worldsJson = (await worldsRes.json()) as { worlds: Array<{ name: string }> };
-  const hasE2eWorld = worldsJson.worlds?.some((w) => w.name === 'E2E Test Campaign (World)');
-  if (!hasE2eWorld) {
+  const worldsJson = (await worldsRes.json()) as { worlds: Array<{ id: string; name: string }> };
+  const existingWorld = worldsJson.worlds?.find((w) => w.name === 'E2E Test Campaign (World)');
+  let worldId: string;
+  if (existingWorld) {
+    worldId = existingWorld.id;
+  } else {
     // POST /campaigns crea el world 'E2E Test Campaign (World)' + campaign
     // 'E2E Test Campaign' atómicamente, y agrega al user como gm worldMember.
     const createRes = await fetch(`${API_URL}/api/v1/campaigns`, {
@@ -98,6 +101,164 @@ setup('ensure test user + sign in + save state', async ({ page }) => {
     });
     if (!createRes.ok) {
       throw new Error(`Campaign create failed: ${createRes.status} ${await createRes.text()}`);
+    }
+    const created = (await createRes.json()) as { worldId: string };
+    worldId = created.worldId;
+  }
+
+  // 3b. Ensure this user has an ACTIVE character in that world.
+  //
+  //     session-player-join-leave.auth.spec.ts (and any other spec that needs
+  //     a playable character) used to rely on wizard.auth.spec.ts's side
+  //     effect: the wizard leaves a pending_approval character behind, which
+  //     that spec's own beforeAll then approves. Playwright runs spec files
+  //     alphabetically, and 'session-*' sorts before 'wizard-*', so on a
+  //     fresh database the character never existed yet and the spec failed
+  //     unconditionally. Own that precondition here instead, the same way
+  //     step 3 owns the world/campaign precondition.
+  //
+  //     Idempotency check (GET /api/v1/characters, like step 3's
+  //     GET /worlds?mine=1): skip entirely if an active character already
+  //     exists in this world. If a pending_approval one exists instead,
+  //     approve it rather than creating a duplicate — this user is the
+  //     world's GM, so POST /characters/:id/approve is authorized; that is
+  //     exactly what session-player-join-leave.auth.spec.ts's beforeAll does.
+  //     Otherwise build one from scratch, reusing the exact call sequence
+  //     apps/api/scripts/seed-e2e-fixture.ts's buildFighterCharacter() makes
+  //     (create → stats → race → class → background → submit → approve).
+  const E2E_ACTIVE_CHARACTER_NAME = 'E2E Setup Fixture — Active';
+
+  const charsRes = await fetch(`${API_URL}/api/v1/characters`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!charsRes.ok) {
+    throw new Error(`Character list failed: ${charsRes.status} ${await charsRes.text()}`);
+  }
+  const charsJson = (await charsRes.json()) as {
+    data: Array<{ id: string; name: string; worldId: string; status: string }>;
+  };
+  const hasActiveChar = charsJson.data?.some(
+    (c) => c.worldId === worldId && c.status === 'active',
+  );
+
+  if (!hasActiveChar) {
+    const pendingChar = charsJson.data?.find(
+      (c) => c.worldId === worldId && c.status === 'pending_approval',
+    );
+
+    let charId: string;
+    if (pendingChar) {
+      charId = pendingChar.id;
+    } else {
+      // 1. Create
+      const createCharRes = await fetch(`${API_URL}/api/v1/characters`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ worldId, name: E2E_ACTIVE_CHARACTER_NAME }),
+      });
+      if (!createCharRes.ok) {
+        throw new Error(
+          `Character create failed: ${createCharRes.status} ${await createCharRes.text()}`,
+        );
+      }
+      const createdChar = (await createCharRes.json()) as { id: string };
+      charId = createdChar.id;
+
+      // 2. Stats
+      const statsRes = await fetch(`${API_URL}/api/v1/characters/${charId}/stats`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: 'standard-array',
+          scores: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+        }),
+      });
+      if (!statsRes.ok) {
+        throw new Error(`Character stats failed: ${statsRes.status} ${await statsRes.text()}`);
+      }
+
+      // 3. Race (human PHB — fixed +1 to all 6 abilities; PHB p.30 requires 1 language choice).
+      const raceRes = await fetch(`${API_URL}/api/v1/characters/${charId}/race`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          race: { slug: 'human', source: 'PHB' },
+          languageChoices: ['elvish'],
+        }),
+      });
+      if (!raceRes.ok) {
+        throw new Error(`Character race failed: ${raceRes.status} ${await raceRes.text()}`);
+      }
+
+      // 4. Class (Fighter — non-caster, no spells required). Soldier background has FIXED
+      //    skills (athletics + intimidation), so the Fighter picks must not overlap
+      //    (acrobatics + survival, PHB Fighter pool, PHB p.72).
+      const classRes = await fetch(`${API_URL}/api/v1/characters/${charId}/class`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          class: { slug: 'fighter', source: 'PHB' },
+          level: 1,
+          skillChoices: ['acrobatics', 'survival'],
+        }),
+      });
+      if (!classRes.ok) {
+        throw new Error(`Character class failed: ${classRes.status} ${await classRes.text()}`);
+      }
+
+      // 5. Background (soldier — no language/tool slot ambiguity; fixed skills
+      //    athletics + intimidation are granted automatically, PHB p.140).
+      const backgroundRes = await fetch(`${API_URL}/api/v1/characters/${charId}/background`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          background: { slug: 'soldier', source: 'PHB' },
+          skillChoices: [],
+          toolChoices: { anyGamingSet: ['dice-set'] },
+        }),
+      });
+      if (!backgroundRes.ok) {
+        throw new Error(
+          `Character background failed: ${backgroundRes.status} ${await backgroundRes.text()}`,
+        );
+      }
+
+      // 6. Submit for approval
+      const submitRes = await fetch(`${API_URL}/api/v1/characters/${charId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'pending_approval' }),
+      });
+      if (!submitRes.ok) {
+        throw new Error(`Character submit failed: ${submitRes.status} ${await submitRes.text()}`);
+      }
+    }
+
+    // 7. Approve (this user is the world's GM, so self-approval is authorized).
+    const approveRes = await fetch(`${API_URL}/api/v1/characters/${charId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!approveRes.ok) {
+      throw new Error(`Character approve failed: ${approveRes.status} ${await approveRes.text()}`);
     }
   }
 

@@ -51,6 +51,12 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: /.*\.auth\.spec\.ts$/,
+      // The journey specs are also named *.auth.spec.ts, so this project matched
+      // them too and ran every one of them twice — once here and once under
+      // 'journeys'. Worse, they depend on 'fixture-setup' for the four seeded
+      // users' storageState, and this project does not, so the copy that ran here
+      // failed on missing auth files. They belong to 'journeys' alone.
+      testIgnore: /journeys\//,
     },
 
     // 4. Fixture setup: signs in the 4 seeded fixture users and saves their

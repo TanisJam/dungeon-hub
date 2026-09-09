@@ -22,8 +22,12 @@ test.describe('RecentGrants widget — mobile smoke @ 375px', () => {
     await page.goto('/dashboard');
     await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
 
-    // Find the first character link (Jugador section → character name → href to /characters/[id])
-    const charLink = page.locator('a[href^="/characters/"]').first();
+    // Find the first character link (Jugador section → character name → href to /characters/[id]).
+    // Scoped to the character <ul> — CharactersSection always renders a "+ Nuevo"
+    // link (href="/characters/new") in the section header, OUTSIDE the <ul>, which
+    // also matches a bare `a[href^="/characters/"]` selector and would be picked as
+    // .first() before any real character card.
+    const charLink = page.locator('ul a[href^="/characters/"]').first();
     const hasChar = await charLink.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(
       !hasChar,

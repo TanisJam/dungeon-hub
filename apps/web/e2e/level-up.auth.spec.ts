@@ -31,7 +31,11 @@ test.describe('Level-up — E2E happy path (iPhone SE 375px)', () => {
 
     // ---- Step 2: Find an owned (player) character ----
     // Go to the first world visible for the user. Any player-role world will do.
-    const charLink = page.locator('a[href^="/characters/"]').first();
+    // Scoped to the character <ul> — CharactersSection always renders a "+ Nuevo"
+    // link (href="/characters/new") in the section header, OUTSIDE the <ul>, which
+    // also matches a bare `a[href^="/characters/"]` selector and would be picked as
+    // .first() before any real character card.
+    const charLink = page.locator('ul a[href^="/characters/"]').first();
     const hasChar = await charLink.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(
       !hasChar,

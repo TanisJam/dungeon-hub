@@ -102,5 +102,21 @@ pnpm --filter @dungeon-hub/web exec next dev -p "${WEB_PORT}" >/tmp/dh-e2e-web.l
 WEB_PID=$!
 wait_for "http://127.0.0.1:${WEB_PORT}" 'web' 90
 
+# next dev compiles each route on its first request — 3 to 20 seconds apiece. The
+# specs were written against a server someone had already been clicking around in,
+# so their timeouts assume warm routes: j6-gm-owner's J6A2, for instance, allows
+# 15s + 15s + 30s of waits inside a 30-second test budget. On a cold server the
+# first navigation alone eats the budget, and the test fails looking like a role
+# bug rather than a compile.
+#
+# Requesting each route once first moves that cost out of the measured window. The
+# alternative — running a production build — would be faster still, but /dev
+# returns notFound() outside development and dev-catalog.public.spec.ts covers it.
+echo "🔥 Warming routes (next dev compiles on first request)..."
+for route in / /inicio /dashboard /personajes /characters/new /compendium /bitacora /mapa /campanas /mercado /herramientas /dev /dev/catalog/tokens /dev/catalog/components /dev/catalog/diagnostics; do
+  curl -sf -o /dev/null --max-time 90 "http://127.0.0.1:${WEB_PORT}${route}" || true
+done
+echo "   routes warm"
+
 echo "🎭 Running Playwright..."
 pnpm --filter @dungeon-hub/web exec playwright test "$@"
