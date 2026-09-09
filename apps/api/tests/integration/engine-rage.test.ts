@@ -27,6 +27,7 @@
  *   RAGE-T11: 10-round auto-expiry (turnsRemaining sweep, REQ-RAGE-07, PHB p.48)
  *   RAGE-T12: 0-HP auto-end — Raging removed when barbarian drops to 0 HP (REQ-RAGE-08)
  *   RAGE-T13: CROSS-TURN-BOUNDARY — attacked hostile → Rage continues (REQ-RAGE-09)
+ *   RAGE-T13b: CROSS-TURN-BOUNDARY — attack that MISSES still counts (REQ-RAGE-09)
  *   RAGE-T14: CROSS-TURN-BOUNDARY — took damage, no attack → Rage continues (REQ-RAGE-09)
  *   RAGE-T15: CROSS-TURN-BOUNDARY — neither attacked nor took damage → Rage ends (REQ-RAGE-09)
  *   RAGE-T16: Deactivate rage — success (bonus action consumed, Raging removed, REQ-RAGE-10)
@@ -1091,6 +1092,44 @@ describe('engine-rage — Barbarian Rage (PHB p.48)', () => {
     const flagsAfter = await getLedgerFlags(barbarianCombatantId);
     expect(flagsAfter.ragedAttackedHostile).toBe(false);
     expect(flagsAfter.ragedTookDamage).toBe(false);
+  });
+
+  // ── RAGE-T13b: CROSS-TURN-BOUNDARY — a MISS still counts as having attacked ───
+
+  // PHB p.48 keys Rage's early end on whether the barbarian "attacked a hostile
+  // creature since your last turn" — on the ATTACK, not on the hit. The ledger flag
+  // used to be written only inside the hit path's transaction, so a barbarian who
+  // swung and missed lost their rage at turn-end. RAGE-T13 could not catch it: it
+  // uses AC 1, where the only miss is a natural 1, so the bug surfaced as a ~5%
+  // flake rather than a failure.
+  //
+  // AC 30 inverts that: every roll misses except a natural 20, which auto-hits
+  // (PHB p.194). The assertion below holds on BOTH branches — the miss path is the
+  // regression guard, the nat-20 path is the pre-existing hit path — so the test is
+  // deterministic even though the die is not.
+  it('RAGE-T13b: CROSS-TURN — an attack that MISSES still marks the ledger and keeps Rage (REQ-RAGE-09)', async () => {
+    await setRageUsed(barbarianCharId, 0);
+
+    const { encounterId, barbarianCombatantId, npcCombatantId, version } =
+      await makeFreshEncounter('RAGE-T13b', { npcAc: 30, npcHp: 200 });
+
+    const activateRes = await doActivateRage(encounterId, barbarianCombatantId, version);
+    expect(activateRes.statusCode).toBe(200);
+
+    const v2 = await getVersion(encounterId);
+    const attackRes = await doAttack(encounterId, barbarianCombatantId, npcCombatantId, longswordInstanceId, v2);
+    expect(attackRes.statusCode).toBe(200);
+
+    const flags = await getLedgerFlags(barbarianCombatantId);
+    expect(
+      flags.ragedAttackedHostile,
+      `attacking a hostile must mark the ledger whether or not it lands (hit=${attackRes.body.hit})`,
+    ).toBe(true);
+
+    // And the consequence that actually matters at the table: Rage survives the turn.
+    const v3 = await getVersion(encounterId);
+    await advanceTurn(encounterId, v3);
+    expect(await isRaging(barbarianCombatantId)).toBe(true);
   });
 
   // ── RAGE-T14: CROSS-TURN-BOUNDARY — took damage, no attack → Rage continues ──
