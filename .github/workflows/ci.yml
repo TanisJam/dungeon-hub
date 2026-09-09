@@ -1,0 +1,61 @@
+# Deliberately NOT covered by this workflow:
+#
+#   - apps/api/tests/integration/ (119 files) need a live GoTrue + Postgres.
+#     `pnpm --filter @dungeon-hub/api test:unit` runs only the 7 files (tests/unit/
+#     + src/ co-located tests) that don't need that stack — see
+#     apps/api/vitest.unit.config.ts for why.
+#   - packages/compendium-import's 5etools dataset (data/5etools/) is fetched
+#     separately and is not committed to the repo, so any test that depends on
+#     it skips itself when the dataset is absent.
+#
+# In short: a green run here does NOT exercise the API's HTTP surface.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.7.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck all workspaces
+        run: pnpm -r typecheck
+
+      - name: Test domain
+        run: pnpm --filter @dungeon-hub/domain test
+
+      - name: Test web
+        run: pnpm --filter @dungeon-hub/web test
+
+      - name: Test bot
+        run: pnpm --filter @dungeon-hub/bot test
+
+      - name: Test compendium-import
+        run: pnpm --filter @dungeon-hub/compendium-import test
+
+      - name: Test api (unit-only, no live infra)
+        run: pnpm --filter @dungeon-hub/api test:unit
