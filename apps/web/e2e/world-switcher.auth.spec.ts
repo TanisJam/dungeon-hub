@@ -61,9 +61,10 @@ test('per-world GM role: /inicio shows DM view when callerRole is gm', async ({ 
   // The text is lowercase in the DOM; CSS uppercases it visually — Playwright matches DOM text.
   await expect(page.getByText('Necesitan tu mirada', { exact: true })).toBeVisible({ timeout: 10_000 });
 
-  // The single RoleSwitcher toggle reflects DM via data-value + aria-pressed (seeded
-  // from callerRole='gm'). Confirms roleDefault='dm' was forwarded correctly. (REQ-WIS-09)
-  const switcher = page.locator('[data-value]');
-  await expect(switcher).toHaveAttribute('data-value', 'dm', { timeout: 5_000 });
-  await expect(switcher).toHaveAttribute('aria-pressed', 'true');
+  // The single RoleSwitcher toggle reflects DM via aria-pressed (seeded from
+  // callerRole='gm'). Confirms roleDefault='dm' was forwarded correctly. (REQ-WIS-09)
+  // `data-value` was dropped when the ToggleChip atom was extracted (commit b79b794);
+  // the button's title stays stable across DM/PJ state.
+  const switcher = page.getByTitle('Cambiar vista DM / Jugador');
+  await expect(switcher).toHaveAttribute('aria-pressed', 'true', { timeout: 5_000 });
 });

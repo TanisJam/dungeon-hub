@@ -564,8 +564,11 @@ test('B1-T1: Mapa view — POI drawer opens when toggle is tapped', async ({ pag
   const drawer = page.locator('[data-testid="poi-map-drawer"]');
   await expect(drawer).toBeVisible({ timeout: 5_000 });
 
-  // The list (ul[role="list"]) inside the drawer must be in the DOM
-  const list = drawer.locator('ul[role="list"]');
+  // The POI list (a plain <ul>, no explicit role attribute) must be in the DOM.
+  // Use the ARIA-role-aware locator (matches the <ul>'s IMPLICIT "list" role) —
+  // a raw `ul[role="list"]` CSS attribute selector never matches because the
+  // element has no literal role="list" attribute in the markup.
+  const list = drawer.getByRole('list');
   await expect(list).toBeVisible({ timeout: 5_000 });
 });
 

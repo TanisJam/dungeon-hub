@@ -105,6 +105,17 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
       await page.getByRole('button', { name: 'Gnomish', exact: true }).click();
       await page.getByRole('button', { name: 'Halfling', exact: true }).click();
       await page.getByRole('button', { name: /^siguiente/i }).click();
+      await expect(page).toHaveURL(/\/wizard\/equipment$/, { timeout: 10_000 });
+      await expect(page.locator('text=Equipo').first()).toBeVisible({ timeout: 5_000 });
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 4b: Equipment step — package path (default, REQ-SEQUIP-09) → next.
+    // Added between background and spells by Batch D (starting-equipment);
+    // see e2e/wizard.auth.spec.ts's "equipo: package path (default)" step.
+    // -----------------------------------------------------------------------
+    await test.step('equipment step: package path (default) → siguiente', async () => {
+      await page.getByRole('button', { name: /^siguiente/i }).click();
       await expect(page).toHaveURL(/\/wizard\/spells$/, { timeout: 10_000 });
       await expect(page.locator('text=Hechizos').first()).toBeVisible({ timeout: 5_000 });
     });

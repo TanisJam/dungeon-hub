@@ -10,17 +10,32 @@ test('role toggle (single button) switches view + player view reaches character'
   await page.setViewportSize({ width: 390, height: 820 });
   await page.goto('/inicio', { waitUntil: 'networkidle' });
 
-  // GM defaults to DM view
-  await expect(page.locator('[data-value]')).toHaveAttribute('data-value', 'dm');
-  await expect(page.getByText('TU GREMIO — DM')).toBeVisible({ timeout: 10_000 });
+  // RoleSwitcher is a single ToggleChip button; `data-value` was dropped when the
+  // ToggleChip atom was extracted (commit b79b794) in favor of aria-pressed. The
+  // button's title stays stable across DM/PJ state — use it to find the switcher.
+  const roleSwitcher = page.getByTitle('Cambiar vista DM / Jugador');
+
+  // GM defaults to DM view.
+  //
+  // The marker is AppShell's subtitle, which /inicio renders as "TU GREMIO — DM" on
+  // the DM branch and "TU GREMIO" on the player one — so its presence is exactly the
+  // server-side branch this spec exists to guard. Assert presence, not visibility:
+  // the subtitle carries `hidden sm:block`, so at this 390px viewport it is in the
+  // DOM and deliberately not painted. The negative assertion below already counts
+  // rather than looks; this makes the pair symmetric.
+  const dmSubtitle = page.getByText('TU GREMIO — DM');
+  await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'true');
+  await expect(dmSubtitle).toHaveCount(1, { timeout: 10_000 });
 
   // Tap the switcher → player view
-  await page.locator('[data-value]').click();
-  await expect(page.getByText('TU GREMIO — DM')).toHaveCount(0, { timeout: 10_000 });
+  await roleSwitcher.click();
+  await expect(dmSubtitle).toHaveCount(0, { timeout: 10_000 });
+  await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('Atajos')).toBeVisible();
   await expect(page.locator('a[href^="/personajes"], a[href^="/characters/"]').first()).toBeVisible();
 
   // Tap again → back to DM view
-  await page.locator('[data-value]').click();
-  await expect(page.getByText('TU GREMIO — DM')).toBeVisible({ timeout: 10_000 });
+  await roleSwitcher.click();
+  await expect(dmSubtitle).toHaveCount(1, { timeout: 10_000 });
+  await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'true');
 });
