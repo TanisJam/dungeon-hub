@@ -103,6 +103,7 @@ describe('deriveSavingThrowProficiencies — provenance label §4b guardrail (RE
     expect(inst!.label).not.toMatch(/fighter|wizard|cleric|rogue|warlock|barbarian|monk|paladin|ranger|druid|bard|sorcerer/i);
   });
 
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: quoting the label's source pattern in prose, not a forgotten template literal — `A` isn't in scope here.
   it('label format for all 6: "Class save (${A.toUpperCase()})" pattern', () => {
     const result = deriveSavingThrowProficiencies(['str', 'dex', 'con', 'int', 'wis', 'cha'], CHAR_ID);
     for (const inst of result) {

@@ -45,7 +45,9 @@ describe('buildSoldierAthleticsModifiers — Athletics proficiency (PHB 140)', (
     const proficiencyBonus = 2;
     const registry = createInMemoryRegistry();
     const instances = buildSoldierAthleticsModifiers(CHAR_ID);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, registry, proficiencyBonus);
@@ -67,7 +69,9 @@ describe('buildSoldierAthleticsModifiers — Athletics proficiency (PHB 140)', (
     const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
 
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst) => freshRegistry.register(inst));
+    reloaded.forEach((inst) => {
+      freshRegistry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(CHAR_ID, 'skill.athletics', 0, ctx, freshRegistry, proficiencyBonus);

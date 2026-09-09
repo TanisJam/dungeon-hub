@@ -14,13 +14,14 @@ export function parseInline(text: string): InlineToken[] {
   const out: InlineToken[] = [];
   const re = /\{@(\w+)(?:\s+([^}]*))?\}/g;
   let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
+  let m: RegExpExecArray | null = re.exec(text);
+  while (m !== null) {
     if (m.index > lastIndex) {
       out.push({ kind: 'text', text: text.slice(lastIndex, m.index) });
     }
     out.push({ kind: 'tag', name: m[1] ?? '', args: m[2] ?? '' });
     lastIndex = re.lastIndex;
+    m = re.exec(text);
   }
   if (lastIndex < text.length) {
     out.push({ kind: 'text', text: text.slice(lastIndex) });
@@ -62,9 +63,14 @@ export function InlineRenderer({ text }: { text: string }) {
   return (
     <>
       {tokens.map((t, i) => {
+        // Tokens are text/tag spans parsed fresh from the `text` prop on every render —
+        // position IS their identity, there is no other stable key.
+        // biome-ignore lint/suspicious/noArrayIndexKey: see comment above.
         if (t.kind === 'text') return <span key={i}>{t.text}</span>;
         const handler = TAG_REGISTRY[t.name];
+        // biome-ignore lint/suspicious/noArrayIndexKey: see comment above.
         if (handler) return <span key={i}>{handler(t.args)}</span>;
+        // biome-ignore lint/suspicious/noArrayIndexKey: see comment above.
         return <UnknownTag key={i} args={t.args} />;
       })}
     </>

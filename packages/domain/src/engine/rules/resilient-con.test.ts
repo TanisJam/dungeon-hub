@@ -53,7 +53,9 @@ describe('buildResilientConModifiers — Con save proficiency (PHB 168)', () => 
     const proficiencyBonus = 3;
     const registry = createInMemoryRegistry();
     const instances = buildResilientConModifiers(CHAR_ID);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(
@@ -82,7 +84,9 @@ describe('buildResilientConModifiers — Con save proficiency (PHB 168)', () => 
     const proficiencyBonus = 3;
     const registry = createInMemoryRegistry();
     const instances = buildResilientConModifiers(CHAR_ID);
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(
@@ -127,7 +131,9 @@ describe('buildResilientConModifiers — Con save proficiency (PHB 168)', () => 
 
     // Also register Resilient (Con) — this is the duplicate
     const resilientInstances = buildResilientConModifiers(CHAR_ID);
-    resilientInstances.forEach((inst) => registry.register(inst));
+    resilientInstances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     // validateCharacterFinal should detect the duplicate (domain:'save', ref:'con')
     const validationResult = validateCharacterFinal(CHAR_ID, registry);
@@ -167,7 +173,9 @@ describe('buildResilientConModifiers — Con save proficiency (PHB 168)', () => 
     registry.register(classProfInstance);
 
     const resilientInstances = buildResilientConModifiers(CHAR_ID);
-    resilientInstances.forEach((inst) => registry.register(inst));
+    resilientInstances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     // resolveStat must not throw — the read path tolerates duplicates
@@ -192,7 +200,9 @@ describe('buildResilientConModifiers — Con save proficiency (PHB 168)', () => 
     const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
 
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst) => freshRegistry.register(inst));
+    reloaded.forEach((inst) => {
+      freshRegistry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(

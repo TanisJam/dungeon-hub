@@ -904,7 +904,7 @@ describe('POST /characters/:id/rest/long — REST-03 + REST-04 (#826)', () => {
       .from(characters)
       .where(eq(characters.id, cooldownCharId))
       .limit(1);
-    const hp = (after?.data as { hp?: { current?: number; max?: number } }).hp;
+    const hp = (after?.data as { hp?: { current?: number; max?: number } })?.hp;
     expect(hp?.current).toBe(hp?.max);
   });
 
@@ -942,7 +942,7 @@ describe('POST /characters/:id/rest/long — REST-03 + REST-04 (#826)', () => {
       .from(characters)
       .where(eq(characters.id, cooldownCharId))
       .limit(1);
-    const hd = (after?.data as { hitDice?: Record<string, { available: number }> }).hitDice;
+    const hd = (after?.data as { hitDice?: Record<string, { available: number }> })?.hitDice;
     expect(hd?.d10?.available).toBe(2); // 1 + 1 recovered
   });
 

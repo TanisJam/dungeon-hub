@@ -87,7 +87,7 @@ export function resolveStat(
     const replaceDef = applicableMod.def;
 
     // If stat is in the retention list, skip substitution
-    if (replaceDef.retain !== undefined && replaceDef.retain.includes(stat)) {
+    if (replaceDef.retain?.includes(stat)) {
       return undefined;
     }
 

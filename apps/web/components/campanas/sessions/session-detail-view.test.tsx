@@ -16,7 +16,7 @@
  * NOTE: afterEach(cleanup) global — do NOT re-add.
  */
 
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SessionDetailView } from './session-detail-view';

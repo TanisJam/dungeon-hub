@@ -80,7 +80,7 @@ function classifyZodErrors(
       !seenCodes.has('UNKNOWN_PRIMITIVE_KIND')
     ) {
       // Try to extract the actual kind value from the input
-      let gotKind: unknown = undefined;
+      let gotKind: unknown ;
       try {
         // Navigate to the emit's def.kind via path
         const pathParts = zodIssue.path;
@@ -114,7 +114,7 @@ function classifyZodErrors(
       !seenCodes.has('INVALID_STAT_KEY')
     ) {
       // Verify it's actually a stat field that failed (not some other field named 'stat')
-      let gotStat: unknown = undefined;
+      let gotStat: unknown ;
       try {
         const pathParts = zodIssue.path;
         let cursor: unknown = input;
@@ -140,7 +140,7 @@ function classifyZodErrors(
       pathStr.includes('predicate') &&
       !seenCodes.has('INVALID_PREDICATE_AST')
     ) {
-      let gotPredicate: unknown = undefined;
+      let gotPredicate: unknown ;
       try {
         const pathParts = zodIssue.path.slice(0, -1); // go up to parent
         let cursor: unknown = input;

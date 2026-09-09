@@ -196,7 +196,7 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       await expect(p3Page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
 
       // Grab the char URL from the final page
-      if (!charHref || !charHref.startsWith('/')) {
+      if (!charHref?.startsWith('/')) {
         charHref = new URL(p3Page.url()).pathname;
       }
 

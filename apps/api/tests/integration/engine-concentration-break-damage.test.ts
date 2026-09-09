@@ -688,7 +688,7 @@ describe('engine-concentration-break-damage — all 3 damage paths (B2g/B2h/B2i)
 
     // CBW-01: concentrating target + non-zero finalDamage → concentrationSave present.
     it('CBW-01: concentrating target + weapon hit → concentrationSave present (REQ-CB-01)', async () => {
-      const {  } = await makeWeaponEncounter({
+      await makeWeaponEncounter({
         targetHp: 200,
         targetAc: 1,  // AC=1 → always hit (any positive d20 hits)
       });

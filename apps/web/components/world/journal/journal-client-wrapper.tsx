@@ -155,8 +155,7 @@ export function JournalClientWrapper({
     <div>
       {/* Tag filter chip row — REQ-CRO-03 */}
       {knownTags.length > 0 && (
-        <div
-          role="group"
+        <fieldset
           aria-label="Filtrar por etiqueta"
           className="mb-3 flex flex-wrap gap-2"
         >
@@ -185,7 +184,7 @@ export function JournalClientWrapper({
               Limpiar filtro ×
             </button>
           )}
-        </div>
+        </fieldset>
       )}
 
       <WorldEntityShell<JournalRow, JournalRow>

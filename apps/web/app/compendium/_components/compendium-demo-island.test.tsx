@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { CompendiumDemoIsland } from './compendium-demo-island';

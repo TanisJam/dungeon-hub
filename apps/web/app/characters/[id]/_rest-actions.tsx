@@ -53,7 +53,7 @@ export function RestActions({ charId }: RestActionsProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Acciones de descanso">
+      <fieldset className="flex flex-wrap gap-2" aria-label="Acciones de descanso">
         <button
           type="button"
           onClick={handleShort}
@@ -70,7 +70,7 @@ export function RestActions({ charId }: RestActionsProps) {
         >
           {isLongPending ? 'Descansando…' : 'Descanso largo'}
         </button>
-      </div>
+      </fieldset>
       {restError && (
         <p role="alert" className="text-xs text-red-400 px-1">
           {restError}

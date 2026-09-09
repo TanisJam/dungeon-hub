@@ -270,6 +270,7 @@ export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
             <div className="space-y-4">
               {slots.map((count, idx) =>
                 count > 0 ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: slots is indexed by spell level (idx+1 = level) — a fixed 9-slot array, idx IS the level, never reordered.
                   <div key={idx}>
                     <div className="mb-1.5 flex items-baseline justify-between">
                       <span className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">

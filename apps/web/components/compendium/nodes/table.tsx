@@ -14,6 +14,7 @@ export function TableNodeView({ node }: { node: TableNode }) {
           <thead>
             <tr className="border-b border-line">
               {labels.map((label, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
                 <th key={i} className="px-2 py-1 text-left font-semibold">
                   {label}
                 </th>
@@ -23,8 +24,10 @@ export function TableNodeView({ node }: { node: TableNode }) {
         ) : null}
         <tbody>
           {node.rows.map((row, ri) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
             <tr key={ri} className="border-b border-line-soft last:border-b-0">
               {row.map((cell, ci) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
                 <td key={ci} className="px-2 py-1 align-top">
                   <EntryNodeRenderer entry={cell} />
                 </td>

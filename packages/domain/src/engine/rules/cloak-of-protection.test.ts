@@ -46,7 +46,9 @@ describe('buildCloakOfProtectionModifiers — +1 AC and saving throws (DMG 159)'
     // Item-category mod (category:'item') for AC.
     const registry = createInMemoryRegistry();
     const instances = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-1');
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(CHAR_ID, 'ac', BASE_AC, ctx, registry);
@@ -64,8 +66,12 @@ describe('buildCloakOfProtectionModifiers — +1 AC and saving throws (DMG 159)'
     const registry = createInMemoryRegistry();
     const cloak1 = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-inst-1');
     const cloak2 = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-inst-2');
-    cloak1.forEach((inst) => registry.register(inst));
-    cloak2.forEach((inst) => registry.register(inst));
+    cloak1.forEach((inst) => {
+      registry.register(inst);
+    });
+    cloak2.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(CHAR_ID, 'ac', BASE_AC, ctx, registry);
@@ -84,7 +90,9 @@ describe('buildCloakOfProtectionModifiers — +1 AC and saving throws (DMG 159)'
     // The flat 'saving-throw' num mod applies when resolving any per-ability save (T2.6 all-saves rule).
     const registry = createInMemoryRegistry();
     const instances = buildCloakOfProtectionModifiers(CHAR_ID, 'cloak-save-test');
-    instances.forEach((inst) => registry.register(inst));
+    instances.forEach((inst) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     // Resolve a flat saving-throw (e.g. for a general save)
@@ -105,7 +113,9 @@ describe('buildCloakOfProtectionModifiers — +1 AC and saving throws (DMG 159)'
     const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
 
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst) => freshRegistry.register(inst));
+    reloaded.forEach((inst) => {
+      freshRegistry.register(inst);
+    });
 
     const ctx = makeCtx(CHAR_ID);
     const result = resolveStat(CHAR_ID, 'ac', BASE_AC, ctx, freshRegistry);

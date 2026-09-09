@@ -5,7 +5,7 @@
  * Mirrors the mock pattern from app/codex/page.test.tsx.
  */
 
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 

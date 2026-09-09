@@ -39,7 +39,9 @@ describe('DMQuickActions', () => {
     const { container } = render(<DMQuickActions />);
     const buttons = container.querySelectorAll('button');
     expect(() => {
-      buttons.forEach((btn) => fireEvent.click(btn));
+      buttons.forEach((btn) => {
+        fireEvent.click(btn);
+      });
     }).not.toThrow();
   });
 

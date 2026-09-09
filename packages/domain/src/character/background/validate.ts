@@ -211,7 +211,8 @@ export function splitEquipmentBlock(
       if (!slotObj || typeof slotObj !== 'object') continue;
       for (const [slot, items] of Object.entries(slotObj)) {
         if (!Array.isArray(items)) continue;
-        (merged[slot] ??= []).push(...items);
+        merged[slot] ??= [];
+        merged[slot].push(...items);
       }
     }
 
@@ -271,7 +272,7 @@ export function splitFeatureBlock(
       if (!entry || typeof entry !== 'object') continue;
       const e = entry as Record<string, unknown>;
       const data = e['data'] as Record<string, unknown> | undefined;
-      if (!data || data['isFeature'] !== true) continue;
+      if (data?.['isFeature'] !== true) continue;
 
       const rawName = typeof e['name'] === 'string' ? e['name'] : '';
       if (!rawName) continue;
@@ -379,7 +380,9 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
     allSkillsFixed.push(...fixed);
     if (choose) {
       totalSkillChooseCount += choose.count;
-      choose.from.forEach((s) => allowedSkillChoosePool.add(s));
+      choose.from.forEach((s) => {
+        allowedSkillChoosePool.add(s);
+      });
     }
   }
 
@@ -477,7 +480,9 @@ export function validateBackgroundSelection(input: ValidateBackgroundInput): Bac
     }
     if (choose) {
       totalToolChooseCount += choose.count;
-      choose.from.forEach((s) => allowedToolChoosePool.add(s));
+      choose.from.forEach((s) => {
+        allowedToolChoosePool.add(s);
+      });
     }
   }
 

@@ -95,6 +95,11 @@ export function CompendiumList({
   // Debounced search — 200ms, stale-drop. Clone of Picker pattern.
   // Re-runs on query OR type-filter change.
   // extraFilters are stable from props and always forwarded (e.g. magic=false from Mercado).
+  // scope and extraFilters are stable object references passed from RSC — JSON.stringify
+  // tracks them by value instead of identity. activeFilters is not listed separately:
+  // it is derived purely from typeFilter (tracked directly) and extraFilters (tracked
+  // via JSON.stringify below), so it carries no information the array doesn't already have.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: value-compares scope/extraFilters via JSON.stringify instead of object identity; activeFilters is fully derived from the tracked deps.
   useEffect(() => {
     const trimmed = query.trim();
     // Fall back to SSR rows when there is NEITHER a query NOR a dynamic filter.
@@ -125,8 +130,6 @@ export function CompendiumList({
       }
     }, 200);
     return () => clearTimeout(handle);
-  // scope and extraFilters are stable object references passed from RSC — serialized by value.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, typeFilter, category, JSON.stringify(scope), JSON.stringify(extraFilters), initialRows, initialTotal]);
 
   async function handleLoadMore() {
@@ -178,17 +181,20 @@ export function CompendiumList({
         <div className="px-4 py-8 text-center text-sm text-ink-soft">Sin resultados</div>
       ) : (
         <ul className="divide-y divide-line">
-          {results.map((row, i) => (
-            <li key={i}>
-              <button
-                type="button"
-                className="w-full min-h-[44px] px-4 text-left hover:bg-paper-soft transition-colors"
-                onClick={() => setSelected(row)}
-              >
-                <config.RowView row={row} shopContext={shopContext} />
-              </button>
-            </li>
-          ))}
+          {results.map((row) => {
+            const { slug, source } = row as { slug: string; source: string };
+            return (
+              <li key={`${slug}|${source}`}>
+                <button
+                  type="button"
+                  className="w-full min-h-[44px] px-4 text-left hover:bg-paper-soft transition-colors"
+                  onClick={() => setSelected(row)}
+                >
+                  <config.RowView row={row} shopContext={shopContext} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 

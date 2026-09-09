@@ -12,6 +12,7 @@ import {
 } from '@dungeon-hub/domain/character/background';
 import { validateMulticlassAddition, computeEffectiveScores } from '@dungeon-hub/domain/character/multiclass';
 import { classGrantsSpellcasting, validateFeatSelection } from '@dungeon-hub/domain/character/feat';
+import type { CharacterFeatContext } from '@dungeon-hub/domain/character/feat';
 import { computeSubclassUnlockLevel, deriveAsiLevels } from '@dungeon-hub/domain/character/class';
 import {
   computeCharacterSheet,
@@ -2316,7 +2317,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
     const charData = (character.data as Record<string, unknown> | null) ?? {};
     const baseStats = charData['baseStats'] as AbilityScores | undefined;
 
-    let featContext = undefined;
+    let featContext: CharacterFeatContext | undefined;
     if (body.featChoice && featData) {
       if (!baseStats) {
         return reply.code(400).send({
@@ -4695,7 +4696,7 @@ export const charactersRoute: FastifyPluginAsync = async (app) => {
       // Aplica a nivel up de Wizard (L2 en adelante).
       let wizardFreeAdded: Array<{ slug: string; source: string }> = [];
       if (currentClass.slug === 'wizard' && newClassLevel >= 2) {
-        if (!body.wizardFreeSpells || body.wizardFreeSpells.length !== 2) {
+        if (body.wizardFreeSpells?.length !== 2) {
           return reply.code(400).send({
             error: 'VALIDATION_FAILED',
             issues: [{ code: 'WIZARD_FREE_SPELLS_REQUIRED', expected: 2 }],

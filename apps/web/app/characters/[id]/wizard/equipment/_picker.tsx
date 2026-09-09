@@ -241,6 +241,7 @@ function ChoiceRowSection({
                     catIdx++;
                     const pick = categoryPicks[catKey];
                     return (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: option.refs is a fixed equipment definition for the already-selected class/background — never reordered; category/special refs have no slug to key on.
                       <div key={ri}>
                         <p className="text-xs text-ink-mute">
                           Elige{ref.quantity > 1 ? ` ${ref.quantity}` : ''}{' '}
@@ -264,6 +265,7 @@ function ChoiceRowSection({
                     );
                   }
                   return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: option.refs is a fixed equipment definition for the already-selected class/background — never reordered; category/special refs have no slug to key on.
                     <p key={ri} className="text-xs text-ink">
                       {refLabel(ref)}
                     </p>
@@ -289,6 +291,7 @@ function FixedItemsList({ refs }: { refs: ParsedRef[] }) {
       </p>
       <ul className="space-y-0.5">
         {refs.map((ref, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed equipment definition for the already-selected class/background — never reordered; category/special refs have no slug to key on.
           <li key={i} className="text-xs text-ink">
             {refLabel(ref)}
           </li>
@@ -492,6 +495,7 @@ export function EquipmentPicker({
               <div className="space-y-4">
                 {parsedClass.choiceRows.map((row, rowIdx) => (
                   <ChoiceRowSection
+                    // biome-ignore lint/suspicious/noArrayIndexKey: choiceRows is the fixed equipment definition for the selected class — never reordered; rowIdx is already the row's canonical identity in classRowChoices/classCategoryPicks state.
                     key={rowIdx}
                     row={row}
                     rowIndex={rowIdx}
@@ -532,6 +536,7 @@ export function EquipmentPicker({
               </p>
               <ul className="space-y-0.5">
                 {parsedBackground.specialItems.map((s, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed special-item text for the selected background — never reordered; strings aren't guaranteed unique.
                   <li key={i} className="text-xs text-ink-soft italic">
                     {s}
                   </li>
@@ -555,6 +560,7 @@ export function EquipmentPicker({
             <div className="space-y-4">
               {parsedBackground.choiceRows.map((row, rowIdx) => (
                 <ChoiceRowSection
+                  // biome-ignore lint/suspicious/noArrayIndexKey: choiceRows is the fixed equipment definition for the selected background — never reordered; rowIdx is already the row's canonical identity in the row-choice/category-pick state.
                   key={rowIdx}
                   row={row}
                   rowIndex={rowIdx}

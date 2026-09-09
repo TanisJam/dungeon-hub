@@ -477,8 +477,7 @@ describe('engine-spell-heal — POST /encounters/:id/actions/heal', () => {
       const app = await getTestApp();
       await setSlotsUsed(clericCharId, [0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-      const {  } =
-        await makeFreshHealEncounter(app, 'SH-T6 self heal', { targetHpCurrent: 10, targetHpMax: 30 });
+      await makeFreshHealEncounter(app, 'SH-T6 self heal', { targetHpCurrent: 10, targetHpMax: 30 });
 
       // Use the HEALER combatant as the target (hpCurrent=38, hpMax=38 seeded in beforeAll fixture).
       // Actually we use a fresh encounter where the healer combatant is the target.

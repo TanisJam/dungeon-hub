@@ -86,8 +86,8 @@ describe('deriveAbilityScoreModifiers — racial / subrace ASIs (REQ-AS-ADAPTER-
     const con = result.find((i) => i.def.kind === 'num' && i.def.stat === 'con');
     expect(str).toBeDefined();
     expect(con).toBeDefined();
-    if (!str || str.def.kind !== 'num') return;
-    if (!con || con.def.kind !== 'num') return;
+    if (str?.def.kind !== 'num') return;
+    if (con?.def.kind !== 'num') return;
     expect(str.def.value).toBe(2);
     expect(con.def.value).toBe(2);
   });

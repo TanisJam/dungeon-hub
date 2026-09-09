@@ -6,17 +6,17 @@ import {
 } from './encumbrance.js';
 import { checkEquipSlots } from './equip-slots.js';
 import { checkEquippedProficiency } from './proficiency.js';
-import {
-  type AddItemInput,
-  type ConsumedReport,
-  type InventoryContext,
-  type InventoryItem,
-  type InventoryOpResult,
-  type InventoryValidationIssue,
-  type InventoryWarning,
-  type ItemCompendiumLite,
-  type ItemState,
-  type UpdateItemInput,
+import type {
+  AddItemInput,
+  ConsumedReport,
+  InventoryContext,
+  InventoryItem,
+  InventoryOpResult,
+  InventoryValidationIssue,
+  InventoryWarning,
+  ItemCompendiumLite,
+  ItemState,
+  UpdateItemInput,
 } from './types.js';
 
 /**

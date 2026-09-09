@@ -417,7 +417,7 @@ describe('engine-reckless-attack — POST /encounters/:id/actions/attack/apply (
     //   On confirmed miss → assert condition exists (primary assertion).
     //   On nat-20 crit hit → condition still exists (secondary assertion — still correct).
     //   Either way, the condition MUST be in the DB after the first reckless:true call.
-    const {  } = await makeFreshEncounter('RECK-T7', { npcAc: 30 });
+    await makeFreshEncounter('RECK-T7', { npcAc: 30 });
 
     // Loop until confirmed miss (nat-20 crit would still hit at ac=30; re-create encounter and retry).
     let done = false;

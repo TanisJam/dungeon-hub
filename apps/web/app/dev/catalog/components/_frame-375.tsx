@@ -26,6 +26,7 @@ export function Frame375({ children, label }: { children: ReactNode; label?: str
   const frameRef = useRef<HTMLDivElement>(null);
   const [issues, setIssues] = useState<TapIssue[]>([]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: children isn't read in the effect body, but the probe must re-run whenever the rendered DOM content changes (new children → new measured elements).
   useEffect(() => {
     if (!frameRef.current) return;
 
@@ -71,6 +72,7 @@ export function Frame375({ children, label }: { children: ReactNode; label?: str
         <div className="space-y-1 mt-1">
           {issues.map((issue, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: dev-only debug overlay — issues is fully recomputed (not incrementally reordered) on every DOM probe, and has no natural id.
               key={i}
               className="flex items-center gap-2 px-2 py-1 rounded bg-warning-soft border border-warning-deep/30 text-[9px] font-mono"
             >

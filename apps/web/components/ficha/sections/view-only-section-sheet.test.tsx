@@ -10,7 +10,7 @@
  * T7: dead + isDm=false → locked banner visible; no edit link (VIEW-SHEET-02).
  * T8: wrapper button has aria-label "Editar linaje" (VIEW-SHEET-03).
  */
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 vi.mock('react-dom', async () => {

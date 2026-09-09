@@ -9,6 +9,7 @@ export function InsetNodeView({ node }: { node: InsetNode }) {
         <h4 className="font-display text-ink font-semibold">{node.name}</h4>
       ) : null}
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </aside>
@@ -23,6 +24,7 @@ export function InsetReadaloudNodeView({ node }: { node: InsetReadaloudNode }) {
         <h4 className="font-display text-ink font-semibold not-italic">{node.name}</h4>
       ) : null}
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </aside>

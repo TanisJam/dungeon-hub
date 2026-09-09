@@ -8,7 +8,7 @@
  * (e) zero worlds shows empty state + CTA (REQ-WIS-04 zero-worlds)
  * (f) each row ≥44px height (REQ-WIS-04 touch-target)
  */
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import type { WorldRow } from '@/lib/api';

@@ -80,7 +80,7 @@ export function ApprovalActions({
   }
 
   return (
-    <div className="space-y-2" role="group" aria-label="Acciones de aprobación">
+    <fieldset className="space-y-2" aria-label="Acciones de aprobación">
       {status === 'pending_approval' && (
         <div className="flex flex-wrap gap-2">
           <button
@@ -120,6 +120,6 @@ export function ApprovalActions({
           {error}
         </p>
       )}
-    </div>
+    </fieldset>
   );
 }

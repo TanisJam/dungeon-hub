@@ -231,7 +231,7 @@ describe('uuid-bridge-factions-pois: faction + POI knowledge resolver', () => {
 
       // Structural key absence — not just falsy value
       for (const row of body.rows) {
-        expect(Object.prototype.hasOwnProperty.call(row, 'dmNotes')).toBe(false);
+        expect(Object.hasOwn(row, 'dmNotes')).toBe(false);
       }
 
       // Also assert the raw JSON string does not contain the sentinel value
@@ -257,8 +257,8 @@ describe('uuid-bridge-factions-pois: faction + POI knowledge resolver', () => {
       expect(body.knownCount).toBeGreaterThanOrEqual(1);
 
       for (const row of body.rows) {
-        expect(Object.prototype.hasOwnProperty.call(row, 'dmNotes')).toBe(false);
-        expect(Object.prototype.hasOwnProperty.call(row, 'parentHexStatus')).toBe(false);
+        expect(Object.hasOwn(row, 'dmNotes')).toBe(false);
+        expect(Object.hasOwn(row, 'parentHexStatus')).toBe(false);
       }
 
       // Assert sentinel dmNotes value absent from raw response
@@ -317,7 +317,7 @@ describe('uuid-bridge-factions-pois: faction + POI knowledge resolver', () => {
       expect(body.rows.length).toBeGreaterThanOrEqual(2);
 
       for (const row of body.rows) {
-        expect(Object.prototype.hasOwnProperty.call(row, 'parentHexStatus')).toBe(false);
+        expect(Object.hasOwn(row, 'parentHexStatus')).toBe(false);
       }
     });
   });

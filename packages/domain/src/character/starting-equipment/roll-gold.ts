@@ -42,7 +42,7 @@ export function rollStartingGold(diceExpr: string, rng: () => number): number {
   // Parse "NdY × Z" — Unicode × (U+00D7)
   // Regex: capture count (N), sides (Y), and multiplier (Z)
   const match = diceExpr.match(/^(\d+)d(\d+)\s*[×x]\s*(\d+)$/);
-  if (!match || !match[1] || !match[2] || !match[3]) {
+  if (!match?.[1] || !match[2] || !match[3]) {
     throw new Error(
       `rollStartingGold: unrecognised dice expression "${diceExpr}". ` +
       `Expected format: "NdY × Z" (e.g. "5d4 × 10").`,

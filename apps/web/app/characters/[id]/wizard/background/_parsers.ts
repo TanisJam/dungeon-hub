@@ -230,13 +230,15 @@ export function deriveChoices(
     if (fixedTools.has(lower)) continue;
 
     if (choosePool.has(lower)) {
-      (toolChoices['choose'] ??= []).push(lower);
+      toolChoices['choose'] ??= [];
+      toolChoices['choose'].push(lower);
       continue;
     }
 
     for (const [kind, pool] of Object.entries(ANY_KIND_POOLS)) {
       if ((pool as readonly string[]).includes(lower)) {
-        (toolChoices[kind] ??= []).push(lower);
+        toolChoices[kind] ??= [];
+        toolChoices[kind].push(lower);
         break;
       }
     }

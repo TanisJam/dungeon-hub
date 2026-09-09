@@ -27,6 +27,7 @@ export function FlowchartNodeView({ node }: { node: FlowchartNode }) {
   return (
     <ol className="list-decimal pl-5 space-y-1 text-ink">
       {(node.blocks ?? []).map((b, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <li key={i}>
           <EntryNodeRenderer entry={b} />
         </li>
@@ -42,6 +43,7 @@ export function TableGroupNodeView({ node }: { node: TableGroupNode }) {
         <h4 className="font-display text-ink font-semibold">{node.name}</h4>
       ) : null}
       {(node.tables ?? []).map((t, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={t} />
       ))}
     </div>
@@ -53,13 +55,17 @@ export function AttackNodeView({ node }: { node: AttackNode }) {
   return (
     <div className="leading-relaxed text-ink">
       {node.attackEntries
-        ? node.attackEntries.map((e, i) => <EntryNodeRenderer key={`a${i}`} entry={e} />)
+        ? // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
+          node.attackEntries.map((e, i) => <EntryNodeRenderer key={`a${i}`} entry={e} />)
         : null}
       {node.hitEntries && node.hitEntries.length > 0 ? (
         <>
           {' '}
           <em className="font-semibold">Hit:</em>{' '}
-          {node.hitEntries.map((e, i) => <EntryNodeRenderer key={`h${i}`} entry={e} />)}
+          {
+            // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
+            node.hitEntries.map((e, i) => <EntryNodeRenderer key={`h${i}`} entry={e} />)
+          }
         </>
       ) : null}
     </div>
@@ -80,6 +86,7 @@ function VariantBox({
         <Heading className="font-display text-ink font-semibold">{node.name}</Heading>
       ) : null}
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </div>
@@ -100,6 +107,7 @@ export function InlineBlockNodeView({ node }: { node: InlineBlockNode }) {
   return (
     <span>
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </span>
@@ -110,6 +118,7 @@ export function InlineNodeView({ node }: { node: InlineNode }) {
   return (
     <span>
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </span>
@@ -123,7 +132,8 @@ export function ItemSubNodeView({ node }: { node: ItemSubNode }) {
       {node.name ? <dt className="font-semibold text-ink inline">{node.name}.</dt> : null}
       <dd className="inline text-ink">
         {node.entries
-          ? node.entries.map((child, i) => <EntryNodeRenderer key={i} entry={child} />)
+          ? // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
+            node.entries.map((child, i) => <EntryNodeRenderer key={i} entry={child} />)
           : node.entry !== undefined
             ? <EntryNodeRenderer entry={node.entry} />
             : null}
@@ -176,6 +186,7 @@ export function RowNodeView({ node }: { node: RowNode }) {
   return (
     <>
       {node.row.map((c, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={c} />
       ))}
     </>
@@ -197,6 +208,7 @@ export function SpellcastingNodeView({ node }: { node: SpellcastingNode }) {
         <h4 className="font-display text-ink font-semibold">{node.name}</h4>
       ) : null}
       {(node.headerEntries ?? []).map((e, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={`h${i}`} entry={e} />
       ))}
       {node.will && node.will.length > 0 ? (
@@ -220,6 +232,7 @@ export function SpellcastingNodeView({ node }: { node: SpellcastingNode }) {
         );
       })}
       {(node.footerEntries ?? []).map((e, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={`f${i}`} entry={e} />
       ))}
     </div>

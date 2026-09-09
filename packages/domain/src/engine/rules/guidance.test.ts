@@ -54,7 +54,9 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
     // Cross-entity NumMod{value:'1d4'} scoped to target via axis:'entities'.
     const registry = createInMemoryRegistry();
     const instances = buildGuidanceModifiers(CASTER_ID, TARGET_ID, TOKEN);
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(TARGET_ID);
     const result = resolveStat(TARGET_ID, 'skill.athletics', 0, ctx, registry);
@@ -71,7 +73,9 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
     // Cross-entity scope: caster is NOT the target; Guidance only helps the target.
     const registry = createInMemoryRegistry();
     const instances = buildGuidanceModifiers(CASTER_ID, TARGET_ID, TOKEN);
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     const casterCtx = makeCtx(CASTER_ID);
     const result = resolveStat(CASTER_ID, 'skill.athletics', 0, casterCtx, registry);
@@ -88,7 +92,9 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
     // PHB 248: concentration, 1 minute. When caster loses concentration, guidance ends.
     const registry = createInMemoryRegistry();
     const instances = buildGuidanceModifiers(CASTER_ID, TARGET_ID, TOKEN);
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     // Confirm guidance is active before concentration ends
     const ctx = makeCtx(TARGET_ID);
@@ -120,7 +126,9 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
     const reloaded: ModifierInstance[] = JSON.parse(serialized) as ModifierInstance[];
 
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst: ModifierInstance) => freshRegistry.register(inst));
+    reloaded.forEach((inst: ModifierInstance) => {
+      freshRegistry.register(inst);
+    });
 
     // Guidance should still work after reload
     const ctx = makeCtx(TARGET_ID);
@@ -147,7 +155,9 @@ describe('buildGuidanceModifiers — cross-entity +1d4 ability check, concentrat
     // This guards the compileRule template slot for a NON-default stat ('int').
     const registry = createInMemoryRegistry();
     const instances = buildGuidanceModifiers(CASTER_ID, TARGET_ID, TOKEN, 'int');
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     const ctx = makeCtx(TARGET_ID);
 

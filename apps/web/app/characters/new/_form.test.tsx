@@ -6,7 +6,7 @@
  * T-3: multi-world — placeholder option present; no hint
  * T-4: error message rendered when state.error is set
  */
-import React from 'react';
+import type React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { NewCharacterForm } from './_form';

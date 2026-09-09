@@ -118,7 +118,7 @@ export function StatCell({
   ) : null;
 
   const footerEl = footer !== undefined && footer !== null ? (
-    <>{footer}</>
+    footer
   ) : null;
 
   const content = (

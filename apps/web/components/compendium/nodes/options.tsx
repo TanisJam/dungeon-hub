@@ -11,6 +11,7 @@ export function OptionsNodeView({ node }: { node: OptionsNode }) {
         </p>
       ) : null}
       {node.entries.map((child, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static compendium content — parsed once per render from the fetched document, never reordered/inserted/removed client-side.
         <EntryNodeRenderer key={i} entry={child} />
       ))}
     </div>

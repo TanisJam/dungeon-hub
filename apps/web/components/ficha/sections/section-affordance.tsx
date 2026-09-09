@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Icon } from '@/components/ui/icon';
 import { ViewOnlySectionSheet } from './view-only-section-sheet';
 import type { CharacterStatus } from '@/lib/sheet-types';

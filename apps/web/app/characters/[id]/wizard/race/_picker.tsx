@@ -967,6 +967,7 @@ function RaceDetailPanel({
           <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Rasgos</p>
           <ul className="mt-1 space-y-1.5 text-xs">
             {traits.map((t, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static race/subrace trait content extracted once per selection — no unique id field, never reordered.
               <li key={i}>
                 <span className="font-semibold text-ink">{t.name}.</span>{' '}
                 <span className="text-ink-soft">{t.text}</span>
@@ -1052,6 +1053,7 @@ function AsiBlock({
           if (slot.kind === 'fixed') {
             const sign = slot.bonus >= 0 ? '+' : '';
             return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: slots is the fixed ASI-slot definition for the selected race — never reordered; idx is already the slot's canonical identity (storageKey below).
               <p key={idx} className="text-xs">
                 <span className="font-mono font-bold text-ink">
                   {sign}{slot.bonus} {slot.ability.toUpperCase()}
@@ -1061,6 +1063,7 @@ function AsiBlock({
           }
           return (
             <AsiChooser
+              // biome-ignore lint/suspicious/noArrayIndexKey: slots is the fixed ASI-slot definition for the selected race — never reordered; idx is already the slot's canonical identity (storageKey below).
               key={idx}
               slot={slot}
               storageKey={`${source}:${idx}`}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  // .jsonc, not .json, so every exclusion below can carry its reason. A rule
+  // turned off without one is indistinguishable from a rule nobody understood.
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  // Formatting is a separate decision from linting and has not been taken.
+  // Enabling it would reformat the entire repository in one commit.
+  "formatter": { "enabled": false },
+  // Import sorting: 982 findings, all ordering. Same reasoning as the style rules.
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      // The full recommended set, minus the seven below. Worth stating plainly:
+      // of Biome's ~200 recommended rules, only 21 ever had a finding here — the
+      // codebase already satisfied the rest. The headline "1139 errors" was almost
+      // entirely three style rules; read the distribution, not the total.
+      "recommended": true,
+      "a11y": {
+        // False positive. `role` is a DOMAIN prop in this codebase, meaning
+        // DM-versus-player: <CampanasView role="dm" />. The rule reads it as an
+        // ARIA role. "Fixing" its 26 reports would mean breaking working code.
+        "useValidAriaRole": "off",
+        // 8 of its 10 findings were real and were fixed before this went off. The
+        // 2 left are both role="group" on a div, and its remedy for that is
+        // <fieldset> — an element for grouping FORM CONTROLS. One site is a row of
+        // seal buttons that post immediately; the other a horizontally scrolling
+        // filter-chip row whose scroll-snap layout a fieldset box would fight.
+        // Biome reports "suppression has no effect" for a biome-ignore at either
+        // site, so it cannot be kept on and excused per-site. Changing the ARIA to
+        // satisfy a linter would be the wrong trade.
+        "useSemanticElements": "off"
+      },
+      "style": {
+        // 1095 findings. `!` is used deliberately and consistently here
+        // (session!.access_token and friends). A house style, not a defect.
+        "noNonNullAssertion": "off",
+        // 42 findings, all cosmetic string concatenation. No bug behind any.
+        "useTemplate": "off"
+      },
+      "complexity": {
+        // 786 findings, every one obj['key'] versus obj.key. Pure style.
+        "useLiteralKeys": "off"
+      },
+      "suspicious": {
+        // 89 findings. Each is real typing debt worth paying — but paying it is
+        // typing work across 89 sites, not a lint pass. Turning this on today
+        // would make the check red on arrival, which is how a linter becomes
+        // background noise. TODO: enable once the `any`s are typed.
+        "noExplicitAny": "off",
+        // The role preference lives in a cookie the server reads on the very first
+        // render — see lib/use-role.ts. document.cookie is the mechanism, not an
+        // oversight.
+        "noDocumentCookie": "off"
+      }
+    }
+  },
+  "files": {
+    // TypeScript sources only. Biome lints CSS too, and reported the design
+    // system's deliberately-unconsumed custom properties in globals.css as unused.
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.mts",
+      "**/*.cts",
+      "!**/node_modules/**",
+      "!**/.next/**",
+      "!**/dist/**",
+      "!**/drizzle/**",
+      "!**/data/**",
+      "!**/.codegraph/**"
+    ]
+  }
+}

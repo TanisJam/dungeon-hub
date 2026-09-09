@@ -38,10 +38,10 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { encounters, encounterCombatants, characters } from '../../infra/db/schema.js';
-import {
-  type ModifierInstance,
-  type ModifierInstanceId,
-  type EntityId,
+import type {
+  ModifierInstance,
+  ModifierInstanceId,
+  EntityId,
 } from '@dungeon-hub/domain/engine';
 import {
   consumeSpellSlot,

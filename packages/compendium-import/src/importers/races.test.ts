@@ -105,6 +105,7 @@ describe('classifyUnnamedSubrace — unnamed subrace disposition', () => {
 // same guard seed-pack.smoke.test.ts already uses. Without it a fresh clone
 // fails these seven tests on ENOENT.
 describe.skipIf(!existsSync(DATA_DIR))('importRaces — real 5etools data integration', () => {
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: quoting the actual placeholder string produced by the bug, not a forgotten template literal — `raceName` isn't in scope here.
   it('emits zero rows with placeholder name "${raceName} Variant" (was the bug)', async () => {
     const warnings: string[] = [];
     const rows = await importRaces(DATA_DIR, warnings);

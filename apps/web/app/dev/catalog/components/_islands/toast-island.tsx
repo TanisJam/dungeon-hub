@@ -12,9 +12,9 @@ import { useEffect } from 'react';
 export function ToastIsland(props: { message: string; durationMs?: number }) {
   const { message: toastMsg, showToast } = useToast();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires only when the message changes — durationMs is read at fire-time, and showToast's identity is not meant to re-trigger the demo toast.
   useEffect(() => {
     showToast(props.message, props.durationMs ?? 3500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.message]);
 
   return <Toast message={toastMsg} />;

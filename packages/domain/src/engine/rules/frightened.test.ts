@@ -64,7 +64,9 @@ describe('buildFrightenedModifiers — disadvantage on attacks+checks while fear
     // The canSee predicate: {op:'query', q:{kind:'canSee', entity:'self', of:'caster'}}
     const registry = createInMemoryRegistry();
     const instances = buildFrightenedModifiers(CHAR_ID, FEAR_SOURCE_ID);
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     // Fear source IS visible
     const ctx = makeCtxWithVisibility(CHAR_ID, FEAR_SOURCE_ID, true);
@@ -92,7 +94,9 @@ describe('buildFrightenedModifiers — disadvantage on attacks+checks while fear
     // When canSee=false, the predicate {op:'query', q:{kind:'canSee',...}} returns false.
     const registry = createInMemoryRegistry();
     const instances = buildFrightenedModifiers(CHAR_ID, FEAR_SOURCE_ID);
-    instances.forEach((inst: ModifierInstance) => registry.register(inst));
+    instances.forEach((inst: ModifierInstance) => {
+      registry.register(inst);
+    });
 
     // Fear source is NOT visible
     const ctx = makeCtxWithVisibility(CHAR_ID, FEAR_SOURCE_ID, false);
@@ -131,7 +135,9 @@ describe('buildFrightenedModifiers — disadvantage on attacks+checks while fear
 
     // Register reloaded instances and confirm behavior is preserved
     const freshRegistry = createInMemoryRegistry();
-    reloaded.forEach((inst: ModifierInstance) => freshRegistry.register(inst));
+    reloaded.forEach((inst: ModifierInstance) => {
+      freshRegistry.register(inst);
+    });
 
     // With fear source visible → disadvantage still applies
     const ctxVisible = makeCtxWithVisibility(CHAR_ID, FEAR_SOURCE_ID, true);

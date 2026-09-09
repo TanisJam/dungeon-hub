@@ -117,7 +117,7 @@ export async function importSpells(dataDir: string): Promise<NormalizedSpell[]> 
   // Cargar el lookup una sola vez. El archivo de 5etools usa los NOMBRES de
   // spell como keys ("fire bolt") pero nosotros buscamos por slug ("fire-bolt"),
   // así que re-mapeamos al cargar.
-  let lookup: SpellSourceLookup = {};
+  const lookup: SpellSourceLookup = {};
   try {
     const raw = await readJson<SpellSourceLookup>(
       join(dataDir, 'generated', 'gendata-spell-source-lookup.json'),
