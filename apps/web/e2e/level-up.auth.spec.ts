@@ -37,26 +37,63 @@ test.describe('Level-up — E2E happy path (iPhone SE 375px)', () => {
     // (href="/characters/new", "/characters/import") render as DashedCTA siblings
     // OUTSIDE that wrapper — a bare `a[href^="/characters/"]` selector would match
     // those too and could be picked as .first() before any real character card.
-    const charLink = page.locator('[data-character-card] a[href^="/characters/"]').first();
-    const hasChar = await charLink.isVisible({ timeout: 5_000 }).catch(() => false);
+    const charHrefs = [
+      ...new Set(
+        await page
+          .locator('[data-character-card] a[href^="/characters/"]')
+          .evaluateAll((els) =>
+            (els as HTMLAnchorElement[])
+              .map((a) => a.getAttribute('href'))
+              .filter((h): h is string => !!h && /\/characters\/[a-f0-9-]{36}/.test(h)),
+          ),
+      ),
+    ];
     test.skip(
-      !hasChar,
+      charHrefs.length === 0,
       'No character found on /personajes — skipping level-up E2E.',
     );
 
-    const charHref = await charLink.getAttribute('href');
-    if (!charHref) throw new Error('charLink has no href');
-    await page.goto(charHref);
-    await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
-
-    // ---- Step 3: Look for "Subir nivel" button ----
-    // The button only appears when: status=active AND non-gm AND xp >= threshold.
-    const levelUpLink = page.getByRole('link', { name: /subir.*nivel/i });
-    const hasLevelUp = await levelUpLink.isVisible({ timeout: 3_000 }).catch(() => false);
+    // ---- Step 3: Take the barbarian, and only if it can actually level ----
+    // Walk the roster rather than betting on the first card: the sibling specs each
+    // level a character of their own before this one runs, so whichever card sorts
+    // first is usually one of theirs and already spent, and reading .first() alone
+    // made the outcome depend on roster order rather than on whether an eligible
+    // character existed.
+    //
+    // Barbarian specifically. This spec walks the plain same-class average-HP flow
+    // through to "Confirmar subida", and a caster detours through a spells step it
+    // never picks from, so taking whatever happened to be eligible left it waiting
+    // on a confirm button that flow had not reached yet. A barbarian gains no spells,
+    // no subclass and no ability score improvement at level 2, and no sibling claims
+    // one. auth.setup.ts provisions it.
+    //
+    // The link only appears when: status=active AND non-gm AND xp >= threshold.
+    let charHref: string | null = null;
+    for (const href of charHrefs) {
+      await page.goto(href);
+      const isBarbarian = await page
+        .locator('text=/barbarian/i')
+        .first()
+        .isVisible({ timeout: 2_000 })
+        .catch(() => false);
+      if (!isBarbarian) continue;
+      const visible = await page
+        .getByRole('link', { name: /subir.*nivel/i })
+        .isVisible({ timeout: 3_000 })
+        .catch(() => false);
+      if (visible) {
+        charHref = href;
+        break;
+      }
+    }
     test.skip(
-      !hasLevelUp,
-      '"Subir nivel" button not visible — character not eligible (inactive, GM, or insufficient XP).',
+      !charHref,
+      'No barbarian can level — none is active, player-owned and at the xp threshold.',
     );
+
+    await page.goto(charHref!);
+    await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
+    const levelUpLink = page.getByRole('link', { name: /subir.*nivel/i });
 
     // ---- Step 4: Navigate to level-up flow ----
     await levelUpLink.click();
@@ -79,7 +116,12 @@ test.describe('Level-up — E2E happy path (iPhone SE 375px)', () => {
     await firstClassBtn.click();
 
     // ---- Step 7: HP step — choose "Promedio" (default selected) ----
-    await expect(page.getByText(/promedio/i)).toBeVisible({ timeout: 5_000 });
+    // Scoped to the button. The HP step also prints a hint that begins "PHB p.15 —
+    // promedio garantiza el valor fijo", so an unscoped /promedio/i matched the hint
+    // as well as the control and raised a strict mode violation the moment the step
+    // rendered. These specs were skipping before the fixture existed, which is what
+    // kept it hidden.
+    await expect(page.getByRole('button', { name: /^promedio/i })).toBeVisible({ timeout: 5_000 });
     const continueBtn = page.getByRole('button', { name: /continuar/i });
     await continueBtn.click();
 
