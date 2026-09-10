@@ -19,6 +19,12 @@ const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
 
 const VIEWPORT = { width: 375, height: 667 };
 
+// Three roles, a full character build, an approval and a read-back. All three
+// attempts stopped at exactly 30s — the Playwright default — never at a varying
+// point, which is the signature of a budget rather than a defect. j6-gm-owner
+// carries 90s for the same reason.
+test.describe.configure({ timeout: 90_000 });
+
 test.describe('J1 — player creates character, DM approves, player sees Activo', () => {
   test('full create-approve-use loop @ 375px', async ({ browser }: { browser: Browser }) => {
     // ── Contexts ──────────────────────────────────────────────────────────────

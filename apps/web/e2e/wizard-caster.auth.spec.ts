@@ -59,6 +59,15 @@
 
 import { test, expect } from '@playwright/test';
 
+// This walk crosses all seven wizard routes, and its own inner waits (10s per
+// URL change, 5s per step sentinel) sum well past Playwright's 30s default. The
+// two measured attempts came in at 33s and 28s — the failure was the budget, not
+// the app, which is why the failing step moved between runs and read like a race
+// in the builder. 82e46b6 established this for sheet-racial-traits, which walks
+// the same routes and carries the same budget; scripts/e2e-stack.sh warms the
+// routes so the compile is not paid inside the measured window either.
+test.describe.configure({ timeout: 180_000 });
+
 test.describe('character builder wizard — Wizard caster happy path', () => {
   test('create Wizard character, fill 6 steps including spell picks, activate', async ({
     page,
