@@ -24,14 +24,23 @@ export function AccountMenu() {
 
   return (
     <>
+      {/* The button is the TAP TARGET; the span is the 34px square you see — the
+          split toggle-chip.tsx introduced. That square is sized to sit beside the
+          CrowMark and the back arrow in a 34px header cluster, so growing it to
+          44 would resize the whole TopBar; a transparent 44px button around it
+          leaves the header looking the same and still gives a thumb something to
+          land on. This is the control that shipped at 34px and only surfaced as
+          an e2e failure in approval-transition-mobile. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Cuenta"
         aria-haspopup="dialog"
-        className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0"
+        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0 flex-shrink-0"
       >
-        <Icon name="user" size={16} />
+        <span className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0">
+          <Icon name="user" size={16} />
+        </span>
       </button>
 
       <V3Sheet open={open} onClose={() => setOpen(false)} title="Cuenta" labelledBy="account-menu-heading">

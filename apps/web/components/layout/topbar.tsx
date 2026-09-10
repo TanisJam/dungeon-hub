@@ -56,12 +56,17 @@ export function TopBar({
   function renderLeftSlot() {
     if (backHref) {
       return (
+        // The link is the tap target, the span is the 34px square — same split as
+        // AccountMenu on the other end of the header, and for the same reason:
+        // the cluster is designed around 34px boxes.
         <Link
           href={backHref}
           aria-label="Volver"
-          className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0 flex-shrink-0"
         >
-          <Icon name="arrow-left" size={16} />
+          <span className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0">
+            <Icon name="arrow-left" size={16} />
+          </span>
         </Link>
       );
     }

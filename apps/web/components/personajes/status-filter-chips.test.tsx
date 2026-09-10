@@ -32,16 +32,18 @@ describe('StatusFilterChips', () => {
   });
 
   it('active chip has class personajes-chip-on when ?status=active', () => {
+    // The visual class lives on the inner <span> (the pill); the <a> is the
+    // 44px transparent tap target, so it's checked via its pill child.
     mockGet.mockReturnValue('active');
     render(<StatusFilterChips counts={counts} />);
     const links = screen.getAllByRole('link');
     const activeLink = links.find((l) => l.getAttribute('href') === '/personajes?status=active');
-    expect(activeLink?.className).toContain('personajes-chip-on');
+    expect(activeLink?.querySelector('span')?.className).toContain('personajes-chip-on');
     // others should not
     links
       .filter((l) => l.getAttribute('href') !== '/personajes?status=active')
       .forEach((l) => {
-        expect(l.className).not.toContain('personajes-chip-on');
+        expect(l.querySelector('span')?.className).not.toContain('personajes-chip-on');
       });
   });
 
@@ -70,6 +72,6 @@ describe('StatusFilterChips', () => {
     render(<StatusFilterChips counts={counts} />);
     const links = screen.getAllByRole('link');
     const activeLink = links.find((l) => l.getAttribute('href') === '/personajes?status=active');
-    expect(activeLink?.className).toContain('personajes-chip-on');
+    expect(activeLink?.querySelector('span')?.className).toContain('personajes-chip-on');
   });
 });
