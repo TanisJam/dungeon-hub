@@ -23,16 +23,25 @@ export function StatusFilterChips({ counts }: { counts: ChipCounts }) {
       {CHIPS.map(({ key, label, showCount }) => {
         const on = key === active;
         return (
+          // The link is the TAP TARGET; the span is the pill you see. Putting
+          // min-h-[44px] on the pill itself would inflate a 27px-tall compact
+          // chip into a slab and change the chip row's proportions — a
+          // transparent 44px link around it keeps the pill exactly as
+          // designed while the measured target clears the minimum.
           <Link
             key={key}
             href={`/personajes?status=${key}`}
-            className={`shrink-0 rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
-              on
-                ? 'personajes-chip-on border-accent-deep'
-                : 'border-line bg-surface text-ink-mute hover:border-ink-mute'
-            }`}
+            className="shrink-0 inline-flex min-h-[44px] items-center"
           >
-            {showCount ? `${label} · ${counts[key]}` : label}
+            <span
+              className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
+                on
+                  ? 'personajes-chip-on border-accent-deep'
+                  : 'border-line bg-surface text-ink-mute hover:border-ink-mute'
+              }`}
+            >
+              {showCount ? `${label} · ${counts[key]}` : label}
+            </span>
           </Link>
         );
       })}

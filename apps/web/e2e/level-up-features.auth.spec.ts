@@ -25,9 +25,9 @@ test.describe('Level-up featuresUnlocked on success screen — Fighter L1→L2 @
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('Fighter L1→L2 success screen shows "Características nuevas" with Action Surge', async ({ page }) => {
-    // ---- Step 1: Dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Fighter L1 character ----
     const allHrefs = await page

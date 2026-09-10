@@ -18,20 +18,22 @@ test.describe('RecentGrants widget — mobile smoke @ 375px', () => {
   test('character sheet renders RecentGrants section (events or empty state)', async ({
     page,
   }) => {
-    // Navigate to dashboard to find a character link
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // Navigate to the character roster to find a character link
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
-    // Find the first character link (Jugador section → character name → href to /characters/[id]).
-    // Scoped to the character <ul> — CharactersSection always renders a "+ Nuevo"
-    // link (href="/characters/new") in the section header, OUTSIDE the <ul>, which
-    // also matches a bare `a[href^="/characters/"]` selector and would be picked as
-    // .first() before any real character card.
-    const charLink = page.locator('ul a[href^="/characters/"]').first();
+    // Find the first character link (roster → character card → href to /characters/[id]).
+    // Scoped to [data-character-card] — PersonajeCard's CharacterCard atom wraps
+    // each real character link in a `<div data-character-card>`, while the
+    // CreatePersonajeCTA/ImportPersonajeCTA "+ Nuevo"/"Importar" links
+    // (href="/characters/new", "/characters/import") render as DashedCTA siblings
+    // OUTSIDE that wrapper — a bare `a[href^="/characters/"]` selector would match
+    // those too and could be picked as .first() before any real character card.
+    const charLink = page.locator('[data-character-card] a[href^="/characters/"]').first();
     const hasChar = await charLink.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(
       !hasChar,
-      'No character link found on dashboard — test user has no characters.',
+      'No character link found on /personajes — test user has no characters.',
     );
 
     await charLink.click();

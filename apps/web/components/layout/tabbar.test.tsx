@@ -150,3 +150,56 @@ describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
     expect(hrefs).toEqual(['/inicio', '/mapa', '/compendium', '/mercado', '/bitacora']);
   });
 });
+
+describe('TabBar — Mesa tab gated on callerRole (GM hub navigability fix)', () => {
+  beforeEach(() => {
+    mockUsePathname.mockReturnValue('/inicio');
+  });
+
+  it('renders exactly 5 tabs for a player (callerRole="player")', () => {
+    render(<TabBar callerRole="player" />);
+    expect(screen.getAllByRole('link')).toHaveLength(5);
+    expect(screen.queryByText('Mesa')).toBeNull();
+  });
+
+  it('renders exactly 5 tabs when callerRole is null (no active world)', () => {
+    render(<TabBar callerRole={null} />);
+    expect(screen.getAllByRole('link')).toHaveLength(5);
+  });
+
+  it('renders exactly 6 tabs for a GM (callerRole="gm"), Mesa last with href /mesa', () => {
+    render(<TabBar callerRole="gm" />);
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(6);
+    const mesaLink = screen.getByRole('link', { name: /mesa/i });
+    expect(mesaLink.getAttribute('href')).toBe('/mesa');
+    expect(links[links.length - 1]).toBe(mesaLink);
+  });
+
+  it('grid-cols-6 when GM, grid-cols-5 otherwise', () => {
+    const { container, rerender } = render(<TabBar callerRole="gm" />);
+    let grid = container.querySelector('nav > div');
+    expect(grid?.className).toContain('grid-cols-6');
+
+    rerender(<TabBar callerRole="player" />);
+    grid = container.querySelector('nav > div');
+    expect(grid?.className).toContain('grid-cols-5');
+  });
+
+  it('Biblioteca renders its full name at 5 columns (player), short label "Códex" at 6 (GM)', () => {
+    const { rerender } = render(<TabBar callerRole="player" />);
+    expect(screen.getByText('Biblioteca')).toBeTruthy();
+    expect(screen.queryByText('Códex')).toBeNull();
+
+    rerender(<TabBar callerRole="gm" />);
+    expect(screen.getByText('Códex')).toBeTruthy();
+    expect(screen.queryByText('Biblioteca')).toBeNull();
+  });
+
+  it('a GM toggling view preference still sees the same tab set — gate is callerRole only', () => {
+    // Regression guard: the tab bar takes no `effectiveView`/view-preference
+    // prop at all, so a DM/Jugador toggle cannot change the rendered tabs.
+    render(<TabBar callerRole="gm" />);
+    expect(screen.getAllByRole('link')).toHaveLength(6);
+  });
+});

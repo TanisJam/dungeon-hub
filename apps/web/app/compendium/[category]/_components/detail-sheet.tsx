@@ -98,6 +98,12 @@ export function DetailSheet({
   const entries = detailRecord?.data
     ? ((detailRecord.data as Record<string, unknown>).entries as Entry[] | undefined) ?? []
     : [];
+  // Lore text (races, backgrounds, classes only — packages/compendium-import/src/fluff.ts).
+  // Same 5etools entry-node shape as `entries`, rendered separately and below the
+  // mechanical body: the rules are what a reference reader came for.
+  const fluff = detailRecord?.data
+    ? ((detailRecord.data as Record<string, unknown>).fluff as Entry[] | undefined) ?? []
+    : [];
 
   return (
     <V3Sheet open={open} onClose={onClose} title={displayName}>
@@ -119,6 +125,20 @@ export function DetailSheet({
               accessToken={accessToken}
             />
           </div>
+          {fluff.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft mb-2">
+                Descripción
+              </div>
+              <div className="desc">
+                <CompendiumEntriesWithTerms
+                  entries={fluff}
+                  worldId={worldId}
+                  accessToken={accessToken}
+                />
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </V3Sheet>

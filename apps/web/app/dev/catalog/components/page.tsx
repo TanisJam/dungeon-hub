@@ -132,7 +132,7 @@ export default function ComponentsPage() {
                   <div className="space-y-2">
                     {combos.map((combo, i) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: dev-only catalog page — combos is a hardcoded registry entry, never reordered; i disambiguates a possible duplicate label.
-                      <Frame375 key={`${combo.label}-${i}`} label={combo.label}>
+                      <Frame375 key={`${combo.label}-${i}`} label={combo.label} entry={entry.name}>
                         <div className="p-3">
                           {entry.render(entry.fixedProps
                             ? { ...entry.fixedProps, ...combo.props } as Parameters<typeof entry.render>[0]

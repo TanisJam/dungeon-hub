@@ -30,7 +30,7 @@ test.describe('character builder wizard — Monk L1 happy path @ 375px', () => {
     const charName = `E2E Monk ${Date.now()}`;
 
     await test.step('navigate to new character form', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
     });
@@ -146,9 +146,14 @@ test.describe('character builder wizard — Monk L1 happy path @ 375px', () => {
       await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
-    await test.step('dashboard muestra el personaje Monk como Pendiente', async () => {
-      await page.goto('/dashboard');
-      const charCard = page.locator('li').filter({ hasText: charName });
+    await test.step('/personajes muestra el personaje Monk como Pendiente', async () => {
+      // /personajes defaults to the 'active' status chip (parseChip in
+      // lib/personajes-filter.ts), which filters out a just-published
+      // pending_approval character. Ask for the pending chip explicitly.
+      await page.goto('/personajes?status=pending');
+      // PersonajeCard wraps each roster entry in <div data-character-card>
+      // (no <li> — /personajes renders cards in a plain flex column).
+      const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
       await expect(charCard).toContainText('Pendiente');
     });

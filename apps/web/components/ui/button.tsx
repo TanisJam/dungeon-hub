@@ -51,13 +51,23 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: 'text-base px-5 py-3.5 rounded-[14px]',
 };
 
+// The 44px floor used to ride along with `fullWidth`, which is a width prop and
+// has nothing to say about height. The effect was that every button the app
+// renders at its natural width — the common case — measured 30px at `sm` and
+// 42px at `md`, under the minimum this codebase applies everywhere else
+// (toggle-chip.tsx, world-switcher, section-affordance, subclass-picker's
+// REQ-CLU-SUB-UI-MOBILE). `md` gains 2px and `lg` is already past it; `sm` is
+// the one that visibly grows, which is the point — it was the worst offender.
+const HIT_FLOOR = 'min-h-[44px] min-w-[44px]';
+
 function buildClasses(tone: ButtonTone, size: ButtonSize, fullWidth?: boolean, extra?: string): string {
   return [
     'inline-flex items-center justify-center gap-2 font-bold',
     'border transition-all active:translate-y-px',
+    HIT_FLOOR,
     toneClasses[tone],
     sizeClasses[size],
-    fullWidth ? 'w-full min-h-[44px]' : '',
+    fullWidth ? 'w-full' : '',
     extra ?? '',
   ]
     .join(' ')

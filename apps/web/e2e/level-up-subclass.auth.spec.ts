@@ -23,9 +23,9 @@ test.describe('Level-up subclass step — Wizard L1→L2 @ 375px', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('Wizard levels up to L2, subclass step appears and picks Evocation', async ({ page }) => {
-    // ---- Step 1: Dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a Wizard L1 character without subclass ----
     const allHrefs = await page

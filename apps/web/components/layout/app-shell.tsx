@@ -72,7 +72,7 @@ export function AppShell({
   return (
     <>
       <div className="md:grid md:grid-cols-[var(--sidebar-w)_1fr]">
-        <DesktopSidebar />
+        <DesktopSidebar callerRole={callerRole} />
         <div className="md:min-w-0">
           <TopBar
             title={title}
@@ -88,7 +88,7 @@ export function AppShell({
           </main>
         </div>
       </div>
-      {showTabBar && <TabBar />}
+      {showTabBar && <TabBar callerRole={callerRole} />}
     </>
   );
 }

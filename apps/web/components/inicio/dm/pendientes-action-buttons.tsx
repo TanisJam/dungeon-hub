@@ -34,13 +34,13 @@ export function PendientesActionButtons({ fichaId, actions }: Props) {
         type="button"
         disabled={isPending}
         onClick={() => startTransition(async () => { await onApprove(fichaId); })}
-        className="rounded-lg px-3 py-1.5 text-sm font-semibold bg-magenta-600 text-white disabled:opacity-50"
+        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-magenta-600 text-white disabled:opacity-50"
       >
         Aprobar
       </button>
       <Link
         href={`/characters/${fichaId}`}
-        className="rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink"
+        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink"
       >
         Ver ficha
       </Link>
@@ -48,7 +48,7 @@ export function PendientesActionButtons({ fichaId, actions }: Props) {
         type="button"
         disabled={isPending}
         onClick={() => startTransition(async () => { await onReject(fichaId); })}
-        className="rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink-mute disabled:opacity-50"
+        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink-mute disabled:opacity-50"
       >
         Devolver
       </button>

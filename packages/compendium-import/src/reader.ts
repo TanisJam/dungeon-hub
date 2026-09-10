@@ -10,22 +10,32 @@ export async function readJson<T = unknown>(path: string): Promise<T> {
   return JSON.parse(buf) as T;
 }
 
+export interface ListFilesOptions {
+  /**
+   * When true, does NOT filter out `fluff-*` files. Opt-in only — every
+   * existing call site keeps skipping `fluff-*` by default, unchanged.
+   */
+  includeFluff?: boolean;
+}
+
 /**
  * Lista archivos JSON dentro de un subdir de data/ que matcheen un patrón.
  * Ej: listFiles(dataDir, 'class', /^class-.+\.json$/) → class-wizard.json, etc.
- *     skipea automáticamente fluff-*, foundry-*, índices, y UA.
+ *     skipea automáticamente fluff-*, foundry-*, índices, y UA (fluff-* solo
+ *     si no se pasa `{ includeFluff: true }`).
  */
 export async function listFiles(
   dataDir: string,
   subdir: string,
   pattern: RegExp,
+  options: ListFilesOptions = {},
 ): Promise<string[]> {
   const dir = join(dataDir, subdir);
   if (!existsSync(dir)) return [];
   const files = await readdir(dir);
   return files
     .filter((f) => pattern.test(f))
-    .filter((f) => !f.startsWith('fluff-'))
+    .filter((f) => options.includeFluff || !f.startsWith('fluff-'))
     .filter((f) => !f.startsWith('foundry-'))
     .filter((f) => !f.startsWith('makebrew-'))
     .filter((f) => !f.includes('-ua-'))

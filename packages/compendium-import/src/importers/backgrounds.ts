@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { readJson } from '../reader.js';
 import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
 import type { FiveeToolsBackground, NormalizedRecord } from '../types.js';
+import { resolveCopies } from '../resolve-copy.js';
 
 interface BackgroundsFile {
   background?: FiveeToolsBackground[];
@@ -35,12 +36,20 @@ function warnIfAnyToolCountBug(b: FiveeToolsBackground): void {
   }
 }
 
-export async function importBackgrounds(dataDir: string): Promise<NormalizedRecord[]> {
+export async function importBackgrounds(
+  dataDir: string,
+  warnings: string[],
+): Promise<NormalizedRecord[]> {
   const file = await readJson<BackgroundsFile>(join(dataDir, 'backgrounds.json'));
   const out: NormalizedRecord[] = [];
 
-  for (const b of file.background ?? []) {
-    if (isExcludedSource(b.source)) continue;
+  // Resolve `_copy` stubs (e.g. Baldur's Gate backgrounds copying PHB backgrounds,
+  // or Augen Trust[EGW] chaining through Variant Criminal (Spy)[PHB]) before
+  // building the normalized rows — otherwise `data` ends up with no `entries`.
+  const filtered = (file.background ?? []).filter((b) => !isExcludedSource(b.source));
+  const resolved = resolveCopies(filtered, warnings, 'background');
+
+  for (const b of resolved) {
     warnIfAnyToolCountBug(b);
     out.push({
       slug: slugify(b.name),

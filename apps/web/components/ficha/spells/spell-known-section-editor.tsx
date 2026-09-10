@@ -51,15 +51,22 @@ export function SpellKnownSectionEditor({
 
   return (
     <>
-      {/* Amber wand affordance — visually distinct from prep pencil */}
+      {/* Amber wand affordance — visually distinct from prep pencil.
+          The button is the TAP TARGET; the span is the 32px icon square you
+          see. Putting min-h/min-w-[44px] directly on the bordered square
+          would inflate the compact icon chip and change its proportions
+          next to the section header — a transparent 44px button around it
+          keeps the square exactly as designed. */}
       <button
         type="button"
         aria-label={`Asignar hechizos conocidos – ${classSlug}`}
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10"
+        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0"
         title="DM: asignar hechizos conocidos"
       >
-        <Icon name="wand" size={14} />
+        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10">
+          <Icon name="wand" size={14} />
+        </span>
       </button>
 
       <V3Sheet open={open} onClose={handleClose} title="Asignar hechizos conocidos (DM)">

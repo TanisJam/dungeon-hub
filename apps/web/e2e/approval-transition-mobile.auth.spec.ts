@@ -37,13 +37,20 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
 
   test('GM sees Aprobar + Rechazar buttons on pending character at 375px', async ({ page }) => {
     // ---- Step 1: Navigate to a GM world ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // /mesa is the DM hub (was reachable only via /dashboard's "Master pill").
+    // It default-denies (notFound → 404) when effectiveView !== 'dm', so a
+    // non-GM auth user gets a 404 response instead of the a[href^="/worlds/"]
+    // link that used to gate this test — check the response status instead.
+    const mesaResponse = await page.goto('/mesa');
+    const isGm = mesaResponse !== null && mesaResponse.status() !== 404;
+    test.skip(!isGm, 'Auth user is not GM of any world — skipping approval transition E2E.');
+
+    // Page-loaded sentinel — /mesa's AppShell h1 title replaces the old
+    // dashboard "Jugador" IdentityHeader text.
+    await expect(page.getByRole('heading', { name: 'Mesa', exact: true })).toBeVisible({ timeout: 10_000 });
 
     const masterLink = page.locator('a[href^="/worlds/"]').first();
-    const hasMasterLink = await masterLink.isVisible({ timeout: 3_000 }).catch(() => false);
-    test.skip(!hasMasterLink, 'Auth user is not GM of any world — skipping approval transition E2E.');
-
+    await expect(masterLink).toBeVisible({ timeout: 10_000 });
     const worldHref = await masterLink.getAttribute('href');
     if (!worldHref) throw new Error('masterLink has no href');
     await page.goto(worldHref);
@@ -127,9 +134,11 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
   });
 
   test('Active character sheet: core sections + RecentGrants render at 375px', async ({ page }) => {
-    // ---- Step 1: Navigate to dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Navigate to the character roster ----
+    await page.goto('/personajes');
+    // Page-loaded sentinel — /personajes's AppShell h1 title replaces the old
+    // dashboard "Jugador" IdentityHeader text.
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find a published (active) character sheet ----
     // Collect all char hrefs

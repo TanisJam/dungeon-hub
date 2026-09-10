@@ -25,7 +25,7 @@ test.describe('equipment wizard step — round-trip (REQ-SEQUIP-10)', () => {
     // ── Create character and reach the equipment step ─────────────────────
 
     await test.step('create character and reach /wizard/equipment', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
 

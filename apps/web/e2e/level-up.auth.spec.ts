@@ -25,21 +25,23 @@ test.describe('Level-up — E2E happy path (iPhone SE 375px)', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
   test('Owner clicks "Subir nivel", does same-class average HP, sheet reflects new level', async ({ page }) => {
-    // ---- Step 1: Navigate to dashboard ----
-    await page.goto('/dashboard');
-    await expect(page.getByRole('main').getByText('Jugador', { exact: true })).toBeVisible({ timeout: 10_000 });
+    // ---- Step 1: Navigate to Personajes roster ----
+    await page.goto('/personajes');
+    await expect(page.getByRole('heading', { name: 'Personajes', exact: true })).toBeVisible({ timeout: 10_000 });
 
     // ---- Step 2: Find an owned (player) character ----
     // Go to the first world visible for the user. Any player-role world will do.
-    // Scoped to the character <ul> — CharactersSection always renders a "+ Nuevo"
-    // link (href="/characters/new") in the section header, OUTSIDE the <ul>, which
-    // also matches a bare `a[href^="/characters/"]` selector and would be picked as
-    // .first() before any real character card.
-    const charLink = page.locator('ul a[href^="/characters/"]').first();
+    // Scoped to [data-character-card] — PersonajeCard's CharacterCard atom wraps
+    // each real character link in a `<div data-character-card>`, while the
+    // CreatePersonajeCTA/ImportPersonajeCTA "+ Nuevo"/"Importar" links
+    // (href="/characters/new", "/characters/import") render as DashedCTA siblings
+    // OUTSIDE that wrapper — a bare `a[href^="/characters/"]` selector would match
+    // those too and could be picked as .first() before any real character card.
+    const charLink = page.locator('[data-character-card] a[href^="/characters/"]').first();
     const hasChar = await charLink.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(
       !hasChar,
-      'No character found on dashboard — skipping level-up E2E.',
+      'No character found on /personajes — skipping level-up E2E.',
     );
 
     const charHref = await charLink.getAttribute('href');

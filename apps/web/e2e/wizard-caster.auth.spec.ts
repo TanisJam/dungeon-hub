@@ -52,12 +52,21 @@
  *
  * 6. Publish flow end-to-end: after completing all 6 steps for a caster, clicking
  *    Publicar on /review succeeds, shows the PublishedSplash, and clicking
- *    "Ir al perfil" redirects to /characters/:id. The dashboard shows the
+ *    "Ir al perfil" redirects to /characters/:id. /personajes shows the
  *    character as "Pendiente".
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { test, expect } from '@playwright/test';
+
+// This walk crosses all seven wizard routes, and its own inner waits (10s per
+// URL change, 5s per step sentinel) sum well past Playwright's 30s default. The
+// two measured attempts came in at 33s and 28s — the failure was the budget, not
+// the app, which is why the failing step moved between runs and read like a race
+// in the builder. 82e46b6 established this for sheet-racial-traits, which walks
+// the same routes and carries the same budget; scripts/e2e-stack.sh warms the
+// routes so the compile is not paid inside the measured window either.
+test.describe.configure({ timeout: 180_000 });
 
 test.describe('character builder wizard — Wizard caster happy path', () => {
   test('create Wizard character, fill 6 steps including spell picks, activate', async ({
@@ -66,7 +75,7 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
     const charName = `E2E Wizard ${Date.now()}`;
 
     await test.step('navigate to new character form', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 10_000 });
     });
@@ -242,9 +251,14 @@ test.describe('character builder wizard — Wizard caster happy path', () => {
       await expect(page).toHaveURL(/\/characters\/.+\/?(?:\?.*)?$/, { timeout: 10_000 });
     });
 
-    await test.step('dashboard muestra el personaje Wizard como pendiente', async () => {
-      await page.goto('/dashboard');
-      const charCard = page.locator('li').filter({ hasText: charName });
+    await test.step('/personajes muestra el personaje Wizard como pendiente', async () => {
+      // /personajes defaults to the 'active' status chip (parseChip in
+      // lib/personajes-filter.ts), which filters out a just-published
+      // pending_approval character. Ask for the pending chip explicitly.
+      await page.goto('/personajes?status=pending');
+      // PersonajeCard wraps each roster entry in <div data-character-card>
+      // (no <li> — /personajes renders cards in a plain flex column).
+      const charCard = page.locator('[data-character-card]').filter({ hasText: charName });
       await expect(charCard).toBeVisible();
       await expect(charCard).toContainText('Pendiente');
     });

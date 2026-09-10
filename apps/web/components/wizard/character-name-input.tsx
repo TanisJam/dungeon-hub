@@ -61,7 +61,7 @@ export function CharacterNameInput({ characterId, initialName }: CharacterNameIn
         value={name}
         onChange={handleChange}
         onBlur={handleBlur}
-        className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 font-display text-base text-ink placeholder:text-ink-mute focus:outline-none focus:ring-2 focus:ring-accent/50"
+        className="w-full min-h-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 font-display text-base text-ink placeholder:text-ink-mute focus:outline-none focus:ring-2 focus:ring-accent/50"
         placeholder="Nombre del personaje…"
       />
       {status === 'saving' && (

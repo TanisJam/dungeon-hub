@@ -58,7 +58,7 @@ export default async function BuildLayout({ children, params }: Props) {
 
   const exitLink = (
     <Link
-      href="/dashboard"
+      href="/inicio"
       className="text-xs font-semibold text-ink-mute hover:text-ink transition-colors"
     >
       ← Salir

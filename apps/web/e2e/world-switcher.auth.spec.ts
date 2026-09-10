@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickUntilVisible } from './helpers/click-until';
 
 /**
  * world-switcher — E2E spec for the WorldSwitcher bottom-sheet (REQ-WIS-E01).
@@ -29,11 +30,19 @@ test('WorldSwitcher: opens sheet from TopBar trigger', async ({ page }) => {
   // The WorldSwitcherTrigger button is in the TopBar left slot.
   // aria-label: "Mundo activo: {worldName}. Abrir selector de mundo."
   // Click the trigger — the V3Sheet portal renders to document.body.
-  await page.getByRole('button', { name: /Abrir selector de mundo/i }).click();
+  const trigger = page.getByRole('button', { name: /Abrir selector de mundo/i });
 
   // REQ-WIS-E01: at least one world row appears (proves the sheet opened).
-  // This is equivalent to verifying the sheet opened and has content.
-  await expect(page.getByRole('button', { name: /E2E Test Campaign/ })).toBeVisible({ timeout: 10_000 });
+  //
+  // Scope the row to the dialog. The trigger's own aria-label carries the active
+  // world's name, so an unscoped `name: /E2E Test Campaign/` matches the trigger
+  // too — one element while the sheet is shut, two once it opens. That inverted
+  // the test: it passed whenever the sheet stayed closed and raised a strict mode
+  // violation whenever it opened. The dialog scope leaves only the row, so this
+  // asserts what the name claims.
+  const worldRow = page.getByRole('dialog').getByRole('button', { name: /E2E Test Campaign/ });
+
+  await clickUntilVisible(trigger, worldRow, 'the world list must appear after tapping the switcher');
 });
 
 test('WorldSwitcher: at least one world row visible in sheet', async ({ page }) => {
@@ -41,12 +50,14 @@ test('WorldSwitcher: at least one world row visible in sheet', async ({ page }) 
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
   const trigger = page.getByRole('button', { name: /Abrir selector de mundo/i });
-  await trigger.click();
 
-  // The sheet should list the E2E world (at least one row button with world name)
-  // Sheet world rows are <button> elements inside the sheet body
-  const worldRows = page.getByRole('button', { name: /E2E Test Campaign/ });
-  await expect(worldRows.first()).toBeVisible({ timeout: 10_000 });
+  // Sheet world rows are <button> elements inside the sheet body. Scoped to the
+  // dialog for the reason above; `.first()` used to hide the ambiguity here by
+  // silencing strict mode, which made this pass against the trigger alone and
+  // never once proved a row had rendered.
+  const worldRow = page.getByRole('dialog').getByRole('button', { name: /E2E Test Campaign/ });
+
+  await clickUntilVisible(trigger, worldRow, 'the world list must appear after tapping the switcher');
 });
 
 test('per-world GM role: /inicio shows DM view when callerRole is gm', async ({ page }) => {
@@ -56,10 +67,21 @@ test('per-world GM role: /inicio shows DM view when callerRole is gm', async ({ 
   await page.goto('/inicio', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
-  // DM view renders DM-specific widgets not present in the player view.
-  // "Necesitan tu mirada" is the eyebrow label of the PendingFichasCardTrigger (DM only).
-  // The text is lowercase in the DOM; CSS uppercases it visually — Playwright matches DOM text.
-  await expect(page.getByText('Necesitan tu mirada', { exact: true })).toBeVisible({ timeout: 10_000 });
+  // "Atajos DM" is the DMQuickActions heading: the component takes no props, has no
+  // empty branch, and only DMView renders it, so it appears whenever the DM view does
+  // and never otherwise.
+  //
+  // The previous probe here was "Necesitan tu mirada", the eyebrow of
+  // PendingFichasCard — which opens with `if (fichas.length === 0) return null`.
+  // That measured whether the world happened to hold a pending sheet, not whether
+  // the DM view rendered, and it only ever passed because the wizard specs seed
+  // pending characters and sort ahead of this file. Run alone, it failed every time
+  // against a DM view that was rendering perfectly.
+  //
+  // The TopBar subtitle "TU GREMIO — DM" tracks the same state but cannot be asserted
+  // at this viewport: its span is `hidden sm:block`, so at 375px it is present in the
+  // DOM and never visible.
+  await expect(page.getByText('Atajos DM', { exact: true })).toBeVisible({ timeout: 10_000 });
 
   // The single RoleSwitcher toggle reflects DM via aria-pressed (seeded from
   // callerRole='gm'). Confirms roleDefault='dm' was forwarded correctly. (REQ-WIS-09)

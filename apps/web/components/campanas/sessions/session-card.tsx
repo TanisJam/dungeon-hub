@@ -71,7 +71,7 @@ export function SessionCard({
       <div className="flex items-start justify-between gap-2">
         <Link
           href={detailHref}
-          className="min-w-0 flex-1 truncate font-sans text-sm font-semibold text-ink"
+          className="min-w-0 flex-1 truncate font-sans text-sm font-semibold text-ink min-h-[44px] flex items-center"
         >
           {session.title}
         </Link>
@@ -125,7 +125,7 @@ export function SessionCard({
           {/* Ver link always present for non-terminal sessions */}
           <Link
             href={detailHref}
-            className="ml-auto font-sans text-xs font-medium text-primary underline-offset-2 hover:underline min-h-[44px] flex items-center"
+            className="ml-auto font-sans text-xs font-medium text-primary underline-offset-2 hover:underline min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             Ver
           </Link>
@@ -137,7 +137,7 @@ export function SessionCard({
         <div className="flex">
           <Link
             href={detailHref}
-            className="ml-auto font-sans text-xs font-medium text-primary underline-offset-2 hover:underline min-h-[44px] flex items-center"
+            className="ml-auto font-sans text-xs font-medium text-primary underline-offset-2 hover:underline min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             Ver
           </Link>

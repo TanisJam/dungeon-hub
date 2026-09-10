@@ -119,10 +119,13 @@ export function SpellPrepEditorIsland({
           {selectableSpells.map((spell) => {
             const checked = preparedSlugs.has(spell.slug);
             const disabledByLimit = atLimit && !checked;
+            // A label, not a div: matches the real SpellPrepEditor — the
+            // 13×13px native tick is not something a thumb can aim at, and
+            // only a label makes the whole row toggle the box.
             return (
-              <div
+              <label
                 key={`${spell.slug}|${spell.source}`}
-                className="flex items-center gap-2 py-2"
+                className="flex min-h-[44px] cursor-pointer items-center gap-2 py-2"
               >
                 <input
                   type="checkbox"
@@ -135,7 +138,7 @@ export function SpellPrepEditorIsland({
                   {spell.name}
                 </span>
                 <span className="ml-auto text-xs text-ink-mute">Nv {spell.level}</span>
-              </div>
+              </label>
             );
           })}
         </div>
@@ -146,7 +149,7 @@ export function SpellPrepEditorIsland({
           type="button"
           onClick={handleSave}
           disabled={isPending}
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="w-full min-h-[44px] flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </button>

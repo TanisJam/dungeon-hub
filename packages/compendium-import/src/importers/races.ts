@@ -4,6 +4,7 @@ import { slugify, parseReprintedAs, isExcludedSource } from '../normalize.js';
 import type { FiveeToolsRace, FiveeToolsSubrace, NormalizedRace } from '../types.js';
 import { expandDragonbornAncestries } from './phb-dragonborn-ancestries.js';
 import { normalizeAdditionalSpells } from './normalize-additional-spells.js';
+import { resolveCopies } from '../resolve-copy.js';
 
 interface RacesFile {
   race?: FiveeToolsRace[];
@@ -39,8 +40,13 @@ export async function importRaces(
   const file = await readJson<RacesFile>(join(dataDir, 'races.json'));
   const out: NormalizedRace[] = [];
 
-  for (const r of file.race ?? []) {
-    if (isExcludedSource(r.source)) continue;
+  // Resolve `_copy` stubs (e.g. Boggart[LFL] copying Goblin[MPMM]) before any
+  // further processing — later steps (additionalSpells, dragonborn ancestries)
+  // need the materialized `entries`/`ability`/etc., not the raw stub.
+  const racesFiltered = (file.race ?? []).filter((r) => !isExcludedSource(r.source));
+  const racesResolved = resolveCopies(racesFiltered, warnings, 'race');
+
+  for (const r of racesResolved) {
     // Normalize additionalSpells for this race and merge into data JSONB.
     // PHB scope: Tiefling base race has additionalSpells (Infernal Legacy).
     const additionalSpellsRaw = Array.isArray(r.additionalSpells)
@@ -73,8 +79,12 @@ export async function importRaces(
     out.push(...expandDragonbornAncestries(baseRow));
   }
 
-  for (const s of file.subrace ?? []) {
-    if (isExcludedSource(s.source)) continue;
+  // Same `_copy` resolution pass for subraces (e.g. Amonkhet[PSA] copying the
+  // unnamed "Variant" Human[PHB] subrace).
+  const subracesFiltered = (file.subrace ?? []).filter((s) => !isExcludedSource(s.source));
+  const subracesResolved = resolveCopies(subracesFiltered, warnings, 'subrace');
+
+  for (const s of subracesResolved) {
     if (!s.raceName || !s.raceSource) {
       warnings.push(`Subrace "${s.name ?? '?'}" (${s.source}) sin raceName/raceSource — skip`);
       continue;

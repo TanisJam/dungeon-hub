@@ -52,7 +52,7 @@ export function WorldSwitcherTrigger({ worldName, callerRole, onClick }: WorldSw
       className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1.5 text-left transition-colors duration-150 hover:border-accent hover:bg-surface/80"
       aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
     >
-      <span className="font-display font-bold text-[13px] leading-tight text-ink truncate max-w-[120px]">
+      <span className="font-display font-bold text-[13px] leading-tight text-ink truncate max-w-[88px] sm:max-w-[120px]">
         {worldName}
       </span>
       {callerRole && <RoleBadge role={callerRole} />}

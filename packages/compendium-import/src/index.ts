@@ -10,6 +10,7 @@ import { importMonsters } from './importers/monsters.js';
 import { importConditions } from './importers/conditions.js';
 import { importLanguages } from './importers/languages.js';
 import { importActions } from './importers/actions.js';
+import { attachRaceFluff, attachBackgroundFluff, attachClassFluff } from './fluff.js';
 import type { ImportResult } from './types.js';
 
 export * from './types.js';
@@ -63,15 +64,24 @@ export async function parseAll(dataDir: string): Promise<ImportResult> {
   ] = await Promise.all([
     importRaces(dataDir, warnings),
     importClassesAndSubclasses(dataDir, warnings),
-    importBackgrounds(dataDir),
+    importBackgrounds(dataDir, warnings),
     importSpells(dataDir),
-    importItems(dataDir),
+    importItems(dataDir, warnings),
     importFeats(dataDir),
     importOptionalFeatures(dataDir),
     importMonsters(dataDir, warnings),
     importConditions(dataDir),
     importLanguages(dataDir),
     importActions(dataDir),
+  ]);
+
+  // Attach descriptive lore text (data.fluff) — races, backgrounds and
+  // classes only (see fluff.ts for the scope rationale). Runs after the
+  // main imports since it matches against their already-normalized rows.
+  await Promise.all([
+    attachRaceFluff(dataDir, races, warnings),
+    attachBackgroundFluff(dataDir, backgrounds, warnings),
+    attachClassFluff(dataDir, classesResult.classes, warnings),
   ]);
 
   return {

@@ -12,6 +12,12 @@ vi.mock('@/components/ui/crow-mark', () => ({
   CrowMark: () => <div data-testid="crow-mark">CrowMark</div>,
 }));
 
+// Mock AccountMenu — it depends on SignOutButton (useRouter + supabase client),
+// neither of which is the focus of these AppShell/callerRole tests.
+vi.mock('@/components/layout/account-menu', () => ({
+  AccountMenu: () => <div data-testid="account-menu">AccountMenu</div>,
+}));
+
 // Mock next/navigation — TabBar uses usePathname.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',

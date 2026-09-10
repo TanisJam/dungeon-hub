@@ -25,16 +25,19 @@ describe('DesktopSidebar (REQ-DSHELL-SIDEBAR-01, REQ-DSHELL-ACTIVE-01, REQ-DSHEL
     mockUsePathname.mockReturnValue('/inicio');
   });
 
-  it('(a) renders exactly 7 links in the correct href order', () => {
+  // Tablero joins the desktop-only trailing group (REQ-DSHELL-SIDEBAR-01
+  // navigability fix) — desktop has room for it; the mobile TabBar does not.
+  it('(a) renders exactly 8 links in the correct href order', () => {
     render(<DesktopSidebar />);
     const links = screen.getAllByRole('link');
-    expect(links).toHaveLength(7);
+    expect(links).toHaveLength(8);
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/inicio',
       '/mapa',
       '/compendium',
       '/mercado',
       '/bitacora',
+      '/tablero',
       '/personajes',
       '/campanas',
     ]);
@@ -64,5 +67,33 @@ describe('DesktopSidebar (REQ-DSHELL-SIDEBAR-01, REQ-DSHELL-ACTIVE-01, REQ-DSHEL
     const root = container.firstElementChild;
     expect(root?.className).toContain('hidden');
     expect(root?.className).toContain('md:flex');
+  });
+
+  it('(d) Tablero link is present with a plain destination (no callerRole needed)', () => {
+    render(<DesktopSidebar />);
+    const tablero = screen.getByRole('link', { name: /tablero/i });
+    expect(tablero.getAttribute('href')).toBe('/tablero');
+  });
+
+  it('(e) no Mesa link when callerRole is absent/player (default-deny)', () => {
+    render(<DesktopSidebar />);
+    expect(screen.queryByRole('link', { name: /^mesa$/i })).toBeNull();
+  });
+
+  it('(f) Mesa link renders for callerRole="gm", placed after Bitácora and before Tablero', () => {
+    render(<DesktopSidebar callerRole="gm" />);
+    const links = screen.getAllByRole('link');
+    const hrefs = links.map((l) => l.getAttribute('href'));
+    expect(hrefs).toEqual([
+      '/inicio',
+      '/mapa',
+      '/compendium',
+      '/mercado',
+      '/bitacora',
+      '/mesa',
+      '/tablero',
+      '/personajes',
+      '/campanas',
+    ]);
   });
 });

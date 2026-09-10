@@ -55,7 +55,7 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
     // Step 1: Create character and fill stats (standard array)
     // -----------------------------------------------------------------------
     await test.step('create character + fill stats (standard array)', async () => {
-      await page.goto('/dashboard');
+      await page.goto('/personajes');
       await page.locator('a[href="/characters/new"]').first().click();
       await expect(page).toHaveURL(/\/characters\/new$/);
 

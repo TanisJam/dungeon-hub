@@ -35,11 +35,18 @@ export function NumberedReviewCard({
           <p className="font-display font-semibold text-[15px] text-ink leading-tight">
             {title}
           </p>
+          {/* The link is the TAP TARGET; the span is the tiny "✎ Editar"
+              label you see. Putting min-h-[44px] on the label itself would
+              blow up this 11px caption sitting next to the card title —
+              a transparent 44px link keeps the label's size while the
+              measured target clears the minimum. */}
           <Link
             href={editHref}
-            className="flex-shrink-0 text-[11px] text-ink-mute hover:text-ink transition-colors"
+            className="flex-shrink-0 inline-flex min-h-[44px] min-w-[44px] items-center justify-center"
           >
-            ✎ Editar
+            <span className="text-[11px] text-ink-mute hover:text-ink transition-colors">
+              ✎ Editar
+            </span>
           </Link>
         </div>
         {subtitle && (

@@ -107,7 +107,7 @@ test.describe('character wizard — multiclass spell picker tabs (SP-06)', () =>
 
       // Placeholder: login to avoid "requires auth" bail-out at test start
       await page.goto('/dashboard');
-      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
+      await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
 
       void getAccessToken; // suppress unused import warning
       void apiGet; void apiPost; void apiPut;
@@ -135,7 +135,7 @@ test.describe('character wizard — multiclass spell picker tabs (SP-06)', () =>
        * REQ-FIXME-04.
        */
       await page.goto('/dashboard');
-      await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
+      await expect(page).toHaveURL(/\/inicio$/, { timeout: 10_000 });
     },
   );
 });

@@ -4,6 +4,7 @@ import { CrowMark } from '@/components/ui/crow-mark';
 import { Icon } from '@/components/ui/icon';
 import type { Role } from '@/lib/use-role';
 import { RoleSwitcher } from './role-switcher';
+import { AccountMenu } from './account-menu';
 
 interface TopBarProps {
   title: string;
@@ -55,12 +56,17 @@ export function TopBar({
   function renderLeftSlot() {
     if (backHref) {
       return (
+        // The link is the tap target, the span is the 34px square — same split as
+        // AccountMenu on the other end of the header, and for the same reason:
+        // the cluster is designed around 34px boxes.
         <Link
           href={backHref}
           aria-label="Volver"
-          className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0 flex-shrink-0"
         >
-          <Icon name="arrow-left" size={16} />
+          <span className="w-[34px] h-[34px] grid place-items-center rounded-md border border-line text-ink-soft transition-colors duration-150 hover:bg-surface hover:text-ink flex-shrink-0">
+            <Icon name="arrow-left" size={16} />
+          </span>
         </Link>
       );
     }
@@ -88,17 +94,29 @@ export function TopBar({
           </span>
         )}
       </div>
-      {/* RIGHT slot: `right` prop OR the RoleSwitcher (DM/PJ view toggle).
+      {/* RIGHT slot: `right` prop OR the RoleSwitcher (DM/PJ view toggle), and
+          then AccountMenu, ALWAYS.
           The old notifications button was a dead affordance (no handler, no
           notifications feature) and used an eye glyph, so it was removed —
-          it also freed header width, easing title truncation on mobile. */}
-      {right ?? (
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* RoleSwitcher visible in all screens (including sub-screens) when canBeDM=true */}
-          {/* SDD ficha-dm-affordances: removed !backHref guard per spec override of design README §State management */}
-          {canBeDM && <RoleSwitcher defaultRole={roleDefault} />}
-        </div>
-      )}
+          it also freed header width, easing title truncation on mobile.
+          AccountMenu is the fix for the audit's worst finding: /dashboard held
+          the app's only sign-out control and was absent from every nav surface,
+          so a user navigating the shell could not log out. It therefore sits
+          OUTSIDE the `right ?? ...` fallback: `right` replaces the page-variable
+          part of the cluster, never the account affordance. Putting it inside
+          would have reopened the same hole on the four pages that pass
+          rightAction — /characters/[id], /characters/new, the wizard layout and
+          /campanas/new — one of which is a primary tab destination. */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {right ?? (
+          <>
+            {/* RoleSwitcher visible in all screens (including sub-screens) when canBeDM=true */}
+            {/* SDD ficha-dm-affordances: removed !backHref guard per spec override of design README §State management */}
+            {canBeDM && <RoleSwitcher defaultRole={roleDefault} />}
+          </>
+        )}
+        <AccountMenu />
+      </div>
       </div>
     </header>
   );
