@@ -94,7 +94,12 @@ test.describe('Level-up Monk L1→L2 — Puntos de Ki visible @ 375px', () => {
     await firstClassBtn.click();
 
     // ---- Step 7: HP step — choose "Promedio" (default) ----
-    await expect(page.getByText(/promedio/i)).toBeVisible({ timeout: 5_000 });
+    // Scoped to the button. The HP step also prints a hint that begins "PHB p.15 —
+    // promedio garantiza el valor fijo", so an unscoped /promedio/i matched the hint
+    // as well as the control and raised a strict mode violation the moment the step
+    // rendered. These specs were skipping before the fixture existed, which is what
+    // kept it hidden.
+    await expect(page.getByRole('button', { name: /^promedio/i })).toBeVisible({ timeout: 5_000 });
     const continueBtn = page.getByRole('button', { name: /continuar/i });
     await continueBtn.click();
 

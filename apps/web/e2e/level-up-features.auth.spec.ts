@@ -85,7 +85,12 @@ test.describe('Level-up featuresUnlocked on success screen — Fighter L1→L2 @
     await classBtn.click();
 
     // ---- Step 7: HP step — choose "Promedio" ----
-    await expect(page.getByText(/promedio/i)).toBeVisible({ timeout: 5_000 });
+    // Scoped to the button. The HP step also prints a hint that begins "PHB p.15 —
+    // promedio garantiza el valor fijo", so an unscoped /promedio/i matched the hint
+    // as well as the control and raised a strict mode violation the moment the step
+    // rendered. These specs were skipping before the fixture existed, which is what
+    // kept it hidden.
+    await expect(page.getByRole('button', { name: /^promedio/i })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // ---- Step 8: ASI step does NOT appear at Fighter L2 (ASI is at L4/6/8/...) ----
