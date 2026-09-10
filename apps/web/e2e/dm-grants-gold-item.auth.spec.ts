@@ -205,11 +205,22 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
 
     // ---- Step 5: Wait for typeahead results (debounced 200ms) ----
     // Results are rendered in a <ul> inside the dialog once debounce fires.
+    //
+    // Wait for the search to actually settle before reading it. The panel shows
+    // "Buscando…" while the Server Action is in flight and "Sin resultados." only
+    // once it has answered with nothing, so waiting on the list alone could not tell
+    // a search still running from a search that found nothing — and under `next dev`
+    // the first call to that action is also compiling it, which three seconds does
+    // not cover. The old budget read a slow search as absent data and skipped
+    // blaming the seed.
     const resultsContainer = dialog.locator('ul');
-    const hasResults = await resultsContainer.isVisible({ timeout: 3_000 }).catch(() => false);
+    const emptyState = dialog.getByText('Sin resultados.', { exact: true });
+    await expect(resultsContainer.or(emptyState).first()).toBeVisible({ timeout: 30_000 });
+
+    const hasResults = await resultsContainer.isVisible().catch(() => false);
     test.skip(
       !hasResults,
-      'No item search results returned for "longsword" — compendium data may not be seeded.',
+      'The item search settled with no hit for "longsword" — the compendium has no such item for this world.',
     );
 
     // ---- Step 6: Click first result ----
