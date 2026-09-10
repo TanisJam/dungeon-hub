@@ -34,8 +34,10 @@ const inactiveClasses: Record<ToggleChipTone, string> = {
 // 9px-text capsule to 44px and wrecked it; an ::after overlay would have fixed
 // the real hit area but not the measured height, so a11y checks would still read
 // it as too small. A transparent 44px button around the pill fixes both.
+// min-w-[44px] added later: the two-letter chips ("PJ", "DM") were 44px tall
+// but only ~31-35px wide, so the tap target still failed on the narrow axis.
 const HIT_AREA =
-  'inline-flex min-h-[44px] items-center justify-center bg-transparent p-0 hover:brightness-110 active:translate-y-px';
+  'inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0 hover:brightness-110 active:translate-y-px';
 
 const PILL =
   'inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors';
