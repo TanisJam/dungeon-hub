@@ -15,11 +15,16 @@ import { expect, type Locator } from '@playwright/test';
  * the first click outran hydration.
  *
  * NOT for a control that toggles. Re-clicking a toggle closes what the previous
- * click opened, so the loop oscillates and never settles: pointed at the
- * WorldSwitcher trigger it burned the full 20s without ever showing the sheet,
- * where a single click on a fresh page load opens it in under three seconds. Use
- * this only where the trigger opens and does not close — a list row opening a
- * detail sheet, not a switcher.
+ * click opened, so the loop oscillates and never settles. Use this only where the
+ * trigger opens and does not close — a list row opening a detail sheet.
+ *
+ * An earlier revision of this note named the WorldSwitcher trigger as the example,
+ * on the strength of a run that burned the full 20s without ever showing the sheet.
+ * That reading was wrong twice over. The trigger does not toggle: it calls
+ * setOpen(true) and nothing else. And the 20s went to a strict mode violation
+ * raised on every iteration, because the assertion's locator matched the trigger
+ * as well as the row it was waiting for. With the locator scoped to the dialog,
+ * this helper is what that spec uses.
  *
  * Site-by-site inline guards were the previous approach and they do not hold:
  * mercado's scenario (d) was guarded while its own scenario (e) was not, and (e)
