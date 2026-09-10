@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { FormErrorAlert } from '@/components/ui/form-error-alert';
 import { deleteCharacter } from './actions';
 
 interface Props {
@@ -38,7 +39,7 @@ export function DeleteCharacterButton({ characterId, characterName }: Props) {
       <button
         type="button"
         onClick={handleOpen}
-        className="text-sm font-medium text-red-500 hover:text-red-600 transition-colors"
+        className="inline-flex min-h-[44px] items-center text-sm font-medium text-danger transition-colors hover:text-danger-deep"
         aria-label="Eliminar personaje"
       >
         Eliminar personaje
@@ -53,13 +54,13 @@ export function DeleteCharacterButton({ characterId, characterName }: Props) {
         >
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-paper/70"
             onClick={handleCancel}
             aria-hidden="true"
           />
 
           {/* Panel */}
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+          <div className="relative z-10 w-full max-w-sm rounded-lg border border-line bg-surface p-6 shadow-stamp-lg">
             <h2
               id="delete-dialog-title"
               className="text-base font-bold text-ink mb-2"
@@ -70,18 +71,14 @@ export function DeleteCharacterButton({ characterId, characterName }: Props) {
               Esta acción no se puede deshacer.
             </p>
 
-            {error && (
-              <p role="alert" className="mb-4 text-sm font-medium text-red-500">
-                {error}
-              </p>
-            )}
+            <FormErrorAlert message={error} className="mb-4" />
 
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={isPending}
-                className="text-sm font-medium text-ink-soft hover:text-ink transition-colors px-4 py-2 rounded-xl border border-line disabled:opacity-50"
+                className="min-h-[44px] rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:text-ink disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -89,7 +86,7 @@ export function DeleteCharacterButton({ characterId, characterName }: Props) {
                 type="button"
                 onClick={handleConfirm}
                 disabled={isPending}
-                className="text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors px-4 py-2 rounded-xl disabled:opacity-50"
+                className="min-h-[44px] rounded-md bg-danger px-4 py-2 text-sm font-bold text-on-danger transition-colors hover:bg-danger-deep disabled:opacity-50"
               >
                 {isPending ? 'Eliminando…' : 'Eliminar'}
               </button>
