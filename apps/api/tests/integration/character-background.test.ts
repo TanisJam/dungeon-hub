@@ -207,7 +207,10 @@ const TOOL_CHOOSE_BACKGROUNDS: BgFixture[] = [
     invalidPick: 'alchemists-supplies',
     languageChoices: ['halfling'],
   },
-  // anyArtisansTool (17) + literal "navigator's tools" (1) = 18; no language
+  // anyArtisansTool (17) + literal "navigator's tools" (1) = 18; needs 1 language.
+  // The language comes from the Guild Artisan base this row `_copy`s: its own
+  // replaced entries read "Languages: One of your choice", and resolving the
+  // copy is what finally surfaces that.
   {
     name: 'Variant Guild Artisan (Guild Merchant)',
     slug: 'variant-guild-artisan-guild-merchant',
@@ -215,7 +218,7 @@ const TOOL_CHOOSE_BACKGROUNDS: BgFixture[] = [
     count: 1,
     validPick: 'alchemists-supplies',
     invalidPick: 'lute', // musical instrument NOT in VGM pool
-    languageChoices: undefined,
+    languageChoices: ['halfling'],
   },
 ];
 
