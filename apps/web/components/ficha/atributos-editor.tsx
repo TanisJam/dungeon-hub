@@ -141,7 +141,7 @@ export function AtributosEditor({
           <button
             type="submit"
             disabled={isPending}
-            className="flex-1 rounded-md bg-accent px-4 py-2 text-sm font-semibold text-[#1A1208] transition-opacity disabled:opacity-50"
+            className="flex-1 min-h-[44px] flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-[#1A1208] transition-opacity disabled:opacity-50"
           >
             {isPending ? 'Guardando…' : 'Guardar'}
           </button>
@@ -149,7 +149,7 @@ export function AtributosEditor({
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 rounded-md border border-line px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md border border-line px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:text-ink"
         >
           Cancelar
         </button>

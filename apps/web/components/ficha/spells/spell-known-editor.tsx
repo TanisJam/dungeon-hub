@@ -82,7 +82,7 @@ export function SpellKnownEditor({
         {leveledSpells.map((spell) => (
           <label
             key={spell.slug}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer hover:bg-surface"
+            className="flex min-h-[44px] items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer hover:bg-surface"
           >
             <input
               type="checkbox"
@@ -103,14 +103,14 @@ export function SpellKnownEditor({
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 rounded-md border border-line px-4 py-2 text-sm text-ink-soft"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md border border-line px-4 py-2 text-sm text-ink-soft"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </button>

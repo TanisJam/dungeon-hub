@@ -57,7 +57,7 @@ export function DesktopSidebar({ callerRole }: DesktopSidebarProps = {}) {
             key={dest.key}
             href={dest.href}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 transition-colors duration-150 ${
+            className={`flex min-h-[44px] items-center gap-3 rounded-md px-3 py-2 transition-colors duration-150 ${
               isActive
                 ? 'text-accent bg-accent-soft'
                 : 'text-ink-mute hover:text-ink-soft hover:bg-surface'

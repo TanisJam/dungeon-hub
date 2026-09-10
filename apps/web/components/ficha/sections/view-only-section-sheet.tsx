@@ -71,7 +71,7 @@ export function ViewOnlySectionSheet({
         {cta.kind === 'edit-link' && (
           <Link
             href={wizardStepHref}
-            className="inline-flex items-center justify-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-accent hover:text-accent transition-colors"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-accent hover:text-accent transition-colors"
             onClick={onClose}
           >
             {cta.label}
