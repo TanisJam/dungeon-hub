@@ -87,7 +87,13 @@ test.describe('Level-up Wizard L1→L2 — subclass + spellbook + back-nav @ 375
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // ---- Step 6: Subclass step (Wizard Tradición arcana at L2) ----
-    const subclassHeading = page.getByText(/tradici[oó]n arcana/i);
+    // The heading, not any text carrying the words. _subclass-step.tsx prints the
+    // title twice — once as "Elegí tu Tradición arcana" and again as the picker's
+    // own title — so an unscoped getByText matched both and raised a strict mode
+    // violation. The `.catch(() => false)` below then turned that error into
+    // "not visible", and the step reported itself missing while it was on screen:
+    // a trace of a skipping run has "Elegí tu Tradición arcana" in it.
+    const subclassHeading = page.getByRole('heading', { name: /tradici[oó]n arcana/i });
     const hasSubclass = await subclassHeading.isVisible({ timeout: 5_000 }).catch(() => false);
     test.skip(!hasSubclass, 'Subclass step did not appear for Wizard L1→L2.');
 
@@ -97,7 +103,10 @@ test.describe('Level-up Wizard L1→L2 — subclass + spellbook + back-nav @ 375
     test.skip(cardCount === 0, 'No subclass cards rendered.');
     await subclassCards.first().click();
 
-    const subCta = page.getByRole('button', { name: /continuar/i });
+    // "Confirmar subclase", not "Continuar": the subclass step names its button
+    // differently from the steps around it, and this only surfaced once the heading
+    // check above stopped reporting the whole step missing.
+    const subCta = page.getByRole('button', { name: /confirmar subclase/i });
     await expect(subCta).toBeEnabled({ timeout: 3_000 });
     await subCta.click();
 
