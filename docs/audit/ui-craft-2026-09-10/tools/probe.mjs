@@ -29,10 +29,23 @@ await del.scrollIntoViewIfNeeded();
 await del.click();
 await page.waitForTimeout(400);
 const modal = await page.evaluate(() => {
-  const box = [...document.querySelectorAll('div')].find((d) => getComputedStyle(d).backgroundColor === 'rgb(255, 255, 255)' && d.getBoundingClientRect().width > 200);
-  if (!box) return null;
-  const h = box.querySelector('h2,h3,p');
-  return { bg: getComputedStyle(box).backgroundColor, textColor: h ? getComputedStyle(h).color : null, text: box.textContent.trim().slice(0, 120) };
+  // Measure the real dialog panel, not "whatever box happens to be white". The original
+  // white-hunting selector could not tell a fixed modal from a missing one once the fix
+  // landed: both returned null.
+  const dialog = document.querySelector('[role="dialog"]');
+  if (!dialog) return { found: false };
+  const panel = [...dialog.querySelectorAll('div')].find((d) => {
+    const bg = getComputedStyle(d).backgroundColor;
+    return bg !== 'rgba(0, 0, 0, 0)' && d.getBoundingClientRect().width > 200 && !d.hasAttribute('aria-hidden');
+  }) ?? dialog;
+  const h = panel.querySelector('h2,h3');
+  return {
+    found: true,
+    bg: getComputedStyle(panel).backgroundColor,
+    isWhite: getComputedStyle(panel).backgroundColor === 'rgb(255, 255, 255)',
+    titleColor: h ? getComputedStyle(h).color : null,
+    text: panel.textContent.trim().slice(0, 120),
+  };
 });
 console.log('delete modal:', modal);
 await page.screenshot({ path: `${OUT}/probe_delete_modal.png` });
