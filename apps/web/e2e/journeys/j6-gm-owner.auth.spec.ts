@@ -142,10 +142,20 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       // The role switcher is a single toggle button. Ensure DM mode: if the DM-only
       // "Otorgar" affordance isn't visible, tap the switcher to toggle into DM.
       const otorgarBtn = dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' });
-      if (!(await otorgarBtn.isVisible().catch(() => false))) {
-        await roleSwitcher.click();
-      }
-      await expect(otorgarBtn).toBeVisible({ timeout: 10_000 });
+      // Retry the tap, not the assertion. The switcher is a client island whose
+      // button is server-rendered and clickable before React attaches its handler,
+      // so a single tap can land on markup with no onClick and do nothing, leaving
+      // the assertion below to time out against a page that is merely un-hydrated.
+      //
+      // Tapping only while "Otorgar" is hidden is what keeps this safe on a control
+      // that toggles: each pass either leaves the page in DM mode or flips it there,
+      // and once it is there no further tap is issued.
+      await expect(async () => {
+        if (!(await otorgarBtn.isVisible().catch(() => false))) {
+          await roleSwitcher.click({ timeout: 5_000 }).catch(() => {});
+        }
+        await expect(otorgarBtn).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 25_000 });
 
       // ── UI FLOW (the REAL user path): set HP max via the editor in DM mode ──
       // This is what the user actually does — NOT a direct API call. Reproduces
