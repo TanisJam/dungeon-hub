@@ -49,11 +49,13 @@ export const COLORS: ColorToken[] = [
   { name: 'warning-soft',       hex: '#3A2D17' },
   { name: 'warning-deep',       hex: '#B07A1E' },
   { name: 'danger',             hex: '#CC4444' },
+  { name: 'danger-deep',        hex: '#A03636' },
   // Alpha-derived danger tokens (compendium monster rows / form error background)
   { name: 'danger-soft',        hex: 'rgba(204, 68, 68, 0.12)', displayOnly: true },
   { name: 'danger-soft-border', hex: 'rgba(204, 68, 68, 0.25)', displayOnly: true },
   { name: 'on-accent',    hex: '#1A1208', note: 'dark text on accent/copper backgrounds' },
   { name: 'on-secondary', hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
+  { name: 'on-danger',    hex: '#FFFFFF', note: 'light text on the solid danger fill — 4.69:1' },
 ];
 
 // ── Typography ───────────────────────────────────────────────────────────────

@@ -51,6 +51,7 @@
   --color-warning-soft:      #3A2D17;
   --color-warning-deep:      #B07A1E;
   --color-danger:            #CC4444;
+  --color-danger-deep:       #A03636;
   --color-danger-soft:       rgba(204, 68, 68, 0.12);
   --color-danger-soft-border: rgba(204, 68, 68, 0.25);
   --color-arcane:             #6F86C9;
@@ -59,6 +60,8 @@
   /* ── On-color tokens (dark ink for text on colored backgrounds) ── */
   --color-on-accent:   #1A1208;
   --color-on-secondary: #1A1208;
+  /* Light ink for the solid danger fill: 4.69:1 vs 3.93:1 for --color-ink. */
+  --color-on-danger:   #FFFFFF;
 
   /* ── Alpha-derived border tokens (soft borders for row icons) ── */
   --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
@@ -1484,10 +1487,12 @@
   --color-secondary-soft:#2E1A28;
   --color-success-soft:          rgba(107, 163, 104, 0.12);
   --color-danger:            #CC4444;
+  --color-danger-deep:       #A03636;
   --color-danger-soft:       rgba(204, 68, 68, 0.12);
   --color-danger-soft-border: rgba(204, 68, 68, 0.25);
   --color-on-accent:          #1A1208;
   --color-on-secondary:       #1A1208;
+  --color-on-danger:          #FFFFFF;
   --color-accent-soft-border:     rgba(212, 162, 76, 0.25);
   --color-secondary-soft-border:  rgba(168, 90, 142, 0.30);
   --color-secondary-soft-bg:      rgba(168, 90, 142, 0.22);
