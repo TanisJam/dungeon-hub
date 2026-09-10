@@ -251,7 +251,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
               type="button"
               disabled={deleting === detailPage.id}
               onClick={() => handleDelete(detailPage.id)}
-              className="flex-1 min-h-[44px] rounded-md border border-red-200 bg-paper-soft px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="flex-1 min-h-[44px] rounded-md border border-danger-soft-border bg-paper-soft px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger-soft disabled:opacity-50"
             >
               {deleting === detailPage.id ? 'Eliminando…' : 'Eliminar'}
             </button>

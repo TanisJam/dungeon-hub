@@ -331,7 +331,7 @@ export function LevelUpFlow({
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mb-4 rounded-md border border-danger-soft-border bg-danger-soft px-4 py-3 text-sm text-danger"
           >
             {error}
           </div>

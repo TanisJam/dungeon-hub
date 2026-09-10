@@ -174,7 +174,7 @@ export function PoiAccordion({
                                 type="button"
                                 onClick={() => handleDelete(poi)}
                                 aria-label={`Eliminar POI ${poi.name}`}
-                                className="min-h-[44px] min-w-[44px] rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100"
+                                className="min-h-[44px] min-w-[44px] rounded-md border border-danger-soft-border bg-danger-soft px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/20"
                               >
                                 ×
                               </button>
