@@ -231,14 +231,33 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
         }
       }
 
-      await aprobarBtn.click();
-
-      // Wait for post-approve state: Aprobar gone OR activo badge visible
+      // Approving runs through a client island calling a Server Action, so the
+      // click needs React attached. The DM page is opened with `domcontentloaded`
+      // and the buttons are server-rendered, so a single click can land on markup
+      // that carries no handler yet and do nothing at all. The trace of a failing
+      // run showed precisely that: 132 requests on the DM context and not one
+      // Server Action among them.
+      //
+      // The click is what has to be retried. The previous loop re-read the page
+      // every time but never clicked again, so hydration finishing a second later
+      // changed nothing and the whole budget went by with the sheet still pending.
+      // Re-clicking is safe: handleApprove returns early while a transition is in
+      // flight, and the button unmounts once the approval lands — which is why the
+      // click is guarded on the button still being there.
+      //
+      // "Devolver a borrador" is the gm x active button (REQ-CAU-REVERT-BUTTON).
+      // It can only render after the approval actually took and the action's
+      // revalidatePath re-rendered the sheet, which makes it a sharper post-state
+      // than "Aprobar went away" — a button can also go away by never rendering.
+      const devolverBtn = dmPage.getByRole('button', { name: /^devolver a borrador$/i });
       await expect(async () => {
-        const aprobarGone = !(await aprobarBtn.isVisible().catch(() => false));
-        const activoBadge = await dmPage.getByText(/activo/i).first().isVisible().catch(() => false);
-        expect(aprobarGone || activoBadge, 'Post-approve: Aprobar gone or activo visible').toBe(true);
-      }).toPass({ timeout: 15_000 });
+        if (await aprobarBtn.isVisible().catch(() => false)) {
+          await aprobarBtn.click({ timeout: 5_000 }).catch(() => {});
+        }
+        await expect(devolverBtn, 'Post-approve: sheet must switch to the gm x active actions').toBeVisible({
+          timeout: 2_000,
+        });
+      }).toPass({ timeout: 30_000 });
 
       // ── Step 12: player3 reloads the sheet and sees Activo ───────────────
       await p3Page.goto(charHref, { waitUntil: 'domcontentloaded' });
