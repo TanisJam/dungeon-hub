@@ -108,6 +108,47 @@ describe('GET /worlds?mine=1', () => {
     await deleteTestUser(noWorldUser.id);
   });
 
+  // T-4: rows come back ordered by name, and repeat requests agree
+  it('T-4: worlds are ordered by name and the order is stable across requests', async () => {
+    const app = await getTestApp();
+    const orderUser = await createTestUser();
+
+    // Seeded out of order, and two share a name so the id tiebreaker is exercised.
+    const suffix = randomUUID().slice(0, 6);
+    const duplicate = `Order World B ${suffix}`;
+    const seeded = [
+      await createWorldWithMember(owner.id, orderUser.id, 'gm', { name: `Order World C ${suffix}` }),
+      await createWorldWithMember(owner.id, orderUser.id, 'player', { name: `Order World A ${suffix}` }),
+      await createWorldWithMember(owner.id, orderUser.id, 'gm', { name: duplicate }),
+      await createWorldWithMember(owner.id, orderUser.id, 'player', { name: duplicate }),
+    ];
+
+    const fetchWorlds = async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/worlds?mine=1',
+        headers: { Authorization: `Bearer ${orderUser.accessToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json<{ worlds: Array<{ id: string; name: string }> }>().worlds;
+    };
+
+    const first = await fetchWorlds();
+    expect(first.length).toBe(seeded.length);
+
+    // Sorted by name, ties broken by id — a total order, so the comparison below
+    // has exactly one correct answer.
+    const expected = [...first].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+    expect(first.map((w) => w.id)).toEqual(expected.map((w) => w.id));
+
+    // The bug this guards was a missing ORDER BY, which reads correct on any single
+    // response and only shows up as two responses disagreeing.
+    const second = await fetchWorlds();
+    expect(second.map((w) => w.id)).toEqual(first.map((w) => w.id));
+
+    await deleteTestUser(orderUser.id);
+  });
+
   // T-3: unauthenticated → 401
   it('T-3: unauthenticated request returns 401', async () => {
     const app = await getTestApp();

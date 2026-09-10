@@ -6,7 +6,7 @@
  */
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { slugify as slugifyForFilename } from '@dungeon-hub/compendium-import/slugify';
 import { db } from '../../infra/db/client.js';
 import { worlds, worldMembers } from '../../infra/db/schema.js';
@@ -67,7 +67,15 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
       });
     }
 
-    // Fetch all worlds where the user has a worldMembers row (any role)
+    // Fetch all worlds where the user has a worldMembers row (any role).
+    //
+    // Ordered by name, then id. Without an ORDER BY the row order is whatever the
+    // plan happens to emit, and the web app reads more into position than a list
+    // can carry: getActiveWorld falls back to worlds[0] when no `dh:world` cookie
+    // is set, so a member of several worlds could land in a different active world
+    // between two requests that changed nothing. Name alone would not settle it —
+    // names are not unique, only the slug is — so id breaks the tie and makes the
+    // order total.
     const rows = await db
       .select({
         id: worlds.id,
@@ -75,7 +83,8 @@ export const worldsRoute: FastifyPluginAsync = async (app) => {
         slug: worlds.slug,
       })
       .from(worlds)
-      .innerJoin(worldMembers, and(eq(worldMembers.worldId, worlds.id), eq(worldMembers.userId, userId)));
+      .innerJoin(worldMembers, and(eq(worldMembers.worldId, worlds.id), eq(worldMembers.userId, userId)))
+      .orderBy(asc(worlds.name), asc(worlds.id));
 
     return reply.send({ worlds: rows });
   });
