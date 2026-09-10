@@ -1,0 +1,428 @@
+<title>Auditoría de craft · dungeon-hub</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+Georgian:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper: #0B0A12; --paper-soft: #13111C; --surface: #1A1726; --surface-soft: #221E30;
+    --ink: #F4EAD5; --ink-soft: #C9BFA8; --ink-mute: #8B8273; --line: #3A3145; --line-soft: #26212F;
+    --accent: #D4A24C; --accent-soft: #3A2D17; --primary: #5BB3C9; --primary-soft: #1A2F38;
+    --danger: #CC4444; --danger-soft: rgba(204,68,68,.12); --success: #6BA368; --success-soft: rgba(107,163,104,.12);
+    --warning: #E0A82E;
+    --display: "Noto Serif Georgian", Georgia, serif; --sans: Inter, ui-sans-serif, system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); padding-block: 40px 96px; padding-inline: clamp(16px, 4vw, 48px); }
+  a { color: var(--primary); }
+  .wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 56px; }
+  header.top { display: grid; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+  .eyebrow { font: 700 10.5px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-mute); }
+  h1 { font: 700 clamp(30px, 4.6vw, 44px)/1.12 var(--display); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+  h2 { font: 700 24px/1.25 var(--display); margin: 0; text-wrap: balance; }
+  h3 { font: 600 19px/1.3 var(--display); margin: 0; }
+  p { margin: 0; max-width: 68ch; }
+  .lede { font-size: 17px; color: var(--ink-soft); max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-mute); }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .kpi { background: var(--surface); padding: 16px 18px; display: grid; gap: 4px; }
+  .kpi .n { font: 700 28px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .kpi .l { font-size: 12.5px; color: var(--ink-mute); }
+  .kpi.good .n { color: var(--success); } .kpi.bad .n { color: var(--warning); } .kpi.ok .n { color: var(--primary); }
+
+  section { display: grid; gap: 22px; }
+  .sec-head { display: grid; gap: 8px; }
+  .sec-head p { color: var(--ink-soft); }
+
+  ol.findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px; counter-reset: f; }
+  .finding { border: 1px solid var(--line); border-radius: 14px; background: var(--paper-soft); overflow: hidden; }
+  .f-head { display: grid; grid-template-columns: 64px 1fr; border-bottom: 1px solid var(--line-soft); }
+  .rank { font: 700 30px/1 var(--display); color: var(--accent); display: grid; place-items: center; border-right: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+  .f-title { padding: 16px 20px 14px; display: grid; gap: 8px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font: 600 10.5px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; padding: 6px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); }
+  .tag.axis { color: var(--primary); border-color: var(--primary-soft); background: var(--primary-soft); }
+  .tag.move { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+  .tag.vp { color: var(--ink-mute); }
+  .f-body { display: grid; gap: 18px; padding: 18px 20px 22px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 22px; }
+  .cell { display: grid; gap: 6px; align-content: start; }
+  .cell .k { font: 700 10.5px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); }
+  .cell.today .k { color: var(--warning); } .cell.should .k { color: var(--primary); }
+  .cell p, .cell li { color: var(--ink-soft); font-size: 14.5px; }
+  .cell ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+  code { font: 500 12.5px/1.5 var(--mono); background: var(--surface); border: 1px solid var(--line-soft); border-radius: 6px; padding: 1px 6px; color: var(--ink); white-space: nowrap; }
+  .where { display: grid; gap: 4px; }
+  .where code { white-space: normal; display: inline-block; }
+  .why { border-left: 2px solid var(--accent); padding-left: 14px; color: var(--ink); font-size: 15px; max-width: 72ch; }
+  .why b { color: var(--accent); font-weight: 600; }
+
+  .evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  figure { margin: 0; display: grid; gap: 6px; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); background: #000; }
+  figcaption { font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute); }
+  figure.wide { grid-column: 1 / -1; }
+  .scroll { overflow-x: auto; }
+  .scroll img { max-width: none; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font: 700 10.5px/1.3 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  td.v { white-space: nowrap; font-weight: 600; }
+  .v.legit { color: var(--success); } .v.debt { color: var(--warning); } .v.mix { color: var(--ink-soft); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--paper-soft); }
+  .tablewrap table { min-width: 640px; }
+
+  .discard { display: grid; gap: 10px; }
+  .discard li { display: grid; grid-template-columns: 16px 1fr; gap: 12px; color: var(--ink-soft); font-size: 14.5px; }
+  .discard li::before { content: "—"; color: var(--success); }
+  .discard ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .note { font-size: 13.5px; color: var(--ink-mute); max-width: 74ch; }
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+  @media (max-width: 560px) { .f-head { grid-template-columns: 48px 1fr; } .rank { font-size: 24px; } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">dungeon-hub · auditoría de craft · lectura sin cambios</div>
+  <h1>Trece hallazgos que separan «funciona» de «se siente producto»</h1>
+  <p class="lede">Medido sobre producción (<code>main = add83b3</code>) en 375 px y 1440 px, con la cuenta demo pública. Cada hallazgo nombra el mecanismo, dónde vive en el código y qué se ve hoy. Ordenados por cuánto mueven la percepción, no por cantidad de ocurrencias.</p>
+  <div class="meta"><span><b>40</b> pantallas × 2 viewports</span><span><b>CLS 0</b> en todas</span><span><b>686</b> valores arbitrarios triados</span><span>2026-09-10</span></div>
+</header>
+
+<section>
+  <div class="kpis">
+    <div class="kpi bad"><div class="n">1.2–2.4 s</div><div class="l">página vieja congelada tras cada tap</div></div>
+    <div class="kpi bad"><div class="n">33 %</div><div class="l">del texto en mobile es menor a 12 px</div></div>
+    <div class="kpi bad"><div class="n">122</div><div class="l">colores crudos que <code>globals.css</code> prohíbe</div></div>
+    <div class="kpi ok"><div class="n">49 %</div><div class="l">de los 686 arbitrarios es deuda real</div></div>
+    <div class="kpi good"><div class="n">0</div><div class="l">layout shift medido (teoría descartada)</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Ranking</div>
+    <h2>Hallazgos por impacto en la percepción</h2>
+    <p>Agrupados por causa raíz: si treinta pantallas comparten un mecanismo, es un hallazgo. «Hoy» describe lo que se ve; «Debería» describe el estado objetivo, no una implementación.</p>
+  </div>
+
+  <ol class="findings">
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">1</div><div class="f-title">
+      <h3>Cada tap congela la pantalla anterior entre 1.2 y 2.4 segundos</h3>
+      <div class="tags"><span class="tag axis">Eje 3 · continuidad</span><span class="tag move">Mueve más la aguja</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>El tap se acusa a los 50–80 ms con una barra de 2 px arriba (<code>NavProgress</code>). Después, nada: la página anterior sigue intacta e interactiva hasta que llega el payload completo. Filmstrip mobile: sigue en <code>/inicio</code> a los 59, 302, 702 y 1202 ms; cambia a los 1801. Desktop: sigue vieja a los 1802 ms, cambia a los 2600.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Al tap, el contenido se vacía a un esqueleto en menos de 100 ms mientras el shell (topbar, tabbar, sidebar) queda fijo. La sensación de «fluido» es esa: la estructura no se mueve, sólo el contenido llega.</p></div>
+      </div>
+      <div class="cell"><div class="k">Mecanismo · dónde</div><div class="where">
+        <p>No existe ningún <code>loading.tsx</code> bajo <code>apps/web/app</code>, y el único <code>Suspense</code> es el que envuelve la barra en <code>app/layout.tsx:56</code>. Sin límite de suspense, el App Router espera el RSC completo antes de pintar, y el prefetch de <code>&lt;Link&gt;</code> en rutas dinámicas no trae nada útil.</p>
+        <p><code>components/layout/app-shell.tsx:84-105</code> se renderiza dentro de cada una de las 28 <code>page.tsx</code>, no en un layout. Medido con un marcador DOM: en cada navegación el <code>&lt;nav&gt;</code> se destruye y se vuelve a crear (<code>nav: false, body: true</code>), aunque visualmente sea idéntico.</p>
+      </div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Es el 80 % de la sensación de fluidez y no aparece en ningún screenshot. Un usuario que toca «Bitácora» y ve Inicio durante dos segundos duda de si registró el tap y vuelve a tocar. La barra de progreso no reemplaza un esqueleto: dice «algo pasa», no «ya estás en otro lado». Los 2.5–5.5 s de carga de la API desde el homelab amplifican el problema; no lo causan.</p>
+      <div class="evidence">
+        <figure class="wide scroll"><img src="{{img:mobile-filmstrip.png}}" alt="Filmstrip mobile: la pantalla de Inicio sigue en pantalla 1.2 segundos después de tocar Bitácora"><figcaption>375 px · seis cuadros tras tocar «Bitácora»; sólo la barra de 2 px cambia hasta el cuadro 5</figcaption></figure>
+        <figure class="wide scroll"><img src="{{img:desktop-filmstrip.png}}" alt="Filmstrip desktop: Inicio sigue en pantalla 1.8 segundos después de hacer clic en Bitácora"><figcaption>1440 px · el cambio llega a los 2600 ms</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">2</div><div class="f-title">
+      <h3>Restos del tema claro dentro de la app oscura: modales blancos, cajas de error rosa, rojos crudos</h3>
+      <div class="tags"><span class="tag axis">Eje 1 · coherencia</span><span class="tag move">Señal de «barato» más fuerte</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>El modal «¿Eliminar a Kael el Centinela?» es <code>bg-white</code> con el título en <code>text-ink</code>: crema <code>rgb(244,234,213)</code> sobre blanco, ilegible. La caja de error del level-up es <code>bg-red-50 border-red-200 text-red-700</code>, una tarjeta de tema claro. Hay 29 <code>text-red-600</code>, 6 <code>bg-red-50</code>, 19 <code>bg-white</code>, 5 <code>shadow-xl</code> y 3 sombras hardcodeadas con color de tema claro (<code>rgba(39,30,51,.25)</code>).</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Todo estado de error, peligro y overlay sale de los tokens que ya existen: <code>text-danger</code>, <code>bg-danger-soft</code>, <code>border-danger-soft-border</code>, <code>bg-surface</code>, <code>shadow-stamp-lg</code>. <code>FormErrorAlert</code> ya lo hace bien; el resto tiene que converger ahí.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where">
+        <p><code>app/characters/[id]/_delete-button.tsx:62</code> (modal blanco) · <code>app/characters/[id]/level-up/_flow.tsx:334</code> · <code>components/world/map/poi-accordion.tsx:177</code> · <code>app/characters/[id]/_tabs/_components/paginas-view.tsx:254</code> · <code>app/characters/[id]/_components/dm-grant-panel.tsx</code> (13 <code>bg-white</code>) · <code>components/wizard/review-banner.tsx:28</code> y <code>published-splash.tsx:25</code> (sombra + <code>to-[#1B1428]</code>).</p>
+        <p>El encabezado de <code>globals.css:22-24</code> prohíbe explícitamente <code>red-*</code>, <code>amber-*</code> y compañía. Son 122 usos fuera de <code>dev/</code>.</p>
+      </div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Un producto oscuro que de golpe muestra una tarjeta blanca parece dos productos pegados. Y ocurre en el momento de mayor atención: confirmar un borrado. No es una inconsistencia sutil de tokens; es una escena de otra app.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-delete-modal.jpg}}" alt="Modal de confirmación blanco con el título en crema casi invisible, en mobile"><figcaption>375 px · título crema sobre blanco</figcaption></figure>
+        <figure><img src="{{img:d-delete-modal.jpg}}" alt="El mismo modal blanco en desktop"><figcaption>1440 px · mismo componente</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">3</div><div class="f-title">
+      <h3>La escala tipográfica está definida y no se usa: la app vive entre 9 y 14 px</h3>
+      <div class="tags"><span class="tag axis">Eje 4 · jerarquía</span><span class="tag axis">Eje 5 · densidad</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Mobile: 33 % de los textos visibles son menores a 12 px, 58 % menores a 14 px, y sólo 7 % llega a 16 px o más. Desktop: 21 % y 43 %. El <code>h1</code> de cada página es <code>text-[15px]</code> en la topbar; en 1440 px el título «Personajes» mide 15 px sobre una pantalla casi vacía. Hay 291 <code>text-[Npx]</code> en el código: 187 de 10 px, 33 de 9 px, 33 de 11 px.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Tres niveles reconocibles en dos segundos: un título de página que pese (≥ 22 px en desktop, ≥ 19 px en mobile), cuerpo a 15–16 px, y etiquetas a 11–12 px. Los eyebrows de 10 px son aceptables como acento, no como el 12 % de la página.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde · causa raíz</div><div class="where">
+        <p><code>apps/web/app/globals.css:126-175</code> define <code>text-micro</code>, <code>text-caption</code>, <code>text-footnote</code>, <code>text-body</code>, <code>text-title</code>, <code>text-headline</code>… con el comentario «define only; migration of <code>text-[Npx]</code> is follow-up». El follow-up no ocurrió. Además falta un token plano de 10 px: <code>text-eyebrow</code> bundlea uppercase + bold + tracking, y 116 de los 187 <code>text-[10px]</code> no son eyebrows.</p>
+        <p><code>components/layout/topbar.tsx:88</code> (<code>h1 text-[15px]</code>), <code>tabbar.tsx:87</code> (labels 9 px).</p>
+      </div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Si todo pesa igual, nada pesa. Una ficha con veinte etiquetas de 10 px y un título de 15 px se lee como panel de administración, no como producto. Es un solo hallazgo aunque toque 291 sitios: la escala ya existe, falta adoptarla.</p>
+      <div class="evidence">
+        <figure><img src="{{img:d-sheet.jpg}}" alt="Ficha de personaje en desktop: todo el texto entre 9 y 14 px"><figcaption>1440 px · ficha: título de página 15 px, etiquetas 10 px</figcaption></figure>
+        <figure><img src="{{img:m-sheet.jpg}}" alt="Ficha de personaje en mobile"><figcaption>375 px · la misma jerarquía plana</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">4</div><div class="f-title">
+      <h3>Desktop es el layout mobile centrado en 768 px, con anchos distintos por página</h3>
+      <div class="tags"><span class="tag axis">Eje 4 · jerarquía</span><span class="tag vp">desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Personajes, Campañas, Tablero y Ajustes ocupan un 10 % del viewport de 1440 px. Mercado y Mapa se angostan aún más (columna de ~350 px). El mapa Leaflet no llena su contenedor: una imagen de ~310 px flotando en un rectángulo de 1200. La ficha conserva la grilla de tres celdas de 375 px.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Un ancho de contenido único por tipo de página (lectura vs. lista vs. lienzo) y, en las de lista, usar el ancho para lo que mobile no puede: dos columnas, panel de detalle lateral, mapa a sangre. Desktop es secundario, pero «secundario» no es «sin decidir».</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where">
+        <p><code>components/layout/app-shell.tsx:96</code> (<code>main max-w-sm md:max-w-3xl</code>) · <code>app/mapa/page.tsx</code> y <code>app/mercado/page.tsx</code> (<code>max-w-sm</code>) · <code>app/characters/[id]/level-up/page.tsx</code> (<code>max-w-lg</code>) · <code>components/world/map/world-map-leaflet.tsx:248</code>.</p>
+      </div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> En desktop el vacío no lee como «aire»: lee como «no terminado». Y la inconsistencia de anchos entre rutas hermanas (Mercado angosto, Bitácora ancha) es exactamente lo que el ojo detecta como falta de sistema aunque no sepa nombrarlo.</p>
+      <div class="evidence">
+        <figure><img src="{{img:d-mercado.jpg}}" alt="Mercado en desktop: lista en una columna de 350 px"><figcaption>1440 px · Mercado</figcaption></figure>
+        <figure><img src="{{img:d-map.jpg}}" alt="Mapa en desktop: imagen pequeña centrada en un área vacía"><figcaption>1440 px · Mapa</figcaption></figure>
+        <figure><img src="{{img:d-personajes.jpg}}" alt="Personajes en desktop: dos tarjetas y el resto vacío"><figcaption>1440 px · Personajes</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">5</div><div class="f-title">
+      <h3>La topbar mobile trunca lo más importante: el mundo siempre dice «La Campañ…»</h3>
+      <div class="tags"><span class="tag axis">Eje 5 · densidad</span><span class="tag vp">mobile</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>En 375 px la topbar aloja cuatro controles: pill del mundo, título, switch de rol, avatar. El pill está limitado a <code>max-w-[88px]</code>, así que el nombre del mundo aparece cortado en <em>todas</em> las páginas medidas (7 de 7). En Herramientas el título también se corta («Herrami…»). El pill mide 32 px de alto, único control del shell bajo los 44 px.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Un solo elemento truncado como máximo, y nunca el que identifica el contexto. O el mundo va completo y el título cede, o el mundo baja a una línea secundaria bajo el título.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/layout/world-switcher.tsx:55</code> (<code>truncate max-w-[88px] sm:max-w-[120px]</code>) · <code>components/layout/topbar.tsx:84-92</code>.</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Un texto cortado con puntos suspensivos en la barra que se ve el 100 % del tiempo es la inconsistencia más repetida de toda la app. No es un caso borde: es el estado por defecto.</p>
+      <div class="evidence">
+        <figure class="wide"><img src="{{img:m-topbar-cut.jpg}}" alt="Topbar mobile con el mundo y el título truncados"><figcaption>375 px · «La Campañ…» y «Herrami…» en la misma barra</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">6</div><div class="f-title">
+      <h3>Tabbar a seis columnas: «Mercado» y «Bitácora» quedan a 3.5 px</h3>
+      <div class="tags"><span class="tag axis">Eje 5 · densidad</span><span class="tag vp">mobile · vista GM</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Con el sexto tab «Mesa» cada columna baja a 60.5 px. Medido: gap Mercado→Bitácora 3.5 px, Códex→Mercado 13.8 px, Inicio→Mapa 26.8 px. A cinco columnas el mínimo es 11.5 px. El código ya sabe del problema: cambia «Biblioteca» por «Códex» sólo a seis columnas, pero el choque quedó un lugar más a la derecha.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Gap mínimo uniforme (≥ 8 px) entre labels a cualquier cantidad de columnas: labels más cortos, o sin label en el tab activo, o icono solo con label únicamente en el activo.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/layout/tabbar.tsx:11-18</code> (comentario del hack), <code>:86-88</code> (<code>text-[9px] uppercase tracking-[0.06em]</code>).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> El ritmo desparejo entre labels es visible sin medir: el ojo lee «MERCADO BITÁCORA» como una palabra y «INICIO  MAPA» como dos. Es la barra que un GM tiene siempre en pantalla.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-tabbar-6.jpg}}" alt="Tabbar de seis columnas con Mercado y Bitácora casi pegados"><figcaption>6 columnas (GM)</figcaption></figure>
+        <figure><img src="{{img:m-tabbar-5.jpg}}" alt="Tabbar de cinco columnas con espaciado regular"><figcaption>5 columnas (jugador)</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">7</div><div class="f-title">
+      <h3>El lápiz de edición de HP tapa la etiqueta «Puntos de golpe»</h3>
+      <div class="tags"><span class="tag axis">Eje 4 · jerarquía</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>El botón circular de editar se superpone al label de la celda de HP en ambos viewports; se lee «PUNTOS DE GOL».</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>La celda reserva espacio para el control (esquina con padding) o el control vive fuera del área del texto.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/sheet/vital-grid.tsx:66-76</code> (<code>hpEditorSlot</code> en el <code>footer</code> de un <code>StatCell size="compact"</code>) · <code>components/ui/stat-cell.tsx:78</code> (<code>relative</code> para posicionar slots absolutos).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Es la primera celda de la ficha, la métrica más consultada en mesa, y muestra un defecto de superposición desde el primer segundo.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-hp-pencil.jpg}}" alt="Celda de HP con el botón de editar sobre el texto de la etiqueta"><figcaption>375 px</figcaption></figure>
+        <figure><img src="{{img:d-hp-pencil.jpg}}" alt="La misma superposición en desktop"><figcaption>1440 px</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">8</div><div class="f-title">
+      <h3>En la ficha, cinco acciones pesan lo mismo y el nombre aparece dos veces como h1</h3>
+      <div class="tags"><span class="tag axis">Eje 4 · jerarquía</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Entre las celdas vitales y las pestañas hay una pila de botones a ancho completo: «Descanso corto / largo», «Devolver a borrador» (dorado), «Otorgar» (cian), «+ Agregar clase». En desktop los anchos se desalinean: «Devolver a borrador» queda chico a la izquierda y «Otorgar» a todo el ancho. El nombre del personaje es <code>h1</code> en la topbar (15 px) y otra vez <code>h1</code> en el hero (24 px), a 100 px de distancia.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Una acción primaria por pantalla; las de DM agrupadas y visualmente subordinadas (menú, fila de chips, sección «Como DM»). Un solo <code>h1</code>: cuando hay hero, la topbar muestra el nombre sólo al scrollear.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>app/characters/[id]/_components/approval-actions.tsx</code> · <code>components/sheet/sheet-hero.tsx:67</code> (<code>h1 text-2xl</code>) · <code>components/layout/topbar.tsx:88</code> (<code>h1</code>) · <code>components/campanas/campana-detail-view.tsx:75</code> (mismo patrón en campañas).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> La pantalla más importante de la app no dice qué es lo importante. Un jugador ve las mismas cuatro acciones de DM que el DM, todas gritando.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-action-stack.jpg}}" alt="Pila de cuatro botones de ancho completo en la ficha mobile"><figcaption>375 px</figcaption></figure>
+        <figure><img src="{{img:d-action-stack.jpg}}" alt="Los mismos botones con anchos inconsistentes en desktop"><figcaption>1440 px · anchos desalineados</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">9</div><div class="f-title">
+      <h3>Estados vacíos: el primitivo existe y enseña qué hacer, pero la adopción es parcial y no hay ningún esqueleto</h3>
+      <div class="tags"><span class="tag axis">Eje 2 · estados</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Lo bueno: <code>V3Empty</code> en Encuentros, Eventos, NPCs, Facciones dice «Tocá el botón + para crear el primero» y funciona. Lo pendiente: «Sin grants recientes.» y «Aún no consultaste ninguna entrada.» son párrafos sueltos; 63 archivos tienen un «No hay…» ad-hoc. Cargando: no hay skeleton en ninguna ruta (dos usos de la palabra en todo <code>apps/web</code>, ninguno de página), y tampoco spinners pelados: no hay nada.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Todo vacío pasa por <code>V3Empty</code> con acción. Toda lista y toda ficha tienen un esqueleto que respeta su forma (celdas, filas, hero), que es lo que resuelve el hallazgo 1.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/ui/empty.tsx</code> (usado en 10 archivos) · <code>app/characters/[id]/_components/recent-grants.tsx</code> · <code>app/compendium/page.tsx</code> («Más consultado») · <code>components/compendium/term/TermCard.tsx</code> y <code>app/compendium/[category]/_components/detail-sheet.tsx</code> (únicos skeletons).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Un vacío que enseña se siente diseñado; uno que sólo informa se siente roto. La diferencia entre los dos ya está resuelta en el propio código base.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-empty-good.jpg}}" alt="Estado vacío de Encuentros con icono, título, explicación y acción"><figcaption>375 px · Encuentros: vacío que enseña</figcaption></figure>
+        <figure><img src="{{img:m-empty-bare.jpg}}" alt="Texto suelto: Sin grants recientes"><figcaption>375 px · ficha: vacío que sólo informa</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">10</div><div class="f-title">
+      <h3>Controles nativos y de terceros sin tematizar: Leaflet, «Choose File», checkboxes de 16 px</h3>
+      <div class="tags"><span class="tag axis">Eje 1 · coherencia</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>El mapa muestra los botones de zoom blancos de Leaflet (30 × 30) y la atribución «Leaflet | Sword Coast» sobre una tira blanca; no hay ningún override de <code>.leaflet-control</code> en el proyecto. El import de personaje muestra un <code>&lt;input type="file"&gt;</code> nativo: «Choose File / No file chosen», en inglés. La tienda del DM lista 62 checkboxes nativos de 16 px. El Mercado usa un <code>&lt;select&gt;</code> nativo.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Los controles de terceros visten los tokens (fondo <code>surface</code>, borde <code>line</code>, radio <code>md</code>); el file input se envuelve en un botón propio con copy en español; los checkboxes tienen área de 44 px aunque el glifo sea chico.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/world/map/world-map-leaflet.tsx</code> · <code>app/characters/import/_form.tsx:162-166</code> · <code>app/herramientas/tienda/</code> (checkboxes) · <code>app/mercado/page.tsx</code> (select).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Un control con el look del sistema operativo o de una librería dentro de una interfaz con identidad fuerte se ve como un parche. El Leaflet blanco sobre obsidiana es el más visible porque el mapa es un tab principal.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-map-leaflet.jpg}}" alt="Mapa con controles de zoom y atribución de Leaflet sin tematizar"><figcaption>375 px · Mapa</figcaption></figure>
+        <figure><img src="{{img:m-file-input.jpg}}" alt="Input de archivo nativo en inglés"><figcaption>375 px · Importar</figcaption></figure>
+        <figure><img src="{{img:m-tienda-checkbox.jpg}}" alt="Lista de checkboxes nativos de 16 px"><figcaption>375 px · Tienda del DM</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">11</div><div class="f-title">
+      <h3>Un nombre de 60 caracteres recorta la tarjeta de personaje sin elipsis</h3>
+      <div class="tags"><span class="tag axis">Eje 2 · estados</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>Simulado en DOM (sin persistir): en la lista, el nombre sale por el borde derecho de la tarjeta y arrastra los chips fuera de vista, sin «…». La topbar y el hero de la ficha sí truncan con elipsis a una línea.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>El nombre envuelve a dos líneas con <code>line-clamp-2</code> (preferible) o trunca con elipsis; los chips nunca dependen del ancho del nombre.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/ui/character-card.tsx:67</code> (<code>overflow-hidden</code> en el wrapper) y <code>:80</code> (columna <code>min-w-0</code> sin <code>truncate</code> en el nodo del nombre).</p></div></div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Los nombres de personaje son el contenido con más variación de largo de toda la app, y la lista es la primera pantalla de un jugador.</p>
+      <div class="evidence">
+        <figure><img src="{{img:m-longname-card.jpg}}" alt="Tarjeta con el nombre largo recortado por el borde y chips fuera de vista"><figcaption>375 px · lista</figcaption></figure>
+        <figure><img src="{{img:m-longname-sheet.jpg}}" alt="Ficha con el nombre largo truncado con elipsis en topbar y hero"><figcaption>375 px · ficha: truncado, no envuelto</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">12</div><div class="f-title">
+      <h3>Radios y sombras fuera de escala, y dos nombres para el mismo pill</h3>
+      <div class="tags"><span class="tag axis">Eje 1 · coherencia</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>La escala es 8 / 12 / 18 / pill. En uso: 32 <code>rounded</code> pelados (4 px), 5 <code>rounded-2xl</code> (16 px), 9 <code>rounded-[…]</code> (5, 9, 10, 14, 24 px), 48 <code>rounded-xl</code> que coinciden con 12 px por casualidad, y <code>rounded-full</code> × 77 contra <code>rounded-pill</code> × 17 para el mismo valor. Sombras: 13 <code>shadow-md/lg/xl</code> de Tailwind junto a la escala <code>stamp</code>.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Un solo vocabulario: <code>rounded-sm/md/lg/pill</code>, <code>shadow-stamp-*</code>. Un lint de Tailwind (o un test de <code>rg</code>) que falle ante <code>rounded</code> pelado y sombras default.</p></div>
+      </div>
+      <p class="why"><b>Por qué mueve la percepción.</b> Menos que los anteriores. Es ruido de fondo: esquinas de 4 px junto a esquinas de 12 px en la misma tarjeta se perciben como «casi iguales», que es peor que distintas.</p>
+    </div>
+  </li>
+
+  <li class="finding">
+    <div class="f-head"><div class="rank">13</div><div class="f-title">
+      <h3>Inicio: en los «Atajos DM» sólo el primer icono tiene fondo circular</h3>
+      <div class="tags"><span class="tag axis">Eje 1 · coherencia</span><span class="tag vp">mobile + desktop</span></div>
+    </div></div>
+    <div class="f-body">
+      <div class="grid2">
+        <div class="cell today"><div class="k">Hoy</div><p>«Iniciativa» lleva un círculo de fondo; «Herramientas», «Mesa», «Nuevo NPC» y «Loot» van sin él, por una clase específica <code>inicio-quick-iniciativa-ic</code>.</p></div>
+        <div class="cell should"><div class="k">Debería</div><p>Los cinco atajos comparten tratamiento; si «Iniciativa» es primaria, se distingue por posición o tamaño, no por un estilo único.</p></div>
+      </div>
+      <div class="cell"><div class="k">Dónde</div><div class="where"><p><code>components/inicio/dm/dm-quick-actions.tsx:27</code> vs <code>:38</code>.</p></div></div>
+      <div class="evidence">
+        <figure><img src="{{img:m-atajos.jpg}}" alt="Cinco atajos, sólo el primero con fondo circular"><figcaption>375 px · Inicio</figcaption></figure>
+      </div>
+    </div>
+  </li>
+
+  </ol>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Eje 1 · triage</div>
+    <h2>Los 686 valores arbitrarios, clasificados</h2>
+    <p>Conteo sobre <code>apps/web/app</code> + <code>components</code> + <code>lib</code>, sin tests ni <code>app/dev/</code>. El punto de partida de 656 difiere por el glob; el reparto es el mismo. Alrededor del 47 % es uso correcto, 49 % es deuda con causa raíz identificable, y el resto es miscelánea.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Patrón</th><th class="n">Usos</th><th>Veredicto</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td><code>min-h-[44px]</code> · <code>min-w-[44px]</code> · <code>w-[44px]</code></td><td class="n">293</td><td class="v legit">Legítimo</td><td>Tap targets deliberados. Podría ser una utility <code>min-h-tap</code>, pero no es deuda de diseño.</td></tr>
+      <tr><td><code>text-[Npx]</code></td><td class="n">291</td><td class="v debt">Deuda · hallazgo 3</td><td>La escala existe en <code>globals.css</code>; falta el token plano de 10 px y la migración.</td></tr>
+      <tr><td><code>top-[120px]</code> · <code>left-[var(--sidebar-w)]</code></td><td class="n">8</td><td class="v legit">Legítimo, tokenizable</td><td>Offset documentado del mapa (topbar + toggle). Merece un token para no romperse si la topbar cambia.</td></tr>
+      <tr><td><code>shadow-[…]</code></td><td class="n">13</td><td class="v mix">Mixto</td><td>6 son glows con <code>var(--color-accent)</code> (aceptables); 3 son sombras con color de tema claro (hallazgo 2); 4 son elevaciones ad-hoc.</td></tr>
+      <tr><td><code>rounded-[Npx]</code></td><td class="n">9</td><td class="v debt">Deuda · hallazgo 12</td><td>4 son <code>12px</code> = <code>rounded-md</code>; el resto está fuera de escala.</td></tr>
+      <tr><td><code>text-[#1A1208]</code> · <code>to-[#1B1428]</code> · <code>bg-[linear-gradient…]</code></td><td class="n">8</td><td class="v debt">Deuda · hallazgo 2</td><td><code>#1A1208</code> ya es <code>text-on-accent</code>. Los gradientes se resuelven con tokens existentes.</td></tr>
+      <tr><td><code>tracking-[…]</code></td><td class="n">6</td><td class="v debt">Deuda · hallazgo 3</td><td>Tres valores distintos de tracking para eyebrows; <code>text-eyebrow</code> ya fija 0.12em.</td></tr>
+      <tr><td><code>min-h-[28|32|36px]</code></td><td class="n">12</td><td class="v debt">Deuda · eje 5</td><td>Chips y toggles bajo los 44 px (filtros de Bitácora 36 px, de Inventario 33 px).</td></tr>
+      <tr><td><code>max-h-[92vh]</code> · <code>max-h-[85vh]</code> · <code>w-[34px]</code> · otros</td><td class="n">≈46</td><td class="v mix">Miscelánea</td><td>Sheets, medidas de icono, un <code>w-[375px]</code> de preview. Sin patrón que valga un hallazgo.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="split">
+    <div class="cell"><div class="k">Hex crudos</div><p class="note">El conteo de 49 incluye referencias a issues en comentarios (<code>#995</code>, <code>#1953</code>). Fuera de <code>globals.css</code>, <code>dev/</code> y el espejo <code>lib/design-tokens.ts</code> (25, intencional), quedan ~11 sitios reales: <code>currency-strip.tsx</code> (3), <code>map-marker-icon.ts</code> (5), <code>crow-mark.tsx</code>, <code>atributos-editor.tsx</code>, y los dos gradientes del wizard. Es un rato de trabajo, no un problema sistémico.</p></div>
+    <div class="cell"><div class="k">Colores Tailwind prohibidos</div><p class="note">122 usos, dominados por estados de error: <code>text-red-600</code> (29), <code>text-red-500</code>, <code>bg-red-50</code>, <code>border-red-200</code>, <code>text-amber-400/700</code>. Una sola causa raíz: los estados de error se escribieron antes de que existieran <code>danger</code> y <code>warning</code>, o sin mirar que existían. Es el hallazgo 2.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Teorías descartadas</div>
+    <h2>Lo que medí y no se sostuvo</h2>
+  </div>
+  <div class="discard"><ul>
+    <li>Layout shift al cargar datos: CLS = 0 en las 40 pantallas, ambos viewports. Los server components pintan completos; no hay reflow posterior.</li>
+    <li>Spinners pelados: no hay ninguno (<code>animate-spin</code> = 0). El problema no es un loading feo sino que no hay loading (hallazgo 1).</li>
+    <li>Latencia del acuse de tap: 50–80 ms, dentro del umbral de 100 ms. Lo que falla es lo que pasa después.</li>
+    <li>Scroll horizontal en 375 px: ninguno en ninguna ruta.</li>
+    <li>Fuentes: las cuatro familias cargan con <code>display: swap</code> y se ven en la página; sólo Leaflet mete «Lucida Console» y «Helvetica Neue» (hallazgo 10).</li>
+    <li>Lista de 200: el compendio (499 hechizos) y la tienda (200+ items) rinden sin virtualizar y sin problema visible en la captura; la deuda ahí es de tap target, no de rendimiento.</li>
+  </ul></div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <div class="eyebrow">Apéndice</div>
+    <h2>Mediciones de referencia</h2>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Métrica</th><th class="n">Mobile 375</th><th class="n">Desktop 1440</th><th>Nota</th></tr></thead>
+    <tbody>
+      <tr><td>Texto &lt; 12 px / &lt; 14 px / ≥ 16 px</td><td class="n">33 % / 58 % / 7 %</td><td class="n">21 % / 43 % / 9 %</td><td>Sobre elementos de texto visibles, 35 páginas</td></tr>
+      <tr><td>Tamaño de texto más frecuente</td><td class="n">14 px (32 %)</td><td class="n">14 px (48 %)</td><td>Segundo: 12 px (23 % / 21 %)</td></tr>
+      <tr><td>Tap desde clic hasta cambio de URL</td><td class="n">1.5–2.4 s</td><td class="n">1.5–2.3 s</td><td>6 tabs medidos, dos corridas</td></tr>
+      <tr><td>Acuse visual del tap</td><td class="n">46–79 ms</td><td class="n">52–79 ms</td><td>Barra de 2 px</td></tr>
+      <tr><td>Carga a red inactiva por ruta</td><td class="n">1.1–5.5 s</td><td class="n">1.2–6.8 s</td><td>Mediana ≈ 3.5 s; API en el homelab</td></tr>
+      <tr><td>Controles &lt; 44 px (excluyendo tienda)</td><td class="n">1–10 por página</td><td class="n">1–10 por página</td><td>Pill del mundo 32 px en todas; chips 33–36; «← Salir» 16; «Eliminar personaje» 20</td></tr>
+      <tr><td>Radios en uso (computados)</td><td class="n" colspan="2">12 px × 538 · pill × 206 · 4 px × 53 · 8 px × 52 · 18 px × 13 · 16 px × 8 · 10 px × 7</td><td>Desktop; mobile equivalente</td></tr>
+      <tr><td>Rutas con <code>loading.tsx</code> / Suspense de página</td><td class="n" colspan="2">0 / 0</td><td>28 páginas con <code>AppShell</code> inline</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Método: Playwright sobre Chromium, sesión con la cuenta demo, sin acciones que muten datos (el modal de borrado se abrió y se canceló; los nombres largos se inyectaron en el DOM del navegador). Capturas completas y JSON de métricas en `` (ver `tools/`).</p>
+</section>
+</div>

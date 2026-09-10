@@ -1,0 +1,27 @@
+# mode|file|x|y|w|h|out|scale
+mobile|probe_delete_modal.png|0|940|750|394|m-delete-modal|0.6
+desktop|probe_delete_modal.png|480|340|480|220|d-delete-modal|1
+mobile|character_0.fold.png|0|520|750|270|m-hp-pencil|0.6
+desktop|character_0.fold.png|460|190|780|140|d-hp-pencil|1
+mobile|herramientas_tienda.fold.png|0|0|750|140|m-topbar-cut|0.6
+mobile|probe_tabbar_6col.png|0|0|full|full|m-tabbar-6|1
+mobile|probe_tabbar_5col.png|0|0|full|full|m-tabbar-5|1
+mobile|mapa.fold.png|0|130|750|1080|m-map-leaflet|0.45
+desktop|mapa.fold.png|0|0|full|full|d-map|0.5
+desktop|mercado.fold.png|0|0|full|full|d-mercado|0.5
+desktop|personajes.fold.png|0|0|full|full|d-personajes|0.5
+mobile|characters_import.fold.png|0|920|750|200|m-file-input|0.6
+mobile|probe_longname_list.png|0|280|750|200|m-longname-card|0.6
+mobile|probe_longname_sheet.png|0|0|750|560|m-longname-sheet|0.5
+mobile|character_0.fold.png|0|800|750|400|m-action-stack|0.6
+desktop|character_0.fold.png|460|330|780|230|d-action-stack|1
+mobile|inicio.fold.png|0|690|750|430|m-atajos|0.6
+mobile|encuentros.fold.png|0|250|750|500|m-empty-good|0.5
+mobile|character_0.png|0|1290|750|150|m-empty-bare|0.6
+mobile|character_inventario.fold.png|0|1100|750|234|m-chips-33|0.6
+mobile|bitacora.fold.png|0|150|750|500|m-bitacora-fold|0.5
+mobile|herramientas_tienda.fold.png|0|1050|750|284|m-tienda-checkbox|0.6
+desktop|inicio.fold.png|0|0|full|full|d-inicio|0.5
+mobile|inicio.fold.png|0|0|full|full|m-inicio|0.4
+mobile|character_0.fold.png|0|0|full|full|m-sheet|0.4
+desktop|character_0.fold.png|0|0|full|full|d-sheet|0.5
