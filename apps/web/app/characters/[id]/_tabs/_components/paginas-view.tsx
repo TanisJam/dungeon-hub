@@ -260,17 +260,17 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
           {/* Share affordance — mobile-first 375px (REQ-SHARE-10 ADR-7) */}
           {detailPage.sharedAt != null ? (
             // Already shared: show read-only Compartido badge (no re-share button)
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-success/30 bg-success-soft px-3 py-2">
               {/* Decorative checkmark — the adjacent text already conveys the status to SRs */}
-              <span className="text-green-600 text-sm" aria-hidden="true">✓</span>
-              <span className="text-sm text-green-700 font-medium">Compartido con el gremio</span>
+              <span className="text-sm text-success" aria-hidden="true">✓</span>
+              <span className="text-sm font-medium text-success">Compartido con el gremio</span>
             </div>
           ) : confirmShare ? (
             // Confirm panel — inline, no navigation away (REQ-SHARE-10)
             <div className="mt-2 flex flex-col gap-2 rounded-md border border-line bg-paper-soft p-3">
               <p className="text-sm text-ink">¿Compartir esta página con el gremio?</p>
               {shareError && (
-                <p className="text-xs text-red-600">{shareError}</p>
+                <p className="text-xs text-danger">{shareError}</p>
               )}
               <div className="flex gap-2">
                 <button

@@ -296,7 +296,7 @@ export function LevelUpFlow({
     : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-2xl md:shadow-xl">
+    <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-2xl md:shadow-stamp-lg">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
         {hasPrev && (
@@ -642,7 +642,7 @@ function AsiFeatStep({
       {kind === 'asi' && (
         <div className="space-y-3">
           <p className="text-xs text-ink-mute">
-            Suma distribuida: <strong className={deltaSum > 2 ? 'text-red-600' : 'text-ink'}>{deltaSum}/2</strong>
+            Suma distribuida: <strong className={deltaSum > 2 ? 'text-danger' : 'text-ink'}>{deltaSum}/2</strong>
           </p>
           {ABILITY_KEYS.map((ability) => (
             <div key={ability} className="flex items-center gap-3">
