@@ -129,6 +129,21 @@ for step in stats race class background equipment spells review; do
   curl -sf -o /dev/null --max-time 90 \
     "http://127.0.0.1:${WEB_PORT}/characters/${WARM_ID}/wizard/${step}" || true
 done
+
+# The character sheet and the level-up flow, for the same reason and with the same
+# throwaway id. The sheet is the route the specs open most and the one route of that
+# weight nothing here compiled, so the first spec to open a character paid for it —
+# inside loops that open each character in turn and decide from a two-second
+# visibility check whether it is the one they want.
+#
+# Warming it did NOT fix the skip that prompted this (that turned out to be a fixture
+# named "— Active" where its spec looked for "fighter"), so this buys margin rather
+# than a specific failure. It stays because the margin is real and the cost is two
+# requests against a compile every later spec would otherwise wait on.
+for path in "" "/level-up"; do
+  curl -sf -o /dev/null --max-time 90 \
+    "http://127.0.0.1:${WEB_PORT}/characters/${WARM_ID}${path}" || true
+done
 echo "   routes warm"
 
 echo "🎭 Running Playwright..."

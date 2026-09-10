@@ -44,26 +44,37 @@ test.use({ viewport: MOBILE });
  * Resolve the first active character ID for the test user by calling the API.
  * Returns null if none found (test will skip gracefully).
  */
-async function resolveCharacterId(request: import('@playwright/test').APIRequestContext, accessToken: string): Promise<string | null> {
+async function resolveCharacter(request: import('@playwright/test').APIRequestContext, accessToken: string): Promise<{ id: string; worldId: string } | null> {
   const res = await request.get(`${API}/api/v1/characters`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok()) return null;
-  const data = await res.json() as { data?: Array<{ id: string; status: string }> };
+  const data = await res.json() as { data?: Array<{ id: string; worldId: string; status: string }> };
   const active = (data.data ?? []).find((c) => c.status === 'active');
-  return active?.id ?? null;
+  return active ? { id: active.id, worldId: active.worldId } : null;
 }
 
 /**
  * Resolve the first monster slug/source from the compendium.
  */
-async function resolveFirstMonster(request: import('@playwright/test').APIRequestContext, accessToken: string): Promise<{ slug: string; source: string; name: string } | null> {
-  const res = await request.get(`${API}/api/v1/compendium/monsters?limit=1`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok()) return null;
+async function resolveFirstMonster(
+  request: import('@playwright/test').APIRequestContext,
+  accessToken: string,
+  worldId: string,
+): Promise<{ monster: { slug: string; source: string; name: string } | null; detail: string }> {
+  // `?world=` is required, not optional: every compendium route resolves a rules
+  // profile first and answers 400 SCOPE_PARAM_REQUIRED unless exactly one of
+  // ?campaign= or ?world= is given. This call passed neither, so it never reached
+  // the table — and the caller read that as an empty compendium and skipped telling
+  // the reader to run the importer, on a stack that imports it on every run.
+  const url = `${API}/api/v1/compendium/monsters?limit=1&world=${worldId}`;
+  const res = await request.get(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok()) {
+    return { monster: null, detail: `GET /compendium/monsters answered ${res.status()}: ${await res.text()}` };
+  }
   const data = await res.json() as { data?: Array<{ slug: string; source: string; name: string }> };
-  return data.data?.[0] ?? null;
+  const monster = data.data?.[0] ?? null;
+  return { monster, detail: monster ? '' : 'the compendium returned no monsters' };
 }
 
 test.describe('Character Codex Browser @ 375px', () => {
@@ -83,15 +94,16 @@ test.describe('Character Codex Browser @ 375px', () => {
         return;
       }
 
-      const characterId = await resolveCharacterId(request, accessToken);
-      if (!characterId) {
+      const character = await resolveCharacter(request, accessToken);
+      if (!character) {
         test.skip(true, 'No active character found for test user — create one first');
         return;
       }
+      const characterId = character.id;
 
-      const monster = await resolveFirstMonster(request, accessToken);
+      const { monster, detail } = await resolveFirstMonster(request, accessToken, character.worldId);
       if (!monster) {
-        test.skip(true, 'No monsters in compendium — run pnpm import:5etools first');
+        test.skip(true, `Could not read a monster from the compendium — ${detail}`);
         return;
       }
 
@@ -139,11 +151,12 @@ test.describe('Character Codex Browser @ 375px', () => {
         return;
       }
 
-      const characterId = await resolveCharacterId(request, accessToken);
-      if (!characterId) {
+      const character = await resolveCharacter(request, accessToken);
+      if (!character) {
         test.skip(true, 'No active character found');
         return;
       }
+      const characterId = character.id;
 
       // Check if tarrasque is in the player's known list first
       const knownRes = await request.get(`${API}/api/v1/characters/${characterId}/knowledge/monsters`, {

@@ -86,8 +86,13 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
       const gridVisible = await currencyGrid.isVisible({ timeout: 3_000 }).catch(() => false);
       if (gridVisible) {
         // Each coin cell: number then label. gp is index 3 (0-based).
-        const coinCells = currencyGrid.locator('div');
-        const gpCell = coinCells.nth(3);
+        // CurrencyStrip renders one .coin div per metal in COINS order — pp, gp,
+        // sp, cp — each holding a .v value span and a .k label span. gp is the
+        // second, so nth(3) was reading cp: the grant landed and this still saw
+        // zero, both before and after. Reading the value span keeps the label
+        // out of the number.
+        const coinCells = currencyGrid.locator('.coin .v');
+        const gpCell = coinCells.nth(1);
         const gpText = await gpCell.textContent().catch(() => '0');
         const parsed = parseInt((gpText ?? '').replace(/\D+/g, '') || '0', 10);
         if (!Number.isNaN(parsed)) goldBefore = parsed;
@@ -149,8 +154,8 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
     // ---- Step 9: Assert gp value is ≥ goldBefore + 50 ----
     const currencyGridAfter = page.locator('[aria-label="Monedas"]');
     await expect(currencyGridAfter).toBeVisible({ timeout: 8_000 });
-    const coinCellsAfter = currencyGridAfter.locator('div');
-    const gpCellAfter = coinCellsAfter.nth(3);
+    const coinCellsAfter = currencyGridAfter.locator('.coin .v');
+    const gpCellAfter = coinCellsAfter.nth(1);
     const gpTextAfter = await gpCellAfter.textContent().catch(() => '0');
     const goldAfter = parseInt((gpTextAfter ?? '').replace(/\D+/g, '') || '0', 10);
     expect(goldAfter, `gp after grant (${goldAfter}) should be ≥ goldBefore(${goldBefore}) + 50`).toBeGreaterThanOrEqual(goldBefore + 50);
@@ -200,11 +205,22 @@ test.describe('DM grants — gold + item tabs @ 375px (iPhone SE)', () => {
 
     // ---- Step 5: Wait for typeahead results (debounced 200ms) ----
     // Results are rendered in a <ul> inside the dialog once debounce fires.
+    //
+    // Wait for the search to actually settle before reading it. The panel shows
+    // "Buscando…" while the Server Action is in flight and "Sin resultados." only
+    // once it has answered with nothing, so waiting on the list alone could not tell
+    // a search still running from a search that found nothing — and under `next dev`
+    // the first call to that action is also compiling it, which three seconds does
+    // not cover. The old budget read a slow search as absent data and skipped
+    // blaming the seed.
     const resultsContainer = dialog.locator('ul');
-    const hasResults = await resultsContainer.isVisible({ timeout: 3_000 }).catch(() => false);
+    const emptyState = dialog.getByText('Sin resultados.', { exact: true });
+    await expect(resultsContainer.or(emptyState).first()).toBeVisible({ timeout: 30_000 });
+
+    const hasResults = await resultsContainer.isVisible().catch(() => false);
     test.skip(
       !hasResults,
-      'No item search results returned for "longsword" — compendium data may not be seeded.',
+      'The item search settled with no hit for "longsword" — the compendium has no such item for this world.',
     );
 
     // ---- Step 6: Click first result ----

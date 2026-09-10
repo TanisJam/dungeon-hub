@@ -165,7 +165,14 @@ test.describe('Encuentros — player read view @ 375px', () => {
     }
 
     // ── Step 6: Navigate to the encounter page ────────────────────────────
-    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'domcontentloaded' });
+    // `networkidle` rather than `domcontentloaded`: the control tapped below is a
+    // client island, and a server-rendered button is clickable before React attaches
+    // its handler, so the tap can land on markup with no onClick and do nothing.
+    // The usual guard — retrying the click — is wrong here because this action is
+    // not idempotent, so a second tap would spend a charge or pass another turn.
+    // Waiting for the chunks to settle is what bitacora-feed already does for the
+    // same reason.
+    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'networkidle' });
 
     // Check if player1 has campaign access — if not, the page returns 404 (FORBIDDEN → notFound())
     // KNOWN LIMITATION: player1 may not be in campaignMembers. Skip gracefully.
@@ -339,7 +346,14 @@ test.describe('REQ-WCPT-WEB-E2E-01: Player passes own turn @ 375px', () => {
     }
 
     // ── Step 6: Navigate to encounter page ────────────────────────────────
-    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'domcontentloaded' });
+    // `networkidle` rather than `domcontentloaded`: the control tapped below is a
+    // client island, and a server-rendered button is clickable before React attaches
+    // its handler, so the tap can land on markup with no onClick and do nothing.
+    // The usual guard — retrying the click — is wrong here because this action is
+    // not idempotent, so a second tap would spend a charge or pass another turn.
+    // Waiting for the chunks to settle is what bitacora-feed already does for the
+    // same reason.
+    await page.goto(`/encuentros/${encounterId}`, { waitUntil: 'networkidle' });
 
     const currentUrl = page.url();
     if (currentUrl.includes('/not-found') || currentUrl.includes('/404')) {
@@ -787,10 +801,16 @@ test.describe('REQ-WCA-E2E-01: player weapon attack vs NPC @ 375px', () => {
     await expect(atacarBtn).toBeEnabled();
 
     // ── Step 8: Open AttackSheet, pick weapon, pick NPC target ──────────
-    await atacarBtn.click();
-
+    // Retry the tap, not the assertion. The button is server-rendered and clickable
+    // before React attaches its handler, so a single tap can land on markup with no
+    // onClick and do nothing at all — and a loop that only re-reads the page would
+    // then spend its whole budget without ever tapping again. Re-tapping is safe
+    // here: opening the sheet is idempotent, unlike the one-shot actions above.
     const shortswordBtn = page.getByRole('button', { name: /shortsword/i });
-    await expect(shortswordBtn).toBeVisible({ timeout: 5_000 });
+    await expect(async () => {
+      await atacarBtn.click({ timeout: 5_000 }).catch(() => {});
+      await expect(shortswordBtn).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 25_000 });
     await shortswordBtn.click();
 
     // NPC name contains timestamp — use partial match

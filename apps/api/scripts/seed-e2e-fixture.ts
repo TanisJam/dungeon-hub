@@ -522,6 +522,23 @@ async function main(): Promise<void> {
     console.log(`  [item] granted  longsword → "${p1HeroName}"`);
   }
 
+  // player1 → P1 Second (a second ACTIVE character)
+  //
+  // active-character.auth.spec.ts asks the roster for a card offering "Seleccionar
+  // como personaje activo". The roster lists active characters only, and the card
+  // for the one already selected offers nothing to select, so with a single active
+  // character there is never a button and the spec skipped itself — telling the
+  // reader to run this very seed, which had given player1 exactly one. Two of them
+  // means one is always selectable whichever is current.
+  const p1SecondName = 'P1 Second';
+  const p1SecondExisting = await findActiveCharacterByName(worldId, player1.id, p1SecondName);
+  if (p1SecondExisting) {
+    console.log(`  [char] exists   "${p1SecondName}" (id: ${p1SecondExisting})`);
+  } else {
+    const p1SecondId = await buildFighterCharacter(worldId, player1.jwt, p1SecondName, 'active', dm.jwt);
+    console.log(`  [char] created  "${p1SecondName}" (active/fighter, id: ${p1SecondId})`);
+  }
+
   // player2 → P2 Mage (active Wizard with spells)
   const p2MageName = 'P2 Mage';
   let p2MageId = await findActiveCharacterByName(worldId, player2.id, p2MageName);

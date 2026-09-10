@@ -81,10 +81,17 @@ test('Biblioteca tab navigates to /compendium and renders content', async ({ pag
   // 'Códex' when the GM's 6th tab (Mesa) forces TabBar into compact labels.
   const bibliotecaTab = nav.getByText(/^(Biblioteca|Códex)$/);
   await expect(bibliotecaTab).toBeVisible({ timeout: 5_000 });
-  await bibliotecaTab.click();
 
-  // Biblioteca tab points directly at /compendium (no /codex dispatcher)
-  await expect(page).toHaveURL(/\/compendium/, { timeout: 10_000 });
+  // Retry the tap until the URL moves. The tab is a Next Link and carries a real
+  // href, so it ought to navigate with or without JS — but inside the hydration
+  // window React has already claimed the click while the router cannot route yet,
+  // and the tap is lost, which is what left this landing back on /inicio.
+  //
+  // Biblioteca tab points directly at /compendium (no /codex dispatcher).
+  await expect(async () => {
+    await bibliotecaTab.click({ timeout: 5_000 }).catch(() => {});
+    await expect(page).toHaveURL(/\/compendium/, { timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   // Page renders without 404 — title visible
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });

@@ -121,11 +121,20 @@ test.describe('DM session lifecycle @ 375px', () => {
 
     // ── 5. DM starts the session ──────────────────────────────────────────────
     // "Iniciar" button lives in the DmControls sticky bar.
-    await expect(page.getByRole('button', { name: 'Iniciar' })).toBeVisible({ timeout: 5_000 });
-    await page.getByRole('button', { name: 'Iniciar' }).click();
-
-    // After starting, status pill should update to "En curso".
-    await expect(page.getByText('En curso')).toBeVisible({ timeout: 10_000 });
+    //
+    // Retry the tap, the same way step 2 above already does for the sessions FAB:
+    // DmControls is a client island, and its button is server-rendered and
+    // clickable before React attaches the handler. The tap is guarded on the
+    // button still being there because it unmounts once the session starts, and a
+    // blind re-tap would then wait on an element that no longer exists.
+    const iniciarBtn = page.getByRole('button', { name: 'Iniciar' });
+    await expect(iniciarBtn).toBeVisible({ timeout: 5_000 });
+    await expect(async () => {
+      if (await iniciarBtn.isVisible().catch(() => false)) {
+        await iniciarBtn.click({ timeout: 5_000 }).catch(() => {});
+      }
+      await expect(page.getByText('En curso')).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 25_000 });
     // "Iniciar" button should be gone; "Pausar" and "Completar sesión" visible.
     await expect(page.getByRole('button', { name: 'Pausar' })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Completar sesión' })).toBeVisible({

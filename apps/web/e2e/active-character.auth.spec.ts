@@ -67,7 +67,12 @@ test('active-character: select character in roster → cookie set → /inicio re
     await page.waitForTimeout(500);
 
     // ── Step 4: assert dh:character cookie is set ─────────────────────────────
-    const allCookies = await context.cookies('http://localhost:3001');
+    // Ask for the cookies of the page actually under test, not of a hardcoded host.
+    // Cookies are keyed by domain and scripts/e2e-stack.sh exports WEB_BASE_URL as
+    // http://127.0.0.1:3001, which is a different domain from localhost — so this
+    // read came back empty under the sanctioned runner no matter what the server
+    // had set. The spec skipped before reaching it, which is why that never showed.
+    const allCookies = await context.cookies(page.url());
     const charCookie = allCookies.find((c) => c.name === 'dh:character');
     expect(charCookie, 'dh:character cookie should be set after selecting character').toBeTruthy();
     expect(charCookie?.value).toBeTruthy();
@@ -118,7 +123,12 @@ test('active-character: dh:world cookie also set on character selection', async 
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(500);
 
-    const allCookies = await context.cookies('http://localhost:3001');
+    // Ask for the cookies of the page actually under test, not of a hardcoded host.
+    // Cookies are keyed by domain and scripts/e2e-stack.sh exports WEB_BASE_URL as
+    // http://127.0.0.1:3001, which is a different domain from localhost — so this
+    // read came back empty under the sanctioned runner no matter what the server
+    // had set. The spec skipped before reaching it, which is why that never showed.
+    const allCookies = await context.cookies(page.url());
     const worldCookie = allCookies.find((c) => c.name === 'dh:world');
     expect(worldCookie, 'dh:world cookie should also be set (double-write REQ-AC-ACT-01)').toBeTruthy();
     expect(worldCookie?.value).toBeTruthy();

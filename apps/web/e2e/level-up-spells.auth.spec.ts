@@ -75,7 +75,12 @@ test.describe('Level-up spells step condition @ 375px', () => {
     await classBtn.click();
 
     // ---- Step 7: HP ----
-    await expect(page.getByText(/promedio/i)).toBeVisible({ timeout: 5_000 });
+    // Scoped to the button. The HP step also prints a hint that begins "PHB p.15 —
+    // promedio garantiza el valor fijo", so an unscoped /promedio/i matched the hint
+    // as well as the control and raised a strict mode violation the moment the step
+    // rendered. These specs were skipping before the fixture existed, which is what
+    // kept it hidden.
+    await expect(page.getByRole('button', { name: /^promedio/i })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // ---- Step 8: Subclass step (Bard unlock=3; appears at L3 if no subclass) ----
@@ -226,7 +231,12 @@ test.describe('Level-up spells step condition @ 375px', () => {
     await classBtn.click();
 
     // ---- Step 5: HP ----
-    await expect(page.getByText(/promedio/i)).toBeVisible({ timeout: 5_000 });
+    // Scoped to the button. The HP step also prints a hint that begins "PHB p.15 —
+    // promedio garantiza el valor fijo", so an unscoped /promedio/i matched the hint
+    // as well as the control and raised a strict mode violation the moment the step
+    // rendered. These specs were skipping before the fixture existed, which is what
+    // kept it hidden.
+    await expect(page.getByRole('button', { name: /^promedio/i })).toBeVisible({ timeout: 5_000 });
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // ---- Step 6: Subclass (Cleric unlock=1, so a Cleric already has subclass normally) ----
