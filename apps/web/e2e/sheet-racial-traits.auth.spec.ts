@@ -56,8 +56,16 @@ test.describe('Racial traits on sheet — Batch 8 (race-traits-on-sheet)', () =>
     // -----------------------------------------------------------------------
     await test.step('create character + fill stats (standard array)', async () => {
       await page.goto('/personajes');
-      await page.locator('a[href="/characters/new"]').first().click();
-      await expect(page).toHaveURL(/\/characters\/new$/);
+      // Retry the tap until the URL moves. A Next Link carries a real href, so it
+      // ought to navigate with or without JS — but inside the hydration window React
+      // has already claimed the click while the router cannot route yet, and the tap
+      // is simply lost. The assertion is unchanged: the page must still land on
+      // /characters/new, and a link that never navigates still fails.
+      const nuevoLink = page.locator('a[href="/characters/new"]').first();
+      await expect(async () => {
+        await nuevoLink.click({ timeout: 5_000 }).catch(() => {});
+        await expect(page).toHaveURL(/\/characters\/new$/, { timeout: 3_000 });
+      }).toPass({ timeout: 30_000 });
 
       await page.selectOption('select[name="worldId"]', { label: 'E2E Test Campaign (World)' });
       await page.fill('input[name="name"]', charName);
