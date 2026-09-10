@@ -42,7 +42,7 @@ export function HPEditorIsland({ currentHp, isDmHere }: Props) {
           type="number"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          className="rounded-md border border-line bg-surface px-3 py-2 text-ink"
+          className="min-h-[44px] rounded-md border border-line bg-surface px-3 py-2 text-ink"
         />
       </div>
 
@@ -65,7 +65,7 @@ export function HPEditorIsland({ currentHp, isDmHere }: Props) {
             type="number"
             value={max}
             onChange={(e) => setMax(e.target.value)}
-            className="rounded-md border border-line bg-surface px-3 py-2 text-ink"
+            className="min-h-[44px] rounded-md border border-line bg-surface px-3 py-2 text-ink"
           />
         ) : (
           <>
@@ -75,7 +75,7 @@ export function HPEditorIsland({ currentHp, isDmHere }: Props) {
               value={max}
               readOnly
               aria-readonly="true"
-              className="rounded-md border border-line bg-surface/50 px-3 py-2 text-ink-mute cursor-not-allowed"
+              className="min-h-[44px] rounded-md border border-line bg-surface/50 px-3 py-2 text-ink-mute cursor-not-allowed"
             />
             <p className="text-xs text-ink-mute">Solo el DM puede ajustar el máximo</p>
           </>
@@ -91,7 +91,7 @@ export function HPEditorIsland({ currentHp, isDmHere }: Props) {
           type="number"
           value={temp}
           onChange={(e) => setTemp(e.target.value)}
-          className="rounded-md border border-line bg-surface px-3 py-2 text-ink"
+          className="min-h-[44px] rounded-md border border-line bg-surface px-3 py-2 text-ink"
         />
       </div>
 
@@ -100,14 +100,14 @@ export function HPEditorIsland({ currentHp, isDmHere }: Props) {
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex-1 rounded-md border border-line px-4 py-2 text-sm text-ink-soft"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md border border-line px-4 py-2 text-sm text-ink-soft"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </button>

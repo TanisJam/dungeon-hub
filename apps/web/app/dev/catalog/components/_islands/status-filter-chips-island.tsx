@@ -48,17 +48,23 @@ export function StatusFilterChipsIsland({
       {CHIPS.map(({ key, label, showCount }) => {
         const on = key === active;
         return (
+          // Same split as the real StatusFilterChips: the button is the tap
+          // target, the span is the pill.
           <button
             key={key}
             type="button"
             onClick={() => setActive(key)}
-            className={`shrink-0 rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
-              on
-                ? 'personajes-chip-on border-accent-deep'
-                : 'border-line bg-surface text-ink-mute hover:border-ink-mute'
-            }`}
+            className="shrink-0 inline-flex min-h-[44px] items-center"
           >
-            {showCount ? `${label} · ${counts[key]}` : label}
+            <span
+              className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
+                on
+                  ? 'personajes-chip-on border-accent-deep'
+                  : 'border-line bg-surface text-ink-mute hover:border-ink-mute'
+              }`}
+            >
+              {showCount ? `${label} · ${counts[key]}` : label}
+            </span>
           </button>
         );
       })}

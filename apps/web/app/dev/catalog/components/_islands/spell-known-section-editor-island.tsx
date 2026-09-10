@@ -39,14 +39,18 @@ export function SpellKnownSectionEditorIsland({
 
   return (
     <>
+      {/* Transparent 44px tap target around the 32px icon square — see the
+          real SpellKnownSectionEditor for why. */}
       <button
         type="button"
         aria-label={`Asignar hechizos conocidos – ${classSlug}`}
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10"
+        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0"
         title="DM: asignar hechizos conocidos"
       >
-        <Icon name="wand" size={14} />
+        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10">
+          <Icon name="wand" size={14} />
+        </span>
       </button>
 
       <V3Sheet open={open} onClose={() => setOpen(false)} title="Asignar hechizos conocidos (DM)">

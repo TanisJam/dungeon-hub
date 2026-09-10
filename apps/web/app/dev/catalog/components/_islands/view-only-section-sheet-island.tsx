@@ -32,7 +32,7 @@ export function ViewOnlySectionSheetIsland({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start rounded-md border border-line px-3 py-1.5 text-xs text-ink-soft hover:border-accent hover:text-accent transition-colors"
+        className="inline-flex min-h-[44px] items-center self-start rounded-md border border-line px-3 py-1.5 text-xs text-ink-soft hover:border-accent hover:text-accent transition-colors"
       >
         Abrir "{title}"
       </button>

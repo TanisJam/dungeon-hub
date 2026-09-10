@@ -46,13 +46,17 @@ export function SpellPrepSectionEditorIsland({
 
   return (
     <>
+      {/* Transparent 44px tap target around the 32px icon square — see the
+          real SpellPrepSectionEditor for why. */}
       <button
         type="button"
         aria-label={`Preparar hechizos – ${classSlug}`}
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
+        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0"
       >
-        <Icon name="edit" size={14} />
+        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent">
+          <Icon name="edit" size={14} />
+        </span>
       </button>
 
       <V3Sheet open={open} onClose={() => setOpen(false)} title="Preparar hechizos">
