@@ -127,7 +127,7 @@ describe('TopBar — subtitle truncate (REQ-UXP1-TOPBAR-01)', () => {
 });
 
 describe('TopBar — world switcher slot (REQ-WIS-03)', () => {
-  it('T8: worldSwitcher prop present → renders switcher node in left slot (no CrowMark)', () => {
+  it('T8: worldSwitcher prop present → renders the switcher node, CrowMark kept as mobile-only fallback (F5)', () => {
     render(
       <TopBar
         title="Inicio"
@@ -135,8 +135,11 @@ describe('TopBar — world switcher slot (REQ-WIS-03)', () => {
       />,
     );
     expect(screen.getByTestId('world-switcher-widget')).toBeTruthy();
-    // CrowMark must NOT appear when worldSwitcher is provided
-    expect(screen.queryByTestId('crow-mark')).toBeNull();
+    // F5: the world moves off the left slot on mobile (its own full-width row
+    // under the title instead), so the left slot falls back to CrowMark there
+    // — hidden at sm:+, where the switcher's own pill takes that spot.
+    const crowMark = screen.getByTestId('crow-mark');
+    expect(crowMark.parentElement?.className).toContain('sm:hidden');
   });
 
   it('T9: worldSwitcher absent + no backHref → CrowMark renders (graceful fallback, REQ-WIS-03)', () => {

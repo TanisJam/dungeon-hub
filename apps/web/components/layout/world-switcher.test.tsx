@@ -74,7 +74,7 @@ describe('WorldSwitcher', () => {
     );
 
     // Open the sheet
-    const trigger = screen.getByRole('button', { name: /abrir selector/i });
+    const trigger = screen.getAllByRole('button', { name: /abrir selector/i })[0];
     await act(async () => { fireEvent.click(trigger); });
 
     // Both world names should appear (at least once each — trigger also has active world name)
@@ -87,7 +87,7 @@ describe('WorldSwitcher', () => {
       <WorldSwitcher worlds={WORLDS} activeWorldId="world-1" callerRole="gm" />,
     );
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /abrir selector/i })); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /abrir selector/i })[0]); });
 
     // The world rows in the sheet are buttons with data-active attribute
     // The active row has aria-current="true"
@@ -102,7 +102,7 @@ describe('WorldSwitcher', () => {
       <WorldSwitcher worlds={WORLDS} activeWorldId="world-1" callerRole="gm" />,
     );
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /abrir selector/i })); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /abrir selector/i })[0]); });
 
     // Click the inactive world — it's only in the sheet (not in the trigger)
     const sheet = screen.getByTestId('v3-sheet');
@@ -120,7 +120,7 @@ describe('WorldSwitcher', () => {
       <WorldSwitcher worlds={WORLDS} activeWorldId="world-1" callerRole="gm" />,
     );
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /abrir selector/i })); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /abrir selector/i })[0]); });
 
     // Click the already-active world row (aria-current="true" in the sheet)
     const sheet = screen.getByTestId('v3-sheet');
@@ -140,7 +140,7 @@ describe('WorldSwitcher', () => {
 
     // Trigger text falls back to "Mundo" when no active world
     // The trigger button should still exist
-    const trigger = screen.getByRole('button', { name: /abrir selector/i });
+    const trigger = screen.getAllByRole('button', { name: /abrir selector/i })[0];
     await act(async () => { fireEvent.click(trigger); });
 
     // Empty state text
@@ -155,7 +155,7 @@ describe('WorldSwitcher', () => {
       <WorldSwitcher worlds={WORLDS} activeWorldId="world-1" callerRole="gm" />,
     );
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /abrir selector/i })); });
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: /abrir selector/i })[0]); });
 
     // Both world rows should have min-h-[44px] class
     const worldButtons = screen.getAllByRole('button').filter((btn) =>
