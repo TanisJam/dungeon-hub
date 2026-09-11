@@ -1,4 +1,32 @@
 import { test, expect } from '@playwright/test';
+import { FIXTURE_PASSWORD } from './helpers/seed-journey-character';
+
+const FIXTURE_PLAYER1_EMAIL = 'player1@dh.test';
+
+/**
+ * Sign the page's context in as the seeded player1 fixture.
+ *
+ * The two gating tests below used to do this instead:
+ *
+ *   await context.storageState({ path: '/home/<a developer>/.../player1.json' });
+ *
+ * which is wrong twice over. storageState(path) SAVES the context's current
+ * state to a file — it does not load one — so those tests ran as the DM they
+ * were already signed in as, and asserted a DM affordance was absent from a DM
+ * session. And the path was absolute to one machine, so the first CI run of the
+ * e2e suite failed them with ENOENT before they could assert anything at all.
+ *
+ * page.request shares the page's cookie jar, so the @supabase/ssr cookies
+ * /api/dev/login sets are visible to the page.goto() that follows. Same pattern
+ * as encuentros-player.auth.spec.ts and fixture.setup.ts.
+ */
+async function signInAsPlayer1(page: import('@playwright/test').Page): Promise<boolean> {
+  await page.goto('/');
+  const res = await page.request.post('/api/dev/login', {
+    data: { email: FIXTURE_PLAYER1_EMAIL, password: FIXTURE_PASSWORD },
+  });
+  return res.status() === 200;
+}
 
 /**
  * mapa — E2E spec for the Mapa tab (Ubicaciones/Hexes + lazy POI accordion + Leaflet markers).
@@ -158,20 +186,21 @@ test('DM expands a hex and POI accordion loads lazily', async ({ page }) => {
   await expect(poiToggle).toBeVisible({ timeout: 5_000 });
 });
 
-test('Player view: no FAB at /mapa (sanitized — REQ-GATE-01 absence)', async ({ page, context }) => {
-  // Use player auth state
-  await context.storageState({ path: '/home/tanisjam/projects/personal/dungeon_hub/apps/web/e2e/.auth/player1.json' });
+test('Player view: no FAB at /mapa (sanitized — REQ-GATE-01 absence)', async ({ page }) => {
+  const signedIn = await signInAsPlayer1(page);
+  test.skip(!signedIn, 'Could not sign in as player1 — run pnpm --filter @dungeon-hub/api db:seed:e2e');
+
   await page.goto('/mapa', { waitUntil: 'domcontentloaded' });
 
   // Page renders without error
   const title = page.locator('h1, h2').first();
   await expect(title).toBeVisible({ timeout: 10_000 });
 
-  // Player must NOT see FAB — REQ-GATE-01 absence
-  const fab = page.getByRole('button', { name: /crear/i });
-  await expect(fab).not.toBeVisible({ timeout: 3_000 }).catch(() => {
-    // FAB may not be in DOM at all — that's the correct behavior
-  });
+  // Player must NOT see the FAB — REQ-GATE-01 absence.
+  // toHaveCount(0) rather than `.not.toBeVisible().catch(() => {})`: that catch
+  // swallowed the assertion, so the check could not fail even when the FAB was
+  // right there. A gate that cannot report a breach is not a gate.
+  await expect(page.locator('[data-testid="poi-create-fab"]')).toHaveCount(0, { timeout: 5_000 });
 });
 
 test('Mapa tab is active in TabBar when on /mapa', async ({ page }) => {
@@ -531,9 +560,10 @@ test('T4: DM popup shows Editar/Mover buttons; Mover opens move-mode banner; pla
  *
  * REQ-PLACE-TAP-01: player view must NOT show "Colocar en mapa" button.
  */
-test('T5: Player gating — no "Colocar en mapa" button in player view', async ({ page, context }) => {
-  // Switch to player auth
-  await context.storageState({ path: '/home/tanisjam/projects/personal/dungeon_hub/apps/web/e2e/.auth/player1.json' });
+test('T5: Player gating — no "Colocar en mapa" button in player view', async ({ page }) => {
+  const signedIn = await signInAsPlayer1(page);
+  test.skip(!signedIn, 'Could not sign in as player1 — run pnpm --filter @dungeon-hub/api db:seed:e2e');
+
   await page.goto('/mapa?view=lista', { waitUntil: 'networkidle' });
 
   // Expand any hex accordion that's visible (if any)
@@ -548,11 +578,10 @@ test('T5: Player gating — no "Colocar en mapa" button in player view', async (
     }
   }
 
-  // Player must not see any "Colocar en mapa" button
+  // Player must not see any "Colocar en mapa" button. toHaveCount(0), not
+  // `.not.toBeVisible().catch(() => {})` — that catch swallowed the assertion.
   const colocarBtn = page.getByRole('button', { name: /colocar.*en el mapa/i });
-  await expect(colocarBtn).not.toBeVisible({ timeout: 3_000 }).catch(() => {
-    // Button not in DOM at all — correct behavior
-  });
+  await expect(colocarBtn).toHaveCount(0, { timeout: 5_000 });
 });
 
 // ---------------------------------------------------------------------------
@@ -1025,9 +1054,21 @@ test('B2-CREATE-5: Full create flow — FAB → tap → sheet → submit (REQ-PW
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   await nameInput.fill(uniquePoiName);
 
-  // Submit
+  // Submit.
+  //
+  // Wait for the button to be ENABLED, not merely visible. PoiForm renders it as
+  // `disabled={submitting || !formName.trim()}`, and formName is React state fed
+  // by onChange — so before hydration the fill() above writes to the DOM while
+  // the state stays empty and the button stays disabled. The click then lands on
+  // a disabled button and does nothing; the sheet never closes and the test times
+  // out 10s later on a dialog that was never submitted.
+  //
+  // This is not a sleep dressed up as an assertion: enabled is the precondition
+  // the product itself defines for this button, and it can only become true once
+  // React has processed the typed name. It failed every attempt in CI (slower
+  // machine, race lost consistently) while being merely flaky locally.
   const submitBtn = page.getByRole('button', { name: /crear poi/i });
-  await expect(submitBtn).toBeVisible({ timeout: 5_000 });
+  await expect(submitBtn).toBeEnabled({ timeout: 10_000 });
   await submitBtn.click();
 
   // After submit: sheet should close and no crash — either FAB reappears or page reloads

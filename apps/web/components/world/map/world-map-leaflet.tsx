@@ -131,6 +131,21 @@ const clamp = (v: number, lo: number, hi: number): number =>
   Math.min(Math.max(v, lo), hi);
 
 /**
+ * A tapped or dragged point becomes a WHOLE map pixel.
+ *
+ * The rounding is not cosmetic. latLngToWorld returns a float, and PoiForm's
+ * coord inputs are `type="number" step={1}` — so an unrounded value like
+ * 1293.227814060699 fails the browser's own constraint validation. The form
+ * then never submits: no request, no error state, no visible explanation. The
+ * DM taps "Crear POI" and nothing happens, because the only feedback is a
+ * native tooltip on a field that is below the fold on a phone.
+ *
+ * Found by the e2e job's first CI run (mapa.auth.spec.ts B2-CREATE-5): the
+ * trace showed the click landing and zero requests leaving the page.
+ */
+const toMapCoord = (value: number, max: number): number => clamp(Math.round(value), 0, max);
+
+/**
  * PlaceModeClickCatcher — useMapEvents child mounted ONLY during place-mode.
  *
  * REQ-PLACE-TAP-04: while active, a tap on the map commits worldX/worldY for the
@@ -143,7 +158,7 @@ function PlaceModeClickCatcher({ onPlace }: { onPlace: (x: number, y: number) =>
   useMapEvents({
     click(e) {
       const { worldX, worldY } = latLngToWorld(e.latlng.lat, e.latlng.lng);
-      onPlace(clamp(worldX, 0, IMAGE_W), clamp(worldY, 0, IMAGE_H));
+      onPlace(toMapCoord(worldX, IMAGE_W), toMapCoord(worldY, IMAGE_H));
     },
   });
   return null;
@@ -165,7 +180,7 @@ function CreateModeClickCatcher({ onCreate }: { onCreate: (x: number, y: number)
   useMapEvents({
     click(e) {
       const { worldX, worldY } = latLngToWorld(e.latlng.lat, e.latlng.lng);
-      onCreate(clamp(worldX, 0, IMAGE_W), clamp(worldY, 0, IMAGE_H));
+      onCreate(toMapCoord(worldX, IMAGE_W), toMapCoord(worldY, IMAGE_H));
     },
   });
   return null;
@@ -329,7 +344,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
                   dragend(e) {
                     const latlng = (e.target as L.Marker).getLatLng();
                     const { worldX, worldY } = latLngToWorld(latlng.lat, latlng.lng);
-                    onMoveDrag(clamp(worldX, 0, IMAGE_W), clamp(worldY, 0, IMAGE_H));
+                    onMoveDrag(toMapCoord(worldX, IMAGE_W), toMapCoord(worldY, IMAGE_H));
                   },
                 } : undefined}
               >

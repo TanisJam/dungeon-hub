@@ -141,10 +141,14 @@ test.describe('Bitácora Pages @ 375px', () => {
         { waitUntil: 'networkidle', timeout: 60_000 },
       );
 
-      // Empty state message is rendered
-      await expect(
-        page.getByText('Aún no escribiste ninguna página.'),
-      ).toBeVisible({ timeout: 10_000 });
+      // The empty state renders. Asserted through V3Empty's data-v3-empty hook,
+      // not its copy: this used to match the literal "Aún no escribiste ninguna
+      // página." and ui-craft F9 rewrote that empty state through V3Empty without
+      // the full stop — the same one-character break that killed recent-grants and
+      // approval-transition-mobile. This one stayed hidden longer because the test
+      // skips itself unless the character has zero pages, so only a clean database
+      // runs it, and until now nothing ran the suite against one.
+      await expect(page.locator('[data-v3-empty]').first()).toBeVisible({ timeout: 10_000 });
 
       // "Nueva página" button is still visible (REQ-BP-WEB-03: create affordance)
       await expect(page.getByText('Nueva página')).toBeVisible({ timeout: 10_000 });
