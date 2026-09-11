@@ -62,7 +62,7 @@ export function WorldSwitcherTrigger({
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full min-h-[44px] items-center gap-1.5 px-0.5 text-left text-ink-soft transition-colors duration-150 hover:text-accent"
+        className="flex w-full min-h-[44px] items-center px-0.5 text-left text-ink-soft transition-colors duration-150 hover:text-accent"
         aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
       >
         {/*
@@ -72,9 +72,11 @@ export function WorldSwitcherTrigger({
          * the sheet, where it distinguishes one world from another.
          *
          * Smaller and lighter than the title on purpose: the title names the
-         * screen, the world is the context it sits in.
+         * screen, the world is the context it sits in. Sans rather than the
+         * display serif — narrower at the same size, and the serif is the
+         * title's voice.
          */}
-        <span className="min-w-0 flex-1 truncate font-display text-[12px] font-medium leading-tight">
+        <span className="min-w-0 flex-1 truncate font-sans text-[12px] font-medium leading-tight">
           {worldName}
         </span>
       </button>
