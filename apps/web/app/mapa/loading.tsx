@@ -8,11 +8,14 @@ import { Skeleton } from '@/components/ui';
  * components/world/map/world-map-leaflet.tsx). A list-shaped skeleton here would
  * misrepresent the page. Positioning instead mirrors the fixed box
  * MapClientWrapper's own ssr:false dynamic import already renders while Leaflet's
- * JS is loading client-side — `fixed inset-x-0 top-[120px] … bg-paper`, bottom
- * offset by the tab bar + safe area
+ * JS is loading client-side — `fixed inset-x-0 top-[var(--topbar-h)] … bg-paper`,
+ * bottom offset by the tab bar + safe area
  * (components/world/map/map-client-wrapper.tsx:32-46). Reusing that exact
  * rectangle means this RSC-boundary loading state and that later client-side one
  * occupy the same box, so there is no jump between them, only a filled-in pulse.
+ * `--topbar-h` (fix/topbar-height-token) must stay in lockstep with that other
+ * site, and with world-map-leaflet.tsx's own top offset, or the three boxes
+ * drift apart and the skeleton/map swap jumps.
  *
  * AppShell gets only title + subtitle: worldSwitcher/roleDefault/callerRole all
  * need server data the page resolves via getActiveWorld (app/mapa/page.tsx:53-66)
@@ -25,7 +28,7 @@ export default function MapaLoading() {
         role="status"
         aria-busy="true"
         aria-label="Cargando Mapa"
-        className="fixed inset-x-0 top-[120px] z-10 bg-paper"
+        className="fixed inset-x-0 top-[var(--topbar-h)] z-10 bg-paper"
         style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       >
         <Skeleton className="h-full w-full" />
