@@ -53,6 +53,8 @@ export const COLORS: ColorToken[] = [
   // Alpha-derived danger tokens (compendium monster rows / form error background)
   { name: 'danger-soft',        hex: 'rgba(204, 68, 68, 0.12)', displayOnly: true },
   { name: 'danger-soft-border', hex: 'rgba(204, 68, 68, 0.25)', displayOnly: true },
+  { name: 'arcane',             hex: '#6F86C9', note: 'spell/magic indigo — distinct from the cyan primary' },
+  { name: 'arcane-deep',        hex: '#4C63A6' },
   { name: 'on-accent',    hex: '#1A1208', note: 'dark text on accent/copper backgrounds' },
   { name: 'on-secondary', hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
   { name: 'on-danger',    hex: '#FFFFFF', note: 'light text on the solid danger fill — 4.69:1' },
