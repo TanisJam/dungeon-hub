@@ -2,8 +2,6 @@ import type { ReactNode } from 'react';
 import type { Role } from '@/lib/use-role';
 import type { CallerRole } from '@/lib/active-world';
 import { TopBar } from './topbar';
-import { TabBar } from './tabbar';
-import { DesktopSidebar } from './desktop-sidebar';
 
 type AppShellProps = {
   title: string;
@@ -14,8 +12,6 @@ type AppShellProps = {
   constructorHref?: string;
   /** Show the role switcher pill in the topbar. Defaults false (ADR-C2, default-deny). */
   canBeDM?: boolean;
-  /** Hide the morphing tabbar (e.g. wizard / full-bleed flows). Defaults true. */
-  showTabBar?: boolean;
   /**
    * When set: TopBar shows a back arrow linking to this path.
    * CrowMark is hidden. RoleSwitcher is forwarded as-is (canBeDM unchanged).
@@ -46,9 +42,18 @@ type AppShellProps = {
 };
 
 /**
- * AppShell — authenticated page shell (v3, obsidian aesthetic).
- * TopBar (sticky) + scrollable main + morphing TabBar (role-aware).
- * Server component; TabBar / RoleSwitcher are client islands.
+ * AppShell — authenticated page content shell (v3, obsidian aesthetic).
+ * TopBar (sticky) + scrollable main. Pure server component.
+ *
+ * The persistent nav chrome (DesktopSidebar + TabBar + the md:grid wrapper
+ * around this component) moved OUT of AppShell and into AppChrome, mounted
+ * once in the root layout (audit F1, work unit 1) — see
+ * apps/web/components/layout/app-chrome.tsx and apps/web/lib/route-chrome.ts.
+ * Previously AppShell rendered inside every page.tsx, so DesktopSidebar and
+ * TabBar were destroyed and recreated on every navigation even though they
+ * render identically across pages. AppShell still takes `callerRole`: it's
+ * needed here for the canBeDM derivation below (RoleSwitcher gating), even
+ * though it no longer forwards it to any nav component.
  *
  * World props (worldId, worldSwitcher, callerRole) are OPTIONAL and additive.
  * Pages that pass nothing render exactly as before (REQ-WIS-03 graceful fallback).
@@ -58,7 +63,6 @@ export function AppShell({
   subtitle,
   rightAction,
   canBeDM: canBeDMProp = false,
-  showTabBar = true,
   backHref,
   roleDefault = 'player',
   worldSwitcher,
@@ -71,24 +75,18 @@ export function AppShell({
 
   return (
     <>
-      <div className="md:grid md:grid-cols-[var(--sidebar-w)_1fr]">
-        <DesktopSidebar callerRole={callerRole} />
-        <div className="md:min-w-0">
-          <TopBar
-            title={title}
-            subtitle={subtitle}
-            right={rightAction}
-            canBeDM={canBeDM}
-            backHref={backHref}
-            roleDefault={roleDefault}
-            worldSwitcher={worldSwitcher}
-          />
-          <main className="mx-auto min-h-screen max-w-sm px-4 py-4 pb-28 md:max-w-3xl md:pb-8">
-            {children}
-          </main>
-        </div>
-      </div>
-      {showTabBar && <TabBar callerRole={callerRole} />}
+      <TopBar
+        title={title}
+        subtitle={subtitle}
+        right={rightAction}
+        canBeDM={canBeDM}
+        backHref={backHref}
+        roleDefault={roleDefault}
+        worldSwitcher={worldSwitcher}
+      />
+      <main className="mx-auto min-h-screen max-w-sm px-4 py-4 pb-28 md:max-w-3xl md:pb-8">
+        {children}
+      </main>
     </>
   );
 }
