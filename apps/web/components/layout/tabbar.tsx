@@ -81,14 +81,24 @@ export function TabBar({ callerRole }: TabBarProps = {}) {
             key={tab.key}
             href={tab.href}
             aria-current={isActive ? 'page' : undefined}
-            className={`relative flex flex-col items-center gap-1 pt-2 pb-1 px-0.5 transition-colors duration-300 ease-out ${
+            className={`relative flex flex-col items-center gap-1 pt-2 pb-1 px-1 transition-colors duration-300 ease-out ${
               isActive
                 ? `${activeColor} before:content-[''] before:absolute before:top-0 before:left-[30%] before:right-[30%] before:h-[2px] before:rounded-b-full ${underline}`
                 : 'text-ink-mute hover:text-ink-soft'
             }`}
           >
             <Icon name={tab.icon} size={20} strokeWidth={isActive ? 2 : 1.75} />
-            <span className="font-sans text-[9px] font-bold uppercase tracking-[0.06em]">
+            {/*
+             * F6: dropped `uppercase` — mixed case is ~15% narrower at the same
+             * size, which is what closed the Mercado/Bitácora 3.5px collision at
+             * 6 columns. Also dropped `tracking-[0.06em]`: that letter-spacing
+             * was earning its keep on uppercase glyphs; on mixed case at 9px it
+             * only adds width back without a legibility payoff, so it's gone.
+             * `truncate` + the link's `px-1` are the "plus safety" part of the
+             * decision: a column's label can now never exceed its column,
+             * regardless of locale/label length, by construction.
+             */}
+            <span className="block max-w-full truncate font-sans text-[9px] font-bold">
               {isCompact ? (tab.shortLabel ?? tab.label) : tab.label}
             </span>
           </Link>
