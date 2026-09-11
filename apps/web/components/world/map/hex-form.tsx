@@ -29,8 +29,7 @@ const HEX_STATUSES: { value: HexStatus; label: string }[] = [
   { value: 'cleared', label: 'Despejada' },
 ];
 
-const selectClass =
-  'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20';
+const selectClass = 'select-field';
 
 interface HexFormProps {
   mode: 'create' | 'edit';
