@@ -14,6 +14,20 @@ interface StatCellProps {
   selected?: boolean;
   onClick?: () => void;
   footer?: ReactNode;
+  /**
+   * Corner affordance (the HP edit pencil). The cell owns the positioning so a
+   * caller cannot place it against the page instead of the cell.
+   *
+   * It is drawn over the label's row, so a cell with an action needs a label
+   * short enough to clear a 24px corner mark: at 375px the cell is 109px wide
+   * and offers 85px of content. Reserving the width instead was tried and
+   * rejected — it pushes short labels off-centre on desktop, where the cell is
+   * four times wider and the clearance is free. See audit F7.
+   *
+   * Not for use with `onClick`: an interactive cell is itself a button, and a
+   * button inside a button is invalid.
+   */
+  action?: ReactNode;
   className?: string;
   ariaLabel?: string;
 }
@@ -35,6 +49,7 @@ export function StatCell({
   selected = false,
   onClick,
   footer,
+  action,
   className,
   ariaLabel,
 }: StatCellProps) {
@@ -126,8 +141,15 @@ export function StatCell({
     footer
   ) : null;
 
+  const actionEl = action !== undefined && action !== null ? (
+    <div data-stat-action className="absolute top-1 right-1">
+      {action}
+    </div>
+  ) : null;
+
   const content = (
     <>
+      {actionEl}
       {labelEl}
       {valueEl}
       {subEl}

@@ -41,13 +41,12 @@ export function HpEditorSlot({
 
   if (!showEditor) return null;
 
+  // StatCell positions this in the HP cell's corner (its `action` slot).
   return (
-    <div className="absolute top-1 right-1">
-      <HPSectionEditor
-        characterId={characterId}
-        currentHp={currentHp}
-        isDmHere={isDmMode}
-      />
-    </div>
+    <HPSectionEditor
+      characterId={characterId}
+      currentHp={currentHp}
+      isDmHere={isDmMode}
+    />
   );
 }
