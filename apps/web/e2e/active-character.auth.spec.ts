@@ -54,8 +54,12 @@ test('active-character: select character in roster → cookie set → /inicio re
     // The card name uses the .truncate class inside the Link's inner content div.
     const targetButton = setActiveButtons.first();
     const cardWrapper = targetButton.locator('xpath=ancestor::div[contains(@class,"rounded-md")]').first();
-    // The name element is a div with class "truncate" inside the flex content area
-    const charNameEl = cardWrapper.locator('.truncate').first();
+    // Read the name off its data-testid, not off a styling class. This used to
+    // select `.truncate`; ui-craft F11 (29553c4) swapped that for `line-clamp-2`
+    // so long names wrap instead of escaping the card, and this spec started
+    // timing out at 30s on a selector that could never match again — silently,
+    // because the e2e suite does not run in CI.
+    const charNameEl = cardWrapper.getByTestId('char-name').first();
     const charName = (await charNameEl.textContent())?.trim() ?? '';
 
     // ── Step 3: tap the set-active button ────────────────────────────────────

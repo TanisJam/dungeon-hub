@@ -57,7 +57,19 @@ export function PersonajeCard({
         ) : null
       }
     >
-      <div className="line-clamp-2 font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
+      {/*
+        data-testid, like the sibling char-lineage below: the name is what tests
+        read off a roster card, and the only handle it had was the `truncate`
+        utility class. ui-craft F11 (29553c4) swapped that for `line-clamp-2` so a
+        long name wraps instead of escaping the card — a purely visual decision —
+        and active-character.auth.spec.ts started timing out on a selector that
+        could no longer match. A styling class is the most brittle possible
+        selector: it is meant to change.
+      */}
+      <div
+        data-testid="char-name"
+        className="line-clamp-2 font-display text-[15px] font-bold leading-tight tracking-tight text-ink"
+      >
         {char.name}
       </div>
       {char.lineage ? (
