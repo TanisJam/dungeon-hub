@@ -14,6 +14,13 @@ interface StatCellProps {
   selected?: boolean;
   onClick?: () => void;
   footer?: ReactNode;
+  /**
+   * Corner affordance (the HP edit pencil). The cell positions it and reserves
+   * the width on the label, so it can never sit on top of the label text.
+   * Not for use with `onClick`: an interactive cell is itself a button, and a
+   * button inside a button is invalid.
+   */
+  action?: ReactNode;
   className?: string;
   ariaLabel?: string;
 }
@@ -35,6 +42,7 @@ export function StatCell({
   selected = false,
   onClick,
   footer,
+  action,
   className,
   ariaLabel,
 }: StatCellProps) {
@@ -93,8 +101,12 @@ export function StatCell({
     .join(' ');
 
   // ── Content ───────────────────────────────────────────────────────────
+  // With an action in the corner, pad the label by the action's footprint so the
+  // text still centres — in the remaining width rather than under the button.
   const labelEl = (
-    <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+    <span
+      className={`text-[9px] font-bold uppercase tracking-widest text-ink-mute${action ? ' pr-11' : ''}`}
+    >
       {label}
     </span>
   );
@@ -126,8 +138,15 @@ export function StatCell({
     footer
   ) : null;
 
+  const actionEl = action !== undefined && action !== null ? (
+    <div data-stat-action className="absolute top-1 right-1">
+      {action}
+    </div>
+  ) : null;
+
   const content = (
     <>
+      {actionEl}
       {labelEl}
       {valueEl}
       {subEl}

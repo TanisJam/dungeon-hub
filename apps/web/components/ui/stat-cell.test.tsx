@@ -103,4 +103,34 @@ describe('StatCell', () => {
     );
     expect(container.firstElementChild?.className).toContain('relative');
   });
+
+  // F7 (docs/audit/ui-craft-2026-09-10): the HP pencil arrived through `footer`
+  // and was positioned by the caller, so it landed on top of the centred label —
+  // "PUNTOS DE GOLPE" read as "PUNTOS D / GOL". The cell now owns the corner and
+  // reserves the width, so a label can never run under the action.
+  it('T11: action slot renders in the cell', () => {
+    render(
+      <StatCell label="Vida" value="12 / 12" action={<button type="button">edit</button>} />,
+    );
+    expect(screen.getByRole('button', { name: 'edit' })).toBeTruthy();
+  });
+
+  it('T12: the label reserves the action corner only when an action is present', () => {
+    const { rerender } = render(
+      <StatCell label="Vida" value="12 / 12" action={<button type="button">edit</button>} />,
+    );
+    expect(screen.getByText('Vida').className).toContain('pr-11');
+
+    rerender(<StatCell label="Vida" value="12 / 12" />);
+    expect(screen.getByText('Vida').className).not.toContain('pr-11');
+  });
+
+  it('T13: the action is positioned by the cell, not by its caller', () => {
+    const { container } = render(
+      <StatCell label="Vida" value="12 / 12" action={<button type="button">edit</button>} />,
+    );
+    const wrapper = container.querySelector('[data-stat-action]');
+    expect(wrapper?.className).toContain('absolute');
+    expect(wrapper?.className).toContain('right-1');
+  });
 });
