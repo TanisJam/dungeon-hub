@@ -12,9 +12,17 @@ describe('DMQuickActions', () => {
     expect(iniciativaLink!.getAttribute('href')).toBe('/encuentros');
   });
 
-  it('T2: icon-cell element with class inicio-quick-iniciativa-ic is present', () => {
+  // Audit F13: Iniciativa carried a one-off magenta class while the other four
+  // asked for a token that was never declared, so only the first drew a circle.
+  // The five chips are one treatment now, and the test asserts sameness rather
+  // than the presence of a bespoke class.
+  it('T2: all five icon chips share one treatment', () => {
     const { container } = render(<DMQuickActions />);
-    expect(container.querySelector('.inicio-quick-iniciativa-ic')).toBeTruthy();
+    const chips = container.querySelectorAll('span.rounded-full');
+    expect(chips.length).toBe(5);
+    const treatments = new Set(Array.from(chips).map((c) => c.className));
+    expect(treatments.size).toBe(1);
+    expect(chips[0]!.className).toContain('bg-accent-soft');
   });
 
   it('T3: Nuevo NPC is a button with aria-disabled="true" and cursor-not-allowed class', () => {

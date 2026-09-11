@@ -241,10 +241,6 @@
     radial-gradient(ellipse 70% 55% at 90% 10%, rgba(168, 90, 142, 0.18), transparent 50%),
     var(--color-surface);
 }
-.inicio-quick-iniciativa-ic {
-  background-color: rgba(168, 90, 142, 0.18);
-  color: var(--color-secondary);
-}
 .inicio-row-quest-ic {
   background-color: rgba(168, 90, 142, 0.15);
   color: var(--color-secondary);
