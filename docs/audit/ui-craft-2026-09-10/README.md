@@ -266,6 +266,27 @@ width; sibling routes (Mercado vs Bitácora) share the same width; map fills the
 
 ---
 
+> **Re-measured 2026-09-11, after F2/F5/F6/F7/F9/F10/F11/F12 landed: this finding does not
+> reproduce, and the one attempt to act on it made things worse.**
+>
+> *Widths.* Content width at 1440px is 736–768px on every route — 51–53% of the viewport, and
+> every route shares 768px. The expected result below asks for "no page where content occupies
+> < 40%" and "sibling routes share the same width". Both already hold. The "~10%" figure is not
+> reproducible against this code. The three named width tokens and the two-column list layouts
+> would be new design work on top of a layout that already passes, not a fix.
+>
+> *Map fill.* The container does fill its area: 1200 × 707 at 1440px, 375 × 619 at 375px.
+> The image inside it covers 64% × 72% of that on desktop and spans the full width on mobile.
+> A `fitBounds` on mount was tried, on the theory that a fixed initial zoom was the cause. It
+> measured **worse**: mobile vertical fill fell from 83% to 41%, and the map became the small
+> picture floating in black that this finding describes. Fitting the whole image into a tall
+> narrow container necessarily letterboxes it. Reverted; see PR #63.
+>
+> What is left here is genuine design work — two-column lists, a list/detail split, a desktop
+> sheet layout — and it needs a design decision, not a measurement.
+
+---
+
 ### F5 — The mobile topbar truncates what matters most: the world always reads "La Campañ…"
 
 **Axis 5 (density). Mobile.**
