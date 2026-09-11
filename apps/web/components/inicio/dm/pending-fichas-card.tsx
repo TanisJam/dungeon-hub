@@ -19,7 +19,7 @@ export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasC
     <button
       type="button"
       onClick={onClick}
-      className="inicio-pending-bg block w-full text-left rounded-2xl p-4"
+      className="inicio-pending-bg block w-full text-left rounded-lg p-4"
     >
       {/* Eyebrow */}
       <p className="text-xs font-semibold uppercase tracking-widest text-ink-mute mb-2">
@@ -31,7 +31,7 @@ export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasC
         {fichas.map((ficha) => (
           <span
             key={ficha.id}
-            className="inicio-pending-stack-av inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold text-white -ml-1 first:ml-0"
+            className="inicio-pending-stack-av inline-flex items-center justify-center w-8 h-8 rounded-pill text-sm font-bold text-white -ml-1 first:ml-0"
           >
             {ficha.portraitInitial}
           </span>
@@ -49,7 +49,7 @@ export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasC
       </p>
 
       {/* CTA */}
-      <span className="inicio-pending-cta mt-3 inline-block px-3 py-1 text-xs font-bold uppercase tracking-wide rounded-full">
+      <span className="inicio-pending-cta mt-3 inline-block px-3 py-1 text-xs font-bold uppercase tracking-wide rounded-pill">
         Revisar
       </span>
     </button>

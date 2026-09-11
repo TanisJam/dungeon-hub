@@ -46,9 +46,9 @@ const toneClasses: Record<ButtonTone, string> = {
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'text-xs px-3 py-1.5 rounded-[9px]',
-  md: 'text-sm px-4 py-2.5 rounded-[12px]',
-  lg: 'text-base px-5 py-3.5 rounded-[14px]',
+  sm: 'text-xs px-3 py-1.5 rounded-sm',
+  md: 'text-sm px-4 py-2.5 rounded-md',
+  lg: 'text-base px-5 py-3.5 rounded-lg',
 };
 
 // The 44px floor used to ride along with `fullWidth`, which is a width prop and

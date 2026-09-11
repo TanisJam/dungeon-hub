@@ -39,10 +39,10 @@ export function IdentityHeader({
           <img
             src={avatarUrl}
             alt=""
-            className="h-12 w-12 rounded-full ring-2 ring-line"
+            className="h-12 w-12 rounded-pill ring-2 ring-line"
           />
         ) : (
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-surface border border-line text-ink-soft font-display font-bold text-lg">
+          <div className="grid h-12 w-12 place-items-center rounded-pill bg-surface border border-line text-ink-soft font-display font-bold text-lg">
             {me.username.charAt(0).toUpperCase()}
           </div>
         )}

@@ -230,11 +230,11 @@ export function SessionList({
           className={[
             'fixed bottom-20 right-4 z-40',
             'flex h-14 w-14 items-center justify-center',
-            'rounded-full bg-gradient-to-br from-accent to-secondary text-white',
+            'rounded-pill bg-gradient-to-br from-accent to-secondary text-white',
             'shadow-[0_4px_20px_rgba(232,148,111,0.4),0_1px_4px_rgba(39,30,51,0.12)]',
             'active:scale-95 transition-transform',
             'md:relative md:bottom-auto md:right-auto md:h-auto md:w-auto md:min-h-[44px]',
-            'md:flex md:items-center md:gap-1.5 md:rounded-[10px] md:px-3 md:py-2',
+            'md:flex md:items-center md:gap-1.5 md:rounded-md md:px-3 md:py-2',
             'md:text-sm md:font-bold md:shadow-none',
           ].join(' ')}
         >

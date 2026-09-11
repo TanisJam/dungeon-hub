@@ -65,7 +65,7 @@ export function DevModeToggle({ currentValue }: DevModeToggleProps) {
           checked={checked}
           disabled={pending}
           onChange={handleChange}
-          className="h-5 w-9 cursor-pointer rounded-full appearance-none bg-line checked:bg-ink disabled:opacity-50 transition-colors"
+          className="h-5 w-9 cursor-pointer rounded-pill appearance-none bg-line checked:bg-ink disabled:opacity-50 transition-colors"
         />
       </label>
 

@@ -52,7 +52,7 @@ export function ScreenFrame({
             )}
           </div>
           {role && (
-            <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-mute">
+            <span className="shrink-0 rounded-pill border border-line px-2 py-0.5 text-[10px] font-semibold text-ink-mute">
               {role === 'dm' ? 'DM' : 'Jugador'}
             </span>
           )}

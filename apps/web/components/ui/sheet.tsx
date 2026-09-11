@@ -132,7 +132,7 @@ export function V3Sheet({ open, onClose, title, labelledBy, children }: V3SheetP
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
       >
         {/* Handle bar — decorative affordance, aria-hidden */}
-        <span aria-hidden="true" className="mx-auto mt-2 mb-1 block h-1 w-10 rounded-full bg-ink-mute" />
+        <span aria-hidden="true" className="mx-auto mt-2 mb-1 block h-1 w-10 rounded-pill bg-ink-mute" />
         {title && (
           <h2 id={headingId} className="px-4 pt-4 font-display text-lg text-ink">
             {title}

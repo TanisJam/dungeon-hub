@@ -31,7 +31,7 @@ export function ReviewBanner({
         className="absolute right-4 top-1/2 -translate-y-1/2 rotate-12 flex items-center justify-center"
         aria-hidden
       >
-        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-secondary text-secondary">
+        <div className="flex h-16 w-16 items-center justify-center rounded-pill border-2 border-secondary text-secondary">
           <span className="text-[9px] font-bold uppercase tracking-widest leading-tight text-center">
             LISTO<br />P/APROBAR
           </span>

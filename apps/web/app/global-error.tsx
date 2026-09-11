@@ -32,13 +32,13 @@ export default function GlobalError({
             <button
               type="button"
               onClick={reset}
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[12px] border border-transparent bg-gradient-to-br from-accent to-secondary px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(232,148,111,0.35),0_1px_2px_rgba(39,30,51,0.08)] transition-all hover:brightness-105 active:translate-y-px"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-transparent bg-gradient-to-br from-accent to-secondary px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(232,148,111,0.35),0_1px_2px_rgba(39,30,51,0.08)] transition-all hover:brightness-105 active:translate-y-px"
             >
               Reintentar
             </button>
             <a
               href="/"
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[12px] border border-line bg-transparent px-4 py-2.5 text-sm font-bold text-ink-soft transition-all hover:bg-paper-soft active:translate-y-px"
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-line bg-transparent px-4 py-2.5 text-sm font-bold text-ink-soft transition-all hover:bg-paper-soft active:translate-y-px"
             >
               Volver al inicio
             </a>

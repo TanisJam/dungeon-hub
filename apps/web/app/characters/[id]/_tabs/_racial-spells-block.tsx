@@ -118,7 +118,7 @@ function SpellRow({ spell }: SpellRowProps) {
       </div>
 
       {/* Frequency badge */}
-      <span className="ml-2 flex-shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-mute">
+      <span className="ml-2 flex-shrink-0 rounded-pill bg-paper-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-mute">
         {freqBadge}
       </span>
     </div>

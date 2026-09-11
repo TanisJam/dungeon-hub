@@ -157,7 +157,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
               {/* Proficiency dot */}
               <span
                 className={[
-                  'h-3 w-3 flex-shrink-0 rounded-full border',
+                  'h-3 w-3 flex-shrink-0 rounded-pill border',
                   st.proficient
                     ? 'bg-primary border-primary-deep'
                     : 'bg-surface border-line',

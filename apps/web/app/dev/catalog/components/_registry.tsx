@@ -645,11 +645,11 @@ const scrollNavEntry: ComponentEntry = {
       className: 'pb-0.5',
       children: (
         <>
-          <span className="shrink-0 rounded-full border border-accent-deep personajes-chip-on px-2.5 py-1 text-[11px] font-semibold">Activos · 3</span>
-          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Pendientes · 1</span>
-          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Retirados</span>
-          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Borradores · 2</span>
-          <span className="shrink-0 rounded-full border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Todos</span>
+          <span className="shrink-0 rounded-pill border border-accent-deep personajes-chip-on px-2.5 py-1 text-[11px] font-semibold">Activos · 3</span>
+          <span className="shrink-0 rounded-pill border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Pendientes · 1</span>
+          <span className="shrink-0 rounded-pill border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Retirados</span>
+          <span className="shrink-0 rounded-pill border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Borradores · 2</span>
+          <span className="shrink-0 rounded-pill border border-line bg-surface text-ink-mute px-2.5 py-1 text-[11px] font-semibold">Todos</span>
         </>
       ),
     },
@@ -718,7 +718,7 @@ const questRowEntry: ComponentEntry = {
   id: 'quest-row',
   name: 'QuestRow',
   group: 'ui',
-  notes: 'Card-row atom for dm quest lists. rounded-xl bg-surface-soft. Props: title, subtitle (lastChange line), className?. Icon cell (📜 + inicio-row-quest-ic) + trailing chevron (›). Zero-visual-change replacement for copy-pasted block in quests-sin-tocar-list + pendientes-sheet-content.',
+  notes: 'Card-row atom for dm quest lists. rounded-md bg-surface-soft. Props: title, subtitle (lastChange line), className?. Icon cell (📜 + inicio-row-quest-ic) + trailing chevron (›). Zero-visual-change replacement for copy-pasted block in quests-sin-tocar-list + pendientes-sheet-content.',
   propsSchema: {
     title:    { kind: 'string', default: 'El correo perdido',           label: 'Title' },
     subtitle: { kind: 'string', default: 'Último cambio: hace 3 días',  label: 'Subtitle' },

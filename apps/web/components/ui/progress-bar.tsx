@@ -60,7 +60,7 @@ export function ProgressBar({
   const pct = max > 0 ? Math.min(100, Math.max(0, Math.round((value / max) * 100))) : 0;
 
   const trackClass = [
-    'w-full overflow-hidden rounded-full',
+    'w-full overflow-hidden rounded-pill',
     TRACK_HEIGHT[height],
     trackClassName,
     className,
@@ -78,7 +78,7 @@ export function ProgressBar({
       aria-label={ariaLabel}
     >
       <div
-        className={`h-full rounded-full transition-[width] duration-500 ${FILL_TONE[tone]}`}
+        className={`h-full rounded-pill transition-[width] duration-500 ${FILL_TONE[tone]}`}
         style={{ width: `${pct}%` }}
       />
     </div>

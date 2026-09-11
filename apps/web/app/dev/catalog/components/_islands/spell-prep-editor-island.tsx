@@ -76,7 +76,7 @@ export function SpellPrepEditorIsland({
   return (
     <div className="space-y-4 p-4">
       <div
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${counterColors[counterTone]}`}
+        className={`inline-flex items-center gap-1.5 rounded-pill border px-3 py-1 text-xs font-semibold ${counterColors[counterTone]}`}
       >
         <span>
           {count}/{prepLimit} preparados

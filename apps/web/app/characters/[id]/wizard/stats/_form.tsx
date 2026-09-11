@@ -267,7 +267,7 @@ function PointBuyEditor({
                   aria-label={`Reducir ${a.abbr}`}
                   onClick={() => dec(a.key)}
                   disabled={!canDec}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-line bg-paper-soft text-base text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
+                  className="grid h-9 w-9 place-items-center rounded-pill border border-line bg-paper-soft text-base text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   −
                 </button>
@@ -279,7 +279,7 @@ function PointBuyEditor({
                   aria-label={`Aumentar ${a.abbr}`}
                   onClick={() => inc(a.key)}
                   disabled={!canInc}
-                  className="grid h-9 w-9 place-items-center rounded-full border border-line bg-paper-soft text-base text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
+                  className="grid h-9 w-9 place-items-center rounded-pill border border-line bg-paper-soft text-base text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   +
                 </button>
@@ -369,7 +369,7 @@ function StandardArrayEditor({
                   type="button"
                   aria-label={`${a.abbr} assign value`}
                   onClick={() => onTileTap(a.key)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-primary text-paper text-sm transition hover:brightness-110 active:scale-95"
+                  className="grid h-9 w-9 place-items-center rounded-pill bg-primary text-paper text-sm transition hover:brightness-110 active:scale-95"
                 >
                   ↻
                 </button>

@@ -182,7 +182,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
           <span>Mis páginas</span>
         </button>
 
-        <div className="rounded-xl border border-line bg-surface p-4 flex flex-col gap-3">
+        <div className="rounded-md border border-line bg-surface p-4 flex flex-col gap-3">
           {detailPage.title && (
             <h2 className="text-base font-semibold text-ink">{detailPage.title}</h2>
           )}
@@ -232,7 +232,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
               {detailPage.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-line bg-paper-soft px-2.5 py-0.5 text-xs text-ink-mute"
+                  className="rounded-pill border border-line bg-paper-soft px-2.5 py-0.5 text-xs text-ink-mute"
                 >
                   {tag}
                 </span>
@@ -340,7 +340,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
             type="button"
             onClick={() => setActiveTag(null)}
             className={[
-              'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+              'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
               activeTag === null
                 ? 'bg-ink text-paper border-ink'
                 : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -357,7 +357,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
                 type="button"
                 onClick={() => setActiveTag(activeTag === tag ? null : tag)}
                 className={[
-                  'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                  'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                   activeTag === tag
                     ? 'bg-ink text-paper border-ink'
                     : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -391,7 +391,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
               key={page.id}
               type="button"
               onClick={() => setDetailPage(page)}
-              className="w-full text-left rounded-xl border border-line bg-surface p-3 flex flex-col gap-1 min-h-[44px] hover:bg-paper transition-colors"
+              className="w-full text-left rounded-md border border-line bg-surface p-3 flex flex-col gap-1 min-h-[44px] hover:bg-paper transition-colors"
             >
               {page.title && (
                 <p className="text-sm font-semibold text-ink">{page.title}</p>
@@ -402,7 +402,7 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
                   {page.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
+                      className="rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
                     >
                       {tag}
                     </span>

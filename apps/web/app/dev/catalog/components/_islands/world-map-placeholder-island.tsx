@@ -77,7 +77,7 @@ function ControlPill({ label }: { label: string }) {
   return (
     <span
       aria-disabled="true"
-      className="flex items-center justify-center rounded-full border border-line bg-paper-soft px-3 py-1 text-xs font-medium text-ink-soft opacity-60 select-none"
+      className="flex items-center justify-center rounded-pill border border-line bg-paper-soft px-3 py-1 text-xs font-medium text-ink-soft opacity-60 select-none"
     >
       {label}
     </span>
@@ -159,7 +159,7 @@ export function WorldMapPlaceholderIsland() {
           </div>
 
           {/* POI count badge suggestion */}
-          <div className="absolute bottom-2 right-2 rounded-full border border-line bg-paper px-2 py-0.5 text-[10px] font-mono text-ink-soft">
+          <div className="absolute bottom-2 right-2 rounded-pill border border-line bg-paper px-2 py-0.5 text-[10px] font-mono text-ink-soft">
             {FIXTURE_POIS.length} POIs (fixture)
           </div>
         </div>

@@ -452,7 +452,7 @@ export function SpellsPicker({
           onClick={() => setFilterRitual((v) => !v)}
           aria-pressed={filterRitual}
           className={[
-            'rounded-full border px-3 py-1 text-xs font-medium transition',
+            'rounded-pill border px-3 py-1 text-xs font-medium transition',
             filterRitual
               ? 'border-warning bg-warning-soft text-warning'
               : 'border-line bg-paper-soft text-ink-mute hover:border-warning hover:text-warning',
@@ -465,7 +465,7 @@ export function SpellsPicker({
           onClick={() => setFilterConcentration((v) => !v)}
           aria-pressed={filterConcentration}
           className={[
-            'rounded-full border px-3 py-1 text-xs font-medium transition',
+            'rounded-pill border px-3 py-1 text-xs font-medium transition',
             filterConcentration
               ? 'border-arcane bg-arcane/10 text-arcane'
               : 'border-line bg-paper-soft text-ink-mute hover:border-arcane hover:text-arcane',

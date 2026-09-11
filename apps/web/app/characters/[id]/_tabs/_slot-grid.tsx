@@ -62,7 +62,7 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
           >
             <span
               className={[
-                'block h-6 w-6 rounded-full border-2 transition-colors',
+                'block h-6 w-6 rounded-pill border-2 transition-colors',
                 isFilled
                   ? 'border-warning bg-warning'
                   : 'border-warning/40 bg-transparent',
@@ -126,7 +126,7 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
           >
             <span
               className={[
-                'block h-6 w-6 rounded-full border-2 transition-colors',
+                'block h-6 w-6 rounded-pill border-2 transition-colors',
                 isFilled
                   ? 'border-secondary bg-secondary'
                   : 'border-secondary/40 bg-transparent',

@@ -334,7 +334,7 @@ export function BitacoraComposer({
                   type="button"
                   onClick={() => handleTagToggle(tag)}
                   className={[
-                    'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                    'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                     active
                       ? 'bg-ink text-paper border-ink'
                       : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -372,7 +372,7 @@ export function BitacoraComposer({
                     type="button"
                     onClick={() => handleKindSwitch('monster')}
                     className={[
-                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                       refKindSwitch === 'monster'
                         ? 'bg-ink text-paper border-ink'
                         : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -387,7 +387,7 @@ export function BitacoraComposer({
                     type="button"
                     onClick={() => handleKindSwitch('npc')}
                     className={[
-                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                       refKindSwitch === 'npc'
                         ? 'bg-ink text-paper border-ink'
                         : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -402,7 +402,7 @@ export function BitacoraComposer({
                     type="button"
                     onClick={() => handleKindSwitch('faction')}
                     className={[
-                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                       refKindSwitch === 'faction'
                         ? 'bg-ink text-paper border-ink'
                         : 'bg-paper-soft text-ink-mute border-line hover:text-ink',
@@ -417,7 +417,7 @@ export function BitacoraComposer({
                     type="button"
                     onClick={() => handleKindSwitch('location')}
                     className={[
-                      'rounded-full px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
+                      'rounded-pill px-3 py-1 text-xs font-medium border transition-colors min-h-[32px]',
                       refKindSwitch === 'location'
                         ? 'bg-ink text-paper border-ink'
                         : 'bg-paper-soft text-ink-mute border-line hover:text-ink',

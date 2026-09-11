@@ -29,7 +29,7 @@ export function TabBar({ tabs, activeSlug, onTabChange }: TabBarProps) {
             onClick={() => onTabChange(tab.classSlug)}
             type="button"
             className={[
-              'inline-flex items-center gap-1 min-h-11 px-3 py-2 text-sm rounded-t transition-colors',
+              'inline-flex items-center gap-1 min-h-11 px-3 py-2 text-sm rounded-t-sm transition-colors',
               isActive
                 ? 'font-semibold border-b-2 border-[var(--color-accent)] text-ink'
                 : 'text-ink-mute hover:text-ink',
@@ -38,7 +38,7 @@ export function TabBar({ tabs, activeSlug, onTabChange }: TabBarProps) {
             {tab.label}
             {!tab.isComplete && (
               <span
-                className="ml-1 h-1.5 w-1.5 rounded-full bg-warning inline-block"
+                className="ml-1 h-1.5 w-1.5 rounded-pill bg-warning inline-block"
                 role="img"
                 aria-label="incomplete"
               />

@@ -227,7 +227,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
         {isActive && character.userId === session.user.id && (
           <Link
             href={`/characters/${id}/level-up`}
-            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-transparent px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/5 transition-colors"
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-primary/40 bg-transparent px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/5 transition-colors"
             aria-label="Agregar una nueva clase (multiclase)"
           >
             + Agregar clase
@@ -289,7 +289,7 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
 
         <section
           aria-label="Zona de peligro"
-          className="mt-6 rounded-2xl border border-danger-soft-border p-4"
+          className="mt-6 rounded-lg border border-danger-soft-border p-4"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-danger mb-3">
             Zona de peligro
