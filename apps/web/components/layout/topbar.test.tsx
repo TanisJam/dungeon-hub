@@ -127,19 +127,27 @@ describe('TopBar — subtitle truncate (REQ-UXP1-TOPBAR-01)', () => {
 });
 
 describe('TopBar — world switcher slot (REQ-WIS-03)', () => {
-  it('T8: worldSwitcher prop present → renders the switcher node, CrowMark kept as mobile-only fallback (F5)', () => {
+  // F5: the world left the left slot, where an 88px cap cut its name on every
+  // page, and moved under the title. The CrowMark keeps the left slot, and the
+  // world takes the subtitle's place rather than adding a row to the header.
+  it('T8: worldSwitcher renders under the title, and the CrowMark keeps the left slot', () => {
     render(
       <TopBar
         title="Inicio"
+        subtitle="EYEBROW"
         worldSwitcher={<div data-testid="world-switcher-widget">WorldSwitcher</div>}
       />,
     );
-    expect(screen.getByTestId('world-switcher-widget')).toBeTruthy();
-    // F5: the world moves off the left slot on mobile (its own full-width row
-    // under the title instead), so the left slot falls back to CrowMark there
-    // — hidden at sm:+, where the switcher's own pill takes that spot.
-    const crowMark = screen.getByTestId('crow-mark');
-    expect(crowMark.parentElement?.className).toContain('sm:hidden');
+    const widget = screen.getByTestId('world-switcher-widget');
+    expect(widget).toBeTruthy();
+    expect(screen.getByTestId('crow-mark')).toBeTruthy();
+
+    // Same column as the title, not a sibling of the left slot.
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(widget.parentElement).toBe(heading.parentElement);
+
+    // The eyebrow stands down: it would be a second line saying less.
+    expect(screen.queryByText('EYEBROW')).toBeNull();
   });
 
   it('T9: worldSwitcher absent + no backHref → CrowMark renders (graceful fallback, REQ-WIS-03)', () => {

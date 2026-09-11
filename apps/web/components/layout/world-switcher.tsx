@@ -122,34 +122,19 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
   return (
     <>
       {/*
-       * F5: TopBar receives `worldSwitcher` as ONE pre-built ReactNode (server
-       * props delivery, ADR-4) and inserts it once, right after its left slot.
-       * Rendering that same node a second time elsewhere in TopBar would mount
-       * a second `WorldSwitcher` client instance — a second `open` state and a
-       * second `<V3Sheet>` — so the responsive split lives HERE instead: one
-       * instance renders both trigger variants (sharing this single `open`
-       * state and the one sheet below) and lets CSS pick which is visible.
-       * The pill keeps default DOM order so it lands right after the left
-       * slot on sm:+ (same spot as before); the line variant is `order-last`
-       * so, inside TopBar's flex-wrap row, it always sorts after the title and
-       * right slot and wraps onto its own full-width row on mobile.
+       * F5: one trigger, one open state, one sheet. The world used to be a
+       * capped pill in the left slot, where its name was cut on every page; it
+       * now sits under the title as the line variant, which is where the
+       * remaining width is. TopBar places this node inside the title column, so
+       * it costs the header the difference between the column and the 44px
+       * right cluster rather than a whole extra row.
        */}
-      <div className="hidden flex-shrink-0 sm:block">
-        <WorldSwitcherTrigger
-          variant="pill"
-          worldName={worldName}
-          callerRole={callerRole}
-          onClick={() => setOpen(true)}
-        />
-      </div>
-      <div className="order-last w-full sm:hidden">
-        <WorldSwitcherTrigger
-          variant="line"
-          worldName={worldName}
-          callerRole={callerRole}
-          onClick={() => setOpen(true)}
-        />
-      </div>
+      <WorldSwitcherTrigger
+        variant="line"
+        worldName={worldName}
+        callerRole={callerRole}
+        onClick={() => setOpen(true)}
+      />
 
       <V3Sheet
         open={open}
