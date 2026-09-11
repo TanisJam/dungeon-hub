@@ -139,6 +139,10 @@ export function ShopCurationEditor({
                       box is a 16px target however tappable the label around it
                       is, and this list holds 200 of them. The box below is the
                       drawing; this is the control.
+
+                      24px, not 16: the radius scale starts at 8px, and 8 on a
+                      16px box closes into a circle — which reads as a radio,
+                      not a checkbox.
                     */}
                     <label className="relative flex min-h-[44px] w-full items-center gap-3 py-2 text-sm text-ink">
                       <input
@@ -151,7 +155,7 @@ export function ShopCurationEditor({
                       />
                       <span
                         aria-hidden="true"
-                        className="grid h-4 w-4 shrink-0 place-items-center rounded-sm border border-line bg-paper-soft text-[10px] font-bold text-on-accent transition-colors peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:border-accent"
+                        className="grid h-6 w-6 shrink-0 place-items-center rounded-sm border border-line bg-paper-soft text-xs font-bold text-on-accent transition-colors peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:border-accent"
                       >
                         {forSale.has(key) ? '✓' : ''}
                       </span>
