@@ -1054,9 +1054,21 @@ test('B2-CREATE-5: Full create flow — FAB → tap → sheet → submit (REQ-PW
   await expect(nameInput).toBeVisible({ timeout: 5_000 });
   await nameInput.fill(uniquePoiName);
 
-  // Submit
+  // Submit.
+  //
+  // Wait for the button to be ENABLED, not merely visible. PoiForm renders it as
+  // `disabled={submitting || !formName.trim()}`, and formName is React state fed
+  // by onChange — so before hydration the fill() above writes to the DOM while
+  // the state stays empty and the button stays disabled. The click then lands on
+  // a disabled button and does nothing; the sheet never closes and the test times
+  // out 10s later on a dialog that was never submitted.
+  //
+  // This is not a sleep dressed up as an assertion: enabled is the precondition
+  // the product itself defines for this button, and it can only become true once
+  // React has processed the typed name. It failed every attempt in CI (slower
+  // machine, race lost consistently) while being merely flaky locally.
   const submitBtn = page.getByRole('button', { name: /crear poi/i });
-  await expect(submitBtn).toBeVisible({ timeout: 5_000 });
+  await expect(submitBtn).toBeEnabled({ timeout: 10_000 });
   await submitBtn.click();
 
   // After submit: sheet should close and no crash — either FAB reappears or page reloads
