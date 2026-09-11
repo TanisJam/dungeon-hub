@@ -53,12 +53,12 @@ describe('Pill', () => {
 
   // ── Sizes ─────────────────────────────────────────────────────────────────
 
-  it('renders size="sm" applying px-2 py-0.5 text-[10px]', () => {
+  it('renders size="sm" applying px-2 py-0.5 text-label', () => {
     render(<Pill size="sm">Small</Pill>);
     const el = screen.getByText('Small');
     expect(el.className).toContain('px-2');
     expect(el.className).toContain('py-0.5');
-    expect(el.className).toContain('text-[10px]');
+    expect(el.className).toContain('text-label');
   });
 
   it('renders size="md" applying px-2.5 py-0.5 text-xs', () => {
@@ -155,7 +155,7 @@ describe('Pill', () => {
     const el = screen.getByText('Base');
     expect(el.className).toContain('rounded-pill');
     expect(el.className).toContain('px-2');
-    expect(el.className).toContain('text-[10px]');
+    expect(el.className).toContain('text-label');
   });
 
   // ── neutral tone ─────────────────────────────────────────────────────────

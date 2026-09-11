@@ -184,7 +184,7 @@ export function Picker({ characterId, worldId }: PickerProps) {
                         <p className="truncate text-sm font-semibold text-ink">
                           {item.name}
                         </p>
-                        <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                        <p className="text-eyebrow text-ink-mute">
                           {item.source}
                           {item.weight != null && (
                             <span className="ml-2 normal-case">

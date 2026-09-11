@@ -101,7 +101,7 @@ export function TopBar({
       {/* LEFT slot: backHref arrow, else the CrowMark */}
       {renderLeftSlot()}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        <h1 className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate m-0">
+        <h1 className="font-display font-bold text-body leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
         </h1>
         {/*
@@ -112,7 +112,7 @@ export function TopBar({
          */}
         {showWorldSwitcher && worldSwitcher}
         {subtitle && !showWorldSwitcher && (
-          <span className="hidden sm:block font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none truncate">
+          <span className="hidden sm:block font-sans text-eyebrow text-ink-mute truncate">
             {subtitle}
           </span>
         )}

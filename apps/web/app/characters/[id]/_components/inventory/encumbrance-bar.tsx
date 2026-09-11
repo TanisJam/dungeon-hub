@@ -49,7 +49,7 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
   return (
     <fieldset className="space-y-2" aria-label="Capacidad de carga">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        <p className="text-eyebrow text-ink-mute">
           Carga
         </p>
         <div className="text-right">
@@ -58,7 +58,7 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
           </p>
           {/* REQ-ID-ENCUMBRANCE-COIN-LABEL: show coin weight hint when > 0. */}
           {coinWeight != null && coinWeight > 0 && (
-            <p className="text-[10px] text-ink-mute tabular-nums">
+            <p className="text-label text-ink-mute tabular-nums">
               Monedas: {coinWeight} lb
             </p>
           )}

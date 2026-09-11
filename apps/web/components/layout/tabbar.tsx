@@ -11,7 +11,7 @@ type Tab = {
   /**
    * Short label used ONLY by this mobile bar when it renders at 6 columns
    * (GM + Mesa tab). At 375px/6-cols each tab has ~56.5px for its label —
-   * "Biblioteca" (~68px at text-[9px] uppercase) overflows that budget, so
+   * "Biblioteca" (~68px at text-micro uppercase) overflows that budget, so
    * it swaps to "Códex" here. The section keeps the "Biblioteca" name
    * everywhere else (DesktopSidebar, page titles, etc).
    */
@@ -98,7 +98,7 @@ export function TabBar({ callerRole }: TabBarProps = {}) {
              * decision: a column's label can now never exceed its column,
              * regardless of locale/label length, by construction.
              */}
-            <span className="block max-w-full truncate font-sans text-[9px] font-bold">
+            <span className="block max-w-full truncate font-sans text-micro font-bold">
               {isCompact ? (tab.shortLabel ?? tab.label) : tab.label}
             </span>
           </Link>

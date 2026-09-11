@@ -166,7 +166,7 @@ export function ShopCurationEditor({
                         {forSale.has(key) ? '✓' : ''}
                       </span>
                       <span className="flex-1 truncate">{item.name}</span>
-                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-ink-mute">
+                      <span className="shrink-0 text-eyebrow text-ink-mute">
                         {item.source}
                       </span>
                     </label>

@@ -75,6 +75,7 @@ export type ScaleEntry = { name: string; size: string; utility: string };
 
 export const TYPE_SCALE: ScaleEntry[] = [
   { name: 'text-micro',    size: '9px',  utility: 'lh 1.4' },
+  { name: 'text-label',    size: '10px', utility: 'lh 1.3' },
   { name: 'text-caption',  size: '11px', utility: 'lh 1.4' },
   { name: 'text-eyebrow',  size: '10px', utility: 'sans, 700, uppercase, tracking-wide' },
   { name: 'text-footnote', size: '13px', utility: 'lh 1.45' },

@@ -27,7 +27,7 @@ export function V3CampCard({ campaign }: Props) {
       >
         {isDm ? 'Dirigís' : 'Jugás'}
       </Pill>
-      <div className="font-display text-[17px] font-bold leading-tight tracking-tight text-ink">
+      <div className="font-display text-body-lg font-bold leading-tight tracking-tight text-ink">
         {campaign.name}
       </div>
       <div className="mt-2.5 flex flex-wrap gap-1.5">

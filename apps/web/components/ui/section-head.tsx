@@ -10,7 +10,7 @@ interface SectionHeadProps {
    * - 'sm' (default): original SectionHead look — items-baseline, pb-1,
    *   num pill px-2 py-0.5 text-xs.
    * - 'md': NumberedSectionHead density — wrapper mb-5, items-center,
-   *   num pill h-6 min-w-6 px-1.5 text-[11px]. num is required in practice
+   *   num pill h-6 min-w-6 px-1.5 text-caption. num is required in practice
    *   for wizard pages.
    *
    * Note: a future slice could converge sm and md to a single visual density
@@ -25,15 +25,15 @@ export function SectionHead({ num, title, meta, description, size = 'sm' }: Sect
       <div className="mb-5">
         <div className="flex items-center gap-2.5">
           {num !== undefined && (
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-pill bg-accent-soft px-1.5 text-[11px] font-bold text-accent-deep leading-none tracking-wide">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-pill bg-accent-soft px-1.5 text-caption font-bold text-accent-deep leading-none tracking-wide">
               {num}
             </span>
           )}
-          <span className="font-display font-semibold text-[17px] leading-tight tracking-tight text-ink">
+          <span className="font-display font-semibold text-body-lg leading-tight tracking-tight text-ink">
             {title}
           </span>
           {meta && (
-            <span className="ml-auto text-[11px] font-semibold text-ink-mute tracking-wide">
+            <span className="ml-auto text-caption font-semibold text-ink-mute tracking-wide">
               {meta}
             </span>
           )}
@@ -53,11 +53,11 @@ export function SectionHead({ num, title, meta, description, size = 'sm' }: Sect
           {num}
         </span>
       )}
-      <span className="font-display font-semibold text-[17px] leading-tight tracking-tight text-ink">
+      <span className="font-display font-semibold text-body-lg leading-tight tracking-tight text-ink">
         {title}
       </span>
       {meta && (
-        <span className="ml-auto text-[11px] font-semibold text-ink-mute tracking-wide">
+        <span className="ml-auto text-caption font-semibold text-ink-mute tracking-wide">
           {meta}
         </span>
       )}

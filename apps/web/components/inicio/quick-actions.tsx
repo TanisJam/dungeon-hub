@@ -21,7 +21,7 @@ export function QuickActions() {
           <Link
             key={a.href}
             href={a.href}
-            className="flex flex-col items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-3.5 text-[11px] font-semibold text-ink transition-colors hover:border-accent hover:bg-surface-soft"
+            className="flex flex-col items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-3.5 text-caption font-semibold text-ink transition-colors hover:border-accent hover:bg-surface-soft"
           >
             <span className="grid h-8 w-8 place-items-center rounded-md border border-accent/35 bg-accent-soft text-accent">
               <Icon name={a.icon} size={16} />

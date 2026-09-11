@@ -14,7 +14,7 @@ const inputClass =
   'w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-base text-ink ' +
   'placeholder:text-ink-mute focus:outline-none focus:ring-2 focus:ring-accent/50';
 const labelClass =
-  'block text-[10px] font-bold uppercase tracking-widest text-ink-mute mb-1';
+  'block text-eyebrow text-ink-mute mb-1';
 
 export function DevLoginForm({ redirectTo = '/inicio' }: { redirectTo?: string }) {
   const router = useRouter();
@@ -51,7 +51,7 @@ export function DevLoginForm({ redirectTo = '/inicio' }: { redirectTo?: string }
       onSubmit={handle}
       className="mt-6 w-full rounded-md bg-surface border border-line shadow-stamp-md p-4 text-left"
     >
-      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-mute mb-3">
+      <p className="text-eyebrow text-ink-mute mb-3">
         Dev — Email + Contraseña
       </p>
 

@@ -24,11 +24,11 @@ function SpellRow({ spell }: { spell: SpellSheetRef }) {
       <span className="min-w-0 truncate text-sm text-ink">{spell.name}</span>
       <div className="flex shrink-0 items-center gap-1">
         {spell.level === 0 ? (
-          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
+          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-label font-bold text-ink-mute">
             Truco
           </span>
         ) : (
-          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
+          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-label font-bold text-ink-mute">
             Nv {spell.level}
           </span>
         )}
@@ -50,7 +50,7 @@ function SpellGroup({ label, spells }: { label: string; spells: SpellSheetRef[] 
   if (spells.length === 0) return null;
   return (
     <div className="mt-3">
-      <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+      <p className="mb-1 text-micro font-bold uppercase tracking-widest text-ink-mute">
         {label}
       </p>
       <div className="divide-y divide-line">
@@ -138,7 +138,7 @@ function ClassSpellSection({
     <Card variant="surface" className="p-4">
       {/* Class header with prep pencil (prepared casters) and wand (DM known) */}
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        <p className="text-eyebrow text-ink-mute">
           {sc.classSlug}{' '}
           <span className="normal-case text-ink-mute/60">· {sc.classSource}</span>
         </p>
@@ -167,19 +167,19 @@ function ClassSpellSection({
       {/* Spellcasting stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+          <span className="text-micro font-bold uppercase tracking-widest text-ink-mute">
             CD Hechizo
           </span>
           <span className="text-base font-bold text-ink">{sc.saveDC}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+          <span className="text-micro font-bold uppercase tracking-widest text-ink-mute">
             Ataque
           </span>
           <span className="text-base font-bold text-ink">{fmtMod(sc.attackBonus)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+          <span className="text-micro font-bold uppercase tracking-widest text-ink-mute">
             Habilidad
           </span>
           <span className="text-base font-bold text-ink">
@@ -267,7 +267,7 @@ export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
           beyond hechizos — transversal action, not tab-scoped. */}
       {(slots || pact) && (
         <Card variant="surface" className="p-4">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="mb-3 text-eyebrow text-ink-mute">
             Espacios de Hechizo
           </p>
 
@@ -278,7 +278,7 @@ export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
                   // biome-ignore lint/suspicious/noArrayIndexKey: slots is indexed by spell level (idx+1 = level) — a fixed 9-slot array, idx IS the level, never reordered.
                   <div key={idx}>
                     <div className="mb-1.5 flex items-baseline justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+                      <span className="text-eyebrow text-ink-mute">
                         Nivel {idx + 1}
                       </span>
                       <span className="text-xs font-medium tabular-nums text-ink-mute">
@@ -300,7 +300,7 @@ export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
           {pact && (
             <div className={slots ? 'mt-5 border-t border-line pt-4' : ''}>
               <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-secondary">
+                <span className="text-eyebrow text-secondary">
                   Magia de Pacto · Nivel {pact.slotLevel}
                 </span>
                 <span className="text-xs font-medium tabular-nums text-ink-mute">

@@ -34,7 +34,7 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
       </Pill>
 
       {/* Campaign title */}
-      <h2 className="font-display font-bold text-[19px] leading-tight tracking-tight text-ink pr-16 mt-1">
+      <h2 className="font-display font-bold text-subhead leading-tight tracking-tight text-ink pr-16 mt-1">
         {name}
       </h2>
 

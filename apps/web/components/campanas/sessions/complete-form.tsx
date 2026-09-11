@@ -408,7 +408,7 @@ export function CompleteForm({
                   >
                     <span className="min-w-0 flex-1 truncate font-sans text-sm text-ink">
                       {row.name || row.slug}
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-ink-mute">
+                      <span className="ml-2 text-eyebrow text-ink-mute">
                         {row.source}
                       </span>
                     </span>

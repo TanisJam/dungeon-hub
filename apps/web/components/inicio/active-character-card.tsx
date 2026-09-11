@@ -18,7 +18,7 @@ export function ActiveCharacterCard({ char }: ActiveCharacterCardProps) {
         portraitClassName="border-r border-accent"
         className="border-accent ring-1 ring-accent/30 hover:border-accent"
       >
-        <div className="line-clamp-2 font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
+        <div className="line-clamp-2 font-display text-body font-bold leading-tight tracking-tight text-ink">
           {char.name}
         </div>
         <div className="font-sans text-xs italic text-ink-mute">{char.lineage}</div>

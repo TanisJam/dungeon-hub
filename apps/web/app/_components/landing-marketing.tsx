@@ -88,7 +88,7 @@ export function LandingMarketing({ ctaSlot, devSlot }: LandingMarketingProps) {
         ))}
       </ul>
 
-      <footer className="mt-14 w-full border-t border-line pt-6 text-[11px] text-ink-mute">
+      <footer className="mt-14 w-full border-t border-line pt-6 text-caption text-ink-mute">
         <p>Dungeon Hub — compañero de mesa para D&amp;D 5e (PHB 2014).</p>
         <p className="mt-1">Proyecto personal de Mauricio Romero.</p>
       </footer>

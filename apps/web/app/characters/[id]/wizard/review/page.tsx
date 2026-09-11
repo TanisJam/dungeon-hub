@@ -265,10 +265,10 @@ export default async function ReviewStepPage({ params }: Props) {
         {abilityScores && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="font-display font-semibold text-[15px] text-ink">Atributos</span>
+              <span className="font-display font-semibold text-body text-ink">Atributos</span>
               <Link
                 href={`/characters/${id}/wizard/stats`}
-                className="text-[11px] text-ink-mute hover:text-ink transition-colors"
+                className="text-caption text-ink-mute hover:text-ink transition-colors"
               >
                 ✎ Editar
               </Link>
@@ -276,7 +276,7 @@ export default async function ReviewStepPage({ params }: Props) {
             <Card variant="surface" className="p-4">
               <AbilityScoreGrid scores={abilityScores} />
               {statMethodLabel && (
-                <p className="mt-2.5 text-[10px] text-ink-mute text-center">
+                <p className="mt-2.5 text-label text-ink-mute text-center">
                   Método: {statMethodLabel} · Total {statTotal}
                 </p>
               )}

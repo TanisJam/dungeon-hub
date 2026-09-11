@@ -16,7 +16,7 @@ interface HabilidadesTabProps {
 export function HabilidadesTab({ sheet }: HabilidadesTabProps) {
   return (
     <Card variant="surface" className="p-4">
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="mb-3 text-eyebrow text-ink-mute">
         Habilidades
       </p>
       <div className="space-y-1.5">
@@ -43,7 +43,7 @@ function SkillRow({ skill }: { skill: SkillView }) {
           title={skill.expertise ? 'Maestría' : skill.proficient ? 'Competencia' : 'Sin competencia'}
         />
         <span className="truncate text-sm text-ink">{skill.name}</span>
-        <span className="text-[10px] font-bold text-ink-mute flex-shrink-0">
+        <span className="text-label font-bold text-ink-mute flex-shrink-0">
           {ABILITY_ES[skill.ability] ?? skill.ability.toUpperCase()}
         </span>
       </div>

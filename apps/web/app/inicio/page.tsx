@@ -356,7 +356,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
             {/* +nueva partida en este mundo — DM-only (REQ-CIW-02) */}
             <Link
               href={`/campanas/new?worldId=${gmCampaign!.worldId}`}
-              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
+              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-footnote font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
             >
               <span className="text-lg text-accent">+</span>
               <span>Nueva partida en este mundo</span>
@@ -371,7 +371,7 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
             />
             <Link
               href="/campanas/new"
-              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-[13px] font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
+              className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-4 py-3 font-sans text-footnote font-semibold text-ink-mute transition-colors hover:border-accent hover:text-accent"
             >
               <span className="text-lg text-accent">+</span>
               <span>Crear campaña nueva</span>

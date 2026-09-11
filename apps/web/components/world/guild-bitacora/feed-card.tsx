@@ -140,7 +140,7 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
           </Pill>
         )}
 
-        <span className="ml-auto text-[10px] text-ink-soft">{formatDate(item.sortAt)}</span>
+        <span className="ml-auto text-label text-ink-soft">{formatDate(item.sortAt)}</span>
       </div>
 
       {/* Title or body snippet */}
@@ -162,7 +162,7 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
           {item.tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center rounded-pill bg-paper-soft px-2 py-0.5 text-[10px] font-medium text-ink-soft"
+              className="inline-flex items-center rounded-pill bg-paper-soft px-2 py-0.5 text-label font-medium text-ink-soft"
             >
               {tag}
             </span>
@@ -180,7 +180,7 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
           className="flex w-full items-center gap-2 rounded-md border border-line bg-paper-soft px-3 min-h-[44px]"
         >
           {item.refEntityKind && ENTITY_KIND_LABEL[item.refEntityKind] ? (
-            <span className="shrink-0 rounded-pill bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+            <span className="shrink-0 rounded-pill bg-primary/10 px-2 py-0.5 text-label font-semibold text-primary">
               {ENTITY_KIND_LABEL[item.refEntityKind]}
             </span>
           ) : null}
@@ -216,7 +216,7 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
             </button>
           </div>
           {sealError && (
-            <p role="alert" className="text-[10px] font-medium text-danger">
+            <p role="alert" className="text-label font-medium text-danger">
               {sealError}
             </p>
           )}

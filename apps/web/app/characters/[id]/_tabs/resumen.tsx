@@ -55,11 +55,11 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
       {/* Atributos */}
       <Card variant="surface" className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="text-eyebrow text-ink-mute">
             Atributos
           </p>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold text-ink-soft">
+            <span className="text-label font-semibold text-ink-soft">
               Comp. {fmtMod(sheet.proficiencyBonus)}
             </span>
             {/* Edit pencil — opens AtributosEditor via V3Sheet (C5, sdd/ficha-restyle) */}
@@ -80,7 +80,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
       {/* Identidad — Linaje / Clase / Trasfondo con pencil affordances (C6, sdd/ficha-section-editors) */}
       {characterId && characterStatus && (
         <Card variant="surface" className="p-4">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="mb-3 text-eyebrow text-ink-mute">
             Identidad
           </p>
           <div className="space-y-2">
@@ -88,7 +88,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             {sheet.identity.race && (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Linaje</p>
+                  <p className="text-micro font-bold uppercase tracking-widest text-ink-mute">Linaje</p>
                   <p className="text-sm text-ink capitalize">{sheet.identity.race.slug}</p>
                   {sheet.identity.subrace && (
                     <p className="text-xs text-ink-mute capitalize">{sheet.identity.subrace.slug}</p>
@@ -108,7 +108,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             {sheet.identity.classes.length > 0 && (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Clase</p>
+                  <p className="text-micro font-bold uppercase tracking-widest text-ink-mute">Clase</p>
                   {sheet.identity.classes.map((c) => (
                     <p key={c.slug} className="text-sm text-ink capitalize">
                       {c.slug} {c.level}
@@ -128,7 +128,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             {sheet.identity.background && (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">Trasfondo</p>
+                  <p className="text-micro font-bold uppercase tracking-widest text-ink-mute">Trasfondo</p>
                   <p className="text-sm text-ink capitalize">{sheet.identity.background.slug}</p>
                 </div>
                 <BackgroundSection
@@ -145,7 +145,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
 
       {/* Salvaciones — 2-col grid of cards */}
       <Card variant="surface" className="p-4">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        <p className="mb-3 text-eyebrow text-ink-mute">
           Salvaciones
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -167,7 +167,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
                 <span className="block truncate text-xs text-ink leading-tight">
                   {ABILITY_LONG_ES[st.ability] ?? st.ability}
                 </span>
-                <span className="text-[9px] text-ink-mute">{ABILITY_ES[st.ability] ?? st.ability.toUpperCase()}</span>
+                <span className="text-micro text-ink-mute">{ABILITY_ES[st.ability] ?? st.ability.toUpperCase()}</span>
               </div>
               <span
                 className={[
@@ -184,7 +184,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
 
       {/* Secondary stats */}
       <Card variant="surface" className="p-4">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        <p className="mb-3 text-eyebrow text-ink-mute">
           Secundarios
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -204,13 +204,13 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
         sheet.proficiencies.weapons.length > 0 ||
         sheet.proficiencies.tools.length > 0) && (
         <Card variant="surface" className="p-4">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="mb-3 text-eyebrow text-ink-mute">
             Competencias
           </p>
           <div className="space-y-2">
             {sheet.proficiencies.languages.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold uppercase text-ink-mute">Idiomas</span>
+                <span className="text-eyebrow text-ink-mute">Idiomas</span>
                 <p className="text-sm text-ink">
                   {sheet.proficiencies.languages.map(titleCase).join(', ')}
                 </p>
@@ -218,7 +218,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             )}
             {sheet.proficiencies.armor.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold uppercase text-ink-mute">Armaduras</span>
+                <span className="text-eyebrow text-ink-mute">Armaduras</span>
                 <p className="text-sm text-ink">
                   {sheet.proficiencies.armor.map(titleCase).join(', ')}
                 </p>
@@ -226,7 +226,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             )}
             {sheet.proficiencies.weapons.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold uppercase text-ink-mute">Armas</span>
+                <span className="text-eyebrow text-ink-mute">Armas</span>
                 <p className="text-sm text-ink">
                   {sheet.proficiencies.weapons.map(titleCase).join(', ')}
                 </p>
@@ -234,7 +234,7 @@ export function ResumenTab({ sheet, characterId, characterStatus, statusLocked =
             )}
             {sheet.proficiencies.tools.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold uppercase text-ink-mute">Herramientas</span>
+                <span className="text-eyebrow text-ink-mute">Herramientas</span>
                 <p className="text-sm text-ink">
                   {sheet.proficiencies.tools.map(titleCase).join(', ')}
                 </p>
@@ -265,11 +265,11 @@ function RasgosSection({ sheet }: { sheet: CharacterSheet }) {
   return (
     <Card variant="surface" className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+        <p className="text-eyebrow text-ink-mute">
           Rasgos de clase
         </p>
         {sectionSubtitle && (
-          <span className="text-[10px] text-ink-soft truncate ml-2">
+          <span className="text-label text-ink-soft truncate ml-2">
             {sectionSubtitle}
           </span>
         )}
@@ -299,7 +299,7 @@ function RasgosSection({ sheet }: { sheet: CharacterSheet }) {
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold uppercase text-ink-mute">{label}</span>
+      <span className="text-eyebrow text-ink-mute">{label}</span>
       <span className="text-sm font-semibold text-ink">{value}</span>
     </div>
   );

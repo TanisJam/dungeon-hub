@@ -316,11 +316,11 @@ function BackgroundDetailInline({
 }) {
   return (
     <div className="space-y-3">
-      <p className="text-[10px] text-ink-mute">{entry.source}</p>
+      <p className="text-label text-ink-mute">{entry.source}</p>
 
       {/* Skills */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Habilidades</p>
+        <p className="text-eyebrow text-ink-mute">Habilidades</p>
         {parsed.fixedSkills.length > 0 && (
           <p className="mt-1 text-xs">
             <span className="text-ink-mute">Otorgadas:</span>{' '}
@@ -342,7 +342,7 @@ function BackgroundDetailInline({
       {/* Languages */}
       {(parsed.fixedLanguages.length > 0 || Object.keys(parsed.languageChooseCounts).length > 0) && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Idiomas</p>
+          <p className="text-eyebrow text-ink-mute">Idiomas</p>
           {parsed.fixedLanguages.length > 0 && (
             <p className="mt-1 text-xs">
               <span className="text-ink-mute">Otorgados:</span>{' '}
@@ -370,7 +370,7 @@ function BackgroundDetailInline({
       {/* Tools */}
       {(parsed.fixedTools.length > 0 || Object.keys(parsed.toolChooseCounts).length > 0 || parsed.toolChoose !== null) && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Herramientas</p>
+          <p className="text-eyebrow text-ink-mute">Herramientas</p>
           {parsed.fixedTools.length > 0 && (
             <p className="mt-1 text-xs">
               <span className="text-ink-mute">Otorgadas:</span>{' '}
@@ -447,7 +447,7 @@ function ChooseGroup({
   const hasLocked = lockedSkills && Array.from(lockedSkills).some((s) => pool.includes(s));
   return (
     <div className="mt-2 rounded-md border border-accent-soft bg-paper p-2.5">
-      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
+      <p className="text-label font-semibold text-accent-deep">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((s) => {
           const isOn = selected.includes(s);
@@ -475,7 +475,7 @@ function ChooseGroup({
         })}
       </div>
       {hasLocked && (
-        <p className="mt-1.5 text-[10px] text-ink-mute">
+        <p className="mt-1.5 text-label text-ink-mute">
           Las habilidades tachadas ya fueron otorgadas por tu clase.
         </p>
       )}
@@ -504,7 +504,7 @@ function MultiSelectChoose({
   }
   return (
     <div className="mt-2 rounded-md border border-accent-soft bg-paper p-2.5">
-      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
+      <p className="text-label font-semibold text-accent-deep">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((v) => {
           const isOn = selected.includes(v);
@@ -570,7 +570,7 @@ export function MixedPoolPicker({
 
   return (
     <div className="space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         Habilidades, idiomas y herramientas
       </p>
       <div className="flex flex-col gap-2">
@@ -670,7 +670,7 @@ export function EquipmentPicker({
 
   return (
     <div className="space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Equipo</p>
+      <p className="text-eyebrow text-ink-mute">Equipo</p>
 
       {/* Mode toggle */}
       <div className="flex flex-col gap-2">
@@ -726,7 +726,7 @@ export function EquipmentPicker({
             <div className="space-y-2">
               {selectedPackage.alwaysGranted.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-ink-mute">Siempre otorgado:</p>
+                  <p className="text-label text-ink-mute">Siempre otorgado:</p>
                   <ul className="mt-1 space-y-0.5">
                     {selectedPackage.alwaysGranted.map((item, i) => (
                       // biome-ignore lint/suspicious/noArrayIndexKey: static equipment package text — fixed content for the selected package, no reorder/insert/remove; item strings aren't guaranteed unique.
@@ -740,7 +740,7 @@ export function EquipmentPicker({
 
               {altSlots.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-ink-mute">Elegí una opción:</p>
+                  <p className="text-label text-ink-mute">Elegí una opción:</p>
                   <div className="mt-1 flex flex-col gap-1.5">
                     {altSlots.map((slot) => {
                       const items = selectedPackage.alternatives[slot] ?? [];
@@ -812,7 +812,7 @@ export function FeaturePicker({
 
   return (
     <div className="space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Característica</p>
+      <p className="text-eyebrow text-ink-mute">Característica</p>
 
       {/* Filter input */}
       <input

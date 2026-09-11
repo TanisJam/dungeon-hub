@@ -29,8 +29,8 @@ function RoleBadge({ role }: { role: CallerRole }) {
   const label = role === 'gm' ? 'GM' : 'Player';
   const className =
     role === 'gm'
-      ? 'rounded-sm bg-secondary/20 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-secondary'
-      : 'rounded-sm bg-accent/20 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-[0.08em] text-accent';
+      ? 'rounded-sm bg-secondary/20 px-1.5 py-0.5 font-sans text-micro font-bold uppercase tracking-[0.08em] text-secondary'
+      : 'rounded-sm bg-accent/20 px-1.5 py-0.5 font-sans text-micro font-bold uppercase tracking-[0.08em] text-accent';
 
   return <span className={className}>{label}</span>;
 }
@@ -77,7 +77,7 @@ export function WorldSwitcherTrigger({
          * display serif — narrower at the same size, and the serif is the
          * title's voice.
          */}
-        <span className="min-w-0 flex-1 truncate font-sans text-[12px] font-medium leading-tight">
+        <span className="min-w-0 flex-1 truncate font-sans text-caption font-medium leading-tight">
           {worldName}
         </span>
       </button>
@@ -91,7 +91,7 @@ export function WorldSwitcherTrigger({
       className="flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1.5 text-left transition-colors duration-150 hover:border-accent hover:bg-surface/80"
       aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
     >
-      <span className="font-display font-bold text-[13px] leading-tight text-ink truncate max-w-[88px] sm:max-w-[120px]">
+      <span className="font-display font-bold text-footnote leading-tight text-ink truncate max-w-[88px] sm:max-w-[120px]">
         {worldName}
       </span>
       {callerRole && <RoleBadge role={callerRole} />}
@@ -180,7 +180,7 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
                   }`}
                   aria-current={isActive ? 'true' : undefined}
                 >
-                  <span className="flex-1 font-sans text-[13px] font-semibold leading-tight truncate">
+                  <span className="flex-1 font-sans text-footnote font-semibold leading-tight truncate">
                     {world.name}
                   </span>
                   {/* Role badge only shown for active world (callerRole from server) */}

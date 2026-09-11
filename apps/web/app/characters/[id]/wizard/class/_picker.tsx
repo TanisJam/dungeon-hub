@@ -267,7 +267,7 @@ function ClassDetailInline({
 
       {skillChoice && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="text-eyebrow text-ink-mute">
             Habilidades — elegí {skillChoice.count}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -302,7 +302,7 @@ function ClassDetailInline({
             })}
           </div>
           {lockedSkills.size > 0 && (
-            <p className="mt-1 text-[10px] text-ink-mute">
+            <p className="mt-1 text-label text-ink-mute">
               Las habilidades tachadas ya fueron otorgadas por tu trasfondo.
             </p>
           )}
@@ -343,7 +343,7 @@ function SubclassPicker({
   }
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         {title} — elegí 1
       </p>
       <div className="mt-2 grid grid-cols-1 gap-1.5">
@@ -364,7 +364,7 @@ function SubclassPicker({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium">{sc.name}</span>
-                <span className="shrink-0 text-[9px] uppercase text-ink-mute">{sc.source}</span>
+                <span className="shrink-0 text-micro uppercase text-ink-mute">{sc.source}</span>
               </div>
             </button>
           );
@@ -377,7 +377,7 @@ function SubclassPicker({
 function Prof({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">{label}</p>
+      <p className="text-eyebrow text-ink-mute">{label}</p>
       <p className="mt-0.5 text-xs text-ink-soft">{value}</p>
     </div>
   );

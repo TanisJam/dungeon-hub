@@ -40,7 +40,7 @@ const HIT_AREA =
   'inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0 hover:brightness-110 active:translate-y-px';
 
 const PILL =
-  'inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-[9px] font-bold uppercase tracking-[0.08em] transition-colors';
+  'inline-flex items-center gap-1 rounded-pill border px-2 py-[3px] font-sans text-micro font-bold uppercase tracking-[0.08em] transition-colors';
 
 export function ToggleChip({
   tone = 'accent',

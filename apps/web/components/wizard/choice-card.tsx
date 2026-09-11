@@ -106,7 +106,7 @@ export function ChoiceCard({
             {title}
           </p>
           {resolvedSubtitle && (
-            <p className="mt-0.5 truncate text-[11px] italic text-ink-mute">{resolvedSubtitle}</p>
+            <p className="mt-0.5 truncate text-caption italic text-ink-mute">{resolvedSubtitle}</p>
           )}
           {resolvedPills && resolvedPills.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">

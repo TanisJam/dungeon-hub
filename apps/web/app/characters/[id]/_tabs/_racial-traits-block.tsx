@@ -31,7 +31,7 @@ export function RacialTraitsBlock({ traits }: RacialTraitsBlockProps) {
 
   return (
     <Card variant="surface" className="p-4">
-      <h2 className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <h2 className="mb-3 text-eyebrow text-ink-mute">
         Rasgos raciales
       </h2>
 

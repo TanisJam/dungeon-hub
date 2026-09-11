@@ -83,7 +83,7 @@ function ResourceRow({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink">{name}</p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-mute">
+          <p className="mt-0.5 text-eyebrow text-ink-mute">
             {classLabel} · recupera con {triggerLabel}
           </p>
         </div>
@@ -97,7 +97,7 @@ function ResourceRow({
         <div className="mt-2">
           <span
             data-testid="resource-die-badge"
-            className="inline-flex items-center rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mute"
+            className="inline-flex items-center rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-eyebrow text-ink-mute"
           >
             {resource.extra.dieSize}
           </span>
@@ -106,7 +106,7 @@ function ResourceRow({
 
       {isPool && (
         <div className="mt-3">
-          <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-mute">
+          <label className="block text-eyebrow text-ink-mute">
             Cantidad
             <input
               data-testid="resource-amount-input"

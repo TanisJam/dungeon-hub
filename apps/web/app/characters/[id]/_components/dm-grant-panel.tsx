@@ -501,7 +501,7 @@ function ItemTab({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                      <p className="text-eyebrow text-ink-mute">
                         {item.source}
                       </p>
                     </div>
@@ -664,7 +664,7 @@ function BestiarioTab({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink">{monster.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                      <p className="text-eyebrow text-ink-mute">
                         {[monster.cr ? `CR ${monster.cr}` : null, monster.type, monster.source]
                           .filter(Boolean)
                           .join(' · ')}
@@ -822,7 +822,7 @@ function FactionTab({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink">{faction.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                      <p className="text-eyebrow text-ink-mute">
                         {faction.state}
                       </p>
                     </div>
@@ -981,7 +981,7 @@ function LocationTab({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink">{poi.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                      <p className="text-eyebrow text-ink-mute">
                         {poi.status}
                       </p>
                     </div>
@@ -1150,7 +1150,7 @@ function NpcTab({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-ink">{npc.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-ink-mute">
+                      <p className="text-eyebrow text-ink-mute">
                         {[npc.race, STATUS_LABELS[npc.status]]
                           .filter(Boolean)
                           .join(' · ')}
