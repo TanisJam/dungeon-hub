@@ -51,10 +51,16 @@ describe('PersonajeCard', () => {
     expect(screen.getByText('?')).toBeTruthy();
   });
 
-  it('name element has class truncate', () => {
-    render(<PersonajeCard char={baseChar} />);
-    const nameEl = screen.getByText('Brann');
-    expect(nameEl.className).toContain('truncate');
+  // F11 (docs/audit/ui-craft-2026-09-10): truncating cut a long name to one
+  // line with an ellipsis. Wrapping shows more of it and still bounds the card,
+  // so the name clamps to two lines instead.
+  it('a 60-character name clamps to two lines and the pills still render', () => {
+    const longName = 'Thalindra Voss-Ravenwood de la Casa Argéntea del Norte Helado';
+    render(<PersonajeCard char={{ ...baseChar, name: longName }} worldName="Tres Lunas" />);
+
+    expect(screen.getByText(longName).className).toContain('line-clamp-2');
+    expect(screen.getByText('Tres Lunas')).toBeTruthy();
+    expect(screen.getByText('Activo')).toBeTruthy();
   });
 
   it('renders world pill only when worldName is provided', () => {

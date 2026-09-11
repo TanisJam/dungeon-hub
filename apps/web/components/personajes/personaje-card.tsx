@@ -57,7 +57,7 @@ export function PersonajeCard({
         ) : null
       }
     >
-      <div className="truncate font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
+      <div className="line-clamp-2 font-display text-[15px] font-bold leading-tight tracking-tight text-ink">
         {char.name}
       </div>
       {char.lineage ? (
