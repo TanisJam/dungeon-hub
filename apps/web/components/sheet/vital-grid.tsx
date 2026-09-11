@@ -9,9 +9,10 @@ interface VitalGridProps {
   armorFormula?: string;
   walkSpeed?: number;
   /**
-   * Optional slot rendered inside the HP cell (absolute top-1 right-1).
-   * Used by character sheet page to inject the role-reactive HPSectionEditor
-   * via DmAwareAffordances (FIX B). When absent, no editor affordance is shown.
+   * Optional affordance rendered in the HP cell's top-right corner. Used by the
+   * character sheet page to inject the role-reactive HPSectionEditor via
+   * DmAwareAffordances (FIX B). When absent, no editor affordance is shown.
+   * StatCell owns the positioning; this slot passes a plain button.
    */
   hpEditorSlot?: ReactNode;
 }
@@ -63,15 +64,15 @@ export function VitalGrid({
     <div className="grid grid-cols-3 gap-2">
       {/* HP — peach gradient (ficha-vital-hp replaces inline style) */}
       <StatCell
-        label="Puntos de Golpe"
+        label="Vida"
         value={hpDisplay}
         size="compact"
         accent="peach"
+        action={hpEditorSlot}
         footer={
           <>
             {hpTempEl}
             {hpBar}
-            {hpEditorSlot}
           </>
         }
       />

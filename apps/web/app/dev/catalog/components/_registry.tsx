@@ -227,7 +227,7 @@ const statCellEntry: ComponentEntry = {
 
     if (label.includes('Compact size')) {
       return (
-        <StatCell label="Puntos de Golpe" value="28 / 36" size="compact" accent="peach" />
+        <StatCell label="Vida" value="28 / 36" size="compact" accent="peach" />
       );
     }
     if (label.includes('Paper surface')) {
