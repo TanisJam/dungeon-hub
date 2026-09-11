@@ -712,7 +712,7 @@ export function EquipmentPicker({
               const [slug, src] = e.target.value.split('|');
               if (slug && src) selectBg(slug, src);
             }}
-            className="w-full rounded-md border border-line bg-paper px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none"
+            className="select-field"
           >
             <option value="">Elegí un trasfondo…</option>
             {packages.map((p) => (
@@ -828,7 +828,7 @@ export function FeaturePicker({
         value={value?.slug ?? ''}
         onChange={(e) => handleSelect(e.target.value)}
         size={1}
-        className="w-full rounded-md border border-line bg-paper px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none"
+        className="select-field"
       >
         <option value="">Elegí una característica…</option>
         {filtered.map((f) => (

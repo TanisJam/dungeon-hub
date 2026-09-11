@@ -388,7 +388,7 @@ export function CompleteForm({
                   data-testid={`item-row-${index}-recipient`}
                   value={row.characterId}
                   onChange={(e) => updateItem(index, 'characterId', e.target.value)}
-                  className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 font-sans text-sm text-ink"
+                  className="select-field mt-1 font-sans"
                 >
                   <option value="">— Elegir personaje —</option>
                   {activeParticipants.map((p) => (
@@ -547,7 +547,7 @@ export function CompleteForm({
                       e.target.value as 'public' | 'dm-only',
                     )
                   }
-                  className="mt-1 w-full rounded-md border border-line bg-paper-soft px-3 py-2 font-sans text-sm text-ink"
+                  className="select-field mt-1 font-sans"
                 >
                   <option value="public">Público</option>
                   <option value="dm-only">Solo DM</option>

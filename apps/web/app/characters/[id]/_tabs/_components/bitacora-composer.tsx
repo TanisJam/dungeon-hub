@@ -436,7 +436,7 @@ export function BitacoraComposer({
                 id="bp-ref"
                 value={selectedRef?.kind === 'monster' ? `${selectedRef.refKey}|${selectedRef.refSource}` : ''}
                 onChange={handleMonsterRefChange}
-                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                className="select-field"
               >
                 <option value="">Sin monstruo</option>
                 {knownMonsters.map((m) => (
@@ -453,7 +453,7 @@ export function BitacoraComposer({
                 id="bp-ref-npc"
                 value={selectedRef?.kind === 'npc' ? selectedRef.refKey : ''}
                 onChange={handleNpcRefChange}
-                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                className="select-field"
               >
                 <option value="">Sin NPC</option>
                 {knownNpcs.map((n) => (
@@ -470,7 +470,7 @@ export function BitacoraComposer({
                 id="bp-ref-faction"
                 value={selectedRef?.kind === 'faction' ? selectedRef.refKey : ''}
                 onChange={handleFactionRefChange}
-                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                className="select-field"
               >
                 <option value="">Sin facción</option>
                 {knownFactions.map((f) => (
@@ -487,7 +487,7 @@ export function BitacoraComposer({
                 id="bp-ref-location"
                 value={selectedRef?.kind === 'location' ? selectedRef.refKey : ''}
                 onChange={handleLocationRefChange}
-                className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+                className="select-field"
               >
                 <option value="">Sin lugar</option>
                 {knownLocations.map((l) => (

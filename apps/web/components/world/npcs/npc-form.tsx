@@ -26,8 +26,7 @@ const STATUSES: { value: NpcStatus; label: string }[] = [
   { value: 'unknown', label: 'Desconocido' },
 ];
 
-const selectClass =
-  'min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20';
+const selectClass = 'select-field';
 
 export function NpcForm({ mode, initial, onSubmit, onDone }: NpcFormProps) {
   const [name, setName] = useState(initial?.name ?? '');

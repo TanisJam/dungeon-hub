@@ -174,6 +174,92 @@
   line-height: 1.2;
 }
 
+/* ── Native/third-party control overrides (audit F10) ──
+   Leaflet, native <select>, and the DM shop checkboxes ship unthemed, in the
+   wrong language, or with sub-44px touch targets. Scoped overrides below keep
+   native behaviour (dropdown, checkbox, zoom) and restyle the look only. */
+
+/* Leaflet ships its own unlayered CSS (imported by world-map-leaflet.tsx) with
+   white 30×30 zoom buttons and a white attribution strip — the only foreign
+   fonts in the app ("Lucida Console", "Helvetica Neue") come from that
+   stylesheet. This block is DELIBERATELY NOT inside @layer components: an
+   `@import "tailwindcss"` project puts @layer rules below any unlayered CSS
+   in the cascade regardless of specificity, so a layered override would
+   always lose to leaflet.css. `!important` on the touched properties makes
+   the theming win regardless of the two stylesheets' load order (Leaflet's
+   own `.leaflet-touch .leaflet-bar a` rule already outranks a plain
+   `.leaflet-bar a` by specificity, which is the second reason a bare override
+   is not enough here). Themed with tokens, bumped to the 44px touch target.
+   See components/world/map/world-map-leaflet.tsx. */
+.leaflet-bar,
+.leaflet-touch .leaflet-bar {
+  border-color: var(--color-line) !important;
+}
+.leaflet-bar a,
+.leaflet-touch .leaflet-bar a {
+  background-color: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+  border-color: var(--color-line) !important;
+  width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus,
+.leaflet-touch .leaflet-bar a:hover,
+.leaflet-touch .leaflet-bar a:focus {
+  background-color: var(--color-surface-soft) !important;
+  color: var(--color-ink) !important;
+}
+.leaflet-bar a.leaflet-disabled {
+  background-color: var(--color-surface) !important;
+  color: var(--color-ink-mute) !important;
+}
+.leaflet-control-attribution,
+/* leaflet.css:275 sets "Helvetica Neue" on the container, and :342 sets
+   'Lucida Console' on the zoom glyphs — the only two foreign families in the
+   app's computed-font census. The container's stack reaches the tiles, which
+   paint no text; the zoom rule paints the + and − you can see. */
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+}
+.leaflet-container .leaflet-control-zoom-in,
+.leaflet-container .leaflet-control-zoom-out {
+  font: 700 20px / 44px var(--font-sans) !important;
+}
+
+.leaflet-container .leaflet-control-attribution {
+  background: var(--color-paper) !important;
+  color: var(--color-ink-mute) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a {
+  color: var(--color-ink-mute) !important;
+}
+
+/* Shared native <select> treatment — same border/background/radius/text the
+   app's text inputs use (components/ui/form-input.tsx), applied once instead
+   of hand-editing every call site. Keeps native dropdown behaviour. */
+@layer components {
+  .select-field {
+    display: block;
+    min-height: 44px;
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-line);
+    background-color: var(--color-paper-soft);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-ink);
+  }
+  .select-field:focus {
+    border-color: var(--color-ink);
+    outline: none;
+  }
+}
+
 /* ── Sheet animation ── */
 @keyframes v3-sheet-slide-up {
   from { transform: translateY(100%); }

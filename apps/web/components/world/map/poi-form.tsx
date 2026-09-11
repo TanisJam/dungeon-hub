@@ -140,7 +140,7 @@ export function PoiForm({
           id={`poi-status-${idPrefix}`}
           value={formStatus}
           onChange={(e) => setFormStatus(e.target.value as PoiStatus)}
-          className="mt-1 min-h-[44px] w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+          className="select-field mt-1"
         >
           <option value="unknown">Desconocido</option>
           <option value="discovered">Descubierto</option>
