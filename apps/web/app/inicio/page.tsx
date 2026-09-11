@@ -222,7 +222,14 @@ async function PlayerView({ token, worldSwitcher, callerRole, worldId }: { token
 
   return (
     <AppShell title="Inicio" subtitle="TU GREMIO" roleDefault="player" callerRole={callerRole ?? undefined} worldSwitcher={worldSwitcher}>
-      <div className="flex flex-col gap-4">
+      {/*
+       * data-home-view names which branch the SERVER resolved, so that fact is
+       * observable without depending on visible copy. It used to be read off
+       * the "TU GREMIO — DM" subtitle, which F5 then stopped rendering here
+       * (TopBar shows the worldSwitcher instead when a page passes both), and
+       * the e2e guard for the whole DM/player switch silently lost its probe.
+       */}
+      <div data-home-view="player" className="flex flex-col gap-4">
         {heroData ? (
           <HeroNextSession campaign={heroData} />
         ) : (
@@ -335,7 +342,9 @@ async function DMView({ token, worldSwitcher, callerRole }: { token?: string; wo
 
   return (
     <AppShell title="Inicio" subtitle="TU GREMIO — DM" roleDefault="dm" callerRole={callerRole ?? undefined} worldSwitcher={worldSwitcher}>
-      <div className="flex flex-col gap-4">
+      {/* See the note on the player branch — data-home-view is the stable
+          observable for which branch the server resolved. */}
+      <div data-home-view="dm" className="flex flex-col gap-4">
         <PendingFichasCardTrigger
           fichas={fichasData}
           oldestAge={oldestAge ?? '—'}

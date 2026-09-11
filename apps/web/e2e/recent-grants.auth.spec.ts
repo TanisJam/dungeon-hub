@@ -55,7 +55,7 @@ test.describe('RecentGrants widget — mobile smoke @ 375px', () => {
 
     // Section is visible — assert it contains either events or empty state
     const hasGrants = await grantsSection.locator('ul li').count() > 0;
-    const hasEmptyState = await grantsSection.getByText('Sin grants recientes.').isVisible();
+    const hasEmptyState = await grantsSection.locator('[data-v3-empty]').first().isVisible();
 
     expect(hasGrants || hasEmptyState, 'RecentGrants shows events or empty state').toBe(true);
 

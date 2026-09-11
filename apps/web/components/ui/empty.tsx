@@ -22,11 +22,18 @@ interface V3EmptyProps {
  * (codex-rehome) player Codex no-active-character empty state with CTA, and
  * (ui-craft F9) section/card-level empties via size="inline".
  * REQ-EMPTY-01: optional CTA link, ≥44px tap target, mobile-first.
+ *
+ * Both variants carry `data-v3-empty` so a test can assert "this section is
+ * showing its empty state" without pinning the assertion to the copy. Two e2e
+ * specs used to match the literal "Sin grants recientes." and both broke the day
+ * ui-craft F9 rewrote that empty state and dropped the full stop — a one-character
+ * change, green CI, two silently dead guards. With 34 call sites and copy that is
+ * meant to keep improving, the copy is the wrong thing to assert on.
  */
 export function V3Empty({ glyph, title, sub, cta, size = 'page' }: V3EmptyProps) {
   if (size === 'inline') {
     return (
-      <div className="flex flex-col items-center gap-1.5 py-4 text-center text-ink-mute">
+      <div data-v3-empty="inline" className="flex flex-col items-center gap-1.5 py-4 text-center text-ink-mute">
         <Icon name={glyph} size={20} strokeWidth={1.5} />
         <p className="font-sans text-sm text-ink">{title}</p>
         {sub && <p className="font-sans text-xs">{sub}</p>}
@@ -43,7 +50,7 @@ export function V3Empty({ glyph, title, sub, cta, size = 'page' }: V3EmptyProps)
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-ink-mute">
+    <div data-v3-empty="page" className="flex flex-col items-center justify-center gap-3 py-16 text-center text-ink-mute">
       <Icon name={glyph} size={40} strokeWidth={1.25} />
       <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
       {sub && <p className="font-sans text-sm">{sub}</p>}

@@ -17,19 +17,25 @@ test('role toggle (single button) switches view + player view reaches character'
 
   // GM defaults to DM view.
   //
-  // The marker is AppShell's subtitle, which /inicio renders as "TU GREMIO — DM" on
-  // the DM branch and "TU GREMIO" on the player one — so its presence is exactly the
-  // server-side branch this spec exists to guard. Assert presence, not visibility:
-  // the subtitle carries `hidden sm:block`, so at this 390px viewport it is in the
-  // DOM and deliberately not painted. The negative assertion below already counts
-  // rather than looks; this makes the pair symmetric.
-  const dmSubtitle = page.getByText('TU GREMIO — DM');
+  // The marker is `data-home-view` on /inicio's branch wrapper, which names which
+  // branch the SERVER resolved — exactly what this spec exists to guard.
+  //
+  // It used to read the "TU GREMIO — DM" subtitle instead. Audit finding F5 then
+  // moved the world switcher under the title, and TopBar renders the world OR the
+  // subtitle, never both — so on /inicio, which passes both, the subtitle stopped
+  // rendering entirely and this spec lost its probe without anyone noticing,
+  // because the e2e suite does not run in CI. Assert on a deliberate observable,
+  // not on visible copy that a craft PR is free to move.
+  //
+  // Count rather than visibility: the wrapper is in the DOM either way and the
+  // negative assertions below need the same shape.
+  const dmView = page.locator('[data-home-view="dm"]');
   await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'true');
-  await expect(dmSubtitle).toHaveCount(1, { timeout: 10_000 });
+  await expect(dmView).toHaveCount(1, { timeout: 10_000 });
 
   // Tap the switcher → player view
   await roleSwitcher.click();
-  await expect(dmSubtitle).toHaveCount(0, { timeout: 10_000 });
+  await expect(dmView).toHaveCount(0, { timeout: 10_000 });
   await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('Atajos')).toBeVisible();
   // Filtered to visible: DesktopSidebar renders its own /personajes link, and at
@@ -44,6 +50,6 @@ test('role toggle (single button) switches view + player view reaches character'
 
   // Tap again → back to DM view
   await roleSwitcher.click();
-  await expect(dmSubtitle).toHaveCount(1, { timeout: 10_000 });
+  await expect(dmView).toHaveCount(1, { timeout: 10_000 });
   await expect(roleSwitcher).toHaveAttribute('aria-pressed', 'true');
 });
