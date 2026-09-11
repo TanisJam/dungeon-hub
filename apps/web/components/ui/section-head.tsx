@@ -29,7 +29,7 @@ export function SectionHead({ num, title, meta, description, size = 'sm' }: Sect
               {num}
             </span>
           )}
-          <span className="font-display font-semibold text-body-lg leading-tight tracking-tight text-ink">
+          <span className="font-display font-semibold text-subhead leading-tight tracking-tight text-ink">
             {title}
           </span>
           {meta && (
@@ -53,7 +53,7 @@ export function SectionHead({ num, title, meta, description, size = 'sm' }: Sect
           {num}
         </span>
       )}
-      <span className="font-display font-semibold text-body-lg leading-tight tracking-tight text-ink">
+      <span className="font-display font-semibold text-subhead leading-tight tracking-tight text-ink">
         {title}
       </span>
       {meta && (

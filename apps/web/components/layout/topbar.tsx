@@ -101,7 +101,18 @@ export function TopBar({
       {/* LEFT slot: backHref arrow, else the CrowMark */}
       {renderLeftSlot()}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        <h1 className="font-display font-bold text-body leading-[1.15] tracking-tight text-ink truncate m-0">
+        {/*
+         * F3 step 3: the page title was text-body (15px) on every route, so at
+         * 1440px "Personajes" was a 15px heading over a mostly empty screen and
+         * on a phone it barely outranked the row labels beneath it. text-subhead
+         * on mobile, text-title on desktop — the audit's own acceptance criterion
+         * is a desktop h1 of at least 22px.
+         *
+         * truncate stays: this is the element that was overflowing before F5
+         * moved the world switcher out of the left slot, and a bigger title
+         * makes that more likely, not less.
+         */}
+        <h1 className="font-display font-bold text-subhead md:text-title leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
         </h1>
         {/*
