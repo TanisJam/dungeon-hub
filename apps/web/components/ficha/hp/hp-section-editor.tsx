@@ -23,13 +23,21 @@ export function HPSectionEditor({ characterId, currentHp, isDmHere }: HPSectionE
   return (
     <>
       {/* Pencil affordance */}
+      {/*
+        The tap area stays 44px, but its visible chrome is a 24px mark pinned to
+        the button's top-right corner. A 44px bordered box in the HP cell reaches
+        down over the value: the cell is 109px wide at 375px, so the box covered
+        the label before and would cover "12 / 12" after. See audit F7.
+      */}
       <button
         type="button"
         aria-label="Editar HP"
         onClick={() => setOpen(true)}
-        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-line text-ink-mute transition-colors hover:border-accent hover:text-accent"
+        className="group flex min-h-[44px] min-w-[44px] items-start justify-end text-ink-mute transition-colors hover:text-accent"
       >
-        <Icon name="edit" size={16} />
+        <span className="flex h-6 w-6 items-center justify-center rounded-md border border-line transition-colors group-hover:border-accent">
+          <Icon name="edit" size={14} />
+        </span>
       </button>
 
       {/* V3Sheet — bottom modal, controlled */}
