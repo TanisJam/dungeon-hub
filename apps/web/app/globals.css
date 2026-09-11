@@ -128,10 +128,16 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Named type-scale utilities (ADR-4 — define only; migration of text-[Npx] is follow-up) ── */
+/* ── Named type-scale utilities (ADR-4 — F3 migrated existing text-[Npx] arbitraries onto these) ── */
 @utility text-micro {
   font-size: 9px;
   line-height: 1.4;
+}
+
+/* Plain 10px — the non-eyebrow 10px sites (not uppercase) have nowhere else on the scale to go. */
+@utility text-label {
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 @utility text-caption {
