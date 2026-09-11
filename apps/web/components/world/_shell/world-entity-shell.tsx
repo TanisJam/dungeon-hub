@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { V3Sheet } from '@/components/ui';
+import { V3Sheet, V3Empty } from '@/components/ui';
 
 export type EffectiveView = 'dm' | 'player';
 
@@ -243,16 +243,15 @@ export function WorldEntityShell<TRow, TDetail>({
           </div>
         ) : (
           // True empty (nothing created yet): guide the user, and point DMs at the + FAB.
-          <div className="px-6 py-14 text-center">
-            <p className="font-display text-lg text-ink">
-              {emptyTitle ?? 'Todavía no hay nada acá'}
-            </p>
-            {isDM && (
-              <p className="mt-1.5 text-sm text-ink-soft">
-                {emptyHint ?? 'Tocá el botón + para crear el primero.'}
-              </p>
-            )}
-          </div>
+          <V3Empty
+            glyph="scroll"
+            title={emptyTitle ?? 'Todavía no hay nada acá'}
+            sub={
+              isDM
+                ? (emptyHint ?? 'Tocá el botón + para crear el primero.')
+                : 'Solo el DM puede agregar contenido nuevo.'
+            }
+          />
         )
       ) : (
         <ul className="divide-y divide-line">

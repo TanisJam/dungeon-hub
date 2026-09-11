@@ -13,6 +13,7 @@
 // unrelated tests that render this island green.
 
 import { useState, useTransition } from 'react';
+import { V3Empty } from '@/components/ui/empty';
 
 export interface ShopItemRef {
   slug: string;
@@ -106,7 +107,12 @@ export function ShopCurationEditor({
       </p>
 
       {items.length === 0 ? (
-        <p className="text-sm text-ink-mute">No hay ítems mundanos en este mundo.</p>
+        <V3Empty
+          size="inline"
+          glyph="bag"
+          title="No hay ítems mundanos en este mundo"
+          sub="Van a aparecer acá cuando el compendio del mundo los tenga registrados."
+        />
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">

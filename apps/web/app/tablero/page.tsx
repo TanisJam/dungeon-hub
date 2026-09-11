@@ -21,6 +21,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
+import { V3Empty } from '@/components/ui/empty';
 import { QuestRow } from '@/components/ui/quest-row';
 import { getActiveCharacter } from '@/lib/active-character';
 import { selectBoardQuests, type AnnouncedQuest, type BoardQuest } from './_select-board-quests';
@@ -76,9 +77,11 @@ export default async function TableroPage() {
   if (!activeCharacter) {
     return (
       <AppShell title="Tablero" subtitle="ANUNCIOS">
-        <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
-          <p>Seleccioná un personaje para ver el Tablero.</p>
-        </div>
+        <V3Empty
+          glyph="user"
+          title="Seleccioná un personaje para ver el Tablero"
+          cta={{ label: 'Ver mis personajes', href: '/personajes' }}
+        />
       </AppShell>
     );
   }
@@ -101,9 +104,11 @@ export default async function TableroPage() {
   if (board.length === 0) {
     return (
       <AppShell title="Tablero" subtitle="ANUNCIOS">
-        <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
-          <p>No hay convocatorias disponibles en este mundo.</p>
-        </div>
+        <V3Empty
+          glyph="scroll"
+          title="No hay convocatorias disponibles en este mundo"
+          sub="El DM puede publicar convocatorias desde Herramientas → Quests."
+        />
       </AppShell>
     );
   }

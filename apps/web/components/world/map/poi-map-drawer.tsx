@@ -28,6 +28,7 @@
 import type { PoiRow } from '@/app/mapa/actions';
 import type { EffectiveView } from '@/components/world/_shell/world-entity-shell';
 import { Pill } from '@/components/ui/pill';
+import { V3Empty } from '@/components/ui/empty';
 import { POI_STATUS_LABEL } from './poi-detail';
 import { POI_STATUS_TONE } from './status-tones';
 
@@ -122,8 +123,13 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
         style={{ paddingBottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       >
         {pois.length === 0 ? (
-          <li className="px-4 py-6 text-center text-sm text-ink-mute">
-            No hay puntos de interés
+          <li>
+            <V3Empty
+              size="inline"
+              glyph="compass"
+              title="No hay puntos de interés"
+              sub="El DM los agrega tocando el mapa."
+            />
           </li>
         ) : (
           pois.map((poi) => <PoiListRow key={poi.id} poi={poi} onFlyTo={onFlyTo} />)

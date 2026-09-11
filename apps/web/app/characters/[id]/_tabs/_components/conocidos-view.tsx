@@ -18,6 +18,7 @@
  */
 
 import { useState } from 'react';
+import { V3Empty } from '@/components/ui/empty';
 import { MonsterRowView } from '@/app/compendium/[category]/_components/row-views';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
@@ -237,8 +238,13 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {monsterPages.length === 0 ? (
-            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
-              <p className="text-sm text-ink-mute">No hay notas sobre este monstruo.</p>
+            <div className="rounded-md border border-dashed border-line bg-surface">
+              <V3Empty
+                size="inline"
+                glyph="scroll"
+                title="No hay notas sobre este monstruo"
+                sub="Agregá una nota para registrar lo que sabés."
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -342,8 +348,13 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {npcPages.length === 0 ? (
-            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
-              <p className="text-sm text-ink-mute">No hay notas sobre este NPC.</p>
+            <div className="rounded-md border border-dashed border-line bg-surface">
+              <V3Empty
+                size="inline"
+                glyph="scroll"
+                title="No hay notas sobre este NPC"
+                sub="Agregá una nota para registrar lo que sabés."
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -440,8 +451,13 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {factionPages.length === 0 ? (
-            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
-              <p className="text-sm text-ink-mute">No hay notas sobre esta facción.</p>
+            <div className="rounded-md border border-dashed border-line bg-surface">
+              <V3Empty
+                size="inline"
+                glyph="scroll"
+                title="No hay notas sobre esta facción"
+                sub="Agregá una nota para registrar lo que sabés."
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -538,8 +554,13 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {locationPages.length === 0 ? (
-            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
-              <p className="text-sm text-ink-mute">No hay notas sobre este lugar.</p>
+            <div className="rounded-md border border-dashed border-line bg-surface">
+              <V3Empty
+                size="inline"
+                glyph="scroll"
+                title="No hay notas sobre este lugar"
+                sub="Agregá una nota para registrar lo que sabés."
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-2">
@@ -606,14 +627,11 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
 
   if (!hasMonsters && !hasNpcs && !hasFactions && !hasLocations) {
     return (
-      <div className="py-10 text-center">
-        <p className="text-sm text-ink-mute">
-          Aún no conocés ningún monstruo, NPC, facción ni lugar.
-        </p>
-        <p className="mt-1 text-xs text-ink-soft">
-          El DM puede otorgarte conocimiento desde su panel.
-        </p>
-      </div>
+      <V3Empty
+        glyph="eye"
+        title="Aún no conocés ningún monstruo, NPC, facción ni lugar"
+        sub="El DM puede otorgarte conocimiento desde su panel."
+      />
     );
   }
 

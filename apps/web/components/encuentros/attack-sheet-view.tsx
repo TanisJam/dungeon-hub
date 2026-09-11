@@ -8,6 +8,7 @@
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { V3Empty } from '@/components/ui/empty';
 import type { EnrichedInventoryItem } from '@/lib/sheet-types';
 import type { EncounterCombatant } from './types';
 
@@ -124,7 +125,16 @@ export function AttackSheetView({
               {selectedWeapon?.displayName} — elegí un objetivo
             </p>
             {npcTargets.length === 0 ? (
-              <p className="text-sm text-ink-soft">No hay enemigos disponibles.</p>
+              <div className="flex flex-col items-center gap-2">
+                <V3Empty size="inline" glyph="sword" title="No hay enemigos disponibles" />
+                <button
+                  type="button"
+                  onClick={onBackToWeapon}
+                  className="min-h-[44px] px-2 text-sm font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  Volver a elegir arma
+                </button>
+              </div>
             ) : (
               npcTargets.map((npc) => (
                 <button

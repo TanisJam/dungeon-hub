@@ -6,10 +6,10 @@
 // Mobile-first: 375px, ≥44px tap targets, pinned confirm button.
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { V3Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { FormErrorAlert } from '@/components/ui/form-error-alert';
+import { V3Empty } from '@/components/ui/empty';
 import { joinSession } from '@/app/campanas/[id]/sessions/actions';
 
 // ---------------------------------------------------------------------------
@@ -123,17 +123,12 @@ export function JoinSheet({
 
         {characters.length === 0 ? (
           /* REQ-DPPMB-JOIN-03: empty state */
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <p className="font-sans text-sm text-ink-mute">
-              Aún no tenés un personaje activo en este mundo.
-            </p>
-            <Link
-              href="/characters/new"
-              className="font-sans text-sm font-semibold text-primary underline-offset-2 hover:underline"
-            >
-              Crear personaje
-            </Link>
-          </div>
+          <V3Empty
+            size="inline"
+            glyph="user"
+            title="Aún no tenés un personaje activo en este mundo"
+            cta={{ label: 'Crear personaje', href: '/characters/new' }}
+          />
         ) : (
           <>
             {/* REQ-DPPMB-JOIN-02: character list — ≥44px touch targets */}

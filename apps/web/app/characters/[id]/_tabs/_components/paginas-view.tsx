@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { KNOWLEDGE_TAGS } from '@dungeon-hub/domain/world/codex';
+import { V3Empty } from '@/components/ui/empty';
 import { DetailSheet } from '@/app/compendium/[category]/_components/detail-sheet';
 import { CATEGORY_CONFIG } from '@/app/compendium/[category]/_config/registry';
 import { BitacoraComposer, type KnownMonster, type KnownNpc, type KnownFaction, type KnownLocation, type BitacoraPageRef } from './bitacora-composer';
@@ -372,18 +373,19 @@ export function PaginasView({ characterId, pages, knownMonsters, knownNpcs = [],
 
       {/* Page list */}
       {filteredPages.length === 0 ? (
-        <div className="py-10 text-center">
-          <p className="text-sm text-ink-mute">
-            {activeTag
-              ? `No hay páginas con la etiqueta "${activeTag}".`
-              : 'Aún no escribiste ninguna página.'}
-          </p>
-          {!activeTag && (
-            <p className="mt-1 text-xs text-ink-soft">
-              Usá el botón de abajo para crear tu primera nota.
+        activeTag ? (
+          <div className="py-10 text-center">
+            <p className="text-sm text-ink-mute">
+              {`No hay páginas con la etiqueta "${activeTag}".`}
             </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <V3Empty
+            glyph="scroll"
+            title="Aún no escribiste ninguna página"
+            sub="Usá el botón de abajo para crear tu primera nota."
+          />
+        )
       ) : (
         <div className="flex flex-col gap-2">
           {filteredPages.map((page) => (

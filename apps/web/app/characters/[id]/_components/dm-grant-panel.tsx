@@ -18,6 +18,7 @@
  */
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import { V3Empty } from '@/components/ui/empty';
 import {
   grantXp,
   grantGold,
@@ -799,9 +800,16 @@ function FactionTab({
       {!picked && !loading && (
         <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-ink-mute">
-              {allFactions.length === 0 ? 'No hay facciones en este mundo.' : 'Sin resultados.'}
-            </p>
+            allFactions.length === 0 ? (
+              <V3Empty
+                size="inline"
+                glyph="scroll"
+                title="No hay facciones en este mundo"
+                sub="Creálas desde Herramientas → Facciones."
+              />
+            ) : (
+              <p className="px-4 py-3 text-sm text-ink-mute">Sin resultados.</p>
+            )
           )}
           {filtered.length > 0 && (
             <ul className="divide-y divide-line max-h-48 overflow-y-auto">
@@ -951,9 +959,16 @@ function LocationTab({
       {!picked && !loading && (
         <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-ink-mute">
-              {allPois.length === 0 ? 'No hay lugares en este mundo.' : 'Sin resultados.'}
-            </p>
+            allPois.length === 0 ? (
+              <V3Empty
+                size="inline"
+                glyph="compass"
+                title="No hay lugares en este mundo"
+                sub="Creálos desde el mapa."
+              />
+            ) : (
+              <p className="px-4 py-3 text-sm text-ink-mute">Sin resultados.</p>
+            )
           )}
           {filtered.length > 0 && (
             <ul className="divide-y divide-line max-h-48 overflow-y-auto">
@@ -1113,9 +1128,16 @@ function NpcTab({
       {!picked && !loading && (
         <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
-            <p className="px-4 py-3 text-sm text-ink-mute">
-              {allNpcs.length === 0 ? 'No hay NPCs en este mundo.' : 'Sin resultados.'}
-            </p>
+            allNpcs.length === 0 ? (
+              <V3Empty
+                size="inline"
+                glyph="user"
+                title="No hay NPCs en este mundo"
+                sub="Creálos desde Herramientas → NPCs."
+              />
+            ) : (
+              <p className="px-4 py-3 text-sm text-ink-mute">Sin resultados.</p>
+            )
           )}
           {filtered.length > 0 && (
             <ul className="divide-y divide-line max-h-48 overflow-y-auto">

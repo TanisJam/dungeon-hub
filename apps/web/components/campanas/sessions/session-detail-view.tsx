@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import type { SessionDetail, SessionEvent } from '@/app/campanas/[id]/sessions/actions';
 import { Pill } from '@/components/ui/pill';
 import { SectionHead } from '@/components/ui/section-head';
+import { V3Empty } from '@/components/ui/empty';
 import { EventTimeline } from './event-timeline';
 
 // ---------------------------------------------------------------------------
@@ -131,9 +132,12 @@ export function SessionDetailView({
         <section className="md:w-56 md:shrink-0">
           <SectionHead title="Participantes" meta={visibleParticipants.length} />
           {visibleParticipants.length === 0 ? (
-            <p className="mt-2 font-sans text-sm text-ink-mute">
-              Aún no hay participantes.
-            </p>
+            <V3Empty
+              size="inline"
+              glyph="user"
+              title="Aún no hay participantes"
+              sub="Los jugadores aparecen acá al unirse a la sesión."
+            />
           ) : (
             <ul className="mt-2 flex flex-wrap gap-2">
               {visibleParticipants.map((p) => {

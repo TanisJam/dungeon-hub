@@ -5,7 +5,7 @@ import { CompendiumRecentsList } from './compendium-recents-list';
 describe('CompendiumRecentsList', () => {
   it('renders honest empty state — no fake rows', () => {
     const { getByText } = render(<CompendiumRecentsList />);
-    expect(getByText('Aún no consultaste ninguna entrada.')).toBeTruthy();
+    expect(getByText('Aún no consultaste ninguna entrada')).toBeTruthy();
   });
 
   it('does NOT render fake "Bola de fuego" entry', () => {
