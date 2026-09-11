@@ -1,6 +1,28 @@
 # UI craft audit — 2026-09-10 — findings + step-by-step remediation plan
 
-> Status: **audit complete, nothing applied.** Read-only session on production `main = add83b3`
+> Status (2026-09-11): **F2, F5, F6, F7, F9, F10, F11, F12 applied and in production.**
+> F4 re-measured and does not reproduce (see its section). F1 and F3 not started.
+> Every number below is the *before*; each finding's PR carries the after.
+>
+> | | before | now |
+> |---|---:|---:|
+> | Forbidden raw Tailwind colours | 122 | **0** |
+> | Solid `bg-white` | 19 | **0** |
+> | Raw Tailwind shadows | 13 | **0** |
+> | Off-scale radii | 145 | **0** |
+> | Colour classes naming an undeclared token | 54 | **0** |
+> | Tightest tabbar label gap at 6 columns | 3.5px | **18.5px** |
+> | Routes with a truncated topbar title | 1 of 7 | **0 of 7** |
+> | `/herramientas/tienda` targets under 44px | 61 | **1** |
+> | Foreign font families on `/mapa` | 2 | **0** |
+> | Files importing `V3Empty` | 10 | **34** |
+>
+> A regression guard landed with F2 and grew through F12: `apps/web/lib/design-system-guard.test.ts`
+> fails on a raw palette colour, a solid `bg-white`, a default Tailwind shadow, an off-scale
+> radius, a colour class naming a token `globals.css` never declares, and a `@theme` token missing
+> from `lib/design-tokens.ts`.
+>
+> Original status: **audit complete, nothing applied.** Read-only session on production `main = add83b3`
 > (https://dungeon-hub.vercel.app, API redeployed by hand to the same commit). Mobile 375 px and
 > desktop 1440 px measured with the same depth. This document is the working plan for the
 > follow-up session(s): every finding carries what was measured, where it lives, the steps to
