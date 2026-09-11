@@ -58,7 +58,7 @@ export function RestActions({ charId }: RestActionsProps) {
           type="button"
           onClick={handleShort}
           disabled={isPending}
-          className="flex-1 min-h-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
+          className="flex-1 min-h-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute hover:bg-surface hover:text-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
         >
           {isShortPending ? 'Descansando…' : 'Descanso corto'}
         </button>
@@ -66,7 +66,7 @@ export function RestActions({ charId }: RestActionsProps) {
           type="button"
           onClick={handleLong}
           disabled={isPending}
-          className="flex-1 min-h-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
+          className="flex-1 min-h-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute hover:bg-surface hover:text-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
         >
           {isLongPending ? 'Descansando…' : 'Descanso largo'}
         </button>

@@ -100,7 +100,7 @@ export function Picker({ characterId, worldId }: PickerProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-4 py-3 text-sm font-semibold text-ink hover:bg-paper-muted transition-colors"
+        className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-4 py-3 text-sm font-semibold text-ink hover:bg-surface transition-colors"
       >
         + Agregar ítem
       </button>
@@ -124,7 +124,7 @@ export function Picker({ characterId, worldId }: PickerProps) {
               type="button"
               onClick={handleClose}
               aria-label="Cerrar"
-              className="flex h-11 w-11 items-center justify-center rounded-md text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-ink-mute hover:bg-paper-soft hover:text-ink transition-colors"
             >
               ✕
             </button>
@@ -178,7 +178,7 @@ export function Picker({ characterId, worldId }: PickerProps) {
                       type="button"
                       onClick={() => handlePick(item)}
                       disabled={isPending}
-                      className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper-soft active:bg-paper-muted transition-colors disabled:opacity-60"
+                      className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper-soft active:bg-surface transition-colors disabled:opacity-60"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-ink">

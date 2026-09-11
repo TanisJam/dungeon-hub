@@ -87,7 +87,7 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-ink/5"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-ink-mute transition-colors hover:bg-ink/5"
             aria-label="Cerrar lista"
           >
             {/* Close × glyph */}
@@ -122,7 +122,7 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
         style={{ paddingBottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       >
         {pois.length === 0 ? (
-          <li className="px-4 py-6 text-center text-sm text-ink-muted">
+          <li className="px-4 py-6 text-center text-sm text-ink-mute">
             No hay puntos de interés
           </li>
         ) : (
@@ -175,7 +175,7 @@ function PoiListRow({ poi, onFlyTo }: PoiRowProps) {
     <li className="flex min-h-[44px] cursor-default items-center gap-3 px-4 py-2 opacity-60">
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{poi.name}</span>
       {badge}
-      <span className="shrink-0 text-xs text-ink-muted">sin ubicación</span>
+      <span className="shrink-0 text-xs text-ink-mute">sin ubicación</span>
     </li>
   );
 }

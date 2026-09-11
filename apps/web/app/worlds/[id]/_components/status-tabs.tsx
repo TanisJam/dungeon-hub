@@ -63,7 +63,7 @@ export function StatusTabs({ worldId, currentStatusParam }: StatusTabsProps) {
             className={`min-h-[44px] flex-1 rounded-sm px-2 text-xs font-semibold transition-colors ${
               isActive
                 ? 'bg-ink text-paper'
-                : 'text-ink-mute hover:bg-paper-muted hover:text-ink'
+                : 'text-ink-mute hover:bg-paper-soft hover:text-ink'
             }`}
           >
             {tab.label}
