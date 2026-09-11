@@ -330,10 +330,36 @@ test('T1: Tap-to-place round-trip — null-coord POI → place-mode → tap → 
   await expect(banner).toContainText(poiName);
   await expect(page.getByRole('button', { name: /cancelar colocación/i })).toBeVisible();
 
-  // Step 5: tap the map container to commit coords
+  // Step 5: tap the map container to commit coords.
+  //
+  // The tap has to land on EMPTY map. A fixed offset only does that by luck:
+  // this used to be a hardcoded (300, 200), and the moment the map's top edge
+  // moved 32px (fix/topbar-height-token) that pixel started landing on a POI
+  // marker left over from an earlier run, which opened that POI's popup instead
+  // of committing the placement. Markers also accumulate in the E2E database,
+  // so the fixed point was going to rot on its own eventually.
+  //
+  // So: scan for a point that is actually empty map, and fail loudly if the
+  // map is so full that none exists.
   const mapContainer = page.locator('.leaflet-container');
   await expect(mapContainer).toBeVisible({ timeout: 15_000 });
-  await mapContainer.click({ position: { x: 300, y: 200 } });
+
+  const emptySpot = await mapContainer.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    for (let y = 80; y < box.height - 80; y += 40) {
+      for (let x = 60; x < box.width - 60; x += 40) {
+        const hit = document.elementFromPoint(box.left + x, box.top + y);
+        if (!hit) continue;
+        // A marker (or anything inside one) is not empty map.
+        if (hit.closest('.leaflet-marker-icon, .leaflet-popup, .dungeon-hub-map-marker')) continue;
+        if (!el.contains(hit)) continue;
+        return { x, y };
+      }
+    }
+    return null;
+  });
+  expect(emptySpot, 'no empty spot on the map to tap — the E2E map is saturated with markers').not.toBeNull();
+  await mapContainer.click({ position: emptySpot as { x: number; y: number } });
 
   // Assert ?place param is stripped from URL
   await expect(page).not.toHaveURL(/place=/, { timeout: 5_000 });
