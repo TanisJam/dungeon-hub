@@ -307,7 +307,7 @@ export function CompleteForm({
               {activeParticipants.map((p) => (
                 <li
                   key={p.characterId}
-                  className="rounded-md bg-surface-raised px-2.5 py-1 font-sans text-xs font-medium text-ink"
+                  className="rounded-md bg-surface-soft px-2.5 py-1 font-sans text-xs font-medium text-ink"
                 >
                   {p.name}
                 </li>
@@ -373,7 +373,7 @@ export function CompleteForm({
             <div
               key={row.id}
               data-testid={`item-row-${index}`}
-              className="mb-3 rounded-md border border-line bg-surface-raised p-3"
+              className="mb-3 rounded-md border border-line bg-surface-soft p-3"
             >
               {/* Recipient selector — scoped to ACTIVE participants (REQ-DPPMB-COMPLETE-03) */}
               <div className="mb-2">
@@ -489,7 +489,7 @@ export function CompleteForm({
             <div
               key={row.id}
               data-testid={`world-change-row-${index}`}
-              className="mb-3 rounded-md border border-line bg-surface-raised p-3"
+              className="mb-3 rounded-md border border-line bg-surface-soft p-3"
             >
               {/* Title (required) */}
               <div className="mb-2">

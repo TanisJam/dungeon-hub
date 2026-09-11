@@ -36,12 +36,12 @@ export function TermCard({ state, entry, error }: TermCardProps) {
           {/* Source citation footer */}
           {entry.sourceCitation && (
             <div className="px-3 py-2 border-t border-line">
-              <p className="text-xs text-muted">{entry.sourceCitation}</p>
+              <p className="text-xs text-ink-mute">{entry.sourceCitation}</p>
             </div>
           )}
           {!entry.sourceCitation && entry.source && (
             <div className="px-3 py-2 border-t border-line">
-              <p className="text-xs text-muted">{entry.source}</p>
+              <p className="text-xs text-ink-mute">{entry.source}</p>
             </div>
           )}
         </>
@@ -49,7 +49,7 @@ export function TermCard({ state, entry, error }: TermCardProps) {
 
       {state === 'error' && (
         <div className="px-3 py-3">
-          <p className="text-muted text-xs">{error ?? 'No preview available'}</p>
+          <p className="text-ink-mute text-xs">{error ?? 'No preview available'}</p>
         </div>
       )}
     </div>

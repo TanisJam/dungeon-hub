@@ -39,7 +39,7 @@ const WorldMapLeafletDynamic = dynamic(
         style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
         data-testid="map-container"
       >
-        <p className="text-sm text-ink-muted">Cargando mapa…</p>
+        <p className="text-sm text-ink-mute">Cargando mapa…</p>
       </div>
     ),
   },

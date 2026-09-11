@@ -95,7 +95,7 @@ export function ApprovalActions({
             type="button"
             onClick={handleReject}
             disabled={isPending}
-            className="min-h-[44px] flex-1 rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute transition-colors hover:bg-paper-muted hover:text-ink disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
+            className="min-h-[44px] flex-1 rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-ink-mute transition-colors hover:bg-surface hover:text-ink disabled:opacity-60 disabled:cursor-not-allowed sm:flex-none"
           >
             {isRejectPending ? 'Rechazando…' : 'Rechazar'}
           </button>

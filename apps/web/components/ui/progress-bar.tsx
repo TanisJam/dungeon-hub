@@ -16,8 +16,9 @@ export interface ProgressBarProps {
   /** Track height: 'sm' (h-1) or 'md' (h-1.5, default). */
   height?: ProgressBarHeight;
   /**
-   * Track background override. Defaults to bg-paper-muted (on-light surfaces).
-   * Pass e.g. "bg-white/10" for on-dark surfaces or "bg-accent/20" for a tinted track.
+   * Track background override. Defaults to bg-line-soft, which reads as an empty
+   * channel on paper, paper-soft and surface alike. Pass e.g. "bg-white/10" over a
+   * gradient or "bg-accent/20" for a tinted track.
    */
   trackClassName?: string;
   /** Extra classes on the track element (layout concerns e.g. mt-2). */
@@ -52,7 +53,7 @@ export function ProgressBar({
   max,
   tone = 'accent',
   height = 'md',
-  trackClassName = 'bg-paper-muted',
+  trackClassName = 'bg-line-soft',
   className,
   ariaLabel,
 }: ProgressBarProps) {

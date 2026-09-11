@@ -67,7 +67,7 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
 
       {/* Capacity track with threshold ticks */}
       <div
-        className="relative h-3 w-full overflow-hidden rounded-full bg-paper-muted"
+        className="relative h-3 w-full overflow-hidden rounded-full bg-line-soft"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={max}

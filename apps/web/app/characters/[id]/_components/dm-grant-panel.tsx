@@ -72,7 +72,7 @@ export function DmGrantPanel({ characterId, characterName, callerRole, worldId }
         type="button"
         onClick={handleOpen}
         aria-label="Otorgar recompensa de DM"
-        className="min-h-[44px] w-full rounded-md border border-primary bg-primary-soft px-4 py-3 text-sm font-semibold text-primary-deep hover:bg-primary-muted transition-colors"
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary-soft px-4 py-3 text-sm font-semibold text-primary-deep hover:bg-primary/20 transition-colors"
       >
         Otorgar
       </button>
@@ -161,7 +161,7 @@ function DmGrantModal({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-paper-muted hover:text-ink transition-colors"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-mute hover:bg-paper-soft hover:text-ink transition-colors"
           >
             ✕
           </button>

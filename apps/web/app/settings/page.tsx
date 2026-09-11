@@ -62,7 +62,7 @@ export default async function SettingsPage() {
           <h2 className="mb-3 font-sans text-xs font-semibold uppercase tracking-wide text-ink-mute">
             Preferencias
           </h2>
-          <div className="rounded-md border border-line bg-surface-raised px-3 py-2">
+          <div className="rounded-md border border-line bg-surface-soft px-3 py-2">
             <DevModeToggle currentValue={me.devMode} />
           </div>
         </section>

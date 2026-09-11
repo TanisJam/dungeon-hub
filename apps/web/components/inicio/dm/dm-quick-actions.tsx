@@ -7,6 +7,10 @@ import { Icon } from '@/components/ui/icon';
  *
  * Biblioteca W1 (REQ-NAV-02, REQ-DMTOOLS-01):
  *   - Iniciativa: Link → /encuentros (functional)
+ *
+ * Audit F13: the five icon chips share one treatment. Iniciativa used to carry a
+ * one-off magenta class (.inicio-quick-iniciativa-ic) while the other four asked
+ * for a token that was never declared, so only the first drew a circle.
  *   - Herramientas del DM: Link → /herramientas/facciones (DM authoring tools home)
  *   - Mesa / Campañas: Link → /campanas (Mesa tab removed from TabBar; reachable here)
  *   - Nuevo NPC: stub button, aria-disabled (TODO future SDD)
@@ -22,9 +26,9 @@ export function DMQuickActions() {
         {/* Iniciativa — functional link */}
         <Link
           href="/encuentros"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
+          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
         >
-          <span className="inicio-quick-iniciativa-ic flex items-center justify-center w-9 h-9 rounded-full text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
             <Icon name="sword" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Iniciativa</span>
@@ -33,9 +37,9 @@ export function DMQuickActions() {
         {/* Herramientas del DM — functional link (Biblioteca W1, REQ-DMTOOLS-01) */}
         <Link
           href="/herramientas/facciones"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
+          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
             <Icon name="hammer" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Herramientas</span>
@@ -44,9 +48,9 @@ export function DMQuickActions() {
         {/* Mesa / Campañas — functional link (Biblioteca W1 — Mesa tab absorbed, REQ-NAV-02) */}
         <Link
           href="/campanas"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center"
+          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
             <Icon name="compass" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Mesa</span>
@@ -57,9 +61,9 @@ export function DMQuickActions() {
           type="button"
           disabled
           aria-disabled="true"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
+          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
             <Icon name="user" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Nuevo NPC</span>
@@ -70,9 +74,9 @@ export function DMQuickActions() {
           type="button"
           disabled
           aria-disabled="true"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-raised text-center cursor-not-allowed opacity-50"
+          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-surface-raised text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
             <Icon name="bag" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Loot</span>

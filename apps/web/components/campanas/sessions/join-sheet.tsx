@@ -151,7 +151,7 @@ export function JoinSheet({
                         'border',
                         isSelected
                           ? 'border-primary bg-primary/10'
-                          : 'border-line bg-surface-raised hover:bg-paper-soft',
+                          : 'border-line bg-surface-soft hover:bg-paper-soft',
                       ].join(' ')}
                     >
                       <span className="font-sans text-sm font-semibold text-ink">

@@ -46,7 +46,7 @@ function SourceRow({ source }: { source: Source }) {
       </div>
 
       {hasChildren && (
-        <ul className="pl-3 border-l border-surface-raised mt-0.5 space-y-0.5">
+        <ul className="pl-3 border-l border-surface-soft mt-0.5 space-y-0.5">
           {source.children!.map((child, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: pure Server Component rendering a fixed, order-significant provenance breakdown — no unique id field, never reordered.
             <SourceRow key={`${child.label}-${i}`} source={child} />

@@ -47,15 +47,15 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
 
       {/* Stats pills row */}
       <div className="flex gap-2 flex-wrap mt-4">
-        <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
+        <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
           {players} jugadores
         </span>
         {pendingQuests !== undefined && (
-          <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
+          <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
             {pendingQuests} quests activas
           </span>
         )}
-        <span className="px-2.5 py-0.5 rounded-full bg-surface-raised text-xs font-semibold text-ink">
+        <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
           Sesión {sessions + 1}
         </span>
       </div>

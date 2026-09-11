@@ -718,7 +718,7 @@ const questRowEntry: ComponentEntry = {
   id: 'quest-row',
   name: 'QuestRow',
   group: 'ui',
-  notes: 'Card-row atom for dm quest lists. rounded-xl bg-surface-raised. Props: title, subtitle (lastChange line), className?. Icon cell (📜 + inicio-row-quest-ic) + trailing chevron (›). Zero-visual-change replacement for copy-pasted block in quests-sin-tocar-list + pendientes-sheet-content.',
+  notes: 'Card-row atom for dm quest lists. rounded-xl bg-surface-soft. Props: title, subtitle (lastChange line), className?. Icon cell (📜 + inicio-row-quest-ic) + trailing chevron (›). Zero-visual-change replacement for copy-pasted block in quests-sin-tocar-list + pendientes-sheet-content.',
   propsSchema: {
     title:    { kind: 'string', default: 'El correo perdido',           label: 'Title' },
     subtitle: { kind: 'string', default: 'Último cambio: hace 3 días',  label: 'Subtitle' },

@@ -145,7 +145,7 @@ export function SessionDetailView({
                       'flex flex-col gap-0.5 rounded-md px-3 py-2',
                       hasLeft
                         ? 'bg-paper-soft opacity-60'
-                        : 'bg-surface-raised',
+                        : 'bg-surface-soft',
                     ].join(' ')}
                   >
                     <span className="font-sans text-sm font-semibold text-ink">

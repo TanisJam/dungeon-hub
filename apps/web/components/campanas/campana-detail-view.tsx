@@ -86,7 +86,7 @@ export function CampanaDetailView({ detail, sessions, callerUserId, worldId, cal
           {detail.members.map((m) => (
             <li
               key={m.userId}
-              className="flex items-center justify-between rounded-md bg-surface-raised px-3 py-2"
+              className="flex items-center justify-between rounded-md bg-surface-soft px-3 py-2"
             >
               <span className="font-sans text-sm font-semibold text-ink">{m.username}</span>
               <Pill size="sm" tone={ROLE_TONE[m.role]}>

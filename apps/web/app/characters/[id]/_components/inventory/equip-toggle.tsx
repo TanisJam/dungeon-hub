@@ -51,7 +51,7 @@ export function EquipToggle({
         className={`min-h-[44px] rounded-md border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-60 ${
           isEquipped
             ? 'border-ink bg-ink text-paper hover:bg-ink-soft'
-            : 'border-line bg-paper-soft text-ink-mute hover:bg-paper-muted hover:text-ink'
+            : 'border-line bg-paper-soft text-ink-mute hover:bg-surface hover:text-ink'
         }`}
       >
         {isPending ? '…' : label}

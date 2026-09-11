@@ -304,7 +304,7 @@ export function LevelUpFlow({
             type="button"
             onClick={handleBack}
             aria-label="Paso anterior"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink hover:bg-paper-muted transition-colors"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-mute hover:text-ink hover:bg-paper-soft transition-colors"
           >
             ←
           </button>
@@ -319,7 +319,7 @@ export function LevelUpFlow({
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-paper-muted">
+      <div className="h-1 bg-line-soft">
         <div
           className="h-full bg-primary transition-all"
           style={{ width: `${(current / total) * 100}%` }}
@@ -631,7 +631,7 @@ function AsiFeatStep({
             className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
               kind === k
                 ? 'bg-primary text-paper'
-                : 'bg-paper text-ink-mute hover:bg-paper-muted hover:text-ink'
+                : 'bg-paper text-ink-mute hover:bg-paper-soft hover:text-ink'
             }`}
           >
             {k === 'asi' ? 'Atributo (+2)' : 'Dote'}
