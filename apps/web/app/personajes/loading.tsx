@@ -1,6 +1,18 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities — see the note in app/bitacora/loading.tsx.
+   Five chips: Activos / Pendientes / Retirados / Borradores / Todos, per
+   components/personajes/status-filter-chips.tsx. */
+const STATUS_CHIPS = [
+  { id: 'activos', width: 'w-20' },
+  { id: 'pendientes', width: 'w-24' },
+  { id: 'retirados', width: 'w-20' },
+  { id: 'borradores', width: 'w-24' },
+  { id: 'todos', width: 'w-14' },
+] as const;
+const ROSTER_ROWS = ['row-1', 'row-2', 'row-3', 'row-4'] as const;
+
 /**
  * Loading state for /personajes (audit F1, work unit 2).
  *
@@ -21,15 +33,15 @@ export default function PersonajesLoading() {
       >
         {/* StatusFilterChips — 5 pills: Activos/Pendientes/Retirados/Borradores/Todos */}
         <div className="flex gap-2 overflow-hidden">
-          {['w-20', 'w-24', 'w-20', 'w-24', 'w-14'].map((w, i) => (
-            <Skeleton key={i} className={`h-7 shrink-0 ${w}`} />
+          {STATUS_CHIPS.map((chip) => (
+            <Skeleton key={chip.id} className={`h-7 shrink-0 ${chip.width}`} />
           ))}
         </div>
 
         {/* Roster — CharacterCard rows */}
         <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex overflow-hidden rounded-md border border-line">
+          {ROSTER_ROWS.map((row) => (
+            <div key={row} className="flex overflow-hidden rounded-md border border-line">
               <Skeleton className="h-[72px] w-[72px] shrink-0" />
               <div className="flex flex-1 flex-col justify-center gap-1.5 px-3 py-2.5">
                 <Skeleton className="h-3.5 w-2/3" />

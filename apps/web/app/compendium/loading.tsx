@@ -1,6 +1,10 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities — see the note in app/bitacora/loading.tsx.
+   Six cards: the category count in app/compendium/_components/data.ts. */
+const CATEGORY_CARDS = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6'] as const;
+
 /**
  * Loading state for /compendium (audit F1, work unit 2).
  *
@@ -27,8 +31,8 @@ export default function CompendiumLoading() {
         <div>
           <Skeleton className="h-3.5 w-24" />
           <div className="mt-3 grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-1 rounded-lg border border-line p-3">
+            {CATEGORY_CARDS.map((category) => (
+              <div key={category} className="flex flex-col gap-1 rounded-lg border border-line p-3">
                 <Skeleton className="h-9 w-9" />
                 <Skeleton className="mt-1 h-3.5 w-2/3" />
                 <Skeleton className="h-2.5 w-1/2" />

@@ -1,6 +1,10 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities — see the note in app/bitacora/loading.tsx. */
+const QUICK_ACTIONS = ['action-1', 'action-2', 'action-3', 'action-4'] as const;
+const FEED_ENTRIES = ['entry-1', 'entry-2', 'entry-3'] as const;
+
 /**
  * Loading state for /inicio (audit F1, work unit 2 — App Router `loading.tsx`
  * so the previous screen stops freezing for 1.6-3.2s while the segment resolves).
@@ -46,9 +50,9 @@ export default function InicioLoading() {
         <div>
           <Skeleton className="h-3.5 w-16" />
           <div className="mt-2 grid grid-cols-4 gap-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {QUICK_ACTIONS.map((action) => (
               <div
-                key={i}
+                key={action}
                 className="flex flex-col items-center gap-1.5 rounded-md border border-line px-2 py-3.5"
               >
                 <Skeleton className="h-8 w-8" />
@@ -79,8 +83,8 @@ export default function InicioLoading() {
         <div>
           <Skeleton className="h-3.5 w-40" />
           <div className="mt-2 flex flex-col gap-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex gap-3 rounded-sm border border-line-soft px-3.5 py-3">
+            {FEED_ENTRIES.map((entry) => (
+              <div key={entry} className="flex gap-3 rounded-sm border border-line-soft px-3.5 py-3">
                 <Skeleton className="mt-1.5 h-2 w-2 shrink-0" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <Skeleton className="h-3 w-2/3" />

@@ -1,6 +1,11 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities — see the note in app/bitacora/loading.tsx. */
+const ITEM_ROWS = [
+  'row-1', 'row-2', 'row-3', 'row-4', 'row-5', 'row-6', 'row-7', 'row-8',
+] as const;
+
 /**
  * Loading state for /mercado (audit F1, work unit 2).
  *
@@ -24,8 +29,8 @@ export default function MercadoLoading() {
 
         {/* ItemRowView rows */}
         <div className="divide-y divide-line">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex min-h-[44px] items-center gap-3 py-2">
+          {ITEM_ROWS.map((row) => (
+            <div key={row} className="flex min-h-[44px] items-center gap-3 py-2">
               <div className="flex flex-1 flex-col gap-1">
                 <Skeleton className="h-3.5 w-1/2" />
                 <Skeleton className="h-2.5 w-1/4" />

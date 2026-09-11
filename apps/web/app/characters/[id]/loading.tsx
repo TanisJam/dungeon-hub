@@ -1,6 +1,12 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities — see the note in app/bitacora/loading.tsx.
+   VITAL_CELLS mirrors the three StatCells in components/sheet/vital-grid.tsx;
+   SHEET_TABS the six pills in components/sheet/sheet-tabs.tsx. */
+const VITAL_CELLS = ['cell-1', 'cell-2', 'cell-3'] as const;
+const SHEET_TABS = ['tab-1', 'tab-2', 'tab-3', 'tab-4', 'tab-5', 'tab-6'] as const;
+
 /**
  * Loading state for /characters/[id] (audit F1, work unit 2) — dynamic route.
  *
@@ -49,8 +55,8 @@ export default function CharacterSheetLoading() {
 
         {/* VitalGrid — Vida / Clase Armadura / Iniciativa */}
         <div className="grid grid-cols-3 gap-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex flex-col items-center gap-1.5 rounded-md border border-line px-3 py-4">
+          {VITAL_CELLS.map((cell) => (
+            <div key={cell} className="flex flex-col items-center gap-1.5 rounded-md border border-line px-3 py-4">
               <Skeleton className="h-2 w-12" />
               <Skeleton className="mt-1 h-5 w-10" />
             </div>
@@ -59,8 +65,8 @@ export default function CharacterSheetLoading() {
 
         {/* SheetTabs — Resumen/Habilidades/Hechizos/Recursos/Inventario/Bitácora */}
         <div className="flex gap-2 overflow-hidden py-1">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-7 w-20 shrink-0" />
+          {SHEET_TABS.map((tab) => (
+            <Skeleton key={tab} className="h-7 w-20 shrink-0" />
           ))}
         </div>
 

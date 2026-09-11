@@ -1,6 +1,19 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Skeleton } from '@/components/ui';
 
+/* Placeholder identities. Named rather than indexed: these lists are static and
+   never reorder, but a key derived from the array position says nothing about
+   what the block stands for, and Biome rejects it (noArrayIndexKey). */
+const SUBNAV_TABS = ['todo', 'eventos', 'notas'] as const;
+const TAG_FILTERS = [
+  { id: 'tag-1', width: 'w-12' },
+  { id: 'tag-2', width: 'w-16' },
+  { id: 'tag-3', width: 'w-14' },
+  { id: 'tag-4', width: 'w-20' },
+  { id: 'tag-5', width: 'w-16' },
+] as const;
+const FEED_CARDS = ['card-1', 'card-2', 'card-3', 'card-4'] as const;
+
 /**
  * Loading state for /bitacora (audit F1, work unit 2).
  *
@@ -19,8 +32,8 @@ export default function BitacoraLoading() {
       <div role="status" aria-busy="true" aria-label="Cargando Bitácora" className="flex flex-col gap-4">
         {/* SubNav — Todo/Eventos/Notas, 3 equal-width pills */}
         <div className="flex overflow-hidden rounded-lg border border-line">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex min-h-[44px] flex-1 items-center justify-center px-4 py-2">
+          {SUBNAV_TABS.map((tab) => (
+            <div key={tab} className="flex min-h-[44px] flex-1 items-center justify-center px-4 py-2">
               <Skeleton className="h-3 w-12" />
             </div>
           ))}
@@ -28,16 +41,16 @@ export default function BitacoraLoading() {
 
         {/* TagFilter — horizontal chip row */}
         <div className="flex gap-2 overflow-hidden">
-          {['w-12', 'w-16', 'w-14', 'w-20', 'w-16'].map((w, i) => (
-            <Skeleton key={i} className={`h-8 shrink-0 ${w}`} />
+          {TAG_FILTERS.map((tag) => (
+            <Skeleton key={tag.id} className={`h-8 shrink-0 ${tag.width}`} />
           ))}
         </div>
 
         {/* FeedCard stack */}
         <div className="flex flex-col gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {FEED_CARDS.map((card) => (
             <div
-              key={i}
+              key={card}
               className="flex min-h-[44px] flex-col gap-2 rounded-lg border border-line px-4 py-3"
             >
               <div className="flex items-center gap-2">
