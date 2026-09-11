@@ -340,6 +340,19 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
                 position={markerPos}
                 icon={createMarkerIcon(p.status, isMoving)}
                 draggable={isMoving}
+                /*
+                 * Markers stop swallowing taps while placing or creating.
+                 * The banner tells the DM to tap the map; a tap that landed on
+                 * an existing POI opened that POI's popup instead, so a POI
+                 * could not be placed on or beside one that already exists --
+                 * and the denser the map, the more of its surface was unusable.
+                 *
+                 * Same rule the drawer and its toggle already follow below:
+                 * both are unmounted in these modes so nothing competes with
+                 * the click catcher. The markers were the one interactive
+                 * surface left out of it.
+                 */
+                interactive={!placement && !creating}
                 eventHandlers={isMoving ? {
                   dragend(e) {
                     const latlng = (e.target as L.Marker).getLatLng();
