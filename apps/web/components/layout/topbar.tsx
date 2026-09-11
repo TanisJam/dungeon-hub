@@ -35,6 +35,20 @@ interface TopBarProps {
    * world name on every page.
    */
   worldSwitcher?: ReactNode;
+  /**
+   * Element for the title. Defaults to 'h1' — the topbar title IS the page
+   * heading on nearly every route.
+   *
+   * A page that renders the same name again in its own content (the character
+   * sheet's hero, a campaign detail, a session detail) passes 'p' so the
+   * document gets ONE h1 instead of two with identical text. Measured on
+   * production: every route had exactly one h1 except the sheet, which
+   * announced "Kael el Centinela" twice to a screen reader — at 15px in the
+   * topbar and 24px in the hero (audit F8).
+   *
+   * Visually identical either way; only the element changes.
+   */
+  titleAs?: 'h1' | 'p';
 }
 
 /**
@@ -62,6 +76,7 @@ export function TopBar({
   backHref,
   roleDefault = 'player',
   worldSwitcher,
+  titleAs: TitleTag = 'h1',
 }: TopBarProps) {
   // F5: the world moved out of the left slot, where an 88px cap cut its name on
   // every page, and under the title, where the width is. The left slot goes back
@@ -112,9 +127,9 @@ export function TopBar({
          * moved the world switcher out of the left slot, and a bigger title
          * makes that more likely, not less.
          */}
-        <h1 className="font-display font-bold text-subhead md:text-title leading-[1.15] tracking-tight text-ink truncate m-0">
+        <TitleTag className="font-display font-bold text-subhead md:text-title leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
-        </h1>
+        </TitleTag>
         {/*
          * F5: the world sits under the title, where the width is. A capped pill
          * in the left slot cut the name on all seven measured pages; here the
