@@ -174,6 +174,21 @@
   line-height: 1.2;
 }
 
+/* ── TopBar height token ──
+   `--topbar-h` is measured at runtime by TopbarHeightProbe
+   (components/layout/topbar-height-probe.tsx) from the actual <header
+   data-app-topbar> element and written onto <html>. The header's height is
+   NOT static (device-dependent safe-area padding, worldSwitcher grows it on
+   some pages — see fix/topbar-height-token), so this is a FALLBACK for
+   server-rendered first paint only, before the probe's effect runs — it is
+   not the source of truth. Value = the header's measured height on a
+   worldSwitcher-less page at write time (88px, audit F5). Anything that
+   needs to clear the header should read `var(--topbar-h)`, never a
+   hardcoded pixel offset. */
+:root {
+  --topbar-h: 88px;
+}
+
 /* ── Native/third-party control overrides (audit F10) ──
    Leaflet, native <select>, and the DM shop checkboxes ship unthemed, in the
    wrong language, or with sub-44px touch targets. Scoped overrides below keep

@@ -45,6 +45,14 @@ interface TopBarProps {
  * When worldSwitcher is provided (and no backHref) it renders under the title
  * and takes the subtitle's place, on every viewport.
  * Server component. RoleSwitcher is a client island.
+ *
+ * `data-app-topbar` is a stable hook read by TopbarHeightProbe
+ * (components/layout/topbar-height-probe.tsx), which measures this header's
+ * real rendered height at runtime and publishes it as `--topbar-h` on
+ * <html>. The header's height is NOT constant — the safe-area padding is
+ * device-dependent and a worldSwitcher grows the header — so any fixed-size
+ * layout that needs to clear this header MUST use `var(--topbar-h)`, never a
+ * hardcoded pixel offset (see fix/topbar-height-token).
  */
 export function TopBar({
   title,
@@ -85,6 +93,7 @@ export function TopBar({
 
   return (
     <header
+      data-app-topbar
       className="sticky top-0 z-40 bg-paper/90 backdrop-blur-md border-b border-line"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
