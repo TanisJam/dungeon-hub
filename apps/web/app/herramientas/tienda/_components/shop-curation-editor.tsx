@@ -134,15 +134,27 @@ export function ShopCurationEditor({
                 const key = itemKey(item);
                 return (
                   <li key={key} className="px-3">
-                    <label className="flex min-h-[44px] w-full items-center gap-3 py-2 text-sm text-ink">
+                    {/*
+                      The input covers the row rather than sitting in it: a 16px
+                      box is a 16px target however tappable the label around it
+                      is, and this list holds 200 of them. The box below is the
+                      drawing; this is the control.
+                    */}
+                    <label className="relative flex min-h-[44px] w-full items-center gap-3 py-2 text-sm text-ink">
                       <input
                         type="checkbox"
                         checked={forSale.has(key)}
                         disabled={isPending}
                         onChange={(e) => handleItemToggle(item, e.target.checked)}
                         aria-label={item.name}
-                        className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                        className="peer absolute inset-0 h-full w-full cursor-pointer appearance-none disabled:cursor-not-allowed"
                       />
+                      <span
+                        aria-hidden="true"
+                        className="grid h-4 w-4 shrink-0 place-items-center rounded-sm border border-line bg-paper-soft text-[10px] font-bold text-on-accent transition-colors peer-checked:border-accent peer-checked:bg-accent peer-focus-visible:border-accent"
+                      >
+                        {forSale.has(key) ? '✓' : ''}
+                      </span>
                       <span className="flex-1 truncate">{item.name}</span>
                       <span className="shrink-0 text-[10px] uppercase tracking-wide text-ink-mute">
                         {item.source}
