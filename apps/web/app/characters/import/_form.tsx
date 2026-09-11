@@ -6,7 +6,7 @@
 // the server re-runs the same check regardless (never trust the client as
 // the gate). Mirrors ../new/_form.tsx for world selection.
 
-import { useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { api } from '@/lib/api';
@@ -33,6 +33,7 @@ function readFileAsText(file: File): Promise<string> {
 
 export function ImportCharacterForm({ worlds }: Props) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [worldId, setWorldId] = useState(worlds.length === 1 ? worlds[0]!.id : '');
   const [fileName, setFileName] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export function ImportCharacterForm({ worlds }: Props) {
             id="worldId"
             value={worldId}
             onChange={(e) => setWorldId(e.target.value)}
-            className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none transition-colors"
+            className="select-field mt-1.5"
           >
             <option value="" disabled>
               Elegí un mundo…
@@ -158,15 +159,26 @@ export function ImportCharacterForm({ worlds }: Props) {
           Archivo exportado
         </label>
         <input
+          ref={fileInputRef}
           id="importFile"
           type="file"
           accept=".json,application/json"
           onChange={handleFileChange}
-          className="mt-1.5 block w-full text-sm text-ink-mute file:mr-3 file:rounded-md file:border-0 file:bg-paper-soft file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink"
+          className="sr-only"
         />
-        {fileName && (
-          <p className="mt-1 text-xs text-ink-mute">Archivo: {fileName}</p>
-        )}
+        <Button
+          type="button"
+          tone="ghost"
+          size="md"
+          fullWidth
+          className="mt-1.5"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Elegir archivo…
+        </Button>
+        <p className="mt-1 text-xs text-ink-mute">
+          {fileName ? `Archivo: ${fileName}` : 'Ningún archivo seleccionado.'}
+        </p>
       </div>
 
       {error && (
