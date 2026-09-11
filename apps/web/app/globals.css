@@ -216,6 +216,18 @@
   color: var(--color-ink-mute) !important;
 }
 .leaflet-control-attribution,
+/* leaflet.css:275 sets "Helvetica Neue" on the container, and :342 sets
+   'Lucida Console' on the zoom glyphs — the only two foreign families in the
+   app's computed-font census. The container's stack reaches the tiles, which
+   paint no text; the zoom rule paints the + and − you can see. */
+.leaflet-container {
+  font-family: var(--font-sans) !important;
+}
+.leaflet-container .leaflet-control-zoom-in,
+.leaflet-container .leaflet-control-zoom-out {
+  font: 700 20px / 44px var(--font-sans) !important;
+}
+
 .leaflet-container .leaflet-control-attribution {
   background: var(--color-paper) !important;
   color: var(--color-ink-mute) !important;
