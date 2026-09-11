@@ -15,8 +15,15 @@ interface StatCellProps {
   onClick?: () => void;
   footer?: ReactNode;
   /**
-   * Corner affordance (the HP edit pencil). The cell positions it and reserves
-   * the width on the label, so it can never sit on top of the label text.
+   * Corner affordance (the HP edit pencil). The cell owns the positioning so a
+   * caller cannot place it against the page instead of the cell.
+   *
+   * It is drawn over the label's row, so a cell with an action needs a label
+   * short enough to clear a 24px corner mark: at 375px the cell is 109px wide
+   * and offers 85px of content. Reserving the width instead was tried and
+   * rejected — it pushes short labels off-centre on desktop, where the cell is
+   * four times wider and the clearance is free. See audit F7.
+   *
    * Not for use with `onClick`: an interactive cell is itself a button, and a
    * button inside a button is invalid.
    */
@@ -101,12 +108,8 @@ export function StatCell({
     .join(' ');
 
   // ── Content ───────────────────────────────────────────────────────────
-  // With an action in the corner, pad the label by the action's footprint so the
-  // text still centres — in the remaining width rather than under the button.
   const labelEl = (
-    <span
-      className={`text-[9px] font-bold uppercase tracking-widest text-ink-mute${action ? ' pr-11' : ''}`}
-    >
+    <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
       {label}
     </span>
   );

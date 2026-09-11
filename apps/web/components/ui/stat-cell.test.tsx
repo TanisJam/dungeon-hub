@@ -115,14 +115,18 @@ describe('StatCell', () => {
     expect(screen.getByRole('button', { name: 'edit' })).toBeTruthy();
   });
 
-  it('T12: the label reserves the action corner only when an action is present', () => {
+  // Reserving width on the label was the first attempt; it clears the corner but
+  // pushes a short label off-centre on desktop, where the cell is four times wider
+  // and the clearance costs nothing. The label stays centred and the caller keeps
+  // it short instead.
+  it('T12: an action does not shift the label off-centre', () => {
     const { rerender } = render(
       <StatCell label="Vida" value="12 / 12" action={<button type="button">edit</button>} />,
     );
-    expect(screen.getByText('Vida').className).toContain('pr-11');
+    const withAction = screen.getByText('Vida').className;
 
     rerender(<StatCell label="Vida" value="12 / 12" />);
-    expect(screen.getByText('Vida').className).not.toContain('pr-11');
+    expect(screen.getByText('Vida').className).toBe(withAction);
   });
 
   it('T13: the action is positioned by the cell, not by its caller', () => {
