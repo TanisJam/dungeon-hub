@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { api, getMyWorlds } from '@/lib/api';
 
@@ -81,10 +82,24 @@ async function fallbackToFirstWorld(token: string): Promise<ActiveWorld | null> 
  *    fall back to GET /worlds?mine=1 → first world → GET /worlds/:id for detail.
  * 3. If user has zero worlds → return null.
  *
- * MUST be called inside a Promise.all with other page-level fetches,
- * never as a serial await before them (latency).
+ * MUST be called inside a Promise.all with other page-level fetches on the
+ * SAME caller, never as a serial await before them (latency) — that part of
+ * the contract is unchanged.
+ *
+ * Request-memoized via React's cache() (audit F1, work unit 1): the root
+ * layout resolves callerRole once per request via this function, and an
+ * individual page may ALSO call it directly for its own data (worldId,
+ * worldSwitcher, etc). cache() collapses same-token calls anywhere in one
+ * request into a single underlying fetch, so adding the root-layout call
+ * does not double the cost — it stays one call per request no matter how
+ * many places invoke it. (Note: cache() only memoizes under Next.js's
+ * request-scoped "react-server" runtime; see route-chrome.ts and its test
+ * suite's sibling active-world-cache.test.ts for why Vitest can't observe
+ * that directly.)
  */
-export async function getActiveWorld(token: string | undefined): Promise<ActiveWorld | null> {
+export const getActiveWorld = cache(async function getActiveWorldUncached(
+  token: string | undefined,
+): Promise<ActiveWorld | null> {
   if (!token) return null;
 
   const cookieStore = await cookies();
@@ -97,4 +112,4 @@ export async function getActiveWorld(token: string | undefined): Promise<ActiveW
   }
 
   return fallbackToFirstWorld(token);
-}
+});
