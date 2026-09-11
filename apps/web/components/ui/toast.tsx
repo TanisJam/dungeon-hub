@@ -13,7 +13,7 @@ export function Toast({ message }: ToastProps) {
     <div
       role="status"
       aria-live="polite"
-      className="text-xs text-center px-3 py-2 bg-warning-soft text-warning-deep rounded"
+      className="text-xs text-center px-3 py-2 bg-warning-soft text-warning-deep rounded-sm"
     >
       {message}
     </div>

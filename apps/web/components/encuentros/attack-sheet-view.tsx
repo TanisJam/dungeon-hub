@@ -102,7 +102,7 @@ export function AttackSheetView({
                 key={weapon.instanceId}
                 type="button"
                 onClick={() => onPickWeapon(weapon)}
-                className="w-full min-h-[44px] rounded border border-line text-sm font-medium text-left px-3"
+                className="w-full min-h-[44px] rounded-sm border border-line text-sm font-medium text-left px-3"
               >
                 {weapon.displayName}
               </button>
@@ -110,7 +110,7 @@ export function AttackSheetView({
             <button
               type="button"
               onClick={onClose}
-              className="w-full min-h-[44px] rounded text-sm text-ink-soft border border-line mt-2"
+              className="w-full min-h-[44px] rounded-sm text-sm text-ink-soft border border-line mt-2"
             >
               Cerrar
             </button>
@@ -132,7 +132,7 @@ export function AttackSheetView({
                   type="button"
                   disabled={isPending}
                   onClick={() => onPickTarget(npc)}
-                  className="w-full min-h-[44px] rounded border border-line text-sm font-medium text-left px-3 disabled:opacity-40"
+                  className="w-full min-h-[44px] rounded-sm border border-line text-sm font-medium text-left px-3 disabled:opacity-40"
                 >
                   {npc.name}
                   <span className="ml-2 text-ink-soft text-xs">HP: {npc.hpCurrent}/{npc.hpMax}</span>
@@ -142,7 +142,7 @@ export function AttackSheetView({
             <button
               type="button"
               onClick={onBackToWeapon}
-              className="w-full min-h-[44px] rounded text-sm text-ink-soft border border-line mt-2"
+              className="w-full min-h-[44px] rounded-sm text-sm text-ink-soft border border-line mt-2"
             >
               Volver
             </button>

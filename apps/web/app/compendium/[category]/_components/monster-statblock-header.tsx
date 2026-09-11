@@ -318,7 +318,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
           return (
             <div
               key={key}
-              className="flex flex-col items-center rounded bg-surface px-1 py-1.5"
+              className="flex flex-col items-center rounded-sm bg-surface px-1 py-1.5"
               data-field={`ability-${key}`}
             >
               <div className="font-semibold text-ink-soft">{ABILITY_LABELS[key]}</div>

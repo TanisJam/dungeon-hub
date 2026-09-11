@@ -24,11 +24,11 @@ function SpellRow({ spell }: { spell: SpellSheetRef }) {
       <span className="min-w-0 truncate text-sm text-ink">{spell.name}</span>
       <div className="flex shrink-0 items-center gap-1">
         {spell.level === 0 ? (
-          <span className="rounded bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
+          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
             Truco
           </span>
         ) : (
-          <span className="rounded bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
+          <span className="rounded-sm bg-paper-soft px-1.5 py-0.5 text-[10px] font-bold text-ink-mute">
             Nv {spell.level}
           </span>
         )}

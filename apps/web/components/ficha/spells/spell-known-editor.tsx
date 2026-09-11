@@ -88,7 +88,7 @@ export function SpellKnownEditor({
               type="checkbox"
               checked={selected.has(spell.slug)}
               onChange={() => toggleSpell(spell.slug)}
-              className="rounded border-line accent-warning"
+              className="rounded-sm border-line accent-warning"
               aria-label={spell.name}
             />
             <span className="text-sm text-ink">{spell.name}</span>

@@ -461,7 +461,7 @@ function ChooseGroup({
               disabled={disabled}
               title={isLocked ? 'Ya otorgada por tu clase' : undefined}
               className={[
-                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs ring-1 ring-inset transition',
                 isLocked
                   ? 'bg-paper-soft text-ink-mute ring-line line-through cursor-not-allowed'
                   : isOn
@@ -516,7 +516,7 @@ function MultiSelectChoose({
               onClick={() => toggle(v)}
               disabled={disabled}
               className={[
-                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs ring-1 ring-inset transition',
                 isOn
                   ? 'bg-accent-soft text-accent-deep ring-accent'
                   : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',

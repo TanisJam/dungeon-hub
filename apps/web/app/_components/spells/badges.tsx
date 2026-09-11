@@ -18,7 +18,7 @@ export function SpellBadges({ ritual, concentration, componentsM }: SpellBadgesP
     <>
       {ritual && (
         <span
-          className="rounded bg-warning-soft px-1 text-[10px] font-bold text-warning"
+          className="rounded-sm bg-warning-soft px-1 text-[10px] font-bold text-warning"
           title="Ritual"
         >
           R
@@ -26,7 +26,7 @@ export function SpellBadges({ ritual, concentration, componentsM }: SpellBadgesP
       )}
       {concentration && (
         <span
-          className="rounded bg-arcane/10 px-1 text-[10px] font-bold text-arcane"
+          className="rounded-sm bg-arcane/10 px-1 text-[10px] font-bold text-arcane"
           title="Concentración"
         >
           C
@@ -34,7 +34,7 @@ export function SpellBadges({ ritual, concentration, componentsM }: SpellBadgesP
       )}
       {componentsM && (
         <span
-          className="rounded bg-secondary-soft px-1 text-[10px] font-bold text-secondary"
+          className="rounded-sm bg-secondary-soft px-1 text-[10px] font-bold text-secondary"
           title="Componente material"
         >
           M
