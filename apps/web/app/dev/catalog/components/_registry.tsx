@@ -899,7 +899,7 @@ const appShellEntry: ComponentEntry = {
   },
   render: () => (
     <div className="relative bg-paper rounded-md overflow-hidden" style={{ height: '200px' }}>
-      <AppShell title="Personajes" showTabBar={false} canBeDM={false}>
+      <AppShell title="Personajes" canBeDM={false}>
         <p className="text-sm text-ink-mute">Page content renders here inside max-w-sm px-4 py-4.</p>
       </AppShell>
     </div>

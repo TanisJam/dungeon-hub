@@ -85,7 +85,7 @@ export default async function LevelUpPage({ params }: Props) {
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
     return (
-      <AppShell title="Subir nivel" backHref={`/characters/${id}`} showTabBar={false}>
+      <AppShell title="Subir nivel" backHref={`/characters/${id}`}>
         <p className="py-10 text-center text-sm text-ink-mute">
           {getErrorMessage(err, 'Error al cargar el personaje.')}
         </p>
@@ -288,7 +288,7 @@ export default async function LevelUpPage({ params }: Props) {
   }
 
   return (
-    <AppShell title="Subir nivel" backHref={`/characters/${id}`} constructorHref={`/characters/${id}`} showTabBar={false}>
+    <AppShell title="Subir nivel" backHref={`/characters/${id}`} constructorHref={`/characters/${id}`}>
       <div className="md:mx-auto md:max-w-lg">
         <LevelUpFlow
           characterId={id}

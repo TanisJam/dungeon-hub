@@ -1,4 +1,11 @@
 
+/**
+ * AppShell no longer renders DesktopSidebar or TabBar (they moved to
+ * AppChrome — audit F1, work unit 1; see app-chrome.test.tsx for their
+ * coverage). What AppShell still owns is the canBeDM derivation from
+ * callerRole, which gates the RoleSwitcher pill inside TopBar — that's
+ * what this file covers.
+ */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
@@ -16,13 +23,6 @@ vi.mock('@/components/ui/crow-mark', () => ({
 // neither of which is the focus of these AppShell/callerRole tests.
 vi.mock('@/components/layout/account-menu', () => ({
   AccountMenu: () => <div data-testid="account-menu">AccountMenu</div>,
-}));
-
-// Mock next/navigation — TabBar uses usePathname.
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard',
-  useSearchParams: () => ({ get: () => null }),
-  useSelectedLayoutSegment: () => null,
 }));
 
 import { AppShell } from './app-shell';
