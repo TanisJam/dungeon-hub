@@ -49,7 +49,7 @@ export function SheetTabs({ activeTab, characterId }: SheetTabsProps) {
             {/* Accent underline indicator */}
             <div
               className={[
-                'h-0.5 w-4 rounded-full transition-opacity duration-200',
+                'h-0.5 w-4 rounded-pill transition-opacity duration-200',
                 isActive ? 'bg-accent opacity-100' : 'opacity-0',
               ].join(' ')}
             />

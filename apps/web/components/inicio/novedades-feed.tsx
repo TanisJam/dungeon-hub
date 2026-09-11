@@ -23,7 +23,7 @@ export function NovedadesFeed({ items }: NovedadesFeedProps) {
               className="flex gap-3 rounded-sm border border-line-soft bg-surface px-3.5 py-3"
             >
               <span
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-pill ${
                   n.fresh ? 'inicio-feed-dot' : 'bg-ink-mute'
                 }`}
               />

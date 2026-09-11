@@ -57,7 +57,7 @@ export function StatusFilterChipsIsland({
             className="shrink-0 inline-flex min-h-[44px] items-center"
           >
             <span
-              className={`rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
+              className={`rounded-pill border px-2.5 py-1 font-sans text-[11px] font-semibold transition-colors ${
                 on
                   ? 'personajes-chip-on border-accent-deep'
                   : 'border-line bg-surface text-ink-mute hover:border-ink-mute'

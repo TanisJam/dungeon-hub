@@ -87,7 +87,7 @@ export function FactionChipSection({
         {factions.map((faction) => (
           <div
             key={faction.id}
-            className="flex min-h-[44px] items-center gap-1 rounded-full border border-line bg-paper-soft px-3 text-sm font-medium text-ink"
+            className="flex min-h-[44px] items-center gap-1 rounded-pill border border-line bg-paper-soft px-3 text-sm font-medium text-ink"
           >
             <span>{faction.name}</span>
             {/* DM-only detach control — absent for players (REQ-GATE-01) */}
@@ -97,7 +97,7 @@ export function FactionChipSection({
                 aria-label={`Desvincular ${faction.name}`}
                 onClick={() => handleDetach(faction.id)}
                 disabled={loading === faction.id}
-                className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-paper hover:text-danger disabled:opacity-50"
+                className="ml-1 flex h-5 w-5 items-center justify-center rounded-pill text-ink-soft transition-colors hover:bg-paper hover:text-danger disabled:opacity-50"
               >
                 ×
               </button>
@@ -111,7 +111,7 @@ export function FactionChipSection({
             type="button"
             aria-label="Añadir facción"
             onClick={() => setPickerOpen((v) => !v)}
-            className="flex min-h-[44px] w-10 items-center justify-center rounded-full border border-dashed border-line bg-paper text-ink-soft transition-colors hover:border-ink hover:text-ink"
+            className="flex min-h-[44px] w-10 items-center justify-center rounded-pill border border-dashed border-line bg-paper text-ink-soft transition-colors hover:border-ink hover:text-ink"
           >
             +
           </button>

@@ -39,7 +39,7 @@ function SkillRow({ skill }: { skill: SkillView }) {
     <div className="flex items-center justify-between gap-2 py-0.5">
       <div className="flex items-center gap-2 min-w-0">
         <span
-          className={`h-3 w-3 flex-shrink-0 rounded-full ${indicator}`}
+          className={`h-3 w-3 flex-shrink-0 rounded-pill ${indicator}`}
           title={skill.expertise ? 'Maestría' : skill.proficient ? 'Competencia' : 'Sin competencia'}
         />
         <span className="truncate text-sm text-ink">{skill.name}</span>

@@ -12,7 +12,7 @@ type Props = {
 
 export function PendientesFichaCard({ ficha, actions }: Props) {
   const rootClass = [
-    'rounded-xl bg-surface-soft p-3 flex flex-col gap-3',
+    'rounded-md bg-surface-soft p-3 flex flex-col gap-3',
     ficha.fresh ? 'pendientes-card-fresh' : '',
   ]
     .filter(Boolean)

@@ -18,7 +18,7 @@ describe('DMQuickActions', () => {
   // than the presence of a bespoke class.
   it('T2: all five icon chips share one treatment', () => {
     const { container } = render(<DMQuickActions />);
-    const chips = container.querySelectorAll('span.rounded-full');
+    const chips = container.querySelectorAll('span.rounded-pill');
     expect(chips.length).toBe(5);
     const treatments = new Set(Array.from(chips).map((c) => c.className));
     expect(treatments.size).toBe(1);

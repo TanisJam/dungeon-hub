@@ -83,7 +83,7 @@ export function TabBar({ callerRole }: TabBarProps = {}) {
             aria-current={isActive ? 'page' : undefined}
             className={`relative flex flex-col items-center gap-1 pt-2 pb-1 px-1 transition-colors duration-300 ease-out ${
               isActive
-                ? `${activeColor} before:content-[''] before:absolute before:top-0 before:left-[30%] before:right-[30%] before:h-[2px] before:rounded-b-full ${underline}`
+                ? `${activeColor} before:content-[''] before:absolute before:top-0 before:left-[30%] before:right-[30%] before:h-[2px] before:rounded-b-pill ${underline}`
                 : 'text-ink-mute hover:text-ink-soft'
             }`}
           >

@@ -142,7 +142,7 @@ describe('V3Sheet — Cycle 4: handle bar', () => {
       </V3Sheet>,
       { baseElement: document.body }
     );
-    const handleBar = document.body.querySelector('[aria-hidden="true"].h-1.w-10.rounded-full.bg-ink-mute');
+    const handleBar = document.body.querySelector('[aria-hidden="true"].h-1.w-10.rounded-pill.bg-ink-mute');
     expect(handleBar).not.toBeNull();
   });
 });

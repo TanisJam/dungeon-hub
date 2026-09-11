@@ -296,7 +296,7 @@ export function LevelUpFlow({
     : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-2xl md:shadow-stamp-lg">
+    <div className="flex min-h-screen flex-col bg-paper md:min-h-0 md:rounded-lg md:shadow-stamp-lg">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-line px-4 py-3">
         {hasPrev && (
@@ -425,7 +425,7 @@ function ModeStep({
       <button
         type="button"
         onClick={() => onSelect('same-class')}
-        className="flex min-h-[56px] w-full items-start gap-3 rounded-xl border border-line bg-paper-soft px-4 py-4 text-left hover:border-primary hover:bg-primary-soft transition-colors"
+        className="flex min-h-[56px] w-full items-start gap-3 rounded-md border border-line bg-paper-soft px-4 py-4 text-left hover:border-primary hover:bg-primary-soft transition-colors"
       >
         <div>
           <p className="text-sm font-semibold text-ink">Subir clase existente</p>
@@ -437,7 +437,7 @@ function ModeStep({
         <button
           type="button"
           onClick={() => onSelect('new-class')}
-          className="flex min-h-[56px] w-full items-start gap-3 rounded-xl border border-line bg-paper-soft px-4 py-4 text-left hover:border-primary hover:bg-primary-soft transition-colors"
+          className="flex min-h-[56px] w-full items-start gap-3 rounded-md border border-line bg-paper-soft px-4 py-4 text-left hover:border-primary hover:bg-primary-soft transition-colors"
         >
           <div>
             <p className="text-sm font-semibold text-ink">Agregar nueva clase</p>
@@ -476,7 +476,7 @@ function ClassStep({
               key={cls.slug}
               type="button"
               onClick={() => onSelect({ slug: cls.slug, source: cls.source })}
-              className="flex min-h-[56px] w-full items-center justify-between rounded-xl border border-line bg-paper-soft px-4 py-3 text-left hover:border-primary hover:bg-primary-soft transition-colors"
+              className="flex min-h-[56px] w-full items-center justify-between rounded-md border border-line bg-paper-soft px-4 py-3 text-left hover:border-primary hover:bg-primary-soft transition-colors"
             >
               <div>
                 <p className="text-sm font-semibold text-ink capitalize">
@@ -515,7 +515,7 @@ function NewClassStep({ onSelect }: { onSelect: (cls: ClassRef) => void }) {
             key={cls}
             type="button"
             onClick={() => onSelect({ slug: cls, source: 'PHB' })}
-            className="flex min-h-[44px] w-full items-center rounded-xl border border-line bg-paper-soft px-4 py-3 text-left hover:border-primary hover:bg-primary-soft transition-colors"
+            className="flex min-h-[44px] w-full items-center rounded-md border border-line bg-paper-soft px-4 py-3 text-left hover:border-primary hover:bg-primary-soft transition-colors"
           >
             <p className="text-sm font-semibold text-ink capitalize">
               {CLASS_LABELS[cls] ?? cls}
@@ -550,19 +550,19 @@ function HpStep({
             key={m}
             type="button"
             onClick={() => setMethod(m)}
-            className={`flex min-h-[56px] w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+            className={`flex min-h-[56px] w-full items-center gap-3 rounded-md border px-4 py-3 text-left transition-colors ${
               method === m
                 ? 'border-primary bg-primary-soft text-primary-deep'
                 : 'border-line bg-paper-soft text-ink hover:border-primary hover:bg-primary-soft'
             }`}
           >
             <div
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-pill border-2 transition-colors ${
                 method === m ? 'border-primary' : 'border-ink-mute'
               }`}
             >
               {method === m && (
-                <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+                <div className="h-2.5 w-2.5 rounded-pill bg-primary" />
               )}
             </div>
             <div>
@@ -582,7 +582,7 @@ function HpStep({
       <button
         type="button"
         onClick={() => onContinue(method)}
-        className="min-h-[44px] w-full rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
       >
         Continuar
       </button>
@@ -622,7 +622,7 @@ function AsiFeatStep({
       </div>
 
       {/* Tab toggle */}
-      <div className="flex rounded-xl border border-line overflow-hidden">
+      <div className="flex rounded-md border border-line overflow-hidden">
         {(['asi', 'feat'] as const).map((k) => (
           <button
             key={k}
@@ -671,7 +671,7 @@ function AsiFeatStep({
       )}
 
       {kind === 'feat' && (
-        <div className="rounded-xl border border-line bg-paper-soft p-4">
+        <div className="rounded-md border border-line bg-paper-soft p-4">
           <p className="text-sm text-ink-mute">
             La selección de dotes completa se implementará en una versión futura. Por ahora,
             elegí <strong>Atributo (+2)</strong> para continuar.
@@ -683,7 +683,7 @@ function AsiFeatStep({
         type="button"
         disabled={!isValid}
         onClick={() => onContinue(kind, kind === 'asi' ? deltas : {})}
-        className="min-h-[44px] w-full rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         Continuar
       </button>
@@ -740,7 +740,7 @@ function ReviewStep({
         type="button"
         disabled={isPending}
         onClick={onSubmit}
-        className="min-h-[44px] w-full rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="min-h-[44px] w-full rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isPending ? 'Subiendo de nivel…' : 'Confirmar subida de nivel'}
       </button>
@@ -785,7 +785,7 @@ function SuccessScreen({
 
       {/* Partial spell save warning (REQ-CLU-SPL-TWO-PHASE-SUBMIT) */}
       {partialSpellsError && (
-        <div className="w-full max-w-xs rounded-xl border border-warning-soft bg-warning-soft/30 p-4 text-left">
+        <div className="w-full max-w-xs rounded-md border border-warning-soft bg-warning-soft/30 p-4 text-left">
           <p className="text-xs text-warning-deep">
             Subiste de nivel, pero los hechizos no se guardaron. {partialSpellsError.code}.
             Tocá «Reintentar guardar hechizos» para reintentar.
@@ -801,7 +801,7 @@ function SuccessScreen({
         </div>
       )}
 
-      <dl className="w-full max-w-xs space-y-2 rounded-xl border border-line bg-paper-soft p-4 text-left">
+      <dl className="w-full max-w-xs space-y-2 rounded-md border border-line bg-paper-soft p-4 text-left">
         <Row label="HP ganados" value={`+${summary.hpDelta}`} />
         {summary.rollUsed !== null && (
           <Row label="Tirada" value={`${summary.rollUsed}`} />
@@ -814,7 +814,7 @@ function SuccessScreen({
 
       {/* Features unlocked section (REQ-CLU-FTR-SUCCESS-SCREEN) */}
       {(summary.featuresUnlocked?.length ?? 0) > 0 && (
-        <section className="w-full max-w-xs rounded-xl border border-line bg-paper-soft p-4 text-left">
+        <section className="w-full max-w-xs rounded-md border border-line bg-paper-soft p-4 text-left">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-mute">
             Características nuevas
           </p>
@@ -829,7 +829,7 @@ function SuccessScreen({
       <button
         type="button"
         onClick={onDone}
-        className="min-h-[44px] w-full max-w-xs rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
+        className="min-h-[44px] w-full max-w-xs rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
       >
         Ver ficha
       </button>

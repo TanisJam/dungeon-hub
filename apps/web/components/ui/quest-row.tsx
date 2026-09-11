@@ -1,5 +1,5 @@
 // QuestRow — tappable card-row atom for dm quest lists.
-// Visual grammar: rounded-xl bg-surface-soft card, icon cell + title/sub + chevron.
+// Visual grammar: rounded-md bg-surface-soft card, icon cell + title/sub + chevron.
 // REQ-C2-02: extracted from quests-sin-tocar-list and pendientes-sheet-content (copy-paste).
 
 export interface QuestRowProps {
@@ -14,7 +14,7 @@ export interface QuestRowProps {
 /**
  * QuestRow — atom for the copy-pasted dm quest card-row.
  *
- * Visual grammar: card-row (rounded-xl bg-surface-soft px-3 py-2.5),
+ * Visual grammar: card-row (rounded-md bg-surface-soft px-3 py-2.5),
  * with a leading icon cell (inicio-row-quest-ic), title/sub, and trailing chevron.
  *
  * Used by:
@@ -25,7 +25,7 @@ export interface QuestRowProps {
  */
 export function QuestRow({ title, subtitle, className }: QuestRowProps) {
   const rootClass = [
-    'flex items-center gap-3 rounded-xl bg-surface-soft px-3 py-2.5',
+    'flex items-center gap-3 rounded-md bg-surface-soft px-3 py-2.5',
     className,
   ]
     .filter(Boolean)
@@ -34,7 +34,7 @@ export function QuestRow({ title, subtitle, className }: QuestRowProps) {
   return (
     <li className={rootClass} data-quest-row>
       {/* Magenta scroll icon-cell */}
-      <span className="inicio-row-quest-ic flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-base">
+      <span className="inicio-row-quest-ic flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-pill text-base">
         📜
       </span>
 

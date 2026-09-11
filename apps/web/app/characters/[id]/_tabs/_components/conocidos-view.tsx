@@ -212,7 +212,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
         <button
           type="button"
           onClick={() => setStatblockOpen(true)}
-          className="w-full text-left rounded-xl border border-line bg-surface px-4 py-3 hover:bg-paper transition-colors"
+          className="w-full text-left rounded-md border border-line bg-surface px-4 py-3 hover:bg-paper transition-colors"
           aria-label={`Ver ficha completa de ${selectedMonster.name}`}
         >
           <MonsterRowView row={{ ...selectedMonster, crNumeric: selectedMonster.crNumeric ?? null }} />
@@ -237,7 +237,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {monsterPages.length === 0 ? (
-            <div className="py-6 text-center rounded-xl border border-dashed border-line bg-surface">
+            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
               <p className="text-sm text-ink-mute">No hay notas sobre este monstruo.</p>
             </div>
           ) : (
@@ -245,7 +245,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
               {monsterPages.map((page) => (
                 <div
                   key={page.id}
-                  className="rounded-xl border border-line bg-surface px-3 py-3 flex flex-col gap-1"
+                  className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-1"
                 >
                   {page.title && (
                     <p className="text-sm font-semibold text-ink">{page.title}</p>
@@ -256,7 +256,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                       {page.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
+                          className="rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
                         >
                           {tag}
                         </span>
@@ -317,10 +317,10 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
         </button>
 
         {/* NPC inline detail card — sanitized (NO dmNotes, ADR-6 D3) */}
-        <div className="rounded-xl border border-line bg-surface px-4 py-4 flex flex-col gap-3">
+        <div className="rounded-md border border-line bg-surface px-4 py-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <h3 className="flex-1 font-semibold text-base text-ink">{selectedNpc.name}</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-line bg-paper-soft text-ink-mute">
+            <span className="text-xs px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
               {NPC_STATUS_LABELS[selectedNpc.status]}
             </span>
           </div>
@@ -342,7 +342,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {npcPages.length === 0 ? (
-            <div className="py-6 text-center rounded-xl border border-dashed border-line bg-surface">
+            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
               <p className="text-sm text-ink-mute">No hay notas sobre este NPC.</p>
             </div>
           ) : (
@@ -350,7 +350,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
               {npcPages.map((page) => (
                 <div
                   key={page.id}
-                  className="rounded-xl border border-line bg-surface px-3 py-3 flex flex-col gap-1"
+                  className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-1"
                 >
                   {page.title && (
                     <p className="text-sm font-semibold text-ink">{page.title}</p>
@@ -361,7 +361,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                       {page.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
+                          className="rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
                         >
                           {tag}
                         </span>
@@ -421,10 +421,10 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
         </button>
 
         {/* Faction inline detail card — sanitized (NO dmNotes, ADR-6 D3) */}
-        <div className="rounded-xl border border-line bg-surface px-4 py-4 flex flex-col gap-3">
+        <div className="rounded-md border border-line bg-surface px-4 py-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <h3 className="flex-1 font-semibold text-base text-ink">{selectedFaction.name}</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-line bg-paper-soft text-ink-mute">
+            <span className="text-xs px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
               {FACTION_STATE_LABELS[selectedFaction.state] ?? selectedFaction.state}
             </span>
           </div>
@@ -440,7 +440,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {factionPages.length === 0 ? (
-            <div className="py-6 text-center rounded-xl border border-dashed border-line bg-surface">
+            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
               <p className="text-sm text-ink-mute">No hay notas sobre esta facción.</p>
             </div>
           ) : (
@@ -448,7 +448,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
               {factionPages.map((page) => (
                 <div
                   key={page.id}
-                  className="rounded-xl border border-line bg-surface px-3 py-3 flex flex-col gap-1"
+                  className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-1"
                 >
                   {page.title && (
                     <p className="text-sm font-semibold text-ink">{page.title}</p>
@@ -459,7 +459,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                       {page.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
+                          className="rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
                         >
                           {tag}
                         </span>
@@ -519,10 +519,10 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
         </button>
 
         {/* Location inline detail card — sanitized (NO dmNotes, NO parentHexStatus, ADR-6 D3, ADR-1b) */}
-        <div className="rounded-xl border border-line bg-surface px-4 py-4 flex flex-col gap-3">
+        <div className="rounded-md border border-line bg-surface px-4 py-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <h3 className="flex-1 font-semibold text-base text-ink">{selectedLocation.name}</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-line bg-paper-soft text-ink-mute">
+            <span className="text-xs px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
               {POI_STATUS_LABELS[selectedLocation.status] ?? selectedLocation.status}
             </span>
           </div>
@@ -538,7 +538,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
             Mis notas
           </p>
           {locationPages.length === 0 ? (
-            <div className="py-6 text-center rounded-xl border border-dashed border-line bg-surface">
+            <div className="py-6 text-center rounded-md border border-dashed border-line bg-surface">
               <p className="text-sm text-ink-mute">No hay notas sobre este lugar.</p>
             </div>
           ) : (
@@ -546,7 +546,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
               {locationPages.map((page) => (
                 <div
                   key={page.id}
-                  className="rounded-xl border border-line bg-surface px-3 py-3 flex flex-col gap-1"
+                  className="rounded-md border border-line bg-surface px-3 py-3 flex flex-col gap-1"
                 >
                   {page.title && (
                     <p className="text-sm font-semibold text-ink">{page.title}</p>
@@ -557,7 +557,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                       {page.tags.map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
+                          className="rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-xs text-ink-soft"
                         >
                           {tag}
                         </span>
@@ -633,7 +633,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                   key={`${monster.slug}|${monster.source}`}
                   type="button"
                   onClick={() => setSelectedMonster(monster)}
-                  className="w-full text-left rounded-xl border border-line bg-surface px-3 hover:bg-paper transition-colors"
+                  className="w-full text-left rounded-md border border-line bg-surface px-3 hover:bg-paper transition-colors"
                   aria-label={`Ver ${monster.name}${hasNotes ? ' (tiene notas)' : ''}`}
                 >
                   <div className="flex items-center gap-2">
@@ -643,7 +643,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                     {/* Note indicator dot — REQ-BP-WEB-02 */}
                     {hasNotes && (
                       <div
-                        className="h-2 w-2 rounded-full bg-accent flex-shrink-0"
+                        className="h-2 w-2 rounded-pill bg-accent flex-shrink-0"
                         aria-hidden="true"
                         title="Tiene notas"
                       />
@@ -670,7 +670,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                   key={npc.id}
                   type="button"
                   onClick={() => setSelectedNpc(npc)}
-                  className="w-full text-left rounded-xl border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
+                  className="w-full text-left rounded-md border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
                   aria-label={`Ver ${npc.name}${hasNotes ? ' (tiene notas)' : ''}`}
                 >
                   <div className="flex items-center gap-2">
@@ -680,13 +680,13 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                         <p className="text-xs text-ink-mute">{npc.race}</p>
                       )}
                     </div>
-                    <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border border-line bg-paper-soft text-ink-mute">
+                    <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
                       {NPC_STATUS_LABELS[npc.status]}
                     </span>
                     {/* Note indicator dot */}
                     {hasNotes && (
                       <div
-                        className="h-2 w-2 rounded-full bg-accent flex-shrink-0"
+                        className="h-2 w-2 rounded-pill bg-accent flex-shrink-0"
                         aria-hidden="true"
                         title="Tiene notas"
                       />
@@ -713,7 +713,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                   key={faction.id}
                   type="button"
                   onClick={() => setSelectedFaction(faction)}
-                  className="w-full text-left rounded-xl border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
+                  className="w-full text-left rounded-md border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
                   aria-label={`Ver ${faction.name}${hasNotes ? ' (tiene notas)' : ''}`}
                 >
                   <div className="flex items-center gap-2">
@@ -726,7 +726,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                     {/* Note indicator dot */}
                     {hasNotes && (
                       <div
-                        className="h-2 w-2 rounded-full bg-accent flex-shrink-0"
+                        className="h-2 w-2 rounded-pill bg-accent flex-shrink-0"
                         aria-hidden="true"
                         title="Tiene notas"
                       />
@@ -753,7 +753,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                   key={location.id}
                   type="button"
                   onClick={() => setSelectedLocation(location)}
-                  className="w-full text-left rounded-xl border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
+                  className="w-full text-left rounded-md border border-line bg-surface px-3 py-3 min-h-[44px] hover:bg-paper transition-colors"
                   aria-label={`Ver ${location.name}${hasNotes ? ' (tiene notas)' : ''}`}
                 >
                   <div className="flex items-center gap-2">
@@ -766,7 +766,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                     {/* Note indicator dot */}
                     {hasNotes && (
                       <div
-                        className="h-2 w-2 rounded-full bg-accent flex-shrink-0"
+                        className="h-2 w-2 rounded-pill bg-accent flex-shrink-0"
                         aria-hidden="true"
                         title="Tiene notas"
                       />

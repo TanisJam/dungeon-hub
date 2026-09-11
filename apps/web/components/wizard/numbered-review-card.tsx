@@ -23,7 +23,7 @@ export function NumberedReviewCard({
   return (
     <div className="flex gap-3 rounded-md bg-surface border border-line shadow-stamp-md p-4">
       {/* Number badge */}
-      <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft">
+      <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-pill bg-accent-soft">
         <span className="font-display font-bold text-sm text-accent-deep leading-none">
           {num}
         </span>

@@ -19,7 +19,7 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
   const { name, tagline, players, pendingQuests, sessions } = campaign;
 
   return (
-    <div className="inicio-camp-dm-bg relative rounded-2xl p-4 overflow-hidden">
+    <div className="inicio-camp-dm-bg relative rounded-lg p-4 overflow-hidden">
       {/* DM role pill — absolute positioned */}
       {/* FLAG: original text-ink (#F4EAD5 light) on bg-secondary (magenta). Atom solid secondary uses
            text-on-secondary (#1A1208 dark). DIFFERENT — dark ink vs light cream. Human sign-off needed. */}
@@ -47,15 +47,15 @@ export function DMNextSessionCard({ campaign }: DMNextSessionCardProps) {
 
       {/* Stats pills row */}
       <div className="flex gap-2 flex-wrap mt-4">
-        <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
+        <span className="px-2.5 py-0.5 rounded-pill bg-surface-soft text-xs font-semibold text-ink">
           {players} jugadores
         </span>
         {pendingQuests !== undefined && (
-          <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
+          <span className="px-2.5 py-0.5 rounded-pill bg-surface-soft text-xs font-semibold text-ink">
             {pendingQuests} quests activas
           </span>
         )}
-        <span className="px-2.5 py-0.5 rounded-full bg-surface-soft text-xs font-semibold text-ink">
+        <span className="px-2.5 py-0.5 rounded-pill bg-surface-soft text-xs font-semibold text-ink">
           Sesión {sessions + 1}
         </span>
       </div>

@@ -55,7 +55,7 @@ export function LevelUpEntryPoint({
   return (
     <Link
       href={`/characters/${characterId}/level-up`}
-      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
+      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 py-3 text-sm font-semibold text-paper hover:bg-primary-deep transition-colors"
       aria-label="Subir de nivel"
     >
       ✦ Subir nivel

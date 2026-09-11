@@ -81,7 +81,7 @@ export function EventTimeline({ events }: EventTimelineProps) {
           {/* Left-border accent dot (REQ-DPPMB-DETAIL-06: left-border accent) */}
           <span
             aria-hidden="true"
-            className="absolute -left-[21px] top-3 h-2.5 w-2.5 rounded-full bg-accent"
+            className="absolute -left-[21px] top-3 h-2.5 w-2.5 rounded-pill bg-accent"
           />
 
           {/* Event type label */}

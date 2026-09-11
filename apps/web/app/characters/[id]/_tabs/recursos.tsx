@@ -97,7 +97,7 @@ function ResourceRow({
         <div className="mt-2">
           <span
             data-testid="resource-die-badge"
-            className="inline-flex items-center rounded-full border border-line bg-paper-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mute"
+            className="inline-flex items-center rounded-pill border border-line bg-paper-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-mute"
           >
             {resource.extra.dieSize}
           </span>

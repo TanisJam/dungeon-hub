@@ -64,7 +64,7 @@ export function JournalDetailView({ detail, effectiveView }: JournalDetailProps)
             {detail.tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex min-h-[28px] items-center rounded-full border border-line bg-paper-soft px-3 py-1 text-xs font-medium text-ink"
+                className="inline-flex min-h-[28px] items-center rounded-pill border border-line bg-paper-soft px-3 py-1 text-xs font-medium text-ink"
               >
                 {tag}
               </span>

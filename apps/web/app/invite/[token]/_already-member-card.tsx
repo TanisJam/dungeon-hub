@@ -19,7 +19,7 @@ type Props = {
 };
 
 const buttonClass =
-  'inline-flex items-center justify-center w-full min-h-[44px] rounded-[12px] border bg-gradient-to-br from-primary to-primary-deep px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(111,134,201,0.35),0_1px_2px_rgba(39,30,51,0.08)] transition-all hover:brightness-105 border-transparent';
+  'inline-flex items-center justify-center w-full min-h-[44px] rounded-md border bg-gradient-to-br from-primary to-primary-deep px-4 py-2.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(111,134,201,0.35),0_1px_2px_rgba(39,30,51,0.08)] transition-all hover:brightness-105 border-transparent';
 
 export function AlreadyMemberCard({ worldRole, campaignId, campaignName, worldName }: Props) {
   if (worldRole === 'gm') {

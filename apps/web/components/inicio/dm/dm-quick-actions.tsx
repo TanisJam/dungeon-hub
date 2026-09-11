@@ -26,9 +26,9 @@ export function DMQuickActions() {
         {/* Iniciativa — functional link */}
         <Link
           href="/encuentros"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
+          className="flex flex-col items-center gap-1.5 rounded-md p-3 bg-surface-soft text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-pill bg-accent-soft text-accent">
             <Icon name="sword" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Iniciativa</span>
@@ -37,9 +37,9 @@ export function DMQuickActions() {
         {/* Herramientas del DM — functional link (Biblioteca W1, REQ-DMTOOLS-01) */}
         <Link
           href="/herramientas/facciones"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
+          className="flex flex-col items-center gap-1.5 rounded-md p-3 bg-surface-soft text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-pill bg-accent-soft text-accent">
             <Icon name="hammer" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Herramientas</span>
@@ -48,9 +48,9 @@ export function DMQuickActions() {
         {/* Mesa / Campañas — functional link (Biblioteca W1 — Mesa tab absorbed, REQ-NAV-02) */}
         <Link
           href="/campanas"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center"
+          className="flex flex-col items-center gap-1.5 rounded-md p-3 bg-surface-soft text-center"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-pill bg-accent-soft text-accent">
             <Icon name="compass" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Mesa</span>
@@ -61,9 +61,9 @@ export function DMQuickActions() {
           type="button"
           disabled
           aria-disabled="true"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
+          className="flex flex-col items-center gap-1.5 rounded-md p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-pill bg-accent-soft text-accent">
             <Icon name="user" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Nuevo NPC</span>
@@ -74,9 +74,9 @@ export function DMQuickActions() {
           type="button"
           disabled
           aria-disabled="true"
-          className="flex flex-col items-center gap-1.5 rounded-xl p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
+          className="flex flex-col items-center gap-1.5 rounded-md p-3 bg-surface-soft text-center cursor-not-allowed opacity-50"
         >
-          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-accent-soft text-accent">
+          <span className="flex items-center justify-center w-9 h-9 rounded-pill bg-accent-soft text-accent">
             <Icon name="bag" size={18} />
           </span>
           <span className="text-xs font-semibold text-ink">Loot</span>

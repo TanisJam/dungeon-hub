@@ -167,7 +167,7 @@ export function EventClientWrapper({
               type="button"
               onClick={() => handleTagClick(tag)}
               className={[
-                'inline-flex min-h-[44px] items-center rounded-full border px-4 py-2 text-xs font-medium transition-colors',
+                'inline-flex min-h-[44px] items-center rounded-pill border px-4 py-2 text-xs font-medium transition-colors',
                 activeTag === tag
                   ? 'border-ink bg-ink text-surface'
                   : 'border-line bg-paper-soft text-ink hover:bg-paper',
@@ -181,7 +181,7 @@ export function EventClientWrapper({
             <button
               type="button"
               onClick={() => handleTagClick(activeTag)}
-              className="inline-flex min-h-[44px] items-center rounded-full border border-line bg-paper-soft px-4 py-2 text-xs font-medium text-ink-soft hover:bg-paper"
+              className="inline-flex min-h-[44px] items-center rounded-pill border border-line bg-paper-soft px-4 py-2 text-xs font-medium text-ink-soft hover:bg-paper"
             >
               Limpiar filtro ×
             </button>

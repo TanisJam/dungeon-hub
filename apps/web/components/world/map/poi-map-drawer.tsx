@@ -58,9 +58,9 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
         // Base — fixed panel, z-20 (above map z-10, below toggle z-30 and TabBar z-40)
         'fixed inset-x-0 bottom-0 z-20 flex flex-col',
         // Mobile bottom-sheet shape — fixed half-height sheet (not content-hugging)
-        'h-[55vh] w-full rounded-t-xl',
+        'h-[55vh] w-full rounded-t-md',
         // Desktop left-panel shape (overrides mobile above)
-        'md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:h-auto md:w-80 md:rounded-t-none md:rounded-r-xl',
+        'md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:h-auto md:w-80 md:rounded-t-none md:rounded-r-md',
         // Surface
         'bg-surface shadow-stamp-lg',
         // Animation
@@ -79,7 +79,7 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
         <button
           type="button"
           onClick={onClose}
-          className="mb-2 h-1.5 w-10 rounded-full bg-ink/20 md:hidden"
+          className="mb-2 h-1.5 w-10 rounded-pill bg-ink/20 md:hidden"
           aria-label="Cerrar lista"
         />
         <div className="flex w-full items-center justify-between">

@@ -88,7 +88,7 @@ export function SpellsStep({
           type="button"
           onClick={() => onContinue(value)}
           disabled={!isValid}
-          className="min-h-[44px] w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          className="min-h-[44px] w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
           aria-label="Confirmar hechizos"
         >
           Confirmar

@@ -67,14 +67,14 @@ export function EncumbranceBar({ encumbrance }: EncumbranceBarProps) {
 
       {/* Capacity track with threshold ticks */}
       <div
-        className="relative h-3 w-full overflow-hidden rounded-full bg-line-soft"
+        className="relative h-3 w-full overflow-hidden rounded-pill bg-line-soft"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={max}
         aria-valuenow={Math.min(weight, max)}
       >
         <div
-          className={`h-full rounded-full transition-[width] ${BAR_COLOR[status]}`}
+          className={`h-full rounded-pill transition-[width] ${BAR_COLOR[status]}`}
           style={{ width: `${pct}%` }}
         />
         {/* Ticks at STR×5 (encumbered) and STR×10 (heavily). Only render when
