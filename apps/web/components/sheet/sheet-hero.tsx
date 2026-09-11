@@ -115,10 +115,10 @@ export function SheetHero({
       {/* XP bar */}
       <div className="relative z-10 mt-4">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-white/50">
+          <span className="text-micro font-bold uppercase tracking-widest text-white/50">
             Experiencia
           </span>
-          <span className="text-[10px] font-semibold text-white/70">
+          <span className="text-label font-semibold text-white/70">
             {isMaxLevel ? 'MAX' : `${xpCurrent.toLocaleString()} / ${xpNextThreshold.toLocaleString()}`}
           </span>
         </div>

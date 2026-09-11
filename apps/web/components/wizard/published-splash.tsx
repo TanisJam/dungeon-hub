@@ -23,7 +23,7 @@ export function PublishedSplash({
     <div className="flex flex-col items-center gap-4 py-6">
       {/* Dark gradient announcement card */}
       <div className="w-full max-w-sm rounded-lg bg-gradient-to-br from-ink to-surface border border-line shadow-stamp-lg p-6 text-center">
-        <p className="text-[11px] italic text-paper-soft/70 mb-1">
+        <p className="text-caption italic text-paper-soft/70 mb-1">
           Bienvenido al gremio
         </p>
         <h2 className="font-display font-bold text-[28px] leading-tight text-paper tracking-tight">
@@ -33,7 +33,7 @@ export function PublishedSplash({
           está listo
         </p>
         {identityParts && (
-          <p className="mt-2 text-[11px] text-paper-soft/50">
+          <p className="mt-2 text-caption text-paper-soft/50">
             {identityParts}
           </p>
         )}

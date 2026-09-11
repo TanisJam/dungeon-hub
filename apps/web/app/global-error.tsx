@@ -45,7 +45,7 @@ export default function GlobalError({
           </div>
 
           {error.digest && (
-            <p className="mt-6 text-[11px] text-ink-mute">
+            <p className="mt-6 text-caption text-ink-mute">
               Código de referencia: {error.digest}
             </p>
           )}

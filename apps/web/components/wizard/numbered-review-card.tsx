@@ -32,7 +32,7 @@ export function NumberedReviewCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-display font-semibold text-[15px] text-ink leading-tight">
+          <p className="font-display font-semibold text-body text-ink leading-tight">
             {title}
           </p>
           {/* The link is the TAP TARGET; the span is the tiny "✎ Editar"
@@ -44,7 +44,7 @@ export function NumberedReviewCard({
             href={editHref}
             className="flex-shrink-0 inline-flex min-h-[44px] min-w-[44px] items-center justify-center"
           >
-            <span className="text-[11px] text-ink-mute hover:text-ink transition-colors">
+            <span className="text-caption text-ink-mute hover:text-ink transition-colors">
               ✎ Editar
             </span>
           </Link>

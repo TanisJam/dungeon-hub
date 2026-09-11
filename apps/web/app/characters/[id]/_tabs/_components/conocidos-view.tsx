@@ -698,7 +698,7 @@ export function ConocidosView({ characterId, monsters, npcs, factions, locations
                         <p className="text-xs text-ink-mute">{npc.race}</p>
                       )}
                     </div>
-                    <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
+                    <span className="shrink-0 text-label px-2 py-0.5 rounded-pill border border-line bg-paper-soft text-ink-mute">
                       {NPC_STATUS_LABELS[npc.status]}
                     </span>
                     {/* Note indicator dot */}

@@ -32,7 +32,7 @@ export function ReviewBanner({
         aria-hidden
       >
         <div className="flex h-16 w-16 items-center justify-center rounded-pill border-2 border-secondary text-secondary">
-          <span className="text-[9px] font-bold uppercase tracking-widest leading-tight text-center">
+          <span className="text-micro font-bold uppercase tracking-widest leading-tight text-center">
             LISTO<br />P/APROBAR
           </span>
         </div>
@@ -41,7 +41,7 @@ export function ReviewBanner({
       {/* Content */}
       <div className="pr-20 text-center">
         {aventureroOf && (
-          <p className="text-[11px] italic text-paper-soft/70 mb-1">
+          <p className="text-caption italic text-paper-soft/70 mb-1">
             {aventureroOf}
           </p>
         )}

@@ -92,7 +92,7 @@ export function SpellKnownEditor({
               aria-label={spell.name}
             />
             <span className="text-sm text-ink">{spell.name}</span>
-            <span className="ml-auto text-[10px] text-ink-mute">Nv. {spell.level}</span>
+            <span className="ml-auto text-label text-ink-mute">Nv. {spell.level}</span>
           </label>
         ))}
       </div>

@@ -50,7 +50,7 @@ export function RacialSpellsBlock({ racialSpells }: RacialSpellsBlockProps) {
 
   return (
     <Card variant="surface" className="p-4">
-      <h2 className="mb-3 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <h2 className="mb-3 text-eyebrow text-ink-mute">
         Hechizos raciales
       </h2>
 
@@ -74,7 +74,7 @@ interface SpellGroupProps {
 function SpellGroup({ label, spells }: SpellGroupProps) {
   return (
     <div>
-      <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+      <p className="mb-1 text-micro font-bold uppercase tracking-widest text-ink-mute">
         {label}
       </p>
       <div className="space-y-1.5">
@@ -101,12 +101,12 @@ function SpellRow({ spell }: SpellRowProps) {
         <p className="truncate text-sm font-medium text-ink">
           {titleCase(spell.slug)}
           {spell.isPlayerChoice && (
-            <span className="ml-1.5 text-[10px] font-normal text-ink-soft">(de raza)</span>
+            <span className="ml-1.5 text-label font-normal text-ink-soft">(de raza)</span>
           )}
         </p>
 
         {/* Meta row: ability + level gate + cast level */}
-        <p className="mt-0.5 text-[10px] text-ink-mute">
+        <p className="mt-0.5 text-label text-ink-mute">
           {abilityLabel}
           {spell.characterLevelAvailable > 1 && (
             <span> · Nv {spell.characterLevelAvailable}</span>
@@ -118,7 +118,7 @@ function SpellRow({ spell }: SpellRowProps) {
       </div>
 
       {/* Frequency badge */}
-      <span className="ml-2 flex-shrink-0 rounded-pill bg-paper-soft px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-mute">
+      <span className="ml-2 flex-shrink-0 rounded-pill bg-paper-soft px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-mute">
         {freqBadge}
       </span>
     </div>

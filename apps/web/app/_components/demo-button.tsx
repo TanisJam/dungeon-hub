@@ -47,7 +47,7 @@ export function DemoButton({ redirectTo = '/inicio' }: { redirectTo?: string }) 
           </span>
         )}
       </Button>
-      <p className="mt-2 text-[11px] text-ink-mute">
+      <p className="mt-2 text-caption text-ink-mute">
         Cuenta de ejemplo con un mundo, personajes y bitácora ya poblados.
       </p>
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}

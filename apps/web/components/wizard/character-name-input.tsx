@@ -51,7 +51,7 @@ export function CharacterNameInput({ characterId, initialName }: CharacterNameIn
     <div className="rounded-md bg-surface border border-line shadow-stamp-md p-4">
       <label
         htmlFor="character-name"
-        className="block text-[10px] font-bold uppercase tracking-widest text-ink-mute mb-2"
+        className="block text-eyebrow text-ink-mute mb-2"
       >
         Nombre del Personaje
       </label>
@@ -65,13 +65,13 @@ export function CharacterNameInput({ characterId, initialName }: CharacterNameIn
         placeholder="Nombre del personaje…"
       />
       {status === 'saving' && (
-        <p className="mt-1 text-[10px] text-ink-mute">Guardando…</p>
+        <p className="mt-1 text-label text-ink-mute">Guardando…</p>
       )}
       {status === 'saved' && (
-        <p className="mt-1 text-[10px] text-primary-deep">✓ Guardado</p>
+        <p className="mt-1 text-label text-primary-deep">✓ Guardado</p>
       )}
       {status === 'error' && (
-        <p className="mt-1 text-[10px] text-warning-deep">{errorMsg ?? 'Error al guardar'}</p>
+        <p className="mt-1 text-label text-warning-deep">{errorMsg ?? 'Error al guardar'}</p>
       )}
     </div>
   );

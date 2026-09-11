@@ -286,7 +286,7 @@ function FixedItemsList({ refs }: { refs: ParsedRef[] }) {
   if (refs.length === 0) return null;
   return (
     <div className="rounded-md border border-line bg-surface px-3 py-2.5">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-1.5">
+      <p className="text-eyebrow text-ink-mute mb-1.5">
         Siempre recibís
       </p>
       <ul className="space-y-0.5">
@@ -387,7 +387,7 @@ export function EquipmentPicker({
     <div className="space-y-6">
       {/* Package-vs-gold fork */}
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-2">
+        <p className="text-eyebrow text-ink-mute mb-2">
           Tipo de inicio
         </p>
         <div
@@ -452,7 +452,7 @@ export function EquipmentPicker({
       {/* Gold path: field + roll button */}
       {classPath === 'gold' && parsedClass.goldAlternative && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-2">
+          <p className="text-eyebrow text-ink-mute mb-2">
             Valor de oro (po)
           </p>
           <div className="flex gap-2 items-center">
@@ -489,7 +489,7 @@ export function EquipmentPicker({
           {/* Class choice rows */}
           {parsedClass.choiceRows.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-2">
+              <p className="text-eyebrow text-ink-mute mb-2">
                 Equipo de clase
               </p>
               <div className="space-y-4">
@@ -523,7 +523,7 @@ export function EquipmentPicker({
         parsedBackground.specialItems.length > 0 ||
         parsedBackground.currency > 0) && (
         <div className="space-y-3 border-t border-line pt-4">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="text-eyebrow text-ink-mute">
             Equipo de trasfondo
           </p>
 
@@ -531,7 +531,7 @@ export function EquipmentPicker({
 
           {parsedBackground.specialItems.length > 0 && (
             <div className="rounded-md border border-line bg-surface px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-1.5">
+              <p className="text-eyebrow text-ink-mute mb-1.5">
                 Objetos especiales
               </p>
               <ul className="space-y-0.5">
@@ -547,7 +547,7 @@ export function EquipmentPicker({
 
           {parsedBackground.currency > 0 && (
             <div className="rounded-md border border-line bg-surface px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute mb-1">
+              <p className="text-eyebrow text-ink-mute mb-1">
                 Monedas del trasfondo
               </p>
               <p className="text-xs text-ink">

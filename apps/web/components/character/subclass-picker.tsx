@@ -36,7 +36,7 @@ export function SubclassPicker({
   }
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         {title} — elegí 1
       </p>
       <div className="mt-2 grid grid-cols-1 gap-1.5">
@@ -58,7 +58,7 @@ export function SubclassPicker({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium">{sc.name}</span>
-                <span className="shrink-0 text-[9px] uppercase text-ink-mute">{sc.source}</span>
+                <span className="shrink-0 text-micro uppercase text-ink-mute">{sc.source}</span>
               </div>
             </button>
           );

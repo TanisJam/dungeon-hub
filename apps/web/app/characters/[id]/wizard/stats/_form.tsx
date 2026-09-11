@@ -232,7 +232,7 @@ function PointBuyEditor({
     <div className="space-y-3">
       {/* Violet header card */}
       <div className="flex items-center justify-between rounded-md bg-gradient-to-br from-ink-soft to-ink px-4 py-3 ring-1 ring-ink/30">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-paper/60">
+        <span className="text-eyebrow text-paper/60">
           Puntos restantes
         </span>
         <span className="font-display text-2xl font-bold text-paper">
@@ -257,7 +257,7 @@ function PointBuyEditor({
               {/* Ability name + cost */}
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-ink">{a.label}</span>
-                <span className="text-[11px] text-ink-mute">{cost} pts</span>
+                <span className="text-caption text-ink-mute">{cost} pts</span>
               </div>
 
               {/* Controls */}
@@ -271,7 +271,7 @@ function PointBuyEditor({
                 >
                   −
                 </button>
-                <span className="font-display w-7 text-center text-[22px] font-bold leading-none text-ink">
+                <span className="font-display w-7 text-center text-title font-bold leading-none text-ink">
                   {v}
                 </span>
                 <button
@@ -320,7 +320,7 @@ function StandardArrayEditor({
     <div className="space-y-3">
       {/* Violet header card */}
       <div className="flex items-center justify-between rounded-md bg-gradient-to-br from-ink-soft to-ink px-4 py-3 ring-1 ring-ink/30">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-paper/60">
+        <span className="text-eyebrow text-paper/60">
           Arreglo estándar
         </span>
         <span className="font-display text-sm font-bold text-paper/80 tracking-wide">
@@ -354,7 +354,7 @@ function StandardArrayEditor({
               {/* Ability name */}
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-ink">{a.label}</span>
-                <span className="text-[11px] text-ink-mute">Tocá para cambiar</span>
+                <span className="text-caption text-ink-mute">Tocá para cambiar</span>
               </div>
 
               {/* Modifier pill + score + arrow button */}
@@ -362,7 +362,7 @@ function StandardArrayEditor({
                 {assigned && mod && (
                   <Pill tone="primary" size="sm">{mod}</Pill>
                 )}
-                <span className="font-display w-7 text-center text-[22px] font-bold leading-none text-ink">
+                <span className="font-display w-7 text-center text-title font-bold leading-none text-ink">
                   {assigned ? v : '—'}
                 </span>
                 <button
@@ -416,7 +416,7 @@ function RollEditor({
     <div className="space-y-3">
       {/* Peach gradient header card */}
       <div className="flex items-center justify-between rounded-md bg-gradient-to-br from-accent to-secondary px-4 py-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-paper/80">
+        <span className="text-eyebrow text-paper/80">
           🎲 4D6 (quitar el menor)
         </span>
         <span className="font-display text-lg font-bold text-paper">
@@ -452,7 +452,7 @@ function RollEditor({
       </div>
 
       {/* Audit note */}
-      <p className="text-center text-[11px] text-ink-mute leading-snug">
+      <p className="text-center text-caption text-ink-mute leading-snug">
         La tirada es aleatoria — guardá la que más te guste. El DM podrá auditarla.
       </p>
     </div>

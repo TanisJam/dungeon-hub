@@ -920,7 +920,7 @@ function RaceDetailPanel({
 
       {(fixedLangs.length > 0 || hasLangChoices) && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Idiomas</p>
+          <p className="text-eyebrow text-ink-mute">Idiomas</p>
           {fixedLangs.length > 0 && (
             <p className="mt-1 text-xs">
               <span className="text-ink-mute">Otorgados:</span>{' '}
@@ -964,7 +964,7 @@ function RaceDetailPanel({
 
       {traits.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">Rasgos</p>
+          <p className="text-eyebrow text-ink-mute">Rasgos</p>
           <ul className="mt-1 space-y-1.5 text-xs">
             {traits.map((t, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: static race/subrace trait content extracted once per selection — no unique id field, never reordered.
@@ -1047,7 +1047,7 @@ function AsiBlock({
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">{label}</p>
+      <p className="text-eyebrow text-ink-mute">{label}</p>
       <div className="mt-1 space-y-2">
         {slots.map((slot, idx) => {
           if (slot.kind === 'fixed') {
@@ -1103,7 +1103,7 @@ function AsiChooser({
 
   return (
     <div className="rounded-md border border-accent-soft bg-paper p-2.5">
-      <p className="text-[10px] font-semibold text-accent-deep">
+      <p className="text-label font-semibold text-accent-deep">
         Elegí {slot.count} atributo{slot.count > 1 ? 's' : ''} para +{slot.amount}:
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1195,7 +1195,7 @@ function LangMultiSelect({
   }
   return (
     <div className="rounded-md border border-accent-soft bg-paper p-2.5">
-      <p className="text-[10px] font-semibold text-accent-deep">{label}</p>
+      <p className="text-label font-semibold text-accent-deep">{label}</p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {pool.map((v) => {
           const isOn = selected.includes(v);
@@ -1252,10 +1252,10 @@ function RaceSkillPicker({
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         Habilidades de linaje
       </p>
-      <p className="mt-0.5 text-[10px] text-ink-mute">
+      <p className="mt-0.5 text-label text-ink-mute">
         Elegí {count} habilidad{count === 1 ? '' : 'es'}:
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1307,10 +1307,10 @@ function RaceFeatPicker({
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         Talento racial
       </p>
-      <p className="mt-0.5 text-[10px] text-ink-mute">
+      <p className="mt-0.5 text-label text-ink-mute">
         Elegí 1 talento:
       </p>
       <input
@@ -1372,10 +1372,10 @@ function HighElfCantripPicker({
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="text-eyebrow text-ink-mute">
         Cantrip de linaje
       </p>
-      <p className="mt-0.5 text-[10px] text-ink-mute">
+      <p className="mt-0.5 text-label text-ink-mute">
         Elegí 1 cantrip de mago (PHB p.23):
       </p>
       <input
@@ -1430,7 +1430,7 @@ function SourceChipSelector({
 }) {
   return (
     <div className="rounded-md border border-accent-soft bg-paper p-2.5">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-accent-deep">
+      <p className="text-eyebrow text-accent-deep">
         Fuente · {variants.length} variantes
       </p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">

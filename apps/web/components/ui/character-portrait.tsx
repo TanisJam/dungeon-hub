@@ -68,7 +68,7 @@ export function CharacterPortrait({
 
   const baseClasses =
     size === 'md'
-      ? 'personajes-portrait grid w-[72px] shrink-0 place-items-center font-display text-[26px] font-bold text-accent'
+      ? 'personajes-portrait grid w-[72px] shrink-0 place-items-center font-display text-headline font-bold text-accent'
       : 'pendientes-portrait text-lg font-display font-bold text-white';
 
   const rootClass = [baseClasses, className].filter(Boolean).join(' ');

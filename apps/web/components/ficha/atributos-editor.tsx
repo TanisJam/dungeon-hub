@@ -116,7 +116,7 @@ export function AtributosEditor({
           <div key={key} className="flex flex-col gap-1">
             <label
               htmlFor={`stat-${key}`}
-              className="text-[10px] font-bold uppercase tracking-wide text-ink-mute"
+              className="text-eyebrow text-ink-mute"
             >
               {abbr}
             </label>

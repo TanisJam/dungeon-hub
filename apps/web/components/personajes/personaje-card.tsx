@@ -68,7 +68,7 @@ export function PersonajeCard({
       */}
       <div
         data-testid="char-name"
-        className="line-clamp-2 font-display text-[15px] font-bold leading-tight tracking-tight text-ink"
+        className="line-clamp-2 font-display text-body font-bold leading-tight tracking-tight text-ink"
       >
         {char.name}
       </div>

@@ -478,7 +478,7 @@ export function SpellsPicker({
       {/* ── Cantrips section ──────────────────────────────────────────────── */}
       {cantripList.length > 0 && (
         <div>
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <p className="mb-2 text-eyebrow text-ink-mute">
             Cantrips
           </p>
           <div className="divide-y divide-line rounded-md border border-line bg-paper">
@@ -509,10 +509,10 @@ export function SpellsPicker({
       {/* ── Leveled spells sections ───────────────────────────────────────── */}
       {casterMode === 'wizard' && leveledByLevel.size > 0 && (
         <div className="flex items-center justify-end gap-px pr-3">
-          <span className="w-20 text-center text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <span className="w-20 text-center text-eyebrow text-ink-mute">
             Conoce
           </span>
-          <span className="w-20 text-center text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+          <span className="w-20 text-center text-eyebrow text-ink-mute">
             Prepara
           </span>
         </div>
@@ -522,7 +522,7 @@ export function SpellsPicker({
         .map(([lvl, spells]) => (
           <details key={lvl} open={lvl === lowestLeveledLevel}>
             <summary className="cursor-pointer list-none">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+              <p className="mb-2 text-eyebrow text-ink-mute">
                 Nivel {lvl}
               </p>
             </summary>
@@ -742,7 +742,7 @@ function WizardSpellRow({
 function EmptyGroup({ label }: { label: string }) {
   return (
     <div>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">{label}</p>
+      <p className="mb-2 text-eyebrow text-ink-mute">{label}</p>
       <div className="rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-mute">
         Sin resultados
       </div>

@@ -72,7 +72,7 @@ const fillMap: Record<PillFill, Record<PillTone, string>> = {
 };
 
 const sizeClasses: Record<PillSize, string> = {
-  sm: 'px-2 py-0.5 text-[10px]',
+  sm: 'px-2 py-0.5 text-label',
   md: 'px-2.5 py-0.5 text-xs',
 };
 

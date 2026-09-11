@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 // Base classes shared by all variants
 const BASE_CLASSES =
-  'flex items-center justify-center gap-2 rounded-md border border-dashed border-line font-sans text-[13px] font-semibold text-ink-mute transition-colors';
+  'flex items-center justify-center gap-2 rounded-md border border-dashed border-line font-sans text-footnote font-semibold text-ink-mute transition-colors';
 
 // Enabled state: hover effects
 const ENABLED_CLASSES = 'hover:border-accent hover:text-accent';

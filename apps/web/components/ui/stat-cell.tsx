@@ -109,7 +109,7 @@ export function StatCell({
 
   // ── Content ───────────────────────────────────────────────────────────
   const labelEl = (
-    <span className="text-[9px] font-bold uppercase tracking-widest text-ink-mute">
+    <span className="text-micro font-bold uppercase tracking-widest text-ink-mute">
       {label}
     </span>
   );
@@ -127,7 +127,7 @@ export function StatCell({
 
   const subEl = sub !== undefined && sub !== null ? (
     typeof sub === 'string' ? (
-      <span data-stat-sub className="mt-1 text-[10px] text-ink-soft leading-tight">
+      <span data-stat-sub className="mt-1 text-label text-ink-soft leading-tight">
         {sub}
       </span>
     ) : (

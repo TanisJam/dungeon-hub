@@ -172,10 +172,10 @@ function CategoryResultGroup({ group, campaignId, query, onNavigate }: CategoryR
   return (
     <div>
       <div className="flex items-baseline gap-2.5 pb-1">
-        <span className="font-display font-semibold text-[17px] leading-tight tracking-tight text-ink">
+        <span className="font-display font-semibold text-body-lg leading-tight tracking-tight text-ink">
           {config.label}
         </span>
-        <span className="ml-auto text-[11px] font-semibold text-ink-mute tracking-wide">
+        <span className="ml-auto text-caption font-semibold text-ink-mute tracking-wide">
           {group.total} resultado{group.total === 1 ? '' : 's'}
         </span>
       </div>

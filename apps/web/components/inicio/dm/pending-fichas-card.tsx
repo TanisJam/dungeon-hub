@@ -39,7 +39,7 @@ export function PendingFichasCard({ fichas, oldestAge, onClick }: PendingFichasC
       </div>
 
       {/* Title */}
-      <p className="text-[17px] font-display font-semibold text-ink leading-tight">
+      <p className="text-body-lg font-display font-semibold text-ink leading-tight">
         {fichas.length} fichas pendientes
       </p>
 

@@ -128,7 +128,7 @@ export function MonsterGrantPicker({
                 className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2 text-left font-sans text-sm text-ink transition-colors hover:bg-paper active:bg-surface-soft"
               >
                 <span className="min-w-0 flex-1 truncate font-medium">{monster.name}</span>
-                <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-ink-mute">
+                <span className="flex-shrink-0 text-eyebrow text-ink-mute">
                   {monster.source}
                   {monster.cr ? ` · CR ${monster.cr}` : ''}
                 </span>

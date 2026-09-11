@@ -97,7 +97,7 @@ export function SubraceGroup({
           data-testid={`subrace-group-${parentSlug}`}
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-2 border-t border-line bg-surface/60 px-3 py-2 text-left text-[11px] uppercase tracking-wide text-ink-mute transition hover:bg-accent-soft/30"
+          className="flex w-full items-center justify-between gap-2 border-t border-line bg-surface/60 px-3 py-2 text-left text-caption uppercase tracking-wide text-ink-mute transition hover:bg-accent-soft/30"
         >
           <span className="flex items-center gap-1.5">
             <svg
@@ -193,7 +193,7 @@ export function SubraceGroup({
           <p className="truncate font-display text-base font-semibold leading-tight text-ink">
             {parentName}
           </p>
-          <p className="mt-0.5 text-[11px] text-ink-mute">
+          <p className="mt-0.5 text-caption text-ink-mute">
             {count} sublinaje{count !== 1 ? 's' : ''}
           </p>
         </div>

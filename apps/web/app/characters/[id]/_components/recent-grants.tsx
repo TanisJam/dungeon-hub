@@ -104,7 +104,7 @@ export async function RecentGrants({ characterId, callerRole, accessToken }: Rec
 
   return (
     <section aria-label="Grants recientes">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink-mute">
+      <p className="mb-2 text-eyebrow text-ink-mute">
         Grants recientes
       </p>
 
@@ -129,7 +129,7 @@ export async function RecentGrants({ characterId, callerRole, accessToken }: Rec
                 <p className="truncate text-sm font-medium text-ink">
                   {grantLabel(event)}
                 </p>
-                <p className="text-[10px] text-ink-mute">
+                <p className="text-label text-ink-mute">
                   {relativeTime(event.occurredAt)}
                 </p>
               </div>

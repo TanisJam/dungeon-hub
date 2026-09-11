@@ -116,7 +116,7 @@ export function ApprovalActions({
       )}
 
       {error && (
-        <p role="alert" className="text-[10px] font-medium text-danger">
+        <p role="alert" className="text-label font-medium text-danger">
           {error}
         </p>
       )}

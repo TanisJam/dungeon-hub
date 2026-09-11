@@ -160,7 +160,7 @@ export function SessionDetailView({
                     </span>
                     {/* REQ-DPPMB-DETAIL-04: "Salió" indicator for GM */}
                     {hasLeft && isGm && (
-                      <span className="mt-0.5 font-sans text-[10px] font-medium text-ink-soft">
+                      <span className="mt-0.5 font-sans text-label font-medium text-ink-soft">
                         Salió
                       </span>
                     )}

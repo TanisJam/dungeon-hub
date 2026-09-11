@@ -79,13 +79,13 @@ describe('SectionHead', () => {
       expect(inner.className).not.toContain('items-baseline');
     });
 
-    it('md pill uses h-6 min-w-6 px-1.5 text-[11px]', () => {
+    it('md pill uses h-6 min-w-6 px-1.5 text-caption', () => {
       const { container } = render(<SectionHead size="md" num="02" title="Clase" />);
       const pill = container.querySelector('.rounded-pill') as HTMLElement;
       expect(pill.className).toContain('h-6');
       expect(pill.className).toContain('min-w-6');
       expect(pill.className).toContain('px-1.5');
-      expect(pill.className).toContain('text-[11px]');
+      expect(pill.className).toContain('text-caption');
     });
 
     it('renders description when provided', () => {

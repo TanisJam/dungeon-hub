@@ -28,10 +28,10 @@ export function NovedadesFeed({ items }: NovedadesFeedProps) {
                 }`}
               />
               <div className="min-w-0 flex-1">
-                <div className="font-sans text-[13px] font-semibold text-ink">{n.ttl}</div>
-                <div className="mt-px font-sans text-[11px] text-ink-mute">{n.sub}</div>
+                <div className="font-sans text-footnote font-semibold text-ink">{n.ttl}</div>
+                <div className="mt-px font-sans text-caption text-ink-mute">{n.sub}</div>
               </div>
-              <div className="font-sans text-[10px] font-semibold tracking-wider text-ink-mute">
+              <div className="font-sans text-label font-semibold tracking-wider text-ink-mute">
                 {n.when}
               </div>
             </article>
