@@ -24,11 +24,11 @@ describe('QuestRow', () => {
     expect(screen.getByText('›')).toBeTruthy();
   });
 
-  it('T5: root has rounded-xl bg-surface-raised classes (card-row style)', () => {
+  it('T5: root has rounded-xl bg-surface-soft classes (card-row style)', () => {
     const { container } = render(<QuestRow title="Quest" subtitle="sub" />);
     const root = container.firstElementChild as HTMLElement;
     expect(root.className).toContain('rounded-xl');
-    expect(root.className).toContain('bg-surface-raised');
+    expect(root.className).toContain('bg-surface-soft');
   });
 
   it('T6: root has data-quest-row attribute', () => {

@@ -86,7 +86,7 @@ export default async function MesaPage() {
           <Link
             key={link.href}
             href={link.href}
-            className="flex min-h-[44px] items-center gap-3 rounded-md border border-line bg-surface-raised px-3 py-2.5 transition-colors duration-150 hover:border-accent hover:bg-surface"
+            className="flex min-h-[44px] items-center gap-3 rounded-md border border-line bg-surface-soft px-3 py-2.5 transition-colors duration-150 hover:border-accent hover:bg-surface"
           >
             <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-md bg-surface text-accent">
               <Icon name={link.icon} size={18} />

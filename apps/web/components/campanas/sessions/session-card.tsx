@@ -66,7 +66,7 @@ export function SessionCard({
   const detailHref = `/campanas/${campaignId}/sessions/${session.id}`;
 
   return (
-    <li className="flex flex-col gap-2 rounded-md bg-surface-raised px-3 py-2">
+    <li className="flex flex-col gap-2 rounded-md bg-surface-soft px-3 py-2">
       {/* Row 1: title + status pill */}
       <div className="flex items-start justify-between gap-2">
         <Link

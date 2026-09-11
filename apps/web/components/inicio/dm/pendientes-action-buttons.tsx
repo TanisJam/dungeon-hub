@@ -40,7 +40,7 @@ export function PendientesActionButtons({ fichaId, actions }: Props) {
       </button>
       <Link
         href={`/characters/${fichaId}`}
-        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink"
+        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-soft text-ink"
       >
         Ver ficha
       </Link>
@@ -48,7 +48,7 @@ export function PendientesActionButtons({ fichaId, actions }: Props) {
         type="button"
         disabled={isPending}
         onClick={() => startTransition(async () => { await onReject(fichaId); })}
-        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-raised text-ink-mute disabled:opacity-50"
+        className="min-h-[44px] inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold bg-surface-soft text-ink-mute disabled:opacity-50"
       >
         Devolver
       </button>
