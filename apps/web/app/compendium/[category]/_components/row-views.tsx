@@ -99,7 +99,7 @@ export function SpellRowView({ row }: { row: SpellListHit }) {
   return (
     <div className="flex min-h-[44px] items-center gap-3 py-2">
       <div className="flex min-w-[3rem] flex-col items-center">
-        <span className="rounded bg-surface px-1.5 py-0.5 text-xs font-semibold text-ink-soft">
+        <span className="rounded-sm bg-surface px-1.5 py-0.5 text-xs font-semibold text-ink-soft">
           {levelLabel}
         </span>
       </div>
@@ -222,7 +222,7 @@ export function MonsterRowView({ row }: { row: MonsterListHit }) {
   return (
     <div className="flex min-h-[44px] items-center gap-3 py-2">
       <div className="flex min-w-[3.5rem] flex-col items-center">
-        <span className="rounded bg-surface px-1.5 py-0.5 text-xs font-semibold text-ink-soft">
+        <span className="rounded-sm bg-surface px-1.5 py-0.5 text-xs font-semibold text-ink-soft">
           {crLabel}
         </span>
       </div>

@@ -54,7 +54,7 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
             onClick={() => handleTap(i)}
             className={[
               'inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors',
-              isFilled ? 'cursor-pointer hover:bg-amber-100/60 active:bg-amber-100' : 'cursor-default',
+              isFilled ? 'cursor-pointer hover:bg-warning/10 active:bg-warning/20' : 'cursor-default',
               isPending && 'opacity-60 cursor-wait',
             ]
               .filter(Boolean)
@@ -64,8 +64,8 @@ export function SlotGrid({ charId, level, max, used }: SlotGridProps) {
               className={[
                 'block h-6 w-6 rounded-full border-2 transition-colors',
                 isFilled
-                  ? 'border-amber-500 bg-amber-400'
-                  : 'border-amber-300/50 bg-transparent',
+                  ? 'border-warning bg-warning'
+                  : 'border-warning/40 bg-transparent',
               ].join(' ')}
             />
           </button>
@@ -118,7 +118,7 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
             onClick={() => handleTap(i)}
             className={[
               'inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors',
-              isFilled ? 'cursor-pointer hover:bg-purple-100/60 active:bg-purple-100' : 'cursor-default',
+              isFilled ? 'cursor-pointer hover:bg-secondary/10 active:bg-secondary/20' : 'cursor-default',
               isPending && 'opacity-60 cursor-wait',
             ]
               .filter(Boolean)
@@ -128,8 +128,8 @@ export function PactSlotGrid({ charId, pactLevel, max, used }: PactSlotGridProps
               className={[
                 'block h-6 w-6 rounded-full border-2 transition-colors',
                 isFilled
-                  ? 'border-purple-600 bg-purple-500'
-                  : 'border-purple-300/50 bg-transparent',
+                  ? 'border-secondary bg-secondary'
+                  : 'border-secondary/40 bg-transparent',
               ].join(' ')}
             />
           </button>

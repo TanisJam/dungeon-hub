@@ -1117,7 +1117,7 @@ function AsiChooser({
               onClick={() => toggle(a)}
               disabled={disabled}
               className={[
-                'rounded px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
                 isOn
                   ? 'bg-accent-soft text-accent-deep ring-accent'
                   : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
@@ -1207,7 +1207,7 @@ function LangMultiSelect({
               onClick={() => toggle(v)}
               disabled={disabled}
               className={[
-                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs ring-1 ring-inset transition',
                 isOn
                   ? 'bg-accent-soft text-accent-deep ring-accent'
                   : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
@@ -1269,7 +1269,7 @@ function RaceSkillPicker({
               onClick={() => toggle(skill)}
               disabled={disabled}
               className={[
-                'rounded px-2 py-1 text-xs ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs ring-1 ring-inset transition',
                 isOn
                   ? 'bg-accent-soft text-accent-deep ring-accent'
                   : 'text-ink-soft ring-line hover:ring-accent-soft disabled:opacity-30',
@@ -1445,7 +1445,7 @@ function SourceChipSelector({
                 onSelect(i);
               }}
               className={[
-                'rounded px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
+                'rounded-sm px-2 py-1 text-xs font-mono ring-1 ring-inset transition',
                 isOn
                   ? 'bg-accent-soft text-accent-deep ring-accent'
                   : 'text-ink-soft ring-line hover:ring-accent-soft',

@@ -74,7 +74,7 @@ export function HomebrewUploadForm({ worldId, sourceCode }: HomebrewUploadFormPr
         <summary className="cursor-pointer min-h-[44px] flex items-center font-semibold text-ink">
           Ejemplo de JSON esperado
         </summary>
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded bg-surface p-2 text-xs text-ink-mute">
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words rounded-sm bg-surface p-2 text-xs text-ink-mute">
           {HOMEBREW_JSON_EXAMPLE}
         </pre>
       </details>

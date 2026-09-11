@@ -72,7 +72,7 @@ export function RestActions({ charId }: RestActionsProps) {
         </button>
       </fieldset>
       {restError && (
-        <p role="alert" className="text-xs text-red-400 px-1">
+        <p role="alert" className="text-xs text-danger px-1">
           {restError}
         </p>
       )}

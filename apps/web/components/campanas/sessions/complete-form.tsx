@@ -451,7 +451,7 @@ export function CompleteForm({
 
               {/* Inline row error — REQ-DPPMB-COMPLETE-06 */}
               {itemErrors[index] && (
-                <p className="mt-1 font-sans text-xs text-red-600" role="alert">
+                <p className="mt-1 font-sans text-xs text-danger" role="alert">
                   {itemErrors[index]}
                 </p>
               )}

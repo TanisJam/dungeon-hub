@@ -285,7 +285,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-red-800/30 my-2" />
+      <div className="border-t border-danger/40 my-2" />
 
       {/* Primary stats: AC / HP / Speed */}
       <div className="grid grid-cols-1 gap-1 text-xs">
@@ -306,7 +306,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-red-800/30 my-2" />
+      <div className="border-t border-danger/40 my-2" />
 
       {/* Ability scores — grid-cols-3 @375px: 3 stats per row, 2 rows total */}
       <div
@@ -318,7 +318,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
           return (
             <div
               key={key}
-              className="flex flex-col items-center rounded bg-surface px-1 py-1.5"
+              className="flex flex-col items-center rounded-sm bg-surface px-1 py-1.5"
               data-field={`ability-${key}`}
             >
               <div className="font-semibold text-ink-soft">{ABILITY_LABELS[key]}</div>
@@ -331,7 +331,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-red-800/30 my-2" />
+      <div className="border-t border-danger/40 my-2" />
 
       {/* Secondary stats: saves, skills, senses, languages, CR */}
       <div className="grid grid-cols-1 gap-1 text-xs">
@@ -362,7 +362,7 @@ export function MonsterStatblockHeader({ data }: MonsterStatblockHeaderProps) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-red-800/30 my-2" />
+      <div className="border-t border-danger/40 my-2" />
 
       {/* Traits */}
       <Section title="Traits" items={d.trait ?? []} testId="traits" />

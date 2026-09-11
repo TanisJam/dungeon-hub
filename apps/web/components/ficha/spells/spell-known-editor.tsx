@@ -74,7 +74,7 @@ export function SpellKnownEditor({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
-      <p className="text-xs text-amber-400 font-medium">
+      <p className="text-xs text-warning font-medium">
         {selected.size} hechizo{selected.size !== 1 ? 's' : ''} seleccionado{selected.size !== 1 ? 's' : ''}
       </p>
 
@@ -88,7 +88,7 @@ export function SpellKnownEditor({
               type="checkbox"
               checked={selected.has(spell.slug)}
               onChange={() => toggleSpell(spell.slug)}
-              className="rounded border-line accent-amber-400"
+              className="rounded-sm border-line accent-warning"
               aria-label={spell.name}
             />
             <span className="text-sm text-ink">{spell.name}</span>
@@ -110,7 +110,7 @@ export function SpellKnownEditor({
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="flex-1 min-h-[44px] flex items-center justify-center rounded-md bg-warning px-4 py-2 text-sm font-medium text-surface disabled:opacity-50"
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </button>

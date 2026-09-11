@@ -101,7 +101,7 @@ export function ItemBuyControl({ item, costCp, shopContext }: ItemBuyControlProp
         Comprar
       </button>
       {error && (
-        <div className="mt-2 text-sm text-red-500" aria-live="polite">
+        <div className="mt-2 text-sm text-danger" aria-live="polite">
           {error}
         </div>
       )}

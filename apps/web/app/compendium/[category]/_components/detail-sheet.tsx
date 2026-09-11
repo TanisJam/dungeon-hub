@@ -112,7 +112,7 @@ export function DetailSheet({
           Cargando…
         </div>
       ) : error ? (
-        <div className="py-8 text-center text-sm text-red-500" aria-live="polite">
+        <div className="py-8 text-center text-sm text-danger" aria-live="polite">
           No se pudo cargar el detalle.
         </div>
       ) : detail !== null ? (

@@ -45,7 +45,7 @@ export function InventarioTab({
       {hasStrWarning && (
         <div
           role="status"
-          className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800"
+          className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-xs font-medium text-warning"
         >
           Fuerza insuficiente para esta armadura: aplicá penalty de velocidad
           según PHB p.144.

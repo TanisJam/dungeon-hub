@@ -60,7 +60,7 @@ export function StatusTabs({ worldId, currentStatusParam }: StatusTabsProps) {
             role="tab"
             aria-selected={isActive}
             onClick={() => handleClick(tab.statusParam)}
-            className={`min-h-[44px] flex-1 rounded px-2 text-xs font-semibold transition-colors ${
+            className={`min-h-[44px] flex-1 rounded-sm px-2 text-xs font-semibold transition-colors ${
               isActive
                 ? 'bg-ink text-paper'
                 : 'text-ink-mute hover:bg-paper-muted hover:text-ink'

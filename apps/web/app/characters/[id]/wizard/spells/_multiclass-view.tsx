@@ -109,7 +109,7 @@ export function MulticlassSpellsView({ characterId, casterClasses }: MulticlassS
       {saveError && (
         <div
           role="alert"
-          className="rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+          className="rounded-md border border-warning bg-warning-soft px-3 py-2 text-xs text-warning"
         >
           {saveError}
         </div>

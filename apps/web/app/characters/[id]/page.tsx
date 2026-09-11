@@ -289,9 +289,9 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
 
         <section
           aria-label="Zona de peligro"
-          className="mt-6 rounded-2xl border border-red-200 p-4"
+          className="mt-6 rounded-2xl border border-danger-soft-border p-4"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-red-400 mb-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-danger mb-3">
             Zona de peligro
           </p>
           <ExportButton characterId={id} characterName={identity.name} />

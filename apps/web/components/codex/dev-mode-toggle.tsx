@@ -70,7 +70,7 @@ export function DevModeToggle({ currentValue }: DevModeToggleProps) {
       </label>
 
       {error && (
-        <p role="alert" className="text-xs text-red-600 px-1">
+        <p role="alert" className="text-xs text-danger px-1">
           {error}
         </p>
       )}

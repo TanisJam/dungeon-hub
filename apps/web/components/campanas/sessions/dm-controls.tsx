@@ -134,7 +134,7 @@ function DmControlsInner({
           </Button>
         </div>
         {error && (
-          <p role="alert" className="font-sans text-xs text-red-600">
+          <p role="alert" className="font-sans text-xs text-danger">
             {error}
           </p>
         )}
@@ -214,7 +214,7 @@ function DmControlsInner({
         </Button>
 
         {error && (
-          <p role="alert" className="w-full font-sans text-xs text-red-600">
+          <p role="alert" className="w-full font-sans text-xs text-danger">
             {error}
           </p>
         )}

@@ -50,7 +50,7 @@ export function PoiDetail({ poi, isDM }: PoiDetailProps) {
       )}
       {/* DM notes — absent for players (REQ-GATE-01 single source of truth) */}
       {isDM && poi.dmNotes && (
-        <p className="mt-0.5 text-xs text-amber-700 italic">DM: {poi.dmNotes}</p>
+        <p className="mt-0.5 text-xs text-warning italic">DM: {poi.dmNotes}</p>
       )}
     </div>
   );

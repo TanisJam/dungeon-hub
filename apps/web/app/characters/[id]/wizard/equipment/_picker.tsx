@@ -135,7 +135,7 @@ function CategoryPickerInline({
               onChange={(e) => {
                 setQuery(e.target.value);
               }}
-              className="flex-1 rounded border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
+              className="flex-1 rounded-sm border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-mute focus:border-primary focus:outline-none"
             />
             <button
               type="button"

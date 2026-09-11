@@ -97,7 +97,7 @@ export function FactionChipSection({
                 aria-label={`Desvincular ${faction.name}`}
                 onClick={() => handleDetach(faction.id)}
                 disabled={loading === faction.id}
-                className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-paper hover:text-red-600 disabled:opacity-50"
+                className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-paper hover:text-danger disabled:opacity-50"
               >
                 ×
               </button>

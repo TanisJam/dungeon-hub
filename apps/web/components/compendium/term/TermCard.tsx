@@ -59,10 +59,10 @@ export function TermCard({ state, entry, error }: TermCardProps) {
 function LoadingSkeleton() {
   return (
     <div className="px-3 py-3 space-y-2 animate-pulse">
-      <div className="h-4 bg-surface-soft rounded w-2/3" />
-      <div className="h-3 bg-surface-soft rounded w-full" />
-      <div className="h-3 bg-surface-soft rounded w-5/6" />
-      <div className="h-3 bg-surface-soft rounded w-4/6" />
+      <div className="h-4 bg-surface-soft rounded-sm w-2/3" />
+      <div className="h-3 bg-surface-soft rounded-sm w-full" />
+      <div className="h-3 bg-surface-soft rounded-sm w-5/6" />
+      <div className="h-3 bg-surface-soft rounded-sm w-4/6" />
     </div>
   );
 }

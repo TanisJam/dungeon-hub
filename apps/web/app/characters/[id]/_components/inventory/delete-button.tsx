@@ -44,12 +44,12 @@ export function DeleteButton({
         onClick={handleClick}
         disabled={isPending}
         aria-label={`Eliminar ${itemName}`}
-        className="min-h-[44px] min-w-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-60"
+        className="min-h-[44px] min-w-[44px] rounded-md border border-line bg-paper-soft px-3 py-2 text-xs font-semibold text-danger hover:bg-danger-soft hover:border-danger-soft-border transition-colors disabled:opacity-60"
       >
         {isPending ? '…' : '✕'}
       </button>
       {error && (
-        <p role="alert" className="text-[10px] font-medium text-red-600">
+        <p role="alert" className="text-[10px] font-medium text-danger">
           {error}
         </p>
       )}
