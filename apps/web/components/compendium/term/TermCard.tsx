@@ -18,7 +18,7 @@ export interface TermCardProps {
  */
 export function TermCard({ state, entry, error }: TermCardProps) {
   return (
-    <div className="w-80 rounded-md border border-line bg-paper shadow-md text-ink text-sm">
+    <div className="w-80 rounded-md border border-line bg-paper shadow-stamp-md text-ink text-sm">
       {state === 'loading' && <LoadingSkeleton />}
 
       {state === 'ok' && entry && (
