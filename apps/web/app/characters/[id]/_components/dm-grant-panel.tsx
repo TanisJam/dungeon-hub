@@ -142,10 +142,10 @@ function DmGrantModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dm-grant-panel-title"
-        className="flex h-full w-full flex-col bg-paper md:h-auto md:max-h-[85vh] md:w-full md:max-w-md md:rounded-xl md:shadow-2xl"
+        className="flex h-full w-full flex-col bg-paper md:h-auto md:max-h-[85vh] md:w-full md:max-w-md md:rounded-lg md:shadow-stamp-lg"
       >
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-3 md:rounded-t-xl">
+        <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-3 md:rounded-t-lg">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-mute">
               Otorgar a
@@ -263,12 +263,12 @@ function XpTab({ characterId, onClose }: { characterId: string; onClose: () => v
           onChange={(e) => setAward(e.target.value)}
           placeholder="200"
           required
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
         />
       </div>
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -359,13 +359,13 @@ function GoldTab({ characterId, onClose }: { characterId: string; onClose: () =>
             value={values[coin] ?? ''}
             onChange={(e) => setValues((v) => ({ ...v, [coin]: e.target.value }))}
             placeholder="0"
-            className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+            className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
           />
         </div>
       ))}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -476,13 +476,13 @@ function ItemTab({
             setPicked(null);
           }}
           placeholder="Espada larga, daga…"
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
         />
       </div>
 
       {/* Search results */}
       {query.trim().length > 0 && !picked && (
-        <div className="rounded-md border border-line bg-white overflow-hidden">
+        <div className="rounded-md border border-line bg-surface overflow-hidden">
           {searching && (
             <p className="px-4 py-3 text-sm text-ink-mute">Buscando…</p>
           )}
@@ -525,12 +525,12 @@ function ItemTab({
           max={999}
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
         />
       </div>
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -639,13 +639,13 @@ function BestiarioTab({
             setPicked(null);
           }}
           placeholder="Goblin, dragón rojo…"
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
         />
       </div>
 
       {/* Search results */}
       {query.trim().length > 0 && !picked && (
-        <div className="rounded-md border border-line bg-white overflow-hidden">
+        <div className="rounded-md border border-line bg-surface overflow-hidden">
           {searching && (
             <p className="px-4 py-3 text-sm text-ink-mute">Buscando…</p>
           )}
@@ -678,7 +678,7 @@ function BestiarioTab({
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -792,12 +792,12 @@ function FactionTab({
           }}
           placeholder="Nombre de la facción…"
           disabled={loading}
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
         />
       </div>
 
       {!picked && !loading && (
-        <div className="rounded-md border border-line bg-white overflow-hidden">
+        <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
             <p className="px-4 py-3 text-sm text-ink-mute">
               {allFactions.length === 0 ? 'No hay facciones en este mundo.' : 'Sin resultados.'}
@@ -831,7 +831,7 @@ function FactionTab({
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -944,12 +944,12 @@ function LocationTab({
           }}
           placeholder="Nombre del lugar…"
           disabled={loading}
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
         />
       </div>
 
       {!picked && !loading && (
-        <div className="rounded-md border border-line bg-white overflow-hidden">
+        <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
             <p className="px-4 py-3 text-sm text-ink-mute">
               {allPois.length === 0 ? 'No hay lugares en este mundo.' : 'Sin resultados.'}
@@ -983,7 +983,7 @@ function LocationTab({
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}
@@ -1105,13 +1105,13 @@ function NpcTab({
           }}
           placeholder="Nombre del NPC…"
           disabled={loading}
-          className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none disabled:opacity-50"
         />
       </div>
 
       {/* Results */}
       {!picked && !loading && (
-        <div className="rounded-md border border-line bg-white overflow-hidden">
+        <div className="rounded-md border border-line bg-surface overflow-hidden">
           {filtered.length === 0 && (
             <p className="px-4 py-3 text-sm text-ink-mute">
               {allNpcs.length === 0 ? 'No hay NPCs en este mundo.' : 'Sin resultados.'}
@@ -1147,7 +1147,7 @@ function NpcTab({
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}

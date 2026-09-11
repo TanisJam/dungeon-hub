@@ -33,9 +33,9 @@ const solidClasses: Record<PillTone, string> = {
   ink:       'bg-ink text-surface',
   stone:     'bg-ink-soft text-surface',
   amber:     'bg-warning text-surface',
-  danger:    'bg-danger text-white',
-  success:   'bg-success text-white',
-  neutral:   'bg-white text-ink',
+  danger:    'bg-danger text-on-danger',
+  success:   'bg-success text-surface',
+  neutral:   'bg-surface-soft text-ink',
 };
 
 // ── Outline fill — transparent bg, colored border + text ─────────────────────

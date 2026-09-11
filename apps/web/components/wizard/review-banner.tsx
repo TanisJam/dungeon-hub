@@ -25,7 +25,7 @@ export function ReviewBanner({
   subclassPill,
 }: ReviewBannerProps) {
   return (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-ink to-[#1B1428] border border-line shadow-[0_12px_32px_rgba(39,30,51,0.25)] p-5 mb-4">
+    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-ink to-surface border border-line shadow-stamp-lg p-5 mb-4">
       {/* Stamp badge */}
       <div
         className="absolute right-4 top-1/2 -translate-y-1/2 rotate-12 flex items-center justify-center"

@@ -22,7 +22,7 @@ export function PublishedSplash({
   return (
     <div className="flex flex-col items-center gap-4 py-6">
       {/* Dark gradient announcement card */}
-      <div className="w-full max-w-sm rounded-lg bg-gradient-to-br from-ink to-[#1B1428] border border-line shadow-[0_12px_32px_rgba(39,30,51,0.25)] p-6 text-center">
+      <div className="w-full max-w-sm rounded-lg bg-gradient-to-br from-ink to-surface border border-line shadow-stamp-lg p-6 text-center">
         <p className="text-[11px] italic text-paper-soft/70 mb-1">
           Bienvenido al gremio
         </p>

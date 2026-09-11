@@ -81,7 +81,7 @@ interface MapClientWrapperProps {
 function PlaceModeBanner({ name, onCancel }: { name: string; onCancel: () => void }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
+      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="place-mode-banner"
       role="status"
       aria-live="polite"
@@ -108,7 +108,7 @@ function PlaceModeBanner({ name, onCancel }: { name: string; onCancel: () => voi
 function CreateModeBanner({ onCancel }: { onCancel: () => void }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
+      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="create-mode-banner"
       role="status"
       aria-live="polite"
@@ -145,7 +145,7 @@ function MoveBanner({
 }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-md"
+      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="move-mode-banner"
       role="status"
       aria-live="polite"
@@ -364,7 +364,7 @@ export function MapClientWrapper({
         <button
           type="button"
           onClick={handleStartCreate}
-          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl text-surface shadow-xl"
+          className="fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-ink text-2xl text-surface shadow-stamp-lg"
           style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px) + 16px)' }}
           aria-label="Crear punto de interés"
           data-testid="poi-create-fab"
@@ -384,7 +384,7 @@ export function MapClientWrapper({
         <button
           type="button"
           onClick={() => router.push('?view=lista')}
-          className="fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-ink/80 px-3 text-sm font-medium text-surface shadow-md"
+          className="fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-ink/80 px-3 text-sm font-medium text-surface shadow-stamp-md"
           style={{ top: 'calc(56px + 8px)', right: '1rem' }}
           aria-label="Ver lista de hexes"
           data-testid="hex-list-access"

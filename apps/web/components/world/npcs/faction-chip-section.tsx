@@ -120,7 +120,7 @@ export function FactionChipSection({
 
       {/* Faction picker (DM-only dropdown) */}
       {isDM && pickerOpen && available.length > 0 && (
-        <div className="mt-2 rounded-md border border-line bg-paper shadow-sm">
+        <div className="mt-2 rounded-md border border-line bg-paper shadow-stamp-sm">
           <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Seleccionar facción
           </p>

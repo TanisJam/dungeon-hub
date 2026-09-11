@@ -140,7 +140,7 @@ export function Picker({ characterId, worldId }: PickerProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar ítem…"
-              className="min-h-[44px] w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
+              className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-mute focus:border-ink focus:outline-none"
             />
           </div>
 

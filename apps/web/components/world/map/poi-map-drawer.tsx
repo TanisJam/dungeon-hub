@@ -62,7 +62,7 @@ export function PoiMapDrawer({ pois, open, onClose, onFlyTo }: PoiMapDrawerProps
         // Desktop left-panel shape (overrides mobile above)
         'md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:h-auto md:w-80 md:rounded-t-none md:rounded-r-xl',
         // Surface
-        'bg-surface shadow-xl',
+        'bg-surface shadow-stamp-lg',
         // Animation
         'transition-transform duration-300 motion-reduce:transition-none',
         // Closed-state: off-screen + no pointer events to avoid blocking map pan

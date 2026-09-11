@@ -142,7 +142,7 @@ export function GuildBitacoraFeed({
         <button
           type="button"
           onClick={() => setComposerOpen(true)}
-          className="flex min-h-[44px] items-center gap-2 rounded-full bg-ink px-5 py-2 text-sm font-semibold text-paper shadow-lg"
+          className="flex min-h-[44px] items-center gap-2 rounded-full bg-ink px-5 py-2 text-sm font-semibold text-paper shadow-stamp-md"
           aria-label="Aportar nota al gremio"
         >
           <span aria-hidden="true">+</span>
