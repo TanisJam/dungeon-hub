@@ -30,10 +30,9 @@ import { usePathname } from 'next/navigation';
 export function TopbarHeightProbe() {
   const pathname = usePathname();
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname isn't read in the body — it exists purely to re-run this effect on route transitions, since App Router can unmount/remount the <header data-app-topbar> (e.g. navigating to/from a standalone route with no TopBar — lib/route-chrome.ts) and a detached ResizeObserver target stops firing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname isn't read in the body — it exists purely to re-run this effect on route transitions, matching the precedent in components/layout/nav-progress.tsx.
   useEffect(() => {
-    const header = document.querySelector<HTMLElement>('[data-app-topbar]');
-    if (!header) return;
+    let observed: HTMLElement | null = null;
 
     // A zero height is never a real topbar — it is what you read while the
     // element is hidden, which App Router does to the outgoing tree during a
@@ -44,20 +43,55 @@ export function TopbarHeightProbe() {
     // So a non-positive reading is discarded and the last good value (or the
     // :root fallback) stands.
     const publish = () => {
-      const height = header.getBoundingClientRect().height;
+      if (!observed) return;
+      const height = observed.getBoundingClientRect().height;
       if (height <= 0) return;
       document.documentElement.style.setProperty('--topbar-h', `${height}px`);
     };
 
-    // Defer the first read a frame: on a route transition the effect can run
-    // while the header is still hidden, and publish() would then have nothing
-    // to report.
-    const frame = requestAnimationFrame(publish);
-    const observer = new ResizeObserver(publish);
-    observer.observe(header);
+    const resizeObserver = new ResizeObserver(publish);
+
+    // The header is rendered by the page, not by the persistent chrome, so the
+    // node is REPLACED rather than updated — most visibly when a segment's
+    // loading.tsx renders its own AppShell (a shorter header, no worldSwitcher)
+    // and the real page then swaps it. A ResizeObserver left pointing at the
+    // old node never fires again, which is how this shipped a stale 69px while
+    // the live header measured 88px. So re-target whenever the node identity
+    // changes, not just when the pathname does.
+    const retarget = () => {
+      const header = document.querySelector<HTMLElement>('[data-app-topbar]');
+      if (header === observed) return;
+      if (observed) resizeObserver.unobserve(observed);
+      observed = header;
+      if (header) {
+        resizeObserver.observe(header);
+        publish();
+      }
+    };
+
+    // Coalesce to one check per frame: the mutation observer below watches the
+    // whole subtree, and re-querying on every batch during a map render would
+    // be real work for no extra correctness.
+    let scheduled = false;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        retarget();
+        publish();
+      });
+    };
+
+    retarget();
+    schedule();
+
+    const mutationObserver = new MutationObserver(schedule);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+
     return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
     };
   }, [pathname]);
 

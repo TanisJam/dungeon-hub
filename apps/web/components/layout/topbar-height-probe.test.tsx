@@ -37,6 +37,13 @@ function publishedValue(): string {
  * observer fires again" asserts on nothing and passes whatever the code does.
  */
 let fireResize: (() => void) | null = null;
+let pendingFrames: FrameRequestCallback[] = [];
+
+/** Drain any frame callbacks the component scheduled after the initial mount. */
+function flushFrames(): void {
+  const queued = pendingFrames.splice(0);
+  for (const cb of queued) cb(0);
+}
 class RecordingResizeObserver {
   constructor(cb: () => void) {
     fireResize = cb;
@@ -52,9 +59,12 @@ describe('TopbarHeightProbe', () => {
   beforeEach(() => {
     document.documentElement.style.removeProperty('--topbar-h');
     // The component defers its first read a frame; run it synchronously.
+    pendingFrames = [];
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      // Run immediately AND record, so a test can drive a later coalesced pass.
       cb(0);
-      return 1;
+      pendingFrames.push(cb);
+      return pendingFrames.length;
     });
     vi.stubGlobal('cancelAnimationFrame', () => {});
     fireResize = null;
@@ -103,6 +113,23 @@ describe('TopbarHeightProbe', () => {
       ({ height: 107, width: 375, top: 0, left: 0, right: 375, bottom: 107, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
     fireResize?.();
     expect(publishedValue()).toBe('107px');
+  });
+
+  it('T3c: re-targets when the header NODE is replaced, not just resized', () => {
+    // This is the real-world sequence: a segment's loading.tsx renders its own
+    // AppShell (shorter header, no worldSwitcher), then the real page swaps in a
+    // taller one. A ResizeObserver left on the old node never fires again — this
+    // shipped a stale 69px while the live header measured 88px.
+    const loadingHeader = mountHeader(69);
+    render(<TopbarHeightProbe />);
+    expect(publishedValue()).toBe('69px');
+
+    loadingHeader.remove();
+    mountHeader(88);
+    // The component coalesces its re-target into a frame; the stub runs it now.
+    flushFrames();
+
+    expect(publishedValue()).toBe('88px');
   });
 
   it('T4: renders nothing and survives a route with no topbar', () => {
