@@ -51,21 +51,42 @@ async function fetchWorldById(
 }
 
 /**
- * Resolve the active world by falling back to the first world in the user's
- * list. Fetches world detail for callerRole. Returns null when the user has
- * zero worlds.
+ * Resolve the active world with no `dh:world` cookie to go on.
+ *
+ * Prefers a world where the user actually has an active character, and only
+ * falls back to list order when no such world exists. List position is not a
+ * signal about where someone plays: a user with an old membership sitting
+ * first in the list landed on a world holding none of their characters, so
+ * their roster, their guild feed and anything they shared were all somewhere
+ * they were not looking. Measured on the E2E account, which has four worlds
+ * and every character in the fourth.
+ *
+ * The cookie still wins when it is set, so deliberately switching to a world
+ * you have no character in keeps working.
+ *
+ * Returns null when the user has zero worlds.
  */
 async function fallbackToFirstWorld(token: string): Promise<ActiveWorld | null> {
-  const worlds = await getMyWorlds(token).catch(() => [] as Awaited<ReturnType<typeof getMyWorlds>>);
+  // Parallel: the roster lookup must not add a round-trip to this path.
+  const [worlds, roster] = await Promise.all([
+    getMyWorlds(token).catch(() => [] as Awaited<ReturnType<typeof getMyWorlds>>),
+    api
+      .get<{ data: Array<{ worldId?: string | null }> }>('/characters?status=active', token)
+      .catch(() => null),
+  ]);
   if (worlds.length === 0) return null;
 
-  const first = worlds[0]!;
+  const worldsWithMyCharacters = new Set(
+    (roster?.data ?? []).map((c) => c.worldId).filter((id): id is string => Boolean(id)),
+  );
+  const chosen = worlds.find((w) => worldsWithMyCharacters.has(w.id)) ?? worlds[0]!;
+
   // Fetch full world detail to get callerRole.
-  const detail = await fetchWorldById(first.id, token);
+  const detail = await fetchWorldById(chosen.id, token);
   if (detail) return detail;
 
-  // If detail fetch fails for the first world (edge case), return it without callerRole.
-  return { id: first.id, name: first.name, slug: first.slug, callerRole: null };
+  // If detail fetch fails for the chosen world (edge case), return it without callerRole.
+  return { id: chosen.id, name: chosen.name, slug: chosen.slug, callerRole: null };
 }
 
 // ---------------------------------------------------------------------------
