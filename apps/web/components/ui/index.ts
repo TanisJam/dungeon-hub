@@ -44,3 +44,6 @@ export { ScrollNav } from './scroll-nav';
 export type { ScrollNavProps } from './scroll-nav';
 
 export { Toast } from './toast';
+
+export { Skeleton } from './skeleton';
+export type { SkeletonProps } from './skeleton';

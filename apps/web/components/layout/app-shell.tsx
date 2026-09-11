@@ -4,7 +4,13 @@ import type { CallerRole } from '@/lib/active-world';
 import { TopBar } from './topbar';
 
 type AppShellProps = {
-  title: string;
+  /**
+   * Page title. Usually a string, but a dynamic route's loading.tsx renders a
+   * <Skeleton> shimmer bar here instead of inventing a fake title while the
+   * real one (e.g. a character name) is still loading server-side (audit F1,
+   * work unit 2).
+   */
+  title: ReactNode;
   subtitle?: ReactNode;
   /** When provided, overrides the topbar's default right cluster (the role switcher). */
   rightAction?: ReactNode;
