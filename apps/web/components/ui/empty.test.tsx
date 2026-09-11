@@ -56,4 +56,40 @@ describe('V3Empty', () => {
     render(<V3Empty glyph="home" title="Vacío" />);
     expect(screen.queryByRole('link')).toBeNull();
   });
+
+  // T6-T9 — ui-craft F9: size="inline" variant
+  it('T6: defaults to size="page" — omitting size renders the existing full-treatment markup', () => {
+    render(<V3Empty glyph="home" title="Próximamente" sub="Tu panel vivirá acá." />);
+    const heading = screen.getByRole('heading', { name: 'Próximamente' });
+    expect(heading.className).toContain('text-lg');
+  });
+
+  it('T7: size="inline" renders title as plain text (no heading role) with a 20px icon', () => {
+    render(<V3Empty glyph="home" title="Sin novedades" size="inline" />);
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByText('Sin novedades')).toBeTruthy();
+    const svg = document.querySelector('svg[aria-hidden="true"]');
+    expect(svg?.getAttribute('width')).toBe('20');
+  });
+
+  it('T8: size="inline" renders sub text when provided', () => {
+    render(
+      <V3Empty glyph="home" title="Sin novedades" sub="Volvé más tarde." size="inline" />,
+    );
+    expect(screen.getByText('Volvé más tarde.')).toBeTruthy();
+  });
+
+  it('T9: size="inline" renders the CTA as a plain link, not a filled button', () => {
+    render(
+      <V3Empty
+        glyph="user"
+        title="Sin personaje activo"
+        cta={{ label: 'Crear personaje', href: '/characters/new' }}
+        size="inline"
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Crear personaje' });
+    expect(link.className).not.toContain('bg-ink');
+    expect(link.className).toContain('underline-offset-2');
+  });
 });
