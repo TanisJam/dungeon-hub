@@ -7,7 +7,8 @@ import { RoleSwitcher } from './role-switcher';
 import { AccountMenu } from './account-menu';
 
 interface TopBarProps {
-  title: string;
+  /** Page title. Usually a string; a loading.tsx may pass a <Skeleton> bar instead (audit F1). */
+  title: ReactNode;
   subtitle?: ReactNode;
   /** When provided, replaces the default right cluster (RoleSwitcher + notif bell). */
   right?: ReactNode;
