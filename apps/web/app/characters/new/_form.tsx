@@ -24,7 +24,7 @@ export function NewCharacterForm({ worlds }: { worlds: World[] }) {
           name="worldId"
           required
           defaultValue={defaultWorldId}
-          className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink focus:border-primary focus:outline-none transition-colors"
+          className="select-field mt-1.5"
         >
           {worlds.length > 1 && (
             <option value="" disabled>

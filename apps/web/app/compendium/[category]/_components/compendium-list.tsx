@@ -164,7 +164,7 @@ export function CompendiumList({
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             aria-label="Filtrar por tipo"
-            className="min-h-[44px] w-full rounded-md border border-line bg-paper-soft px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/20"
+            className="select-field"
           >
             <option value="">Todos los tipos</option>
             {ITEM_TYPE_OPTIONS.map(({ code, label }) => (
