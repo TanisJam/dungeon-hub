@@ -42,9 +42,37 @@ interface WorldSwitcherTriggerProps {
   worldName: string;
   callerRole: CallerRole;
   onClick: () => void;
+  /**
+   * F5: 'pill' (default) is the unchanged sm:+ look — bordered chip, name
+   * capped at max-w-[88px]/120px. 'line' is the mobile full-width row: no
+   * border/background, no max-w cap (the name truncates only against the
+   * row's own width), min-h-[44px] tap target, left-aligned.
+   */
+  variant?: 'pill' | 'line';
 }
 
-export function WorldSwitcherTrigger({ worldName, callerRole, onClick }: WorldSwitcherTriggerProps) {
+export function WorldSwitcherTrigger({
+  worldName,
+  callerRole,
+  onClick,
+  variant = 'pill',
+}: WorldSwitcherTriggerProps) {
+  if (variant === 'line') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full min-h-[44px] items-center gap-1.5 px-0.5 text-left transition-colors duration-150 hover:text-accent"
+        aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
+      >
+        <span className="min-w-0 flex-1 truncate font-display font-bold text-[13px] leading-tight text-ink">
+          {worldName}
+        </span>
+        {callerRole && <RoleBadge role={callerRole} />}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -93,11 +121,35 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
 
   return (
     <>
-      <WorldSwitcherTrigger
-        worldName={worldName}
-        callerRole={callerRole}
-        onClick={() => setOpen(true)}
-      />
+      {/*
+       * F5: TopBar receives `worldSwitcher` as ONE pre-built ReactNode (server
+       * props delivery, ADR-4) and inserts it once, right after its left slot.
+       * Rendering that same node a second time elsewhere in TopBar would mount
+       * a second `WorldSwitcher` client instance — a second `open` state and a
+       * second `<V3Sheet>` — so the responsive split lives HERE instead: one
+       * instance renders both trigger variants (sharing this single `open`
+       * state and the one sheet below) and lets CSS pick which is visible.
+       * The pill keeps default DOM order so it lands right after the left
+       * slot on sm:+ (same spot as before); the line variant is `order-last`
+       * so, inside TopBar's flex-wrap row, it always sorts after the title and
+       * right slot and wraps onto its own full-width row on mobile.
+       */}
+      <div className="hidden flex-shrink-0 sm:block">
+        <WorldSwitcherTrigger
+          variant="pill"
+          worldName={worldName}
+          callerRole={callerRole}
+          onClick={() => setOpen(true)}
+        />
+      </div>
+      <div className="order-last w-full sm:hidden">
+        <WorldSwitcherTrigger
+          variant="line"
+          worldName={worldName}
+          callerRole={callerRole}
+          onClick={() => setOpen(true)}
+        />
+      </div>
 
       <V3Sheet
         open={open}
