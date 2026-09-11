@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashedCTA } from '@/components/ui/dashed-cta';
 import { V3Sheet } from '@/components/ui/sheet';
+import { V3Empty } from '@/components/ui/empty';
 import type { WorldRow } from '@/lib/api';
 import type { CallerRole } from '@/lib/active-world';
 import { setActiveWorld } from '@/app/set-active-world';
@@ -154,10 +155,8 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
       >
         {worlds.length === 0 ? (
           // REQ-WIS-04 Scenario: Zero worlds — empty state
-          <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <p className="font-sans text-sm text-ink-mute">
-              Todavía no tenés ningún mundo. ¡Creá el primero!
-            </p>
+          <div className="flex flex-col items-center gap-2 py-2">
+            <V3Empty size="inline" glyph="compass" title="Todavía no tenés ningún mundo" />
             <DashedCTA href="/campanas/new" onClick={() => setOpen(false)} className="px-4 py-3">
               {/* TODO world-ia Part 3: migrate to POST /worlds */}
               <span className="text-lg text-accent">+</span>

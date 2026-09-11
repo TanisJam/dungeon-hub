@@ -193,7 +193,7 @@ export function SessionList({
           <V3Empty
             glyph="dice"
             title="No hay sesiones aún"
-            sub={isDm ? 'Creá la primera sesión de tu campaña.' : undefined}
+            sub={isDm ? 'Creá la primera sesión de tu campaña.' : 'El DM todavía no creó ninguna sesión.'}
             cta={
               isDm
                 ? undefined // DM uses FAB, not inline CTA

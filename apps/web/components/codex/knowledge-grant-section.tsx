@@ -16,6 +16,7 @@
  */
 
 import { useState } from 'react';
+import { V3Empty } from '@/components/ui/empty';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,7 +95,12 @@ export function KnowledgeGrantSection({
       </p>
 
       {candidateEntities.length === 0 ? (
-        <p className="text-xs text-ink-soft">Sin entidades candidatas para esta sesión.</p>
+        <V3Empty
+          size="inline"
+          glyph="eye"
+          title="Sin entidades candidatas para esta sesión"
+          sub="Van a aparecer acá los encuentros y referencias que registre la sesión."
+        />
       ) : (
         <div className="flex flex-wrap gap-2">
           {candidateEntities.map((entity) => {

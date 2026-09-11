@@ -5,12 +5,13 @@
  *   - Shows last 5 item_grant / gold_grant / xp_award events for the character.
  *   - Visible to owner AND DM (callerRole !== null).
  *   - Returns null for unauthenticated / non-viewer callers.
- *   - Empty state: "Sin grants recientes".
+ *   - Empty state: V3Empty size="inline" naming who grants and where.
  *   - Relative time: "hace X días / horas / minutos".
  *   - 375px mobile-first layout. Tap targets ≥44px.
  */
 
 import { api, ApiError } from '@/lib/api';
+import { V3Empty } from '@/components/ui/empty';
 
 type CallerRole = 'gm' | 'player' | null;
 
@@ -108,7 +109,12 @@ export async function RecentGrants({ characterId, callerRole, accessToken }: Rec
       </p>
 
       {events.length === 0 ? (
-        <p className="text-sm text-ink-mute">Sin grants recientes.</p>
+        <V3Empty
+          size="inline"
+          glyph="bag"
+          title="Sin grants recientes"
+          sub="El DM puede otorgarte ítems, oro o experiencia desde su panel."
+        />
       ) : (
         <ul className="space-y-2">
           {events.map((event) => (

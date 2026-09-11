@@ -4,6 +4,7 @@
 // Events are sorted ascending by occurredAt.
 
 import type { SessionEvent } from '@/app/campanas/[id]/sessions/actions';
+import { V3Empty } from '@/components/ui/empty';
 
 // ---------------------------------------------------------------------------
 // Human-readable event type labels
@@ -56,9 +57,12 @@ interface EventTimelineProps {
 export function EventTimeline({ events }: EventTimelineProps) {
   if (events.length === 0) {
     return (
-      <p className="py-4 text-center font-sans text-sm text-ink-mute">
-        No hay eventos registrados aún.
-      </p>
+      <V3Empty
+        size="inline"
+        glyph="scroll"
+        title="No hay eventos registrados aún"
+        sub="Van a aparecer acá a medida que ocurran en la sesión."
+      />
     );
   }
 

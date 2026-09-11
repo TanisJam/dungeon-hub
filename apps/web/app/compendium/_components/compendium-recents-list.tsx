@@ -1,3 +1,5 @@
+import { V3Empty } from '@/components/ui/empty';
+
 /**
  * CompendiumRecentsList — "Más consultado" section.
  * No view-history endpoint exists yet. Renders an honest empty state.
@@ -5,8 +7,11 @@
  */
 export function CompendiumRecentsList() {
   return (
-    <p style={{ fontSize: 13, color: 'var(--color-ink-soft)', padding: '8px 0' }}>
-      Aún no consultaste ninguna entrada.
-    </p>
+    <V3Empty
+      size="inline"
+      glyph="book"
+      title="Aún no consultaste ninguna entrada"
+      sub="Consultá una entrada del compendio para que aparezca acá."
+    />
   );
 }

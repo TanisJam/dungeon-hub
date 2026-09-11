@@ -99,7 +99,9 @@ describe('RecentGrants — with events', () => {
 });
 
 describe('RecentGrants — empty state', () => {
-  it('owner with no events → shows "Sin grants recientes."', async () => {
+  // F9 (docs/audit/ui-craft-2026-09-10): "Sin grants recientes." stated a fact
+  // and stopped. The empty now names who can act and where.
+  it('owner with no events → names who grants, and where', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ events: [] });
 
     await act(async () => {
@@ -108,6 +110,9 @@ describe('RecentGrants — empty state', () => {
       );
     });
 
-    expect(screen.getByText('Sin grants recientes.')).toBeTruthy();
+    expect(screen.getByText('Sin grants recientes')).toBeTruthy();
+    expect(
+      screen.getByText('El DM puede otorgarte ítems, oro o experiencia desde su panel.'),
+    ).toBeTruthy();
   });
 });

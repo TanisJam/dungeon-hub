@@ -1,5 +1,5 @@
 import type { CharacterSheet, SpellcastingView, ClassSpellSummary, SpellSheetRef } from '@/lib/sheet-types';
-import { Card } from '@/components/ui';
+import { Card, V3Empty } from '@/components/ui';
 import { RacialSpellsBlock } from './_racial-spells-block';
 import { SpellBadges } from '@/app/_components/spells/badges';
 import { SlotGrid, PactSlotGrid } from './_slot-grid';
@@ -190,8 +190,13 @@ function ClassSpellSection({
 
       {/* Spell groups — or empty state (REQ-SP04-11) */}
       {isEmpty ? (
-        <div className="mt-3 rounded-md bg-paper-soft px-3 py-4 text-center">
-          <p className="text-xs text-ink-mute">Sin hechizos seleccionados</p>
+        <div className="mt-3 rounded-md bg-paper-soft">
+          <V3Empty
+            size="inline"
+            glyph="wand"
+            title="Sin hechizos seleccionados"
+            sub="Preparás hechizos al subir de nivel o usar tu función de clase."
+          />
         </div>
       ) : isSpellbookCaster ? (
         <>

@@ -14,11 +14,11 @@
  * This is distinct from the /compendium browser which is campaign-scoped.
  * SSR fetches first 50 mundane items; CompendiumList island handles search/pagination.
  */
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { api } from '@/lib/api';
 import { AppShell } from '@/components/layout/app-shell';
+import { V3Empty } from '@/components/ui/empty';
 import { CompendiumList } from '@/app/compendium/[category]/_components/compendium-list';
 import { getActiveCharacter } from '@/lib/active-character';
 
@@ -51,15 +51,11 @@ export default async function MercadoPage() {
   if (!activeCharacter) {
     return (
       <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
-        <div className="flex flex-col items-center justify-center gap-4 py-16 text-sm text-ink-soft">
-          <p>Seleccioná un personaje para ver el Mercado.</p>
-          <Link
-            href="/personajes"
-            className="flex min-h-[44px] items-center justify-center rounded-md border border-line bg-surface px-4 py-2.5 font-sans text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent"
-          >
-            Ver mis personajes
-          </Link>
-        </div>
+        <V3Empty
+          glyph="user"
+          title="Seleccioná un personaje para ver el Mercado"
+          cta={{ label: 'Ver mis personajes', href: '/personajes' }}
+        />
       </AppShell>
     );
   }
@@ -82,9 +78,11 @@ export default async function MercadoPage() {
   if (total === 0 && initialRows.length === 0) {
     return (
       <AppShell title="Mercado" subtitle="COMPRAR ÍTEMS">
-        <div className="flex flex-col items-center justify-center py-16 text-sm text-ink-soft">
-          <p>No hay artículos disponibles en el Mercado de este mundo.</p>
-        </div>
+        <V3Empty
+          glyph="bag"
+          title="No hay artículos disponibles en el Mercado de este mundo"
+          sub="El DM puede marcar ítems para la venta desde Herramientas → Tienda."
+        />
       </AppShell>
     );
   }
