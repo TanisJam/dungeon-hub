@@ -73,10 +73,13 @@ const RULES: readonly Rule[] = [
     fix: 'use shadow-stamp-sm / shadow-stamp-md / shadow-stamp-lg.',
   },
   {
-    name: 'bare rounded',
-    // `rounded` on its own is Tailwind's 4px default and sits off the project
-    // scale (sm 8 / md 12 / lg 18 / pill).
-    pattern: /(?<![\w-])rounded(?![\w-])/g,
+    name: 'off-scale radius',
+    // The project scale is sm 8 / md 12 / lg 18 / pill. Bare `rounded` is
+    // Tailwind's 4px default; xl/2xl/3xl and any arbitrary value sit beside the
+    // scale; and `rounded-full` was a second name for `rounded-pill` — 999px
+    // caps any height, so a square still renders as a circle either way.
+    pattern:
+      /(?<![\w-])rounded(?:-(?:[trbl]|t[lr]|b[lr]|[se]|[trbl][se]))?(?:-(?:xs|xl|[23]xl|full|\[[^\]]+\]))?(?![\w-])(?<!-(?:sm|md|lg|pill))/g,
     fix: 'use rounded-sm / rounded-md / rounded-lg / rounded-pill.',
   },
 ];
