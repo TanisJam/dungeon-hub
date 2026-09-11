@@ -79,7 +79,7 @@ export function SpellsStep({
       />
 
       {validationError && (
-        <p className="text-xs text-red-600">{validationError}</p>
+        <p className="text-xs text-danger">{validationError}</p>
       )}
 
       {/* Sticky bottom CTA — mobile-first */}

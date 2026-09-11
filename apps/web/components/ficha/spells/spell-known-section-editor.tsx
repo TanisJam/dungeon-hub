@@ -64,7 +64,7 @@ export function SpellKnownSectionEditor({
         className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center bg-transparent p-0"
         title="DM: asignar hechizos conocidos"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-amber-500/40 text-amber-400 transition-colors hover:border-amber-400 hover:bg-amber-500/10">
+        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-warning/40 text-warning transition-colors hover:border-warning hover:bg-warning/10">
           <Icon name="wand" size={14} />
         </span>
       </button>

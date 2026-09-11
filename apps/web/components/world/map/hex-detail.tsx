@@ -95,9 +95,9 @@ export function HexDetailView({
 
       {/* DM notes — ABSENT for players (REQ-GATE-01) */}
       {isDM && detail.dmNotes && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Notas del DM</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-amber-900">
+        <div className="rounded-md border border-warning/40 bg-warning-soft p-3">
+          <p className="text-xs font-medium text-warning uppercase tracking-wide">Notas del DM</p>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink-soft">
             {detail.dmNotes}
           </p>
         </div>

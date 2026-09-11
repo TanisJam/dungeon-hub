@@ -454,8 +454,8 @@ export function SpellsPicker({
           className={[
             'rounded-full border px-3 py-1 text-xs font-medium transition',
             filterRitual
-              ? 'border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-              : 'border-line bg-paper-soft text-ink-mute hover:border-amber-400 hover:text-amber-700',
+              ? 'border-warning bg-warning-soft text-warning'
+              : 'border-line bg-paper-soft text-ink-mute hover:border-warning hover:text-warning',
           ].join(' ')}
         >
           Ritual
@@ -467,8 +467,8 @@ export function SpellsPicker({
           className={[
             'rounded-full border px-3 py-1 text-xs font-medium transition',
             filterConcentration
-              ? 'border-blue-500 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-              : 'border-line bg-paper-soft text-ink-mute hover:border-blue-400 hover:text-blue-700',
+              ? 'border-arcane bg-arcane/10 text-arcane'
+              : 'border-line bg-paper-soft text-ink-mute hover:border-arcane hover:text-arcane',
           ].join(' ')}
         >
           Concentración

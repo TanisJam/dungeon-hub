@@ -296,7 +296,7 @@ export function WorldEntityShell<TRow, TDetail>({
             Cargando…
           </div>
         ) : detailError ? (
-          <div className="py-8 text-center text-sm text-red-500" aria-live="polite">
+          <div className="py-8 text-center text-sm text-danger" aria-live="polite">
             No se pudo cargar el detalle.
           </div>
         ) : detail !== null ? (
@@ -320,7 +320,7 @@ export function WorldEntityShell<TRow, TDetail>({
                     type="button"
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="min-h-[44px] flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                    className="min-h-[44px] flex-1 rounded-md bg-danger px-4 py-2 text-sm font-medium text-on-danger transition-colors hover:bg-danger-deep disabled:opacity-50"
                   >
                     {deleting ? 'Eliminando…' : 'Eliminar'}
                   </button>

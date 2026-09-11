@@ -295,7 +295,7 @@ export function HechizosTab({ sheet, charId, isDmHere }: HechizosTabProps) {
           {pact && (
             <div className={slots ? 'mt-5 border-t border-line pt-4' : ''}>
               <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-purple-700">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-secondary">
                   Magia de Pacto · Nivel {pact.slotLevel}
                 </span>
                 <span className="text-xs font-medium tabular-nums text-ink-mute">

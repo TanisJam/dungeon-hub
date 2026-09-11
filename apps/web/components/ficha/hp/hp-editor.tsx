@@ -81,7 +81,7 @@ export function HPEditor({ characterId, currentHp, isDmHere, onClose }: HPEditor
           {isDmHere && (
             <span
               data-testid="dm-override-badge"
-              className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] font-bold text-amber-400"
+              className="rounded bg-warning/20 px-1.5 py-0.5 text-[11px] font-bold text-warning"
             >
               DM Override
             </span>

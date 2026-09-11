@@ -163,7 +163,7 @@ export function ShopCurationEditor({
       )}
 
       {error && (
-        <p role="alert" className="text-xs font-medium text-red-600">
+        <p role="alert" className="text-xs font-medium text-danger">
           {error}
         </p>
       )}

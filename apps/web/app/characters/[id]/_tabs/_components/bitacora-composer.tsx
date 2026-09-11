@@ -314,7 +314,7 @@ export function BitacoraComposer({
             className="w-full rounded-md border border-line bg-paper-soft px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus:outline-none focus:ring-2 focus:ring-ink/20"
           />
           {fieldErrors['body'] && (
-            <p role="alert" className="mt-1 text-xs text-red-600">
+            <p role="alert" className="mt-1 text-xs text-danger">
               {fieldErrors['body']}
             </p>
           )}
@@ -347,7 +347,7 @@ export function BitacoraComposer({
             })}
           </div>
           {fieldErrors['tags'] && (
-            <p role="alert" className="mt-1 text-xs text-red-600">
+            <p role="alert" className="mt-1 text-xs text-danger">
               {fieldErrors['tags']}
             </p>
           )}
@@ -501,7 +501,7 @@ export function BitacoraComposer({
         )}
 
         {error && (
-          <p role="alert" className="text-xs text-red-600">
+          <p role="alert" className="text-xs text-danger">
             {error}
           </p>
         )}

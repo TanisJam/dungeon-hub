@@ -54,7 +54,7 @@ export function VitalGrid({
 
   const hpTempEl =
     hp.temp !== undefined && hp.temp > 0 ? (
-      <span className="text-[10px] font-bold text-amber-400 leading-tight" data-testid="hp-temp">
+      <span className="text-[10px] font-bold text-warning leading-tight" data-testid="hp-temp">
         +{hp.temp} temporal
       </span>
     ) : null;

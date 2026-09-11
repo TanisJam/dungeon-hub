@@ -135,7 +135,7 @@ export function SpellPrepEditor({
 
       {/* At/over-limit hint */}
       {atLimit && !overLimit && (
-        <p className="text-xs text-amber-600">Límite alcanzado</p>
+        <p className="text-xs text-warning">Límite alcanzado</p>
       )}
 
       {/* Error banner */}

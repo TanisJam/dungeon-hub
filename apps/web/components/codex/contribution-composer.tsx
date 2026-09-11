@@ -170,7 +170,7 @@ function ComposerForm({ worldId, refEntityKind, refEntityId, onClose, onSuccess 
       </div>
 
       {error && (
-        <p role="alert" className="text-xs text-red-600">
+        <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}
