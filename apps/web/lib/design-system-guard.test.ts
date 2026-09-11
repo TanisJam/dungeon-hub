@@ -109,6 +109,50 @@ describe('design-system guard — app/ and components/ outside app/dev', () => {
   }
 });
 
+/** Read the colour token names Tailwind actually generates utilities from. */
+function declaredColourTokens(): Set<string> {
+  const css = readFileSync(join(WEB_ROOT, 'app', 'globals.css'), 'utf8');
+  const themeBlock = css.slice(css.indexOf('@theme {'), css.indexOf('/* ── Type-scale utilities'));
+  return new Set([...themeBlock.matchAll(/--color-([a-z0-9-]+)\s*:/g)].map((m) => m[1]!));
+}
+
+describe('semantic colour classes resolve to a declared token', () => {
+  /**
+   * `bg-surface-raised` shipped in 31 places across 10 files and
+   * `--color-surface-raised` was never declared, so Tailwind generated no rule and
+   * every one of those surfaces painted nothing. The audit saw the symptom on one
+   * screen (F13, only the first DM shortcut had a circle) and blamed a one-off
+   * class; the cause was a token that did not exist. Nothing could catch it: the
+   * class looks exactly like a valid one.
+   */
+  it('every project-token colour class names a token globals.css declares', () => {
+    const declared = declaredColourTokens();
+    // Roots that belong to this design system rather than to Tailwind's own scale.
+    const roots =
+      /^(paper|surface|ink|line|primary|accent|secondary|success|warning|danger|arcane|on|mute|muted)(-|$)/;
+    const classPattern = /\b(?:bg|text|border|ring|from|to|via|divide|outline|fill|stroke)-([a-z][a-z0-9-]*)(?:\/\d{1,3})?\b/g;
+
+    const violations: string[] = [];
+    for (const dir of SCANNED_DIRS) {
+      for (const file of collectSourceFiles(join(WEB_ROOT, dir))) {
+        const lines = stripComments(readFileSync(file, 'utf8')).split('\n');
+        lines.forEach((line, i) => {
+          for (const m of line.matchAll(classPattern)) {
+            const token = m[1]!;
+            if (!roots.test(token) || declared.has(token)) continue;
+            violations.push(`${relative(WEB_ROOT, file)}:${i + 1}  ${m[0]}`);
+          }
+        });
+      }
+    }
+
+    expect(
+      violations,
+      `\n${violations.length} colour class(es) name a token globals.css never declares, so Tailwind generates no rule and they paint nothing.\n\n${violations.join('\n')}\n`,
+    ).toEqual([]);
+  });
+});
+
 describe('design-token mirror', () => {
   /**
    * globals.css says the @theme values are "mirrored for dev catalog in
@@ -116,9 +160,7 @@ describe('design-token mirror', () => {
    * could silently drift from what the app actually renders.
    */
   it('every @theme --color-* token appears in lib/design-tokens.ts', async () => {
-    const css = readFileSync(join(WEB_ROOT, 'app', 'globals.css'), 'utf8');
-    const themeBlock = css.slice(css.indexOf('@theme {'), css.indexOf('/* ── Type-scale utilities'));
-    const declared = [...themeBlock.matchAll(/--color-([a-z0-9-]+)\s*:/g)].map((m) => m[1]);
+    const declared = [...declaredColourTokens()];
     expect(declared.length).toBeGreaterThan(20);
 
     const { COLORS } = await import('./design-tokens');
