@@ -62,13 +62,21 @@ export function WorldSwitcherTrigger({
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full min-h-[44px] items-center gap-1.5 px-0.5 text-left transition-colors duration-150 hover:text-accent"
+        className="flex w-full min-h-[44px] items-center gap-1.5 px-0.5 text-left text-ink-soft transition-colors duration-150 hover:text-accent"
         aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
       >
-        <span className="min-w-0 flex-1 truncate font-display font-bold text-[13px] leading-tight text-ink">
+        {/*
+         * No RoleBadge here. The role switcher sits a few millimetres to the
+         * right in the same bar, so the badge spent about 50px repeating it —
+         * width this row does not have. The badge still labels each row inside
+         * the sheet, where it distinguishes one world from another.
+         *
+         * Smaller and lighter than the title on purpose: the title names the
+         * screen, the world is the context it sits in.
+         */}
+        <span className="min-w-0 flex-1 truncate font-display text-[12px] font-medium leading-tight">
           {worldName}
         </span>
-        {callerRole && <RoleBadge role={callerRole} />}
       </button>
     );
   }
