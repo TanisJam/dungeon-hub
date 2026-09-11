@@ -35,7 +35,7 @@ const WorldMapLeafletDynamic = dynamic(
     ssr: false,
     loading: () => (
       <div
-        className="fixed inset-x-0 top-[120px] z-10 flex items-center justify-center bg-paper"
+        className="fixed inset-x-0 top-[var(--topbar-h)] z-10 flex items-center justify-center bg-paper"
         style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
         data-testid="map-container"
       >
@@ -81,7 +81,7 @@ interface MapClientWrapperProps {
 function PlaceModeBanner({ name, onCancel }: { name: string; onCancel: () => void }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
+      className="fixed inset-x-0 top-[var(--topbar-h)] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="place-mode-banner"
       role="status"
       aria-live="polite"
@@ -108,7 +108,7 @@ function PlaceModeBanner({ name, onCancel }: { name: string; onCancel: () => voi
 function CreateModeBanner({ onCancel }: { onCancel: () => void }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
+      className="fixed inset-x-0 top-[var(--topbar-h)] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="create-mode-banner"
       role="status"
       aria-live="polite"
@@ -132,7 +132,7 @@ function CreateModeBanner({ onCancel }: { onCancel: () => void }) {
  * B2 Refinement 2: "Moviendo {name}" + Listo + Cancelar buttons.
  * Listo saves the dragged position (or no-ops if no drag happened).
  * Cancelar discards and returns the marker to its original position.
- * Same z/position contract as CreateModeBanner (z-30, top-[120px]).
+ * Same z/position contract as CreateModeBanner (z-30, top-[var(--topbar-h)]).
  */
 function MoveBanner({
   name,
@@ -145,7 +145,7 @@ function MoveBanner({
 }) {
   return (
     <div
-      className="fixed inset-x-0 top-[120px] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
+      className="fixed inset-x-0 top-[var(--topbar-h)] z-30 flex items-center justify-between gap-3 bg-ink px-4 py-3 text-surface shadow-stamp-md"
       data-testid="move-mode-banner"
       role="status"
       aria-live="polite"
@@ -385,7 +385,7 @@ export function MapClientWrapper({
           type="button"
           onClick={() => router.push('?view=lista')}
           className="fixed z-30 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-pill bg-ink/80 px-3 text-sm font-medium text-surface shadow-stamp-md"
-          style={{ top: 'calc(56px + 8px)', right: '1rem' }}
+          style={{ top: 'calc(var(--topbar-h) + 8px)', right: '1rem' }}
           aria-label="Ver lista de hexes"
           data-testid="hex-list-access"
         >

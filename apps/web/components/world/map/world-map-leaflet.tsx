@@ -16,10 +16,12 @@
  *
  * LAYOUT — AppShell breakout (ADR-4):
  *   AppShell renders <main className="mx-auto max-w-sm px-4 py-4 pb-28">.
- *   The toggle is rendered inside that <main> above this island.
  *   The map MUST fill the viewport. Strategy: fixed inset-0, top offset =
- *   TopBar height + toggle height (~120px combined). This avoids negative-margin
- *   breakout and is reliable across screen sizes.
+ *   `var(--topbar-h)`, the TopBar's real height as measured at runtime by
+ *   TopbarHeightProbe (fix/topbar-height-token — the old MapToggle this
+ *   comment used to reference was removed by REQ-PWC-IA-01; a hardcoded
+ *   top-[120px] left 24px of the hex-list-access button under the header).
+ *   This avoids negative-margin breakout and is reliable across screen sizes.
  *
  * SLICE 3 SCOPE: tap-to-place PlaceModeClickCatcher.
  * B2 Refinement: DM drag removed — edit/move gated behind popup buttons.
@@ -239,13 +241,22 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
     /**
      * Full-bleed breakout from AppShell max-w-sm:
      * fixed inset-0 places the map to fill the full viewport.
-     * top-[120px]: accounts for TopBar (~56px) + MapToggle (~48px) + gap.
+     * top-[var(--topbar-h)]: clears the TopBar's real, runtime-measured
+     * height (published by TopbarHeightProbe — components/layout/topbar-height-probe.tsx).
+     * The header is NOT a fixed size — device safe-area padding and a
+     * worldSwitcher both grow it — so this reads the live token instead of a
+     * hardcoded pixel guess (fix/topbar-height-token; the old `top-[120px]`
+     * assumed a ~56px TopBar + ~48px MapToggle that no longer exists, which
+     * left 24px of the hex-list-access button under the header).
+     * Both top and bottom are set on this `fixed` box, so its height is
+     * computed by the browser (100% of viewport minus top minus bottom) —
+     * it cannot overflow past the TabBar regardless of the header's height.
      * bottom: clears TabBar real height (73px) + iOS safe-area inset so the map
      * edge never hides under the TabBar on notched devices.
      * z-10 keeps the map above page content but below sheets (z-50).
      */
     <div
-      className="fixed inset-x-0 top-[120px] z-10 md:left-[var(--sidebar-w)]"
+      className="fixed inset-x-0 top-[var(--topbar-h)] z-10 md:left-[var(--sidebar-w)]"
       style={{ bottom: 'calc(73px + env(safe-area-inset-bottom, 0px))' }}
       data-testid="map-container"
     >

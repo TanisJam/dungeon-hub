@@ -6,6 +6,7 @@ import type { CallerRole } from '@/lib/active-world';
 import { classifyRoute } from '@/lib/route-chrome';
 import { DesktopSidebar } from './desktop-sidebar';
 import { TabBar } from './tabbar';
+import { TopbarHeightProbe } from './topbar-height-probe';
 
 interface AppChromeProps {
   /** Server-resolved caller role for the active world, forwarded from the
@@ -27,17 +28,28 @@ interface AppChromeProps {
  * `/link/**`, `/dev/**`) or wraps them in the same grid + DesktopSidebar +
  * TabBar markup AppShell used to own. AppShell itself now renders only
  * TopBar + main.
+ *
+ * Also mounts TopbarHeightProbe unconditionally — it is a no-op on
+ * standalone routes (no TopBar to find) and publishes `--topbar-h` on every
+ * other route, so any descendant can measure the real header height instead
+ * of guessing at it (fix/topbar-height-token).
  */
 export function AppChrome({ callerRole, children }: AppChromeProps) {
   const pathname = usePathname();
   const { shell, tabBar } = classifyRoute(pathname);
 
   if (!shell) {
-    return <>{children}</>;
+    return (
+      <>
+        <TopbarHeightProbe />
+        {children}
+      </>
+    );
   }
 
   return (
     <>
+      <TopbarHeightProbe />
       <div className="md:grid md:grid-cols-[var(--sidebar-w)_1fr]">
         <DesktopSidebar callerRole={callerRole} />
         <div className="md:min-w-0">{children}</div>
