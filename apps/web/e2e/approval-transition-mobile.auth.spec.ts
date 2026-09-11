@@ -190,7 +190,7 @@ test.describe('Approval transition + sheet mobile smoke @ 375px', () => {
     if (sectionVisible) {
       // Either events or empty state must be shown
       const hasGrants = (await grantsSection.locator('ul li').count()) > 0;
-      const hasEmptyState = await grantsSection.getByText('Sin grants recientes.').isVisible().catch(() => false);
+      const hasEmptyState = await grantsSection.locator('[data-v3-empty]').first().isVisible().catch(() => false);
       expect(hasGrants || hasEmptyState, 'RecentGrants shows events or empty state').toBe(true);
 
       // No horizontal overflow within the section
