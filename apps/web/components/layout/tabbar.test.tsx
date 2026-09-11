@@ -149,6 +149,17 @@ describe('TabBar — 5-tab world nav (REQ-NAV-01, REQ-MERC-NAV-01)', () => {
     const hrefs = links.map((l) => l.getAttribute('href'));
     expect(hrefs).toEqual(['/inicio', '/mapa', '/compendium', '/mercado', '/bitacora']);
   });
+
+  // F6: mixed case closes the Mercado/Bitácora 3.5px gap at 6 columns; px-1 +
+  // truncate is the "plus safety" so a label can never overflow its column.
+  it('F6: labels are mixed case (no uppercase class) and truncate within a padded column', () => {
+    render(<TabBar />);
+    const label = screen.getByText('Mercado');
+    expect(label.className).not.toContain('uppercase');
+    expect(label.className).toContain('truncate');
+    const link = screen.getByRole('link', { name: /mercado/i });
+    expect(link.className).toContain('px-1');
+  });
 });
 
 describe('TabBar — Mesa tab gated on callerRole (GM hub navigability fix)', () => {

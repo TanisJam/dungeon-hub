@@ -27,20 +27,22 @@ interface TopBarProps {
    */
   roleDefault?: Role;
   /**
-   * WorldSwitcher widget (trigger + sheet) to render in the LEFT slot.
-   * When provided (and backHref is not set), replaces the CrowMark.
-   * Passed as a pre-built ReactNode from AppShell (server-props delivery, ADR-4).
+   * WorldSwitcher widget (trigger + sheet), rendered under the title. Passed as
+   * a pre-built ReactNode from AppShell (server-props delivery, ADR-4).
    * worldName is for display reference only when worldSwitcher is not provided.
-   * REQ-WIS-03.
+   * REQ-WIS-03. F5 moved it out of the left slot, where an 88px cap cut the
+   * world name on every page.
    */
   worldSwitcher?: ReactNode;
 }
 
 /**
  * TopBar — sticky app header (obsidian aesthetic).
- * Crow mark + title/subtitle + role switcher (if canBeDM) + notif bell.
- * When backHref is provided: back arrow in left slot, CrowMark hidden, RoleSwitcher suppressed.
- * When worldSwitcher is provided (and no backHref): WorldSwitcher in left slot, CrowMark hidden.
+ * Crow mark + title + world (or subtitle) + role switcher (if canBeDM).
+ * When backHref is provided: back arrow in left slot, CrowMark hidden,
+ * RoleSwitcher suppressed.
+ * When worldSwitcher is provided (and no backHref) it renders under the title
+ * and takes the subtitle's place, on every viewport.
  * Server component. RoleSwitcher is a client island.
  */
 export function TopBar({
@@ -52,6 +54,13 @@ export function TopBar({
   roleDefault = 'player',
   worldSwitcher,
 }: TopBarProps) {
+  // F5: the world moved out of the left slot, where an 88px cap cut its name on
+  // every page, and under the title, where the width is. The left slot goes back
+  // to the CrowMark. A page that sends both a world and an eyebrow subtitle shows
+  // the world: it is the context that was being lost, and the eyebrow largely
+  // repeats the title.
+  const showWorldSwitcher = Boolean(worldSwitcher) && !backHref;
+
   // Precedence: backHref > worldSwitcher > CrowMark (ADR design: backHref check first)
   function renderLeftSlot() {
     if (backHref) {
@@ -70,9 +79,6 @@ export function TopBar({
         </Link>
       );
     }
-    if (worldSwitcher) {
-      return <div className="flex-shrink-0">{worldSwitcher}</div>;
-    }
     return <CrowMark />;
   }
 
@@ -82,13 +88,20 @@ export function TopBar({
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
     >
       <div className="mx-auto flex w-full max-w-sm items-center gap-2.5 px-3.5 pb-3 md:max-w-3xl">
-      {/* LEFT slot: backHref > worldSwitcher > CrowMark */}
+      {/* LEFT slot: backHref arrow, else the CrowMark */}
       {renderLeftSlot()}
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         <h1 className="font-display font-bold text-[15px] leading-[1.15] tracking-tight text-ink truncate m-0">
           {title}
         </h1>
-        {subtitle && (
+        {/*
+         * F5: the world sits under the title, where the width is. A capped pill
+         * in the left slot cut the name on all seven measured pages; here the
+         * name has the title column to itself and the header grows by the
+         * column's height rather than by a whole row.
+         */}
+        {showWorldSwitcher && worldSwitcher}
+        {subtitle && !showWorldSwitcher && (
           <span className="hidden sm:block font-sans text-[10px] font-bold text-ink-mute tracking-[0.14em] uppercase leading-none truncate">
             {subtitle}
           </span>

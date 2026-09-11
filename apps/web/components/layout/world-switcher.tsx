@@ -42,9 +42,47 @@ interface WorldSwitcherTriggerProps {
   worldName: string;
   callerRole: CallerRole;
   onClick: () => void;
+  /**
+   * F5: 'pill' (default) is the unchanged sm:+ look — bordered chip, name
+   * capped at max-w-[88px]/120px. 'line' is the mobile full-width row: no
+   * border/background, no max-w cap (the name truncates only against the
+   * row's own width), min-h-[44px] tap target, left-aligned.
+   */
+  variant?: 'pill' | 'line';
 }
 
-export function WorldSwitcherTrigger({ worldName, callerRole, onClick }: WorldSwitcherTriggerProps) {
+export function WorldSwitcherTrigger({
+  worldName,
+  callerRole,
+  onClick,
+  variant = 'pill',
+}: WorldSwitcherTriggerProps) {
+  if (variant === 'line') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full min-h-[44px] items-center px-0.5 text-left text-ink-soft transition-colors duration-150 hover:text-accent"
+        aria-label={`Mundo activo: ${worldName}. Abrir selector de mundo.`}
+      >
+        {/*
+         * No RoleBadge here. The role switcher sits a few millimetres to the
+         * right in the same bar, so the badge spent about 50px repeating it —
+         * width this row does not have. The badge still labels each row inside
+         * the sheet, where it distinguishes one world from another.
+         *
+         * Smaller and lighter than the title on purpose: the title names the
+         * screen, the world is the context it sits in. Sans rather than the
+         * display serif — narrower at the same size, and the serif is the
+         * title's voice.
+         */}
+        <span className="min-w-0 flex-1 truncate font-sans text-[12px] font-medium leading-tight">
+          {worldName}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -93,7 +131,16 @@ export function WorldSwitcher({ worlds, activeWorldId, callerRole }: WorldSwitch
 
   return (
     <>
+      {/*
+       * F5: one trigger, one open state, one sheet. The world used to be a
+       * capped pill in the left slot, where its name was cut on every page; it
+       * now sits under the title as the line variant, which is where the
+       * remaining width is. TopBar places this node inside the title column, so
+       * it costs the header the difference between the column and the 44px
+       * right cluster rather than a whole extra row.
+       */}
       <WorldSwitcherTrigger
+        variant="line"
         worldName={worldName}
         callerRole={callerRole}
         onClick={() => setOpen(true)}
