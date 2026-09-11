@@ -1,14 +1,28 @@
-# Deliberately NOT covered by this workflow:
+# Coverage map for this workflow:
 #
-#   - apps/api/tests/integration/ (119 files) need a live GoTrue + Postgres.
-#     `pnpm --filter @dungeon-hub/api test:unit` runs only the 7 files (tests/unit/
-#     + src/ co-located tests) that don't need that stack — see
-#     apps/api/vitest.unit.config.ts for why.
-#   - packages/compendium-import's 5etools dataset (data/5etools/) is fetched
-#     separately and is not committed to the repo, so any test that depends on
-#     it skips itself when the dataset is absent.
+#   - verify: lint, typecheck, and every package's fast/unit-only tests. No
+#     live infra, so nothing here talks to a real Postgres, GoTrue, or HTTP
+#     server — `pnpm --filter @dungeon-hub/api test:unit` runs only the 7
+#     files (tests/unit/ + src/ co-located tests) that don't need that stack,
+#     see apps/api/vitest.unit.config.ts for why.
+#   - integration: apps/api/tests/integration/ (119 files) — direct HTTP
+#     requests against a real running API, real GoTrue, real Postgres. This
+#     proves the API's HTTP surface in isolation; it never renders a page, so
+#     it cannot see a web-component regression.
+#   - e2e: the full Playwright suite (apps/web/e2e/) driving a real Chromium
+#     browser against the web app and API running on the same throwaway
+#     stack. This proves the user-facing flows actually render and work
+#     end-to-end — see the `e2e` job below for exactly what silently broke,
+#     three times, without it.
 #
-# In short: a green run here does NOT exercise the API's HTTP surface.
+# Together, integration + e2e cover the API's HTTP surface from both sides:
+# direct requests, and through the rendered app a player or DM actually uses.
+# Still uncovered: any browser other than Chromium (every project in
+# playwright.config.ts uses devices['Desktop Chrome']), and the Discord bot
+# (apps/bot has unit tests only; per CLAUDE.md its e2e coverage is manual
+# smoke-testing against live Discord). The 5etools dataset (data/5etools/) is
+# fetched fresh by both integration and e2e below, so neither skips on an
+# absent dataset in CI — that caveat only applies to a fresh local clone.
 name: ci
 
 on:
@@ -105,3 +119,77 @@ jobs:
       # compendium, runs the suite, and tears the stack down on exit.
       - name: Run the integration suite
         run: ./scripts/test-stack.sh pnpm --filter @dungeon-hub/api test
+
+  # F5 (#59, the world-switcher move) broke /inicio's subtitle and the
+  # role-toggle probe; F9 (2c595a7) rewrote an empty state through V3Empty and
+  # dropped a full stop, breaking 2 specs matching that literal string; F11
+  # (29553c4) swapped `truncate` for `line-clamp-2`, breaking a spec that
+  # selected `.truncate` (30s timeout). Three separate PRs, three separate
+  # broken specs, all merged on green CI because nothing ran the Playwright
+  # suite anywhere in this workflow. This job is that suite.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    # Locally the full suite is ~20-28 min at workers:1, plus build time for
+    # both apps — this leaves real headroom above that, not a tight ceiling.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.7.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Same cache, same key as `integration` — a PR that already warmed it
+      # there gets a cache hit here too.
+      - name: Cache the 5etools dataset
+        uses: actions/cache@v5
+        with:
+          path: data/5etools
+          key: 5etools-${{ hashFiles('scripts/fetch-5etools.sh') }}
+
+      - name: Fetch the 5etools dataset
+        run: ./scripts/fetch-5etools.sh
+
+      # Every project in playwright.config.ts uses devices['Desktop Chrome'],
+      # so only Chromium needs to be installed here.
+      - name: Install Playwright's Chromium browser
+        run: pnpm --filter @dungeon-hub/web exec playwright install --with-deps chromium
+
+      # Called directly, NOT as `test-stack.sh ./scripts/e2e-stack.sh`:
+      # e2e-stack.sh re-execs itself inside test-stack.sh (the DH_E2E_INNER
+      # marker). Wrapping it by hand would start a second stack whose first
+      # act is `docker compose down -v`, destroying the one it is running in.
+      #
+      # So one command brings up Postgres + GoTrue, migrates, applies the
+      # custom SQL, imports the compendium, starts the API and the web app,
+      # seeds the E2E fixtures, warms the routes, runs the full Playwright
+      # suite, and tears containers and both processes down on exit.
+      - name: Run the e2e suite
+        run: ./scripts/e2e-stack.sh
+
+      # playwright.config.ts sets `trace: 'retain-on-failure'` and
+      # `screenshot: 'only-on-failure'`, both written under the default
+      # outputDir (apps/web/test-results/). Its `reporter: 'github'` in CI
+      # emits annotations, not an HTML report, so playwright-report/ is
+      # normally empty — included anyway in case that ever changes.
+      - name: Upload Playwright traces + screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
