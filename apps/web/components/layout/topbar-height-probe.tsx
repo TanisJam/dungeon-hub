@@ -35,17 +35,30 @@ export function TopbarHeightProbe() {
     const header = document.querySelector<HTMLElement>('[data-app-topbar]');
     if (!header) return;
 
+    // A zero height is never a real topbar — it is what you read while the
+    // element is hidden, which App Router does to the outgoing tree during a
+    // route transition. Publishing it pins every offset derived from this
+    // variable to the top of the viewport, which is worse than not measuring
+    // at all: the first version of this component did exactly that and pushed
+    // the /mapa hex-list button from 24px under the header to 80px under it.
+    // So a non-positive reading is discarded and the last good value (or the
+    // :root fallback) stands.
     const publish = () => {
-      document.documentElement.style.setProperty(
-        '--topbar-h',
-        `${header.getBoundingClientRect().height}px`,
-      );
+      const height = header.getBoundingClientRect().height;
+      if (height <= 0) return;
+      document.documentElement.style.setProperty('--topbar-h', `${height}px`);
     };
 
-    publish();
+    // Defer the first read a frame: on a route transition the effect can run
+    // while the header is still hidden, and publish() would then have nothing
+    // to report.
+    const frame = requestAnimationFrame(publish);
     const observer = new ResizeObserver(publish);
     observer.observe(header);
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [pathname]);
 
   return null;
