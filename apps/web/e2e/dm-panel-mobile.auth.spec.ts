@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openDmSection } from './helpers/open-dm-section';
 
 /**
  * Mobile smoke for SDD `dm-session-panel` (C2 + C3 — DM world panel + approval UI).
@@ -92,6 +93,11 @@ test.describe('DM panel mobile smoke @ 375px (iPhone SE)', () => {
     await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
 
     // ---- Character page (active) — REQ-CAU-REVERT-BUTTON ----
+    // "Devolver a borrador" is a DM affordance, grouped under the collapsed
+    // "Como DM" disclosure since audit F8 (closed by default for an active
+    // character — nothing is waiting on this DM's decision here).
+    await openDmSection(page);
+
     // GM + active char → "Devolver a borrador" button MUST be visible.
     const revertBtn = page.getByRole('button', { name: /devolver.*borrador/i });
     await expect(revertBtn).toBeVisible({ timeout: 5_000 });
