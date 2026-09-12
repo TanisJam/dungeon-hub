@@ -33,7 +33,7 @@ const solidClasses: Record<PillTone, string> = {
   ink:       'bg-ink text-surface',
   stone:     'bg-ink-soft text-surface',
   amber:     'bg-warning text-surface',
-  danger:    'bg-danger text-on-danger',
+  danger:    'bg-danger-deep text-on-danger',
   success:   'bg-success text-surface',
   neutral:   'bg-surface-soft text-ink',
 };
