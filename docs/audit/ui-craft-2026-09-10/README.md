@@ -1,8 +1,40 @@
 # UI craft audit — 2026-09-10 — findings + step-by-step remediation plan
 
-> Status (2026-09-11): **F2, F5, F6, F7, F9, F10, F11, F12 applied and in production.**
-> F4 re-measured and does not reproduce (see its section). F1 and F3 not started.
+> Status (2026-09-12): **every finding is applied except the design half of F8.**
+> F1, F2, F3, F5, F6, F7, F8 (heading half), F9, F10, F11, F12, F13 are in production.
+> F4 was re-measured and does not reproduce (see its section).
 > Every number below is the *before*; each finding's PR carries the after.
+>
+> **F1** (#65, #66, #72): the nav chrome mounts once in the root layout instead of inside
+> every page, and every authenticated route has a `loading.tsx`. The chrome nav now survives
+> a navigation (0/4 → 4/4) and the destination skeleton paints at **100 ms** where the previous
+> screen used to sit frozen for 1.6–3.2 s. The time to real content did not move — that is API
+> latency and nothing here touches it.
+>
+> **F3** (#70, #73): 186 of 188 `text-[Npx]` are named tokens, a `text-label` (plain 10px) fills
+> the gap the scale had, and the page title is `text-subhead` on mobile / `text-title` on desktop.
+> The two holdouts are a character name at 28px, where `text-stat` would force `tabular-nums`.
+>
+> **F8** (#74): the heading half. The character sheet rendered the same name as an `h1` twice —
+> topbar and hero — and so did the campaign and session detail pages. The action-stack
+> regrouping is deliberately NOT done: it is a product decision about how discoverable a DM's
+> destructive actions should be, and the finding itself offers two shapes. It wants a human.
+>
+> **Three findings the audit's own numbers got wrong**, all caught by re-measuring before acting:
+>
+> 1. **F3's histogram counted the persistent chrome once per route.** "33 % of visible text < 12 px"
+>    was dominated by a six-label tab bar measured across seven pages. Separating chrome from page
+>    content: `<12px` is **25.0 %**, not 42.4 %, and `≥16px` is **18.3 %**, not 13.6 %. There is no
+>    9 px text in page content at all. And with chrome excluded, F3's target (`<12px ≤ 15 %`)
+>    contradicts F3's own instruction to *keep eyebrows at 10 px* — both cannot hold.
+> 2. **F4's `top-[120px]` drift was a live mobile bug, not desktop cosmetics.** The hex-list button
+>    on `/mapa` sat 24 px under the header with `elementFromPoint` returning the header: it could
+>    not be tapped. Fixed in #67 with a runtime-measured `--topbar-h`.
+> 3. **The e2e suite never ran in CI**, so three craft PRs from this very audit each silently killed
+>    a spec: F5 removed the subtitle `role-toggle` probed for, F9 dropped a full stop two specs
+>    matched literally, F11 swapped `truncate` for `line-clamp-2` under a spec's selector. All
+>    fixed in #68; the suite now runs in CI (#69) and found four more failures on its first run
+>    that no local machine could see, because CI's database is clean.
 >
 > | | before | now |
 > |---|---:|---:|
@@ -17,7 +49,12 @@
 > | Foreign font families on `/mapa` | 2 | **0** |
 > | Files importing `V3Empty` | 10 | **34** |
 >
-> A regression guard landed with F2 and grew through F12: `apps/web/lib/design-system-guard.test.ts`
+> Guards now in place, each verified by reintroducing the defect and watching the test fail:
+> `design-system-guard` (colours, shadows, radii, undeclared tokens), `type-scale-guard`
+> (arbitrary `text-[Npx]`), `map-topbar-offset-guard` (hardcoded viewport offsets on the map),
+> `route-chrome` (a new route with no declared chrome), and `e2e/headings.auth.spec.ts`
+> (one `h1` per page). The first of them landed with F2 and grew through F12:
+> `apps/web/lib/design-system-guard.test.ts`
 > fails on a raw palette colour, a solid `bg-white`, a default Tailwind shadow, an off-scale
 > radius, a colour class naming a token `globals.css` never declares, and a `@theme` token missing
 > from `lib/design-tokens.ts`.
@@ -85,6 +122,13 @@ Each finding: **Today** (measured) · **Where** (file:line) · **Steps** · **Ex
 **Verify**. Suggested branch names are hints, not mandates.
 
 ### F1 — Every tap freezes the previous screen for 1.2–2.4 s
+
+> **Applied 2026-09-11/12 (#65, #66, #72).** Re-measured before starting: 1.6–3.2 s, worse than
+> recorded here. Chrome nav persistence 0/4 → 4/4; destination skeleton at 100 ms on 4/4 routes,
+> mobile and desktop; every authenticated route has a `loading.tsx` except `/dashboard`, which is
+> a bare redirect. The route group this section proposes was measured and rejected — 147 files
+> import via `@/app/...` and a route group would break all of them, while not being what fixes
+> the freeze. The shell went to the root layout instead: 12 files, same measured outcome.
 
 **Axis 3 (continuity). Mobile + desktop. Moves the needle the most.**
 
@@ -198,6 +242,13 @@ test — PR.
 ---
 
 ### F3 — The type scale is defined but not adopted: the app lives between 9 and 14 px
+
+> **Applied 2026-09-12 (#70, #73).** 186 of 188 arbitrary sizes migrated, `text-label` added,
+> page title raised to 19 px mobile / 22 px desktop (this section's own acceptance criterion).
+> **The "Today" numbers below are wrong**: they count the persistent chrome once per route, so a
+> six-label tab bar across seven pages dominates them. Content only: `<12px` **25.0 %**,
+> `≥16px` **18.3 %**. There is no 9 px text in page content. And the target below
+> (`<12px ≤ 15 %`) contradicts this section's own step 3 (*keep eyebrows at 10 px*).
 
 **Axes 4 (hierarchy) + 5 (density). Mobile + desktop.**
 
@@ -394,6 +445,13 @@ covered by the topbar") — check `e2e/journeys/j6-gm-owner.auth.spec.ts` still 
 ---
 
 ### F8 — On the sheet, five actions weigh the same and the name is an `h1` twice
+
+> **Half applied 2026-09-12 (#74).** The duplicate `h1` is fixed and guarded by
+> `e2e/headings.auth.spec.ts`: measured on production, the sheet rendered the character's name
+> as an `h1` twice (15 px topbar + 24 px hero), and the campaign and session detail pages did the
+> same. **The action-stack regrouping is deliberately NOT done** — it is a product decision about
+> how discoverable a DM's destructive actions should be, and step 1 below offers two shapes
+> without choosing. That choice wants a human.
 
 **Axis 4 (hierarchy). Mobile + desktop.**
 
