@@ -56,7 +56,7 @@ export function TagFilter({ activeTag, onTagChange }: TagFilterProps) {
         aria-pressed={activeTag === null}
         className={[
           'flex-none scroll-snap-align-start rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors',
-          'min-h-[36px] whitespace-nowrap',
+          'min-h-[44px] whitespace-nowrap',
           activeTag === null
             ? 'bg-ink text-paper'
             : 'bg-paper-soft text-ink-soft hover:bg-paper hover:text-ink',
@@ -74,7 +74,7 @@ export function TagFilter({ activeTag, onTagChange }: TagFilterProps) {
           aria-pressed={activeTag === tag}
           className={[
             'flex-none scroll-snap-align-start rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors',
-            'min-h-[36px] whitespace-nowrap',
+            'min-h-[44px] whitespace-nowrap',
             activeTag === tag
               ? 'bg-ink text-paper'
               : 'bg-paper-soft text-ink-soft hover:bg-paper hover:text-ink',
