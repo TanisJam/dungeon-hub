@@ -84,8 +84,22 @@ export function DmAwareAffordances({
    * <details> rather than useState: the disclosure is keyboard-operable and
    * screen-reader-labelled for free, and it works before hydration.
    */
+  /*
+   * Open when the character is waiting on this DM's decision, closed otherwise.
+   *
+   * "Closed by default" was the choice; this is where that default is wrong. A
+   * DM working an approval queue has a decision to make on THIS sheet, and
+   * making them open the same section on every character is a tap per character
+   * for nothing. Seven DM journeys broke when this shipped closed unconditionally,
+   * which is how I learned approvals are the hot path rather than an edge.
+   *
+   * Grants are discretionary — nothing is waiting on them — so they stay behind
+   * the closed default.
+   */
+  const hasPendingDecision = status === 'pending_approval';
+
   return (
-    <details className="group rounded-md border border-line bg-surface/40">
+    <details open={hasPendingDecision} className="group rounded-md border border-line bg-surface/40">
       <summary
         className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-eyebrow text-ink-mute [&::-webkit-details-marker]:hidden"
       >
