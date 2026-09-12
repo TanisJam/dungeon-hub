@@ -1,7 +1,7 @@
 # UI craft audit — 2026-09-10 — findings + step-by-step remediation plan
 
-> Status (2026-09-12): **every finding is applied except the design half of F8.**
-> F1, F2, F3, F5, F6, F7, F8 (heading half), F9, F10, F11, F12, F13 are in production.
+> Status (2026-09-12): **every finding is applied.**
+> F1, F2, F3, F5, F6, F7, F8, F9, F10, F11, F12, F13 are in production.
 > F4 was re-measured and does not reproduce (see its section).
 > Every number below is the *before*; each finding's PR carries the after.
 >
@@ -446,12 +446,24 @@ covered by the topbar") — check `e2e/journeys/j6-gm-owner.auth.spec.ts` still 
 
 ### F8 — On the sheet, five actions weigh the same and the name is an `h1` twice
 
-> **Half applied 2026-09-12 (#74).** The duplicate `h1` is fixed and guarded by
+> **Applied 2026-09-12 (#74 heading, #78 actions).** The duplicate `h1` is fixed and guarded by
 > `e2e/headings.auth.spec.ts`: measured on production, the sheet rendered the character's name
 > as an `h1` twice (15 px topbar + 24 px hero), and the campaign and session detail pages did the
-> same. **The action-stack regrouping is deliberately NOT done** — it is a product decision about
-> how discoverable a DM's destructive actions should be, and step 1 below offers two shapes
-> without choosing. That choice wants a human.
+> same.
+>
+> The action stack was regrouped in #78 after Mauricio chose between the two shapes step 1 offers:
+> the DM affordances sit in a `Como DM` disclosure that opens when the character is
+> `pending_approval` and stays closed otherwise. Tabs moved from y=798 to y=738 at 375px — 60px,
+> and **still below a 667px fold**, because the hero and vitals grid occupy most of the viewport
+> before any action appears. Lifting them needs a smaller hero, which is not this finding.
+>
+> **Two things worth knowing before touching this again.** First, this section's "Today" lists
+> FIVE controls, not four: `+ Agregar clase` is still full-width below the disclosure. It is a
+> *player* action, so it does not belong under `Como DM`, and which of a player's actions should
+> be primary is a question this finding never asked. Second, shipping the disclosure closed
+> unconditionally broke seven DM journeys — approvals are the hot path, not an edge — and
+> `<details open={expr}>` is a CONTROLLED attribute in React, so a bare expression there yanks the
+> section shut the instant approval flips the status. Neither is visible from the source alone.
 
 **Axis 4 (hierarchy). Mobile + desktop.**
 
