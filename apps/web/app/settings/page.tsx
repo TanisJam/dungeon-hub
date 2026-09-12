@@ -79,7 +79,9 @@ function FatalError({ error }: { error: unknown }) {
   return (
     <AppShell title="Ajustes" subtitle="TU CUENTA">
       <div className="py-12 text-center">
-        <h1 className="font-display text-2xl font-semibold text-ink">No se pudo cargar tu cuenta</h1>
+        {/* h2: an error message is not the page heading — the topbar's
+            "Ajustes" is (audit F8). Visually unchanged. */}
+        <h2 className="font-display text-2xl font-semibold text-ink">No se pudo cargar tu cuenta</h2>
         <p className="mt-3 font-mono text-xs text-ink-mute">{message}</p>
       </div>
     </AppShell>

@@ -121,6 +121,8 @@ export default async function SessionDetailPage({ params }: { params: RouteParam
   return (
     <AppShell
       title={sessionDetail.title}
+      /* session-detail-view renders this same title as its h1 — audit F8. */
+      titleAs="p"
       subtitle="SESIÓN"
       // REQ-DPPMB-DETAIL-07: back link to campaign.
       backHref={`/campanas/${id}`}

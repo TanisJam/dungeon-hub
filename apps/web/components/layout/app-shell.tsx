@@ -44,6 +44,11 @@ type AppShellProps = {
    * Falls back to the explicit canBeDM prop (or its default false) for un-migrated pages (ADR-C2).
    */
   callerRole?: CallerRole;
+  /**
+   * Forwarded to TopBar. 'p' for pages that render the same heading again in
+   * their own content, so the document has exactly one h1 (audit F8).
+   */
+  titleAs?: 'h1' | 'p';
   children: ReactNode;
 };
 
@@ -73,6 +78,7 @@ export function AppShell({
   roleDefault = 'player',
   worldSwitcher,
   callerRole,
+  titleAs,
   children,
 }: AppShellProps) {
   // ADR-5 / ADR-C2: auto-derive canBeDM from callerRole when world context is present.
@@ -89,6 +95,7 @@ export function AppShell({
         backHref={backHref}
         roleDefault={roleDefault}
         worldSwitcher={worldSwitcher}
+        {...(titleAs ? { titleAs } : {})}
       />
       <main className="mx-auto min-h-screen max-w-sm px-4 py-4 pb-28 md:max-w-3xl md:pb-8">
         {children}

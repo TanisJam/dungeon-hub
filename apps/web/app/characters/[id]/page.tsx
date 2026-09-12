@@ -162,6 +162,10 @@ export default async function CharacterSheetPage({ params, searchParams }: Props
   return (
     <AppShell
       title={identity.name}
+      /* The hero below renders this same name as its h1 (sheet-hero.tsx).
+         Two h1s with identical text made a screen reader announce the
+         character twice — audit F8. */
+      titleAs="p"
       subtitle={classSummary.toUpperCase()}
       backHref="/personajes"
       rightAction={rightAction}

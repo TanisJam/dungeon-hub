@@ -64,6 +64,8 @@ export default async function CampanaDetailPage({ params }: { params: RouteParam
   return (
     <AppShell
       title={detail.name}
+      /* campana-detail-view renders this same name as its h1 — audit F8. */
+      titleAs="p"
       subtitle="CAMPAÑA"
       backHref="/campanas"
       callerRole={activeWorld?.callerRole ?? undefined}

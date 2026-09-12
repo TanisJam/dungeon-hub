@@ -73,7 +73,10 @@ export default async function BuildLayout({ children, params }: Props) {
       constructorHref={`/characters/${id}/wizard`}
     >
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="font-display text-xl font-bold text-ink">{character.name}</h1>
+        {/* h2, not h1: the page heading is the topbar's "Constructor"; the
+            character is the subject of that page, not a second page title
+            (audit F8 — one h1 per document). Visually unchanged. */}
+        <h2 className="font-display text-xl font-bold text-ink">{character.name}</h2>
         <Pill tone={statusTone} size="sm">{statusLabel}</Pill>
       </div>
 
