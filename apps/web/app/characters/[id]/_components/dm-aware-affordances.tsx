@@ -11,6 +11,7 @@
  * Previously they were gated only on the SSR callerRole and never changed client-side.
  */
 
+import { useState } from 'react';
 import { useRole } from '@/lib/use-role';
 import { ApprovalActions } from './approval-actions';
 import { DmGrantPanel } from './dm-grant-panel';
@@ -47,6 +48,17 @@ export function DmAwareAffordances({
   // isDmMode: only true when the server confirmed GM role AND client selected 'dm'.
   // A non-GM player can never reach isDmMode=true.
   const isDmMode = serverCallerRole === 'gm' && clientRole === 'dm';
+
+  /*
+   * useState, not <details open={status === 'pending_approval'}>.
+   *
+   * React writes `open` on every render, so a bare expression there is a
+   * CONTROLLED attribute: the moment approval flips status to 'active', the
+   * re-render forces the section shut under the DM's finger, right after they
+   * used it. Seeding state once gives the pending default without taking the
+   * disclosure away from the person operating it.
+   */
+  const [isOpen, setIsOpen] = useState(status === 'pending_approval');
 
   const affordances = (
     <>
@@ -96,10 +108,13 @@ export function DmAwareAffordances({
    * Grants are discretionary — nothing is waiting on them — so they stay behind
    * the closed default.
    */
-  const hasPendingDecision = status === 'pending_approval';
 
   return (
-    <details open={hasPendingDecision} className="group rounded-md border border-line bg-surface/40">
+    <details
+      open={isOpen}
+      onToggle={(e) => setIsOpen(e.currentTarget.open)}
+      className="group rounded-md border border-line bg-surface/40"
+    >
       <summary
         className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-eyebrow text-ink-mute [&::-webkit-details-marker]:hidden"
       >
