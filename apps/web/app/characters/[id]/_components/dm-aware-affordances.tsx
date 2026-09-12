@@ -48,7 +48,7 @@ export function DmAwareAffordances({
   // A non-GM player can never reach isDmMode=true.
   const isDmMode = serverCallerRole === 'gm' && clientRole === 'dm';
 
-  return (
+  const affordances = (
     <>
       {/* Approval actions — only visible in DM mode */}
       <ApprovalActions
@@ -65,6 +65,40 @@ export function DmAwareAffordances({
         worldId={worldId}
       />
     </>
+  );
+
+  // Outside DM mode both children gate themselves to null, so render them bare
+  // and change nothing for a player.
+  if (!isDmMode) return affordances;
+
+  /*
+   * Audit F8: the sheet stacked "Descanso corto / largo", "Devolver a borrador"
+   * and "Otorgar" at equal weight, and pushed the tabs 131px below the fold at
+   * 375px. Two of those are a player's frequent actions; the other two belong to
+   * a different role and one of them is destructive.
+   *
+   * Grouping them under a collapsed "Como DM" gives the sheet one primary
+   * surface again and stops a destructive action sitting one stray tap from the
+   * rest controls — without hiding it behind a menu a DM would have to learn.
+   *
+   * <details> rather than useState: the disclosure is keyboard-operable and
+   * screen-reader-labelled for free, and it works before hydration.
+   */
+  return (
+    <details className="group rounded-md border border-line bg-surface/40">
+      <summary
+        className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-eyebrow text-ink-mute [&::-webkit-details-marker]:hidden"
+      >
+        <span
+          aria-hidden="true"
+          className="inline-block transition-transform duration-150 group-open:rotate-90"
+        >
+          ›
+        </span>
+        Como DM
+      </summary>
+      <div className="space-y-3 px-3 pb-3">{affordances}</div>
+    </details>
   );
 }
 
