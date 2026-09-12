@@ -319,7 +319,7 @@ export function WorldEntityShell<TRow, TDetail>({
                     type="button"
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="min-h-[44px] flex-1 rounded-md bg-danger px-4 py-2 text-sm font-medium text-on-danger transition-colors hover:bg-danger-deep disabled:opacity-50"
+                    className="min-h-[44px] flex-1 rounded-md bg-danger-deep px-4 py-2 text-sm font-medium text-on-danger transition-colors hover:bg-danger disabled:opacity-50"
                   >
                     {deleting ? 'Eliminando…' : 'Eliminar'}
                   </button>

@@ -86,7 +86,7 @@ export function DeleteCharacterButton({ characterId, characterName }: Props) {
                 type="button"
                 onClick={handleConfirm}
                 disabled={isPending}
-                className="min-h-[44px] rounded-md bg-danger px-4 py-2 text-sm font-bold text-on-danger transition-colors hover:bg-danger-deep disabled:opacity-50"
+                className="min-h-[44px] rounded-md bg-danger-deep px-4 py-2 text-sm font-bold text-on-danger transition-colors hover:bg-danger disabled:opacity-50"
               >
                 {isPending ? 'Eliminando…' : 'Eliminar'}
               </button>

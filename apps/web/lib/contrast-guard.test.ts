@@ -67,6 +67,22 @@ const PAIRS: Array<{ fg: string; bg: string; where: string }> = [
   { fg: 'danger',     bg: 'paper',           where: 'destructive button label' },
   { fg: 'accent',     bg: 'paper',           where: 'accent text on the page' },
   { fg: 'primary',    bg: 'paper',           where: 'primary text on the page' },
+
+  // Pill's SOLID fills. These were missing from the first version of this
+  // table, and their absence let a fix break one of them: lifting `danger` for
+  // text-on-paper legibility pushed white-on-danger from 4.69 down to 4.27.
+  // A colour serving as both "text on a dark page" and "fill under white text"
+  // is pulled in opposite directions and cannot satisfy both, which is why the
+  // solid destructive fill is now danger-deep and the light red stays for text.
+  { fg: 'primary',      bg: 'surface',      where: 'Pill solid tone="primary"' },
+  { fg: 'on-accent',    bg: 'accent',       where: 'Pill solid tone="accent"' },
+  { fg: 'on-secondary', bg: 'secondary',    where: 'Pill solid tone="secondary"' },
+  { fg: 'surface',      bg: 'ink',          where: 'Pill solid tone="ink"' },
+  { fg: 'surface',      bg: 'ink-soft',     where: 'Pill solid tone="stone"' },
+  { fg: 'surface',      bg: 'warning',      where: 'Pill solid tone="amber"' },
+  { fg: 'on-danger',    bg: 'danger-deep',  where: 'Pill solid tone="danger" and the destructive buttons' },
+  { fg: 'surface',      bg: 'success',      where: 'Pill solid tone="success"' },
+  { fg: 'ink',          bg: 'surface-soft', where: 'Pill solid tone="neutral"' },
 ];
 
 const AA_NORMAL = 4.5;

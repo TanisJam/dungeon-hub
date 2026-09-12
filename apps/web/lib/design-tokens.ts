@@ -56,7 +56,7 @@ export const COLORS: ColorToken[] = [
   { name: 'arcane',             hex: '#6F86C9', note: 'spell/magic indigo — distinct from the cyan primary' },
   { name: 'arcane-deep',        hex: '#4C63A6' },
   { name: 'on-accent',    hex: '#1A1208', note: 'dark text on accent/copper backgrounds' },
-  { name: 'on-secondary', hex: '#1A1208', note: 'dark text on secondary/magenta backgrounds' },
+  { name: 'on-secondary', hex: '#0B0A12', note: 'dark text on secondary/magenta backgrounds' },
   { name: 'on-danger',    hex: '#FFFFFF', note: 'light text on the solid danger fill — 4.69:1' },
 ];
 
