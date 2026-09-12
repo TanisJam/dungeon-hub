@@ -13,6 +13,7 @@
  */
 import { test, expect, type Browser } from '@playwright/test';
 import path from 'node:path';
+import { openDmSection } from '../helpers/open-dm-section';
 
 const AUTH_DIR = path.join(__dirname, '../.auth');
 const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
@@ -249,11 +250,19 @@ test.describe('J1 — player creates character, DM approves, player sees Activo'
       // It can only render after the approval actually took and the action's
       // revalidatePath re-rendered the sheet, which makes it a sharper post-state
       // than "Aprobar went away" — a button can also go away by never rendering.
+      // "Devolver a borrador" is a DM affordance grouped under the collapsed
+      // "Como DM" disclosure (audit F8). The disclosure defaults OPEN while
+      // status is pending_approval (which is where Aprobar lives), but once
+      // approval flips status to active the component re-renders with a new
+      // `status` prop and React re-syncs the <details> `open` attribute back
+      // to closed — collapsing the section out from under this same click.
+      // openDmSection() is idempotent, so re-opening it every retry pass is safe.
       const devolverBtn = dmPage.getByRole('button', { name: /^devolver a borrador$/i });
       await expect(async () => {
         if (await aprobarBtn.isVisible().catch(() => false)) {
           await aprobarBtn.click({ timeout: 5_000 }).catch(() => {});
         }
+        await openDmSection(dmPage);
         await expect(devolverBtn, 'Post-approve: sheet must switch to the gm x active actions').toBeVisible({
           timeout: 2_000,
         });

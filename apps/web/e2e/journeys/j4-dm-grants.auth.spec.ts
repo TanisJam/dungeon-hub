@@ -21,6 +21,7 @@ import {
   getFixtureWorldId,
   seedJourneyCharacter,
 } from '../helpers/seed-journey-character';
+import { openDmSection } from '../helpers/open-dm-section';
 
 const AUTH_DIR = path.join(__dirname, '../.auth');
 const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
@@ -66,6 +67,12 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       // ── Helper: open grant panel in DM context ────────────────────────────
       await dmPage.goto(charPath, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+
+      // The grant panel is a DM affordance grouped under the collapsed
+      // "Como DM" disclosure (audit F8). This character is active, not
+      // pending_approval, so the disclosure defaults closed — open it before
+      // reaching for "Otorgar recompensa de DM".
+      await openDmSection(dmPage);
 
       // Opening the grant dialog can race with revalidatePath re-hydration: the
       // first click on "Otorgar" sometimes lands before the panel is interactive
@@ -122,6 +129,9 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       // Re-navigate to the char page to get a fresh state (revalidatePath race mitigation)
       await dmPage.goto(charPath, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+      // Fresh navigation re-mounts the sheet, so the "Como DM" disclosure is
+      // closed again — reopen it before the next grant.
+      await openDmSection(dmPage);
 
       // ASSERT: XP increased (best-effort — only if we captured xpBefore)
       if (hasXpTestId && xpBefore !== null && !Number.isNaN(xpBefore)) {
@@ -165,6 +175,7 @@ test.describe('J4 — DM grants: XP + Gold + Item @ 375px', () => {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       await dmPage.goto(charPath, { waitUntil: 'domcontentloaded' });
       await expect(dmPage).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+      await openDmSection(dmPage);
 
       const dialog3 = await openGrantDialog();
 

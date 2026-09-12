@@ -11,6 +11,7 @@
  * Previously they were gated only on the SSR callerRole and never changed client-side.
  */
 
+import { useState } from 'react';
 import { useRole } from '@/lib/use-role';
 import { ApprovalActions } from './approval-actions';
 import { DmGrantPanel } from './dm-grant-panel';
@@ -48,7 +49,18 @@ export function DmAwareAffordances({
   // A non-GM player can never reach isDmMode=true.
   const isDmMode = serverCallerRole === 'gm' && clientRole === 'dm';
 
-  return (
+  /*
+   * useState, not <details open={status === 'pending_approval'}>.
+   *
+   * React writes `open` on every render, so a bare expression there is a
+   * CONTROLLED attribute: the moment approval flips status to 'active', the
+   * re-render forces the section shut under the DM's finger, right after they
+   * used it. Seeding state once gives the pending default without taking the
+   * disclosure away from the person operating it.
+   */
+  const [isOpen, setIsOpen] = useState(status === 'pending_approval');
+
+  const affordances = (
     <>
       {/* Approval actions — only visible in DM mode */}
       <ApprovalActions
@@ -65,6 +77,57 @@ export function DmAwareAffordances({
         worldId={worldId}
       />
     </>
+  );
+
+  // Outside DM mode both children gate themselves to null, so render them bare
+  // and change nothing for a player.
+  if (!isDmMode) return affordances;
+
+  /*
+   * Audit F8: the sheet stacked "Descanso corto / largo", "Devolver a borrador"
+   * and "Otorgar" at equal weight, and pushed the tabs 131px below the fold at
+   * 375px. Two of those are a player's frequent actions; the other two belong to
+   * a different role and one of them is destructive.
+   *
+   * Grouping them under a collapsed "Como DM" gives the sheet one primary
+   * surface again and stops a destructive action sitting one stray tap from the
+   * rest controls — without hiding it behind a menu a DM would have to learn.
+   *
+   * <details> rather than useState: the disclosure is keyboard-operable and
+   * screen-reader-labelled for free, and it works before hydration.
+   */
+  /*
+   * Open when the character is waiting on this DM's decision, closed otherwise.
+   *
+   * "Closed by default" was the choice; this is where that default is wrong. A
+   * DM working an approval queue has a decision to make on THIS sheet, and
+   * making them open the same section on every character is a tap per character
+   * for nothing. Seven DM journeys broke when this shipped closed unconditionally,
+   * which is how I learned approvals are the hot path rather than an edge.
+   *
+   * Grants are discretionary — nothing is waiting on them — so they stay behind
+   * the closed default.
+   */
+
+  return (
+    <details
+      open={isOpen}
+      onToggle={(e) => setIsOpen(e.currentTarget.open)}
+      className="group rounded-md border border-line bg-surface/40"
+    >
+      <summary
+        className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 text-eyebrow text-ink-mute [&::-webkit-details-marker]:hidden"
+      >
+        <span
+          aria-hidden="true"
+          className="inline-block transition-transform duration-150 group-open:rotate-90"
+        >
+          ›
+        </span>
+        Como DM
+      </summary>
+      <div className="space-y-3 px-3 pb-3">{affordances}</div>
+    </details>
   );
 }
 

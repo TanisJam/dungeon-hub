@@ -30,6 +30,7 @@ import {
   getCharacterHp,
   getCharacterSheetSpells,
 } from '../helpers/seed-journey-character';
+import { openDmSection } from '../helpers/open-dm-section';
 
 const AUTH_DIR = path.join(__dirname, '../.auth');
 const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
@@ -150,10 +151,16 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
       // Tapping only while "Otorgar" is hidden is what keeps this safe on a control
       // that toggles: each pass either leaves the page in DM mode or flips it there,
       // and once it is there no further tap is issued.
+      //
+      // Independently of role, "Otorgar" also lives under the collapsed "Como DM"
+      // disclosure (audit F8) — DM Hero is active, not pending_approval, so the
+      // disclosure defaults closed. openDmSection() is idempotent and a no-op
+      // while the section is absent (player mode) or already open.
       await expect(async () => {
         if (!(await otorgarBtn.isVisible().catch(() => false))) {
           await roleSwitcher.click({ timeout: 5_000 }).catch(() => {});
         }
+        await openDmSection(dmPage);
         await expect(otorgarBtn).toBeVisible({ timeout: 2_000 });
       }).toPass({ timeout: 25_000 });
 
@@ -192,6 +199,10 @@ test.describe('J6A — GM+owner: HP max set + role toggle (DM Hero)', () => {
 
       // Toggle back to DM mode
       await roleSwitcher.click();
+      // Toggling out of DM mode unmounts the "Como DM" disclosure entirely (it
+      // only exists in isDmMode); toggling back in re-mounts it closed (status
+      // is still active, not pending_approval), so it needs reopening again.
+      await openDmSection(dmPage);
 
       // DM mode again: "Otorgar" should REAPPEAR
       await expect(otorgarBtn).toBeVisible({ timeout: 5_000 });
@@ -238,6 +249,9 @@ test.describe('J6A2 — GM+owner default load: HP editor must be in DM mode with
 
       // Affordances side: Otorgar must be visible by default (GM defaults to dm) — this
       // confirms the page hydrated into DM mode. Wait for it BEFORE checking the editor.
+      // Otorgar also lives under the collapsed "Como DM" disclosure (audit F8), closed
+      // by default for an active (non-pending) character — open it before checking.
+      await openDmSection(dmPage);
       await expect(
         dmPage.getByRole('button', { name: 'Otorgar recompensa de DM' }),
         'GM should default to DM mode (Otorgar visible) on first load',

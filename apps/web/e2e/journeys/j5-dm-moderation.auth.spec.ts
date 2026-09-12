@@ -24,6 +24,7 @@ import {
   seedJourneyCharacter,
   getCharacterStatus,
 } from '../helpers/seed-journey-character';
+import { openDmSection } from '../helpers/open-dm-section';
 
 const AUTH_DIR = path.join(__dirname, '../.auth');
 const BASE_URL = process.env.WEB_BASE_URL ?? 'http://localhost:3001';
@@ -184,6 +185,11 @@ test.describe('J5 — DM moderation: reject/return-to-draft + DM chrome @ 375px'
       // ── Step 2: Activo pill visible ──────────────────────────────────────
       const activoPill = dmPage.getByText('Activo', { exact: true }).first();
       await expect(activoPill).toBeVisible({ timeout: 10_000 });
+
+      // DM chrome (Otorgar, Devolver a borrador) lives under the collapsed
+      // "Como DM" disclosure since audit F8. This character is active, not
+      // pending_approval, so the disclosure defaults closed.
+      await openDmSection(dmPage);
 
       // ── Step 3: DM chrome — "Otorgar" button visible ─────────────────────
       // DmGrantPanel renders the "Otorgar recompensa de DM" button when callerRole=gm.
