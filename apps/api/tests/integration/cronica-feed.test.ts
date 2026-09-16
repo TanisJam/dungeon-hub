@@ -667,6 +667,20 @@ describe('cronica-feed — keyset cursor pagination (feed-keyset-pagination)', (
           'utf8',
         ).toString('base64url'),
       ],
+      [
+        'JSON with a ts that is not a parseable date',
+        Buffer.from(
+          JSON.stringify({ ts: 'not-a-date', s: 'gremio', id: 'x' }),
+          'utf8',
+        ).toString('base64url'),
+      ],
+      [
+        'JSON with a ts that is a numerically-shaped but invalid instant',
+        Buffer.from(
+          JSON.stringify({ ts: '2024-13-45T99:99:99Z', s: 'gremio', id: 'x' }),
+          'utf8',
+        ).toString('base64url'),
+      ],
     ];
 
     it.each(cases)('%s', async (_label, badCursor) => {
