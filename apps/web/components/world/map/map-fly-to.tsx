@@ -64,9 +64,18 @@ export function MapFlyTo({ target, markerRefs }: MapFlyToProps) {
       if (marker) {
         // Wait for the flyTo animation to finish before opening — opening immediately
         // would anchor the popup under the marker's PRE-fly position.
-        map.once('moveend', () => marker.openPopup());
+        const openOnArrival = () => marker.openPopup();
+        map.once('moveend', openOnArrival);
+        // Deregister on re-run/unmount. Without this the listener outlives its fly:
+        // tap another POI mid-animation and the SECOND fly's moveend fires the FIRST
+        // one's handler, opening the previous POI's popup over the new location.
+        return () => {
+          map.off('moveend', openOnArrival);
+        };
       }
     }
+
+    return undefined;
   }, [target, map, markerRefs]);
 
   return null;
