@@ -66,6 +66,14 @@ export interface WorldEntityShellProps<TRow, TDetail> {
    * Defaults to a pointer at the + button.
    */
   emptyHint?: string;
+  /**
+   * Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — the id of a
+   * row to auto-open on mount (via the same path as a row tap: handleRowTap, so
+   * onLoadDetail still runs). Matched ONLY against the SSR-hydrated `items`; a miss
+   * (unknown id, or a row the caller's own server-side scope excludes) opens nothing —
+   * no fetch, no error, no blank sheet.
+   */
+  initialSelectionId?: string;
 }
 
 /**
@@ -85,6 +93,7 @@ export function WorldEntityShell<TRow, TDetail>({
   onDelete,
   emptyTitle,
   emptyHint,
+  initialSelectionId,
 }: WorldEntityShellProps<TRow, TDetail>) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -168,6 +177,18 @@ export function WorldEntityShell<TRow, TDetail>({
       setDetailLoading(false);
     }
   }
+
+  // Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — runs ONCE on
+  // mount, reusing handleRowTap so onLoadDetail still runs exactly as a real row tap
+  // would. Matched only against SSR `items`; a miss opens nothing (graceful, no error).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally mount-only — re-running on every items/prop change would re-open a sheet the viewer already closed.
+  useEffect(() => {
+    if (!initialSelectionId) return;
+    const match = items.find((row) => (row as { id: string }).id === initialSelectionId);
+    if (match) {
+      void handleRowTap(match);
+    }
+  }, []);
 
   function handleCloseDetail() {
     setDetailOpen(false);

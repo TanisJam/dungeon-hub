@@ -29,7 +29,7 @@
  * REQ-WM-03, REQ-WM-04, REQ-PLACE-TAP-04, REQ-PLACE-BOUNDS-02.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -101,6 +101,12 @@ interface WorldMapLeafletProps {
    * Bubbles to MapClientWrapper to update pendingMoveCoords.
    */
   onMoveDrag: (worldX: number, worldY: number) => void;
+  /**
+   * Deep-link focus target (feed-entity-tap-to-open, MVP #3.10) — id of a POI to fly
+   * to and open the popup for, once, on mount. null when ?poi= is absent or didn't
+   * resolve (page.tsx already did the lookup + graceful-miss handling).
+   */
+  focusPoiId: string | null;
 }
 
 /**
@@ -200,8 +206,14 @@ function MapPopupCloser({ active }: { active: boolean }) {
   return null;
 }
 
-export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt, onEditPoi, movingPoiId, pendingMoveCoords, onStartMove, onMoveDrag }: WorldMapLeafletProps) {
+export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, creating, onCreateAt, onEditPoi, movingPoiId, pendingMoveCoords, onStartMove, onMoveDrag, focusPoiId }: WorldMapLeafletProps) {
   const router = useRouter();
+
+  /**
+   * Marker instances keyed by POI id (feed-entity-tap-to-open, MVP #3.10) — filled by
+   * each <Marker ref>, read by MapFlyTo to call marker.openPopup() after a focus fly.
+   */
+  const markerRefs = useRef<Map<string, L.Marker>>(new Map());
 
   /**
    * POI list drawer state (REQ-PML-DRAWER-01, ADR-1).
@@ -240,6 +252,23 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
   useEffect(() => {
     if (placement || creating || movingPoiId) setDrawerOpen(false);
   }, [placement, creating, movingPoiId]);
+
+  /**
+   * Deep-link initial focus (feed-entity-tap-to-open, MVP #3.10) — flies to and opens
+   * the popup for `focusPoiId`, once. Guarded against firing while placement/creating
+   * is active (a click-catcher is mounted then and markers are non-interactive —
+   * REQ-PLACE-TAP-04/REQ-PWC-CREATE-03). `appliedRef` keeps this to a single shot so a
+   * later router.refresh() (e.g. a DM edit elsewhere) doesn't re-fly to the same POI.
+   */
+  const appliedInitialFocusRef = useRef(false);
+  useEffect(() => {
+    if (appliedInitialFocusRef.current) return;
+    if (!focusPoiId || placement || creating) return;
+    const poi = pois.find((p) => p.id === focusPoiId && p.worldX != null && p.worldY != null);
+    if (!poi) return;
+    appliedInitialFocusRef.current = true;
+    setFlyTarget({ x: poi.worldX!, y: poi.worldY!, poiId: poi.id, openPopup: true });
+  }, [focusPoiId, placement, creating, pois]);
 
   // commitCoords was used by the now-removed drag handler (Slice 3).
   // Place-mode tap (PlaceModeClickCatcher) calls updatePoi directly inline.
@@ -337,6 +366,12 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
             return (
               <Marker
                 key={p.id}
+                ref={(instance) => {
+                  // feed-entity-tap-to-open: register/deregister this marker so
+                  // MapFlyTo can resolve target.poiId → marker.openPopup().
+                  if (instance) markerRefs.current.set(p.id, instance);
+                  else markerRefs.current.delete(p.id);
+                }}
                 position={markerPos}
                 icon={createMarkerIcon(p.status, isMoving)}
                 draggable={isMoving}
@@ -422,7 +457,7 @@ export function WorldMapLeaflet({ supabaseUrl, pois, effectiveView, placement, c
          * Fresh flyTarget object per POI row tap → re-fly on same POI works.
          * REQ-PML-FLYTO-01, REQ-PML-FLYTO-02.
          */}
-        <MapFlyTo target={flyTarget} />
+        <MapFlyTo target={flyTarget} markerRefs={markerRefs} />
 
         {/*
          * MapPopupCloser — closes all open popups when move-mode activates (B2 Refinement 2).

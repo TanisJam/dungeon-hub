@@ -53,6 +53,12 @@ interface FactionClientWrapperProps {
   worldId: string;
   effectiveView: EffectiveView;
   initialFactions: FactionRow[];
+  /**
+   * Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — from
+   * ?faccion=<id> on /herramientas/facciones, seeded by the guild feed's faction
+   * ref card (DM-only, this route self-gates with notFound() for players).
+   */
+  focusFactionId?: string;
   /** Optional action bundle for catalog/testing; defaults to real server actions. */
   actions?: FactionWrapperActions;
 }
@@ -61,6 +67,7 @@ export function FactionClientWrapper({
   worldId,
   effectiveView,
   initialFactions,
+  focusFactionId,
   actions,
 }: FactionClientWrapperProps) {
   const a = actions ?? DEFAULT_FACTION_ACTIONS;
@@ -130,6 +137,7 @@ export function FactionClientWrapper({
       renderDetail={renderDetail}
       renderForm={renderForm}
       onDelete={onDelete}
+      initialSelectionId={focusFactionId}
     />
   );
 }

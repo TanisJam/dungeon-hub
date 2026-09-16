@@ -16,12 +16,21 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 
 // Mock the Server Action — sealContribution is the only value FeedCard pulls
 // from this module at runtime (FeedItem/FeedSource are type-only imports,
 // erased at compile time, so they need no mock counterpart here).
 vi.mock('@/app/bitacora/actions', () => ({
   sealContribution: vi.fn(),
+}));
+
+// Mock next/link — render as plain anchor (same convention as
+// view-only-section-sheet.test.tsx).
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: { href: string; children: ReactNode; [key: string]: unknown }) => (
+    <a href={href} {...rest}>{children}</a>
+  ),
 }));
 
 import { FeedCard } from './feed-card';
@@ -65,6 +74,30 @@ const noRefFeedItem: FeedItem = {
   refEntityKind: null,
   refEntityId: null,
   refEntityName: null,
+};
+
+const factionFeedItem: FeedItem = {
+  ...baseFeedItem,
+  refEntityKind: 'faction',
+  refEntityId: 'uuid-los-cuervos',
+  refEntitySource: 'world',
+  refEntityName: 'Los Cuervos',
+};
+
+const locationFeedItem: FeedItem = {
+  ...baseFeedItem,
+  refEntityKind: 'location',
+  refEntityId: 'uuid-poi-taberna',
+  refEntitySource: 'world',
+  refEntityName: 'La Taberna del Ancla',
+};
+
+const unknownKindFeedItem: FeedItem = {
+  ...baseFeedItem,
+  refEntityKind: 'quest',
+  refEntityId: 'uuid-quest-01',
+  refEntitySource: 'world',
+  refEntityName: 'Encontrar el amuleto',
 };
 
 // ---------------------------------------------------------------------------
@@ -114,6 +147,99 @@ describe('FeedCard — linked-entity card', () => {
 
     expect(screen.getByText('Bestiario')).toBeTruthy();
     expect(screen.getByText('Goblin')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tap-to-open (feed-entity-tap-to-open, MVP #3.10) — role-gated destinations.
+// ---------------------------------------------------------------------------
+
+describe('FeedCard — tap-to-open destinations', () => {
+  it('bestiary ref renders a link to /compendium/monsters with slug + source (any viewer)', () => {
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    const link = screen.getByRole('link', { name: 'Ver Bestiario: Goblin' });
+    expect(link.getAttribute('href')).toBe('/compendium/monsters?slug=goblin&source=MM&q=Goblin');
+  });
+
+  it('the bestiary link narrows the destination fetch by name', () => {
+    // The destination seeds its selection from an SSR fetch of limit=50 over a
+    // 2896-row bestiary (Goblin sits at #1175 alphabetically). Without ?q= the
+    // slug is simply not in the rows the seeding searches, so the link would open
+    // the list and nothing else for all but the first ~50 monsters.
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    const href = screen.getByRole('link', { name: 'Ver Bestiario: Goblin' }).getAttribute('href');
+    expect(new URLSearchParams(href!.split('?')[1]).get('q')).toBe('Goblin');
+  });
+
+  it('location ref renders a link to /mapa?poi=<id> (any viewer)', () => {
+    render(<FeedCard item={locationFeedItem} effectiveView="player" />);
+
+    const link = screen.getByRole('link', { name: 'Ver Lugar: La Taberna del Ancla' });
+    expect(link.getAttribute('href')).toBe('/mapa?poi=uuid-poi-taberna');
+  });
+
+  it('npc ref with effectiveView="player" renders NO link (DM-only destination, ADR-6)', () => {
+    render(<FeedCard item={npcFeedItem} effectiveView="player" />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    // The card itself is still shown — just inert, exactly like today.
+    expect(screen.getByText('Aldeana Marta')).toBeTruthy();
+  });
+
+  it('npc ref with effectiveView="dm" renders a link to /herramientas/npcs?npc=<id>', () => {
+    render(<FeedCard item={npcFeedItem} effectiveView="dm" />);
+
+    const link = screen.getByRole('link', { name: 'Ver NPC: Aldeana Marta' });
+    expect(link.getAttribute('href')).toBe('/herramientas/npcs?npc=uuid-aldeana-marta');
+  });
+
+  it('faction ref with effectiveView="player" renders NO link (DM-only destination, ADR-6)', () => {
+    render(<FeedCard item={factionFeedItem} effectiveView="player" />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByText('Los Cuervos')).toBeTruthy();
+  });
+
+  it('faction ref with effectiveView="dm" renders a link to /herramientas/facciones?faccion=<id>', () => {
+    render(<FeedCard item={factionFeedItem} effectiveView="dm" />);
+
+    const link = screen.getByRole('link', { name: 'Ver Facción: Los Cuervos' });
+    expect(link.getAttribute('href')).toBe('/herramientas/facciones?faccion=uuid-los-cuervos');
+  });
+
+  it('a ref with refEntityName: null renders no card at all (no regression)', () => {
+    render(<FeedCard item={noRefFeedItem} effectiveView="dm" />);
+
+    expect(document.querySelector('[data-testid="entity-card"]')).toBeNull();
+  });
+
+  it('unknown kind renders inert — card shown, no link', () => {
+    render(<FeedCard item={unknownKindFeedItem} effectiveView="dm" />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByText('Encontrar el amuleto')).toBeTruthy();
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard?.tagName).toBe('DIV');
+  });
+
+  it('the link is keyboard-focusable and carries a visible focus ring class', () => {
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="dm" />);
+
+    const link = screen.getByRole('link', { name: 'Ver Bestiario: Goblin' });
+    link.focus();
+    expect(document.activeElement).toBe(link);
+    expect(link.className).toContain('focus-visible:ring-2');
+  });
+
+  it('the inert card keeps min-h-[44px] identical to the non-interactive branch', () => {
+    render(<FeedCard item={npcFeedItem} effectiveView="player" />);
+
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard).not.toBeNull();
+    expect(entityCard?.className).toContain('min-h-[44px]');
+    expect(entityCard?.tagName).toBe('DIV');
   });
 });
 
@@ -189,5 +315,43 @@ describe('FeedCard — seal controls', () => {
     });
     // No optimistic update on failure — status pill must not appear.
     expect(screen.queryByText('Confirmado')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Touch affordance (CLAUDE.md §2 — mobile-first, no hover-dependent flows)
+// ---------------------------------------------------------------------------
+
+describe('FeedCard entity card — touch affordance', () => {
+  it('a tappable entity card carries a visible marker a phone can see', () => {
+    // The card signals tappability with hover:bg-paper, which does not exist on
+    // touch. Without a hover-independent marker the linked card is pixel-identical
+    // to the inert one, so a player has no way to know it opens anything.
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard).not.toBeNull();
+    expect(entityCard!.tagName).toBe('A');
+    expect(entityCard!.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('the inert entity card carries no affordance — it promises nothing', () => {
+    // npc + player has no destination (/herramientas/npcs calls notFound() for
+    // players), so the card must stay inert AND look inert.
+    render(<FeedCard item={npcFeedItem} effectiveView="player" />);
+
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard).not.toBeNull();
+    expect(entityCard!.tagName).not.toBe('A');
+    expect(entityCard!.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('the affordance stays out of the accessible name', () => {
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    // aria-label wins over content, and the marker is aria-hidden on top of that:
+    // a screen reader announces the entity, never a stray chevron.
+    const link = screen.getByLabelText('Ver Bestiario: Goblin');
+    expect(link.getAttribute('data-testid')).toBe('entity-card');
   });
 });

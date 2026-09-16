@@ -69,6 +69,12 @@ interface MapClientWrapperProps {
    * Forwarded to createWorldPoi server action.
    */
   worldId: string;
+  /**
+   * Deep-link focus target (feed-entity-tap-to-open, MVP #3.10) — the id of a POI to
+   * fly to and open the popup for on mount. Non-null iff ?poi=<id> resolved to a known,
+   * placed POI (page.tsx already did the lookup + graceful-miss handling).
+   */
+  focusPoiId?: string | null;
 }
 
 /**
@@ -181,6 +187,7 @@ export function MapClientWrapper({
   effectiveView,
   placement,
   worldId,
+  focusPoiId,
 }: MapClientWrapperProps) {
   const router = useRouter();
 
@@ -452,6 +459,7 @@ export function MapClientWrapper({
         pendingMoveCoords={pendingMoveCoords}
         onStartMove={handleStartMove}
         onMoveDrag={handleMoveDrag}
+        focusPoiId={focusPoiId ?? null}
       />
     </>
   );

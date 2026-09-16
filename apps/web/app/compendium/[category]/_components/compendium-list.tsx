@@ -38,6 +38,15 @@ interface CompendiumListProps {
    */
   initialQuery?: string;
   /**
+   * Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — from the guild
+   * bitácora feed's bestiary ref card via ?slug=&source=. Seeds `selected` on mount
+   * ONLY when a row in `initialRows` matches; a miss (the campaign's rulesProfile.sources
+   * legitimately excludes the linked monster) opens nothing — no fetch, no error.
+   */
+  initialSelectionSlug?: string;
+  /** Paired with initialSelectionSlug — omitted matches skip the source check. */
+  initialSelectionSource?: string;
+  /**
    * Extra per-call filters merged into activeFilters and forwarded to searchCompendium.
    * Callers that do not pass this prop receive the current behavior unchanged.
    * REQ-MERC-SURF-01, ADR-3: Mercado passes { magic: 'false' } to pin mundane-only.
@@ -67,6 +76,8 @@ export function CompendiumList({
   initialRows,
   total: initialTotal,
   initialQuery = '',
+  initialSelectionSlug,
+  initialSelectionSource,
   extraFilters = {},
   shopContext,
 }: CompendiumListProps) {
@@ -83,6 +94,22 @@ export function CompendiumList({
   const [selected, setSelected] = useState<unknown | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const reqIdRef = useRef(0);
+
+  // Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — runs ONCE on
+  // mount against the SSR-fetched initialRows only (no extra fetch). A miss (row not
+  // in the campaign-scoped first page) opens nothing — graceful, no error, no blank sheet.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally mount-only — re-running on every initialRows/prop change would re-open a sheet the viewer already closed.
+  useEffect(() => {
+    if (!initialSelectionSlug) return;
+    const match = initialRows.find((row) => {
+      const r = row as { slug?: string; source?: string };
+      return (
+        r.slug === initialSelectionSlug &&
+        (!initialSelectionSource || r.source === initialSelectionSource)
+      );
+    });
+    if (match) setSelected(match);
+  }, []);
 
   // Active filters passed to searchCompendium: extra pinned filters (e.g. magic=false
   // from /mercado) merged with dynamic per-request filters (e.g. type picker).

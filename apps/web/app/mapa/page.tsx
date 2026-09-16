@@ -26,15 +26,22 @@ import { listAllPois } from './actions';
  *
  * Mapa has a single entity type (hexes/ubicaciones) so NO sub-nav is needed — ADR-4 comment.
  *
+ * feed-entity-tap-to-open (MVP #3.10): ?poi=<id> (from the guild bitácora feed's
+ * location ref card, any viewer) flies to and opens that POI's popup on mount.
+ * DISTINCT from ?place= (DM tap-to-place/move trigger) — reusing that param would
+ * misfire the placement flow, since placement disables normal marker interaction.
+ * Self-healing like ?place=: an id that doesn't resolve (deleted, or cascade-filtered
+ * out for a player — unexplored hex / status:'unknown') → null, no error, no stuck state.
+ *
  * REQ-MAP-01, REQ-MAP-02, REQ-GATE-01, REQ-WM-02, REQ-WM-03.
  */
 export default async function MapaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; place?: string }>;
+  searchParams: Promise<{ view?: string; place?: string; poi?: string }>;
 }) {
   // Resolve searchParams first (Next.js 15 async searchParams)
-  const { view, place } = await searchParams;
+  const { view, place, poi } = await searchParams;
   // REQ-PWC-IA-01: map is the default view — no ?view or ?view=mapa → mapa; ?view=lista → lista.
   const activeMapView = view === 'lista' ? 'lista' : 'mapa';
 
@@ -113,6 +120,14 @@ export default async function MapaPage({
       ? (pois.find((p) => p.id === place) ?? null)
       : null;
 
+  // Resolve focus target from ?poi=<poiId> (feed-entity-tap-to-open, MVP #3.10).
+  // Only meaningful when view==='mapa'. Requires resolvable worldX/worldY — a POI without
+  // placed coords can't be flown to, so it degrades exactly like a missing id (null).
+  const focusPoiId =
+    activeMapView === 'mapa' && poi
+      ? (pois.find((p) => p.id === poi && p.worldX != null && p.worldY != null)?.id ?? null)
+      : null;
+
   return (
     <AppShell
       title="Mapa"
@@ -136,6 +151,7 @@ export default async function MapaPage({
           effectiveView={effectiveView}
           placement={placementTarget}
           worldId={aw.id}
+          focusPoiId={focusPoiId}
         />
       ) : (
         <HexClientWrapper
