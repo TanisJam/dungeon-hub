@@ -306,3 +306,41 @@ describe('FeedCard — seal controls', () => {
     expect(screen.queryByText('Confirmado')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Touch affordance (CLAUDE.md §2 — mobile-first, no hover-dependent flows)
+// ---------------------------------------------------------------------------
+
+describe('FeedCard entity card — touch affordance', () => {
+  it('a tappable entity card carries a visible marker a phone can see', () => {
+    // The card signals tappability with hover:bg-paper, which does not exist on
+    // touch. Without a hover-independent marker the linked card is pixel-identical
+    // to the inert one, so a player has no way to know it opens anything.
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard).not.toBeNull();
+    expect(entityCard!.tagName).toBe('A');
+    expect(entityCard!.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('the inert entity card carries no affordance — it promises nothing', () => {
+    // npc + player has no destination (/herramientas/npcs calls notFound() for
+    // players), so the card must stay inert AND look inert.
+    render(<FeedCard item={npcFeedItem} effectiveView="player" />);
+
+    const entityCard = document.querySelector('[data-testid="entity-card"]');
+    expect(entityCard).not.toBeNull();
+    expect(entityCard!.tagName).not.toBe('A');
+    expect(entityCard!.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('the affordance stays out of the accessible name', () => {
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    // aria-label wins over content, and the marker is aria-hidden on top of that:
+    // a screen reader announces the entity, never a stray chevron.
+    const link = screen.getByLabelText('Ver Bestiario: Goblin');
+    expect(link.getAttribute('data-testid')).toBe('entity-card');
+  });
+});

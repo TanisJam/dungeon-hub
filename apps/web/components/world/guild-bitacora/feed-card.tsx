@@ -247,10 +247,18 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
               <Link
                 href={href}
                 data-testid="entity-card"
-                aria-label={`Ver ${kindLabel}: ${item.refEntityName}`}
+                aria-label={kindLabel ? `Ver ${kindLabel}: ${item.refEntityName}` : `Ver ${item.refEntityName}`}
                 className="flex w-full items-center gap-2 rounded-md border border-line bg-paper-soft px-3 min-h-[44px] transition-colors hover:bg-paper focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 {inner}
+                {/* Touch affordance. hover:bg-paper above is a desktop-only signal,
+                    and a phone has no hover — without this the tappable card is
+                    pixel-identical to the inert one (CLAUDE.md §2: no
+                    hover-dependent flows). Decorative: the accessible name
+                    already comes from aria-label. */}
+                <span aria-hidden="true" className="ml-auto shrink-0 text-sm text-ink-soft">
+                  ›
+                </span>
               </Link>
             ) : (
               <div
