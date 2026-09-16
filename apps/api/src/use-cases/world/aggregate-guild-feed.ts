@@ -34,6 +34,18 @@
  * When `cursor` is provided it wins and the offset branch is not used. `nextCursor`
  * is ALWAYS returned (both paths) so a client can migrate from offset to cursor
  * paging by switching which field it reads.
+ *
+ * CAVEAT — nextCursor computed from the offset path: it is a best-effort migration
+ * aid, not a total-order guarantee. The offset branch's merge has no tiebreak (see
+ * above), so the row it hands to encodeFeedCursor is not necessarily the boundary
+ * row the total order would have chosen among exact-`sortAt` ties. Paging with
+ * `offset` and then switching to the `nextCursor` it returned can therefore skip a
+ * row that ties the boundary row's exact `sortAt` but would sort before it in the
+ * total order — the unstable merge placed it after the boundary and never
+ * delivered it, and the cursor predicate then treats it as already-seen. This only
+ * matters for a client that mixes both pagination styles mid-feed; starting from
+ * page one with `cursor` (never touching `offset`) has no such caveat, since every
+ * page after the first is then computed entirely under the total order.
  */
 
 import { and, arrayContains, desc, eq } from 'drizzle-orm';
@@ -386,7 +398,9 @@ export async function aggregateGuildFeed(
   const pageCount = sliced.length;
   // feed-keyset-pagination: ALWAYS populate nextCursor (both paths) from the
   // actual last row of this page, so a client can migrate from offset to
-  // cursor paging by switching which field it reads.
+  // cursor paging by switching which field it reads. From the offset branch
+  // this is a best-effort migration aid, not a total-order guarantee — see
+  // the CAVEAT in the module doc comment above.
   const nextCursor = hasMore && sliced.length > 0 ? encodeFeedCursor(sliced[sliced.length - 1]!) : null;
 
   // ── Entity name resolution (guild-feed-linked-entity-refs) ────────────────
