@@ -91,6 +91,22 @@ export function decodeFeedCursor(raw: string): FeedCursor | null {
   if (typeof id !== 'string' || id.length === 0) return null;
   if (typeof s !== 'string' || !VALID_FEED_SOURCES.has(s)) return null;
 
+  // `ts` must parse to a real instant — a structurally valid but unparseable
+  // (or out-of-range) date string must never reach buildFeedCursorCondition's
+  // `new Date(cursor.ts)`, because the pg driver serializes a Date via
+  // toISOString(), which throws RangeError on an Invalid Date — a 500 on
+  // client input, exactly what this decoder exists to rule out.
+  const parsedTs = new Date(ts);
+  if (Number.isNaN(parsedTs.getTime())) return null;
+  // Exact round-trip, not just "parseable": encodeFeedCursor always writes
+  // toISOString() output, and cursors are opaque tokens the client only ever
+  // round-trips back to us (never authors by hand) — so a legitimate cursor's
+  // `ts` is always already in that exact canonical form. Requiring the match
+  // rejects any hand-crafted timestamp spelling (missing milliseconds, an
+  // explicit +00:00 offset, etc.) without rejecting anything we ourselves
+  // ever issue.
+  if (parsedTs.toISOString() !== ts) return null;
+
   return { ts, s: s as FeedSource, id };
 }
 
