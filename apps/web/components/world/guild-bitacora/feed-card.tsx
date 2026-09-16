@@ -106,6 +106,7 @@ function destinationFor(
   id: string | null | undefined,
   source: string | null | undefined,
   effectiveView: 'dm' | 'player',
+  name?: string | null,
 ): string | null {
   if (!id) return null;
 
@@ -113,6 +114,12 @@ function destinationFor(
     case 'bestiary': {
       const params = new URLSearchParams({ slug: id });
       if (source) params.set('source', source);
+      // Carry the name as ?q= too. The destination seeds its selection from the
+      // SSR fetch, which is limit=50 over a 2896-row bestiary — without narrowing
+      // that fetch the slug is absent from it for ~98% of monsters and the link
+      // opens the list and nothing else. ?q= prefilters the same fetch by name,
+      // so the linked row is on the page the seeding actually searches.
+      if (name) params.set('q', name);
       return `/compendium/monsters?${params.toString()}`;
     }
     case 'location':
@@ -231,7 +238,13 @@ export function FeedCard({ item, effectiveView = 'player' }: FeedCardProps) {
       {item.refEntityName
         ? (() => {
             const kindLabel = item.refEntityKind ? ENTITY_KIND_LABEL[item.refEntityKind] : undefined;
-            const href = destinationFor(item.refEntityKind, item.refEntityId, item.refEntitySource, effectiveView);
+            const href = destinationFor(
+              item.refEntityKind,
+              item.refEntityId,
+              item.refEntitySource,
+              effectiveView,
+              item.refEntityName,
+            );
             const inner = (
               <>
                 {kindLabel ? (

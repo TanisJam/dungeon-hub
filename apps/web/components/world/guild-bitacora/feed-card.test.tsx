@@ -159,7 +159,18 @@ describe('FeedCard — tap-to-open destinations', () => {
     render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
 
     const link = screen.getByRole('link', { name: 'Ver Bestiario: Goblin' });
-    expect(link.getAttribute('href')).toBe('/compendium/monsters?slug=goblin&source=MM');
+    expect(link.getAttribute('href')).toBe('/compendium/monsters?slug=goblin&source=MM&q=Goblin');
+  });
+
+  it('the bestiary link narrows the destination fetch by name', () => {
+    // The destination seeds its selection from an SSR fetch of limit=50 over a
+    // 2896-row bestiary (Goblin sits at #1175 alphabetically). Without ?q= the
+    // slug is simply not in the rows the seeding searches, so the link would open
+    // the list and nothing else for all but the first ~50 monsters.
+    render(<FeedCard item={bestiaryFeedItem} effectiveView="player" />);
+
+    const href = screen.getByRole('link', { name: 'Ver Bestiario: Goblin' }).getAttribute('href');
+    expect(new URLSearchParams(href!.split('?')[1]).get('q')).toBe('Goblin');
   });
 
   it('location ref renders a link to /mapa?poi=<id> (any viewer)', () => {
