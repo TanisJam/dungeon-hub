@@ -10,7 +10,9 @@
  * Renders:
  *   - TagFilter pinned under the AppShell header
  *   - Vertical stack of FeedCard (full-bleed at 375px, mobile-first)
- *   - "Load more" pagination (offset-based, nextOffset from API)
+ *   - "Load more" pagination (keyset cursor-based, nextCursor from API —
+ *     feed-keyset-pagination: offset pagination shifted rows under concurrent
+ *     writes, and editing a journal entry re-sorted it to the top)
  *   - "Aportar" button (player entry point for ContributionComposer)
  *   - V3Empty when items.length === 0 after load
  *
@@ -19,11 +21,12 @@
  *   source        — optional facet filter ('gremio' | 'dm' | 'evento')
  *   initialItems  — SSR initial rows (avoids client waterfall on first render)
  *   initialTag    — active tag from ?tag= URL param (optional)
- *   initialNextOffset — nextOffset from SSR fetch (optional)
+ *   initialNextCursor — opaque nextCursor from SSR fetch (optional). Never
+ *                       parsed or constructed — round-tripped verbatim.
  *   effectiveView — 'dm' | 'player' (passed through from page)
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { V3Empty, V3Sheet } from '@/components/ui';
 import { listGuildBitacoraFeed } from '@/app/bitacora/actions';
 import type { FeedItem, FeedSource } from '@/app/bitacora/actions';
@@ -40,7 +43,7 @@ interface GuildBitacoraFeedProps {
   source?: FeedSource;
   initialItems: FeedItem[];
   initialTag?: string;
-  initialNextOffset?: number | null;
+  initialNextCursor?: string | null;
   effectiveView?: 'dm' | 'player';
 }
 
@@ -53,46 +56,54 @@ export function GuildBitacoraFeed({
   source,
   initialItems,
   initialTag,
-  initialNextOffset = null,
+  initialNextCursor = null,
   effectiveView = 'player',
 }: GuildBitacoraFeedProps) {
   const [items, setItems] = useState<FeedItem[]>(initialItems);
   const [activeTag, setActiveTag] = useState<string | null>(initialTag ?? null);
-  const [nextOffset, setNextOffset] = useState<number | null>(initialNextOffset);
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [loading, setLoading] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
-  // Re-fetch from offset=0 when tag changes
+  // Guards against a late response (e.g. a load-more still in flight when the
+  // tag changes) appending rows that belong to a stale filter — only the
+  // request that is still the latest one gets to update state.
+  const requestIdRef = useRef(0);
+
+  // Re-fetch from the first page (no cursor) when tag changes
   async function handleTagChange(tag: string | null) {
+    const requestId = ++requestIdRef.current;
     setActiveTag(tag);
     setLoading(true);
     try {
       const result = await listGuildBitacoraFeed(worldId, {
         ...(tag !== null ? { tag } : {}),
         ...(source ? { source } : {}),
-        offset: 0,
       });
+      if (requestId !== requestIdRef.current) return;
       setItems(result.rows);
-      setNextOffset(result.nextOffset);
+      setNextCursor(result.nextCursor);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
-  // Load more (append to list)
+  // Load more (append to list) — sends the opaque cursor verbatim.
   async function handleLoadMore() {
-    if (nextOffset === null || loading) return;
+    if (nextCursor === null || loading) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const result = await listGuildBitacoraFeed(worldId, {
         ...(activeTag !== null ? { tag: activeTag } : {}),
         ...(source ? { source } : {}),
-        offset: nextOffset,
+        cursor: nextCursor,
       });
+      if (requestId !== requestIdRef.current) return;
       setItems((prev) => [...prev, ...result.rows]);
-      setNextOffset(result.nextOffset);
+      setNextCursor(result.nextCursor);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
@@ -123,7 +134,7 @@ export function GuildBitacoraFeed({
       )}
 
       {/* Load more */}
-      {nextOffset !== null && (
+      {nextCursor !== null && (
         <button
           type="button"
           onClick={handleLoadMore}
