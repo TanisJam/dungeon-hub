@@ -10,8 +10,14 @@ vi.mock('../_config/registry', () => ({
   },
 }));
 
-// Mock the detail sheet (not under test here).
-vi.mock('./detail-sheet', () => ({ DetailSheet: () => null }));
+// Mock the detail sheet (not under test here) — renders the selected row's slug
+// so seeding tests can assert whether the sheet opened without depending on
+// DetailSheet's real fetch-on-tap implementation.
+vi.mock('./detail-sheet', () => ({
+  DetailSheet: ({ row }: { row: { slug: string } }) => (
+    <div data-testid="detail-sheet">{row.slug}</div>
+  ),
+}));
 
 // Mock the server action.
 vi.mock('../actions', () => ({ searchCompendium: vi.fn() }));
@@ -79,5 +85,70 @@ describe('CompendiumList — item type filter (#3.4)', () => {
     // SSR row reappears, no new filtered search fired (empty q + empty filter short-circuits)
     await waitFor(() => expect(screen.getByText('Club')).toBeTruthy());
     expect(searchCompendium).not.toHaveBeenCalled();
+  });
+});
+
+describe('CompendiumList — deep-link initial selection (feed-entity-tap-to-open, MVP #3.10)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(searchCompendium).mockResolvedValue({ rows: [], total: 0 });
+  });
+
+  it('opens the detail sheet when initialSelectionSlug+Source match a row in initialRows', () => {
+    render(
+      <CompendiumList
+        category="items"
+        scope={SCOPE}
+        worldId={null}
+        accessToken="t"
+        initialRows={[{ slug: 'club', name: 'Club', source: 'PHB' }]}
+        total={1}
+        initialSelectionSlug="club"
+        initialSelectionSource="PHB"
+      />,
+    );
+
+    expect(screen.getByTestId('detail-sheet')).toBeTruthy();
+    expect(screen.getByTestId('detail-sheet').textContent).toBe('club');
+  });
+
+  it('matches on slug alone when initialSelectionSource is omitted', () => {
+    render(
+      <CompendiumList
+        category="items"
+        scope={SCOPE}
+        worldId={null}
+        accessToken="t"
+        initialRows={[{ slug: 'club', name: 'Club', source: 'PHB' }]}
+        total={1}
+        initialSelectionSlug="club"
+      />,
+    );
+
+    expect(screen.getByTestId('detail-sheet')).toBeTruthy();
+  });
+
+  it('opens NOTHING when initialSelectionSlug matches no row (graceful miss — out-of-sources monster)', () => {
+    render(
+      <CompendiumList
+        category="items"
+        scope={SCOPE}
+        worldId={null}
+        accessToken="t"
+        initialRows={[{ slug: 'club', name: 'Club', source: 'PHB' }]}
+        total={1}
+        initialSelectionSlug="does-not-exist"
+        initialSelectionSource="PHB"
+      />,
+    );
+
+    expect(screen.queryByTestId('detail-sheet')).toBeNull();
+    // No error, plain list renders normally.
+    expect(screen.getByText('Club')).toBeTruthy();
+  });
+
+  it('opens nothing when initialSelectionSlug is absent (unchanged default behavior)', () => {
+    renderList('items');
+    expect(screen.queryByTestId('detail-sheet')).toBeNull();
   });
 });

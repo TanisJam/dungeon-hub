@@ -25,7 +25,7 @@ type ListEnvelope = { data: unknown[]; total: number } | null;
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ campaign?: string; q?: string }>;
+  searchParams: Promise<{ campaign?: string; q?: string; slug?: string; source?: string }>;
 }
 
 /**
@@ -34,13 +34,18 @@ interface CategoryPageProps {
  * ADR-2: validates category via CATEGORY_CONFIG; unknown → notFound() (404).
  * REQ-CBROWSE-02: initial server-side fetch for first 50 rows before hydration.
  * REQ-CBROWSE-05: always passes ?campaign= so API enforces rulesProfile.sources filter.
+ * feed-entity-tap-to-open (MVP #3.10): an incoming ?slug=&source= (from the guild
+ * bitácora feed's bestiary ref card) seeds CompendiumList's initial selection.
+ * Untrusted input — it only SELECTS among rows the campaign-scoped SSR fetch already
+ * returned; a slug not present in that fetch (out-of-sources monster) opens nothing.
  */
 export default async function CompendiumCategoryPage({
   params,
   searchParams,
 }: CategoryPageProps) {
   const { category } = await params;
-  const { campaign: campaignIdParam, q: initialQuery } = await searchParams;
+  const { campaign: campaignIdParam, q: initialQuery, slug: initialSelectionSlug, source: initialSelectionSource } =
+    await searchParams;
 
   // ADR-2: validate category against registry — unknown slug → 404
   if (!(category in CATEGORY_CONFIG)) {
@@ -110,6 +115,8 @@ export default async function CompendiumCategoryPage({
         initialRows={initialRows}
         total={total}
         initialQuery={trimmedInitialQuery}
+        initialSelectionSlug={initialSelectionSlug}
+        initialSelectionSource={initialSelectionSource}
       />
     </AppShell>
   );
