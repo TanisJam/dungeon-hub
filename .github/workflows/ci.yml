@@ -71,6 +71,24 @@ jobs:
       - name: Test bot
         run: pnpm --filter @dungeon-hub/bot test
 
+      # compendium-import's integration suites gate on the dataset being on disk
+      # (`describe.skipIf(!existsSync(DATA_DIR))`). Without these two steps this
+      # job silently skipped 34 of its 112 tests on every run — three whole files
+      # plus races.test.ts's real-data block — and reported green. The importer is
+      # the boundary CLAUDE.md §10 calls buggy upstream data, so those were the
+      # tests least safe to lose.
+      #
+      # Same cache and same key as `integration` and `e2e`, so a PR that warmed it
+      # in either gets a hit here. All 34 pass once the data is present.
+      - name: Cache the 5etools dataset
+        uses: actions/cache@v5
+        with:
+          path: data/5etools
+          key: 5etools-${{ hashFiles('scripts/fetch-5etools.sh') }}
+
+      - name: Fetch the 5etools dataset
+        run: ./scripts/fetch-5etools.sh
+
       - name: Test compendium-import
         run: pnpm --filter @dungeon-hub/compendium-import test
 
