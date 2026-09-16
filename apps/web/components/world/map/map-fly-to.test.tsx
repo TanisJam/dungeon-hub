@@ -40,7 +40,9 @@ function createFakeMap() {
     fireMoveEnd() {
       const live = [...moveEndHandlers];
       moveEndHandlers.clear();
-      live.forEach((h) => h());
+      live.forEach((h) => {
+        h();
+      });
     },
     get pendingMoveEndCount() {
       return moveEndHandlers.size;
