@@ -102,7 +102,33 @@ docker exec dh-api-candidate node -e \
 Expect `{"status":"ok","db":"up",...}`. A route added in this deploy should answer
 `401` unauthenticated, while the same path against the live `dungeon-hub-api` still
 answers `404` — that contrast is the clearest proof the new code is really in the
-image. Remove the container when you are done: `docker rm -f dh-api-candidate`.
+image.
+
+**That proof does not generalise.** It only works when the release adds a brand-new
+route. A release that changes an existing route — a new query param, a new response
+field, a bugfix inside a handler — answers `401` on both the candidate and the live
+container, because auth runs before validation: the contrast disappears even though
+the code genuinely differs. Reaching for it anyway just tells you the release didn't
+add a route, not that the new code is present.
+
+The deploy-agnostic technique: pick a file the release actually adds or changes, and
+check for its literal presence inside the container's filesystem — the image ships
+mostly TypeScript source (see "Layout on the VM" above), so this works whether or not
+the change touches a route at all:
+
+```bash
+docker exec dh-api-candidate node -e \
+  'console.log(require("fs").existsSync("/app/apps/api/src/use-cases/world/feed-cursor.ts"))'
+```
+
+Run the same check against the live container **before** the swap as your baseline —
+it should answer `false` (absent) if the file is genuinely new — then re-run it against
+the swapped container afterward and expect `true` (present). This is what verified the
+2026-09-16 keyset-pagination deploy, which added a new query param (`?cursor=`) to an
+existing route (`GET /cronica-feed`) rather than a new route, so the `401`-vs-`404`
+check would have shown nothing.
+
+Remove the container when you are done: `docker rm -f dh-api-candidate`.
 
 **5. Swap.** Only after the candidate is verified:
 
