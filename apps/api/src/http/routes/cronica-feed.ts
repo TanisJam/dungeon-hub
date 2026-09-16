@@ -9,7 +9,10 @@
  *     tag?    — filter by KNOWLEDGE_TAGS tag (validated, 400 if invalid)
  *     source? — 'gremio' | 'dm' | 'evento' (facet filter)
  *     limit?  — default 50, max 200
- *     offset? — default 0
+ *     offset? — @deprecated default 0. Retained only for the manual-API-deploy
+ *               window (feed-keyset-pagination). Ignored when `cursor` is present.
+ *     cursor? — feed-keyset-pagination: opaque token from a previous page's
+ *               `nextCursor`. Wins over `offset` when present.
  *
  * Auth: world member required (403 for non-members).
  * Visibility: each source filtered by its OWN helper BEFORE merge (ADR-3 — no leak).
@@ -18,7 +21,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { getWorldAccess } from '../../use-cases/auth/get-world-access.js';
-import { aggregateGuildFeed, type FeedSource } from '../../use-cases/world/aggregate-guild-feed.js';
+import {
+  aggregateGuildFeed,
+  decodeFeedCursor,
+  type FeedSource,
+} from '../../use-cases/world/aggregate-guild-feed.js';
 import { isKnowledgeTag } from '@dungeon-hub/domain/world/codex';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +39,7 @@ const CronicaFeedQuery = z.object({
   source: z.enum(['gremio', 'dm', 'evento']).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
   offset: z.coerce.number().int().min(0).optional(),
+  cursor: z.string().min(1).max(512).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -67,6 +75,16 @@ export const cronicaFeedRoute: FastifyPluginAsync = async (app) => {
         });
       }
 
+      // feed-keyset-pagination: reject a malformed ?cursor= with 400, not a 500.
+      // The decode helper lives in the use-case module (feed-cursor.ts) — the
+      // route only checks its result.
+      if (query.cursor !== undefined && decodeFeedCursor(query.cursor) === null) {
+        return reply.code(400).send({
+          error: 'VALIDATION_FAILED',
+          issues: [{ code: 'FEED_CURSOR_INVALID', got: query.cursor }],
+        });
+      }
+
       const result = await aggregateGuildFeed({
         worldId,
         access,
@@ -75,6 +93,7 @@ export const cronicaFeedRoute: FastifyPluginAsync = async (app) => {
         ...(query.source !== undefined && { source: query.source as FeedSource }),
         limit: query.limit ?? 50,
         offset: query.offset ?? 0,
+        ...(query.cursor !== undefined && { cursor: query.cursor }),
       });
 
       return reply.code(200).send(result);

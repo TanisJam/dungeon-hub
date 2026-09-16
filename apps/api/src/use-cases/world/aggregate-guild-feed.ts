@@ -3,6 +3,8 @@
  *
  * bitacora-gremio W4, ADR-1 (server-side thin union use-case).
  * REQ-GREM-FD-01, REQ-GREM-FD-03.
+ * feed-keyset-pagination: adds keyset (cursor) pagination alongside the
+ * legacy offset path (kept for the manual-deploy window — see ADR notes below).
  *
  * Aggregates three existing stores:
  *   - guild_contributions (gremio source)
@@ -17,8 +19,33 @@
  *   - world_events       → occurredAt
  *   - journal_entries    → updatedAt (no occurredAt field; recency signal per ADR-5)
  *
- * Pagination: offset-based over the merged slice.
- * nextOffset = offset + limit when any source still has rows; null otherwise.
+ * Pagination — TWO paths, both supported simultaneously during the deploy window
+ * (web deploys automatically on merge to main; the API deploys manually):
+ *
+ *   - `offset` (legacy, @deprecated): offset-based over the merged slice, using
+ *     only `sortAt` for ordering (no total order — ties fall back to array
+ *     insertion order). Kept BEHAVIOURALLY UNTOUCHED so the currently-live web
+ *     app keeps working against the new API during the window.
+ *   - `cursor` (feed-keyset-pagination): keyset pagination over the total order
+ *     `sortAt DESC, sourceRank ASC, id DESC` (see feed-cursor.ts). Correct under
+ *     concurrent writes — no skips/duplicates when rows are inserted (or, for
+ *     journal entries, edited) between pages.
+ *
+ * When `cursor` is provided it wins and the offset branch is not used. `nextCursor`
+ * is ALWAYS returned (both paths) so a client can migrate from offset to cursor
+ * paging by switching which field it reads.
+ *
+ * CAVEAT — nextCursor computed from the offset path: it is a best-effort migration
+ * aid, not a total-order guarantee. The offset branch's merge has no tiebreak (see
+ * above), so the row it hands to encodeFeedCursor is not necessarily the boundary
+ * row the total order would have chosen among exact-`sortAt` ties. Paging with
+ * `offset` and then switching to the `nextCursor` it returned can therefore skip a
+ * row that ties the boundary row's exact `sortAt` but would sort before it in the
+ * total order — the unstable merge placed it after the boundary and never
+ * delivered it, and the cursor predicate then treats it as already-seen. This only
+ * matters for a client that mixes both pagination styles mid-feed; starting from
+ * page one with `cursor` (never touching `offset`) has no such caveat, since every
+ * page after the first is then computed entirely under the total order.
  */
 
 import { and, arrayContains, desc, eq } from 'drizzle-orm';
@@ -37,12 +64,24 @@ import {
   type LoadedWorldEvent,
 } from './load-world-event.js';
 import { resolveFeedEntityNames } from './resolve-feed-entity-names.js';
+import {
+  buildFeedCursorCondition,
+  compareFeedItems,
+  decodeFeedCursor,
+  encodeFeedCursor,
+  FEED_SOURCE_RANK,
+  type FeedCursor,
+  type FeedSource,
+} from './feed-cursor.js';
+
+// Re-exported for existing callers (e.g. the cronica-feed route) — feed-cursor.ts
+// is the canonical source of truth for FeedSource, decodeFeedCursor and encodeFeedCursor.
+export type { FeedSource } from './feed-cursor.js';
+export { decodeFeedCursor, encodeFeedCursor };
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type FeedSource = 'gremio' | 'dm' | 'evento';
 
 export interface FeedItem {
   id: string;
@@ -84,13 +123,29 @@ export interface AggregateGuildFeedOptions {
   tag?: string;
   source?: FeedSource;
   limit?: number;
+  /**
+   * @deprecated Retained only for the manual-API-deploy window (feed-keyset-pagination).
+   * Prefer `cursor`. Ignored when `cursor` is provided.
+   */
   offset?: number;
+  /**
+   * feed-keyset-pagination: opaque cursor token from a previous page's
+   * `nextCursor` (see encodeFeedCursor/decodeFeedCursor in feed-cursor.ts).
+   * When present, wins over `offset` and the legacy offset branch is skipped.
+   */
+  cursor?: string;
 }
 
 export interface AggregateGuildFeedResult {
   rows: FeedItem[];
   pageCount: number;
+  /**
+   * @deprecated Retained only for the manual-API-deploy window (feed-keyset-pagination).
+   * Prefer `nextCursor`.
+   */
   nextOffset: number | null;
+  /** feed-keyset-pagination: opaque cursor for the next page. Always populated (both paths). */
+  nextCursor: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,83 +230,178 @@ export async function aggregateGuildFeed(
   const { worldId, access, userId, tag, source, offset = 0 } = opts;
   const limit = Math.min(opts.limit ?? 50, 200);
 
-  // Over-fetch enough rows from each source to fill the merged page after sort.
-  // Fetch offset+limit+1 rows so we can detect if more rows exist beyond the current page.
-  // The +1 sentinel lets us compute nextOffset without a separate COUNT query.
-  const fetchLimit = offset + limit + 1;
+  // feed-keyset-pagination: `cursor` wins over `offset` when present. A malformed
+  // cursor decodes to null and falls back to the legacy offset branch below —
+  // the route is expected to reject a malformed cursor with 400 before this is
+  // ever reached, but this keeps the use-case itself total.
+  const decodedCursor: FeedCursor | null = opts.cursor ? decodeFeedCursor(opts.cursor) : null;
 
   const viewerRole: 'gm' | 'player' = access === 'gm' ? 'gm' : 'player';
 
-  // ── guild_contributions ───────────────────────────────────────────────────
-
   let gcItems: FeedItem[] = [];
-  if (!source || source === 'gremio') {
-    const gcConditions = [eq(guildContributions.worldId, worldId)];
-    if (tag) gcConditions.push(arrayContains(guildContributions.tags, [tag]));
-
-    const gcRows = await db
-      .select()
-      .from(guildContributions)
-      .where(and(...gcConditions))
-      .orderBy(desc(guildContributions.occurredAt))
-      .limit(fetchLimit);
-
-    // Apply domain visibility filter BEFORE merge (ADR-3 — no leak)
-    gcItems = gcRows
-      .filter((row) =>
-        isVisibleTo(
-          {
-            visibility: row.visibility as 'personal' | 'guild' | 'canonical',
-            authorUserId: row.authorUserId,
-            sealedStatus: row.sealedStatus as 'confirmed' | 'debunked' | null,
-          },
-          { userId, role: viewerRole },
-        ),
-      )
-      .map((row) => normalizeContribution(row as Parameters<typeof normalizeContribution>[0]));
-  }
-
-  // ── journal_entries ───────────────────────────────────────────────────────
-
   let journalItems: FeedItem[] = [];
-  if (!source || source === 'dm') {
-    const journalList = await listJournalEntries({
-      worldId,
-      ...(tag ? { tag } : {}),
-      limit: fetchLimit,
-    });
-
-    // Apply journal access filter BEFORE merge (ADR-3)
-    journalItems = filterJournalByAccess(journalList, access).map(normalizeJournalEntry);
-  }
-
-  // ── world_events ──────────────────────────────────────────────────────────
-
   let eventItems: FeedItem[] = [];
-  if (!source || source === 'evento') {
-    const eventList = await listWorldEvents({
-      worldId,
-      ...(tag ? { tag } : {}),
-      limit: fetchLimit,
-    });
+  let hasMore: boolean;
+  let sliced: FeedItem[];
+  let nextOffset: number | null;
 
-    // Apply world event access filter BEFORE merge (ADR-3)
-    eventItems = filterWorldEventsByAccess(eventList, access).map(normalizeWorldEvent);
+  if (decodedCursor) {
+    // ── Keyset (cursor) path — feed-keyset-pagination ─────────────────────
+    // Each source fetches exactly limit+1 rows, ordered by its own timestamp
+    // column DESC, id DESC, restricted by the per-source cursor predicate
+    // (feed-cursor.ts). Merging with the shared total-order comparator and
+    // slicing to `limit` is what makes this correct with no over-fetching.
+    const fetchLimit = limit + 1;
+
+    // ── guild_contributions ─────────────────────────────────────────────
+    if (!source || source === 'gremio') {
+      const gcConditions = [eq(guildContributions.worldId, worldId)];
+      if (tag) gcConditions.push(arrayContains(guildContributions.tags, [tag]));
+      const cursorCondition = buildFeedCursorCondition(
+        decodedCursor,
+        FEED_SOURCE_RANK.gremio,
+        guildContributions.occurredAt,
+        guildContributions.id,
+      );
+      if (cursorCondition) gcConditions.push(cursorCondition);
+
+      const gcRows = await db
+        .select()
+        .from(guildContributions)
+        .where(and(...gcConditions))
+        .orderBy(desc(guildContributions.occurredAt), desc(guildContributions.id))
+        .limit(fetchLimit);
+
+      // Apply domain visibility filter BEFORE merge (ADR-3 — no leak)
+      gcItems = gcRows
+        .filter((row) =>
+          isVisibleTo(
+            {
+              visibility: row.visibility as 'personal' | 'guild' | 'canonical',
+              authorUserId: row.authorUserId,
+              sealedStatus: row.sealedStatus as 'confirmed' | 'debunked' | null,
+            },
+            { userId, role: viewerRole },
+          ),
+        )
+        .map((row) => normalizeContribution(row as Parameters<typeof normalizeContribution>[0]));
+    }
+
+    // ── journal_entries ─────────────────────────────────────────────────
+    if (!source || source === 'dm') {
+      const journalList = await listJournalEntries({
+        worldId,
+        ...(tag ? { tag } : {}),
+        limit: fetchLimit,
+        cursor: decodedCursor,
+      });
+
+      // Apply journal access filter BEFORE merge (ADR-3)
+      journalItems = filterJournalByAccess(journalList, access).map(normalizeJournalEntry);
+    }
+
+    // ── world_events ────────────────────────────────────────────────────
+    if (!source || source === 'evento') {
+      const eventList = await listWorldEvents({
+        worldId,
+        ...(tag ? { tag } : {}),
+        limit: fetchLimit,
+        cursor: decodedCursor,
+      });
+
+      // Apply world event access filter BEFORE merge (ADR-3)
+      eventItems = filterWorldEventsByAccess(eventList, access).map(normalizeWorldEvent);
+    }
+
+    // ── Merge with the shared total-order comparator, paginate ───────────
+    const merged = [...gcItems, ...journalItems, ...eventItems].sort(compareFeedItems);
+    hasMore = merged.length > limit;
+    sliced = merged.slice(0, limit);
+    // Offset semantics don't apply to the keyset path — the cursor is the source of truth.
+    nextOffset = null;
+  } else {
+    // ── Legacy offset path — BEHAVIOURALLY UNTOUCHED (deploy-window compat) ─
+
+    // Over-fetch enough rows from each source to fill the merged page after sort.
+    // Fetch offset+limit+1 rows so we can detect if more rows exist beyond the current page.
+    // The +1 sentinel lets us compute nextOffset without a separate COUNT query.
+    const fetchLimit = offset + limit + 1;
+
+    // ── guild_contributions ───────────────────────────────────────────────────
+
+    if (!source || source === 'gremio') {
+      const gcConditions = [eq(guildContributions.worldId, worldId)];
+      if (tag) gcConditions.push(arrayContains(guildContributions.tags, [tag]));
+
+      const gcRows = await db
+        .select()
+        .from(guildContributions)
+        .where(and(...gcConditions))
+        .orderBy(desc(guildContributions.occurredAt))
+        .limit(fetchLimit);
+
+      // Apply domain visibility filter BEFORE merge (ADR-3 — no leak)
+      gcItems = gcRows
+        .filter((row) =>
+          isVisibleTo(
+            {
+              visibility: row.visibility as 'personal' | 'guild' | 'canonical',
+              authorUserId: row.authorUserId,
+              sealedStatus: row.sealedStatus as 'confirmed' | 'debunked' | null,
+            },
+            { userId, role: viewerRole },
+          ),
+        )
+        .map((row) => normalizeContribution(row as Parameters<typeof normalizeContribution>[0]));
+    }
+
+    // ── journal_entries ───────────────────────────────────────────────────────
+
+    if (!source || source === 'dm') {
+      const journalList = await listJournalEntries({
+        worldId,
+        ...(tag ? { tag } : {}),
+        limit: fetchLimit,
+      });
+
+      // Apply journal access filter BEFORE merge (ADR-3)
+      journalItems = filterJournalByAccess(journalList, access).map(normalizeJournalEntry);
+    }
+
+    // ── world_events ──────────────────────────────────────────────────────────
+
+    if (!source || source === 'evento') {
+      const eventList = await listWorldEvents({
+        worldId,
+        ...(tag ? { tag } : {}),
+        limit: fetchLimit,
+      });
+
+      // Apply world event access filter BEFORE merge (ADR-3)
+      eventItems = filterWorldEventsByAccess(eventList, access).map(normalizeWorldEvent);
+    }
+
+    // ── Merge, sort DESC, paginate ────────────────────────────────────────────
+
+    const merged = [...gcItems, ...journalItems, ...eventItems].sort((a, b) =>
+      b.sortAt < a.sortAt ? -1 : b.sortAt > a.sortAt ? 1 : 0,
+    );
+
+    // The merged array may contain up to fetchLimit rows (sentinel included).
+    // hasMore: if merged has MORE rows than offset+limit, there's a next page.
+    hasMore = merged.length > offset + limit;
+    sliced = merged.slice(offset, offset + limit);
+    nextOffset = hasMore ? offset + limit : null;
   }
 
-  // ── Merge, sort DESC, paginate ────────────────────────────────────────────
-
-  const merged = [...gcItems, ...journalItems, ...eventItems].sort((a, b) =>
-    b.sortAt < a.sortAt ? -1 : b.sortAt > a.sortAt ? 1 : 0,
-  );
-
-  // The merged array may contain up to fetchLimit rows (sentinel included).
-  // hasMore: if merged has MORE rows than offset+limit, there's a next page.
-  const hasMore = merged.length > offset + limit;
-  const sliced = merged.slice(offset, offset + limit);
   // pageCount = rows on THIS page (not the aggregate total — semantics clarified REQ-FEED-01)
   const pageCount = sliced.length;
-  const nextOffset = hasMore ? offset + limit : null;
+  // feed-keyset-pagination: ALWAYS populate nextCursor (both paths) from the
+  // actual last row of this page, so a client can migrate from offset to
+  // cursor paging by switching which field it reads. From the offset branch
+  // this is a best-effort migration aid, not a total-order guarantee — see
+  // the CAVEAT in the module doc comment above.
+  const nextCursor = hasMore && sliced.length > 0 ? encodeFeedCursor(sliced[sliced.length - 1]!) : null;
 
   // ── Entity name resolution (guild-feed-linked-entity-refs) ────────────────
   // Resolve (refEntityKind, refEntityId, refEntitySource) → sanitized name for the sliced page.
@@ -279,5 +429,5 @@ export async function aggregateGuildFeed(
     return { ...item, refEntityName: null };
   });
 
-  return { rows, pageCount, nextOffset };
+  return { rows, pageCount, nextOffset, nextCursor };
 }
