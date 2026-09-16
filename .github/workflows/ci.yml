@@ -21,8 +21,15 @@
 # playwright.config.ts uses devices['Desktop Chrome']), and the Discord bot
 # (apps/bot has unit tests only; per CLAUDE.md its e2e coverage is manual
 # smoke-testing against live Discord). The 5etools dataset (data/5etools/) is
-# fetched fresh by both integration and e2e below, so neither skips on an
-# absent dataset in CI — that caveat only applies to a fresh local clone.
+# fetched fresh by all three jobs below, so none skips on an absent dataset in
+# CI — that caveat now really does only apply to a fresh local clone.
+#
+# It did not always. This note previously said "both integration and e2e",
+# which was true of those two and quietly false about `verify` — the job that
+# runs compendium-import's suite, whose integration describes skip on
+# `!existsSync(DATA_DIR)`. 34 of its 112 tests skipped on every run while this
+# comment reassured the reader that CI did not skip. If you add a job that runs
+# a suite gated on that dataset, give it the fetch steps and amend this note.
 name: ci
 
 on:
@@ -70,6 +77,24 @@ jobs:
 
       - name: Test bot
         run: pnpm --filter @dungeon-hub/bot test
+
+      # compendium-import's integration suites gate on the dataset being on disk
+      # (`describe.skipIf(!existsSync(DATA_DIR))`). Without these two steps this
+      # job silently skipped 34 of its 112 tests on every run — three whole files
+      # plus races.test.ts's real-data block — and reported green. The importer is
+      # the boundary CLAUDE.md §10 calls buggy upstream data, so those were the
+      # tests least safe to lose.
+      #
+      # Same cache and same key as `integration` and `e2e`, so a PR that warmed it
+      # in either gets a hit here. All 34 pass once the data is present.
+      - name: Cache the 5etools dataset
+        uses: actions/cache@v5
+        with:
+          path: data/5etools
+          key: 5etools-${{ hashFiles('scripts/fetch-5etools.sh') }}
+
+      - name: Fetch the 5etools dataset
+        run: ./scripts/fetch-5etools.sh
 
       - name: Test compendium-import
         run: pnpm --filter @dungeon-hub/compendium-import test
