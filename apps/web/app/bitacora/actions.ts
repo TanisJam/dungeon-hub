@@ -379,11 +379,20 @@ export interface FeedItem {
   sourceBitacoraPageId?: string | null;
 }
 
-/** REQ-FEED-01: pageCount = rows on current page (NOT aggregate total). */
+/**
+ * REQ-FEED-01: pageCount = rows on current page (NOT aggregate total).
+ *
+ * feed-keyset-pagination: the API replaced offset pagination with keyset
+ * cursor pagination (guild feed merges three sources; offset pages shift
+ * under concurrent writes — worse yet, editing a journal entry re-sorts it
+ * by updatedAt and teleports it to the top). `nextCursor` is opaque: never
+ * parse it, never construct one, only round-trip exactly what the server
+ * returned.
+ */
 export interface GuildBitacoraFeedResult {
   rows: FeedItem[];
   pageCount: number;
-  nextOffset: number | null;
+  nextCursor: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -393,15 +402,17 @@ export interface GuildBitacoraFeedResult {
 
 export async function listGuildBitacoraFeed(
   worldId: string,
-  opts: { tag?: string; source?: FeedSource; offset?: number; limit?: number },
+  opts: { tag?: string; source?: FeedSource; cursor?: string; limit?: number },
 ): Promise<GuildBitacoraFeedResult> {
   const token = await getToken();
-  if (!token) return { rows: [], pageCount: 0, nextOffset: null };
+  if (!token) return { rows: [], pageCount: 0, nextCursor: null };
 
   try {
-    const params = new URLSearchParams({ limit: String(opts.limit ?? 50), offset: String(opts.offset ?? 0) });
+    const params = new URLSearchParams({ limit: String(opts.limit ?? 50) });
     if (opts.tag?.trim()) params.set('tag', opts.tag.trim());
     if (opts.source) params.set('source', opts.source);
+    // Opaque cursor — round-tripped verbatim, never parsed or constructed.
+    if (opts.cursor) params.set('cursor', opts.cursor);
 
     // NOTE: API endpoint URL is intentionally /cronica-feed (not renamed — barrido-final spec)
     const res = await api.get<GuildBitacoraFeedResult>(
@@ -410,7 +421,7 @@ export async function listGuildBitacoraFeed(
     );
     return res;
   } catch {
-    return { rows: [], pageCount: 0, nextOffset: null };
+    return { rows: [], pageCount: 0, nextCursor: null };
   }
 }
 

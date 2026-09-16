@@ -82,19 +82,19 @@ export default async function BitacoraPage({
     );
   }
 
-  // SSR initial feed items
+  // SSR initial feed items — first page, no cursor (feed-keyset-pagination).
   // NOTE: API endpoint URL /cronica-feed is intentionally unchanged (barrido-final spec)
   let initialItems: FeedItem[] = [];
-  let initialNextOffset: number | null = null;
+  let initialNextCursor: string | null = null;
   try {
-    const params = new URLSearchParams({ limit: '50', offset: '0' });
+    const params = new URLSearchParams({ limit: '50' });
     if (tag) params.set('tag', tag);
-    const res = await api.get<{ rows: FeedItem[]; pageCount: number; nextOffset: number | null }>(
+    const res = await api.get<{ rows: FeedItem[]; pageCount: number; nextCursor: string | null }>(
       `/worlds/${aw.id}/cronica-feed?${params.toString()}`,
       token,
     );
     initialItems = res.rows ?? [];
-    initialNextOffset = res.nextOffset ?? null;
+    initialNextCursor = res.nextCursor ?? null;
   } catch {
     // Render with empty list — GuildBitacoraFeed handles empty state
   }
@@ -112,7 +112,7 @@ export default async function BitacoraPage({
         worldId={aw.id}
         initialItems={initialItems}
         initialTag={tag}
-        initialNextOffset={initialNextOffset}
+        initialNextCursor={initialNextCursor}
         effectiveView={effectiveView}
       />
     </AppShell>
