@@ -9,13 +9,46 @@
 
 Derived from gap-audit #1809 and `definition.md §7`. The MVP is not shippable until all 10 items in `definition.md §3` are ✅.
 
-| Priority | Arc / Work | 1-line scope | Closes definition.md item |
-|---|---|---|---|
-| 1 | **JSON import/export (remaining)** | Character EXPORT ✅ shipped. Character RE-IMPORT ✅ **built** 2026-09-08 (`POST /characters/import`) — but the API deploys manually and production still runs 11 June code, so it is not live; its web UI waits at PR #20 rather than shipping a button that 404s. **Deploying the API is now the blocker, not writing the code.** World export ✅ shipped 2026-09-09: `GET /worlds/:worldId/export`, GM-only, same versioned envelope as the character one, with a download control under `/herramientas/contenido`. #3.9 is closed. | #3.9 Import/export |
-| 2 | **West Marches write-path — remaining** (`wm-knowledge-layer`, substantially delivered via codex-ia-reframe) | Delivered: guild contributions + tags + unified feed + share-personal-page-to-guild + entity refs/Conocidos (monsters/NPCs/factions/locations); `NovedadesFeed` backend hookup (2026-09-03, `feed-to-novedad.ts`); Mercado shop browse+buy (2026-09-03, closes the prior deferral per #1960). Sealing/debunking UI ✅ shipped 2026-09-08 — the seal endpoint had been live since 2026-06-05 with no web caller; DMs now confirm/refute from the feed (un-sealing is not offered: the API's SealBody enum has no null variant). Adventure board ✅ shipped 2026-09-09 at `/tablero` — a player-facing read of quests on offer, built on the existing `quests` table and its already-access-filtered endpoint. **Remaining**: feed entity tap-to-open; keyset pagination. | #3.10 WM knowledge |
-| 3 | ~~**Custom content via JSON upload**~~ ✅ **shipped 2026-09-09** (DEC-1, locked 2026-06-04) | `POST /worlds/:worldId/homebrew/items` + a paste-a-JSON textarea at `/herramientas/contenido`. Items only for this slice. The source code is **per world** (`HB-<first 8 hex of worldId>`) because compendium tables are global and keyed `(slug, source)`: a shared code would collide between DMs and leak one world's homebrew into any other that enabled it. The upload enables the source in `rulesProfile` so the DM sees their content immediately. Visual authoring is still post-MVP. | #3.8 Custom content |
+**The MVP is done. All 10 items in `definition.md §3` are ✅, verified 2026-09-16 — this table has
+no remaining rows.** The last two closed this batch: feed entity tap-to-open (PR #80) and keyset
+pagination (PR #82 API + PR #83 web), both under #3.10. See `docs/STATUS.md §2` for the row-by-row
+evidence. Everything below is the closed history that got the MVP here — kept for the record, not
+because it's outstanding.
+
+> ✅ **JSON import/export** — CLOSED. Character export shipped 2026-06-05; character re-import
+> built 2026-09-08 and reached production with the 2026-09-09 API swap (web UI via PR #20 the same
+> day); world export shipped 2026-09-09 (`GET /worlds/:worldId/export`, GM-only, same versioned
+> envelope). The end-to-end round trip is now also covered by an e2e spec (PR #81,
+> `e2e/character-import-round-trip.auth.spec.ts`, run at 375px). Closes #3.9.
+> ✅ **West Marches write-path** (`wm-knowledge-layer`, delivered via codex-ia-reframe + since) —
+> CLOSED. Guild contributions + tags + unified feed + share-personal-page-to-guild + entity
+> refs/Conocidos (monsters/NPCs/factions/locations); `NovedadesFeed` backend hookup (2026-09-03);
+> Mercado shop browse+buy (2026-09-03); sealing/debunking UI (2026-09-08); adventure board at
+> `/tablero` (2026-09-09). Last two items closed this batch: feed entity tap-to-open — the linked
+> entity card in `feed-card.tsx` is a real `<Link>`, scoped per viewer (PR #80) — and keyset
+> pagination — `apps/api/src/use-cases/world/feed-cursor.ts` plus the web client switching from
+> `offset` to `cursor` (PR #82 API, PR #83 web). Closes #3.10.
+> ✅ **Custom content via JSON upload** — CLOSED, shipped 2026-09-09 (DEC-1, locked 2026-06-04).
+> `POST /worlds/:worldId/homebrew/items` + a paste-a-JSON textarea at `/herramientas/contenido`.
+> Items only for this slice. The source code is **per world** (`HB-<first 8 hex of worldId>`)
+> because compendium tables are global and keyed `(slug, source)`: a shared code would collide
+> between DMs and leak one world's homebrew into any other that enabled it. The upload enables the
+> source in `rulesProfile` so the DM sees their content immediately. Visual authoring is still
+> post-MVP (`definition.md §5.2`). Closes #3.8.
 > ✅ **Biblioteca cross-category search** (was P4b) — SHIPPED 2026-09-08. Search sheet on the landing fans out one request per category across all 8 via a Server Action, debounced at 300ms with a stale-response guard, 5 rows per category. No aggregate endpoint was added: the API deploys manually and lags `main`, so it had to work against endpoints already live. Partial failure names unreachable categories instead of blanking the screen. Closes #3.4.
 > ✅ **Map tiles** (was P5) — FIXED 2026-09-07. The tiles were on the volume one directory level too deep, so Storage raised `ENOENT` and the live map drew POIs over nothing. Originals extracted and re-uploaded (1398/1398). The former "mobile zoom buttons + waypoint visibility" scope was verified to be two non-issues and dropped. Closes #3.5.
+
+### What's next, now that the MVP table is empty
+
+`definition.md §5.1` froze the combat engine and web combat surface "until the MVP lands" (decision
+2026-06-04) — see this doc's own §3.1 below for what shipped and what's preserved. With #3.1–#3.10
+all ✅, that's the explicit resume condition, not an open-ended pause; §3.1 already names what
+resumes first (healing, conditions UI, DM controls, the full encounter management surface). Two
+other candidates are on record but not yet scoped as an arc: visual homebrew authoring
+(`definition.md §5.2`, explicitly deferred when #3.8 shipped as JSON-upload-only) and a matching
+**world import** to pair with the world export that shipped 2026-09-09 (`docs/STATUS.md §7` already
+flags this as a named gap: "the world export has no matching import yet"). None of these three is
+prioritized yet — that decision needs an explicit SDD proposal, not a default.
 
 > ✅ **Campaign invite flow** (gap #782, was P1) — SHIPPED 2026-06-05 via SDD `campaign-invite-flow` (engram archive #1877). Invite-link mechanism (`campaign_invite_tokens` + `POST /campaigns/:id/invite` + `/invites/status|confirm` + `/invite/[token]` accept screen, atomic `worldMembers`+`campaignMembers` dual-write). Closes #3.6 DM campaigns.
 >
@@ -167,6 +200,6 @@ Per `definition.md §5.1` (decision 2026-06-04): the combat engine and web comba
 
 **What resumes after MVP**: the remaining web slices (healing, conditions UI, DM controls), the full encounter management surface.
 
-### 3.2 WM knowledge layer (`wm-knowledge-layer`) — SUBSTANTIALLY DELIVERED
+### 3.2 WM knowledge layer (`wm-knowledge-layer`) — CLOSED (#3.10)
 
-The codex-ia-reframe arc (2026-06-06 – 2026-06-08) delivered the player write-path and knowledge IA in 8 waves. What was item #2 in §1 is now narrowed to the remaining feed-completeness work (see §1 row 2 updated scope). The original paused SDD (#1808, engram #1804 vision / #1806 decisions) informed the arc; the arc superseded it as the implementation vehicle.
+The codex-ia-reframe arc (2026-06-06 – 2026-06-08) delivered the player write-path and knowledge IA in 8 waves. The remaining feed-completeness work (feed entity tap-to-open, keyset pagination) closed 2026-09-16 — see §1. The original paused SDD (#1808, engram #1804 vision / #1806 decisions) informed the arc; the arc superseded it as the implementation vehicle.
