@@ -20,8 +20,18 @@ import type { NpcRow, FactionRow } from '../actions';
  * Resolves active world + view preference in parallel (REQ-NPC-01, REQ-FAC-02 pattern).
  * SSR-fetches initial NPC list AND world factions (for N:M picker) in parallel.
  * REQ-NPC-01, REQ-NPC-02, REQ-GATE-01, REQ-DMTOOLS-01, REQ-DMTOOLS-02.
+ *
+ * feed-entity-tap-to-open (MVP #3.10): an incoming ?npc=<id> (from the guild bitácora
+ * feed's NPC ref card, DM-only) seeds NpcClientWrapper's initial selection. Untrusted
+ * input — this route already self-gates DM-only above; the param only selects among
+ * rows the SSR fetch already returned. A miss opens nothing.
  */
-export default async function NpcsPage() {
+export default async function NpcsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ npc?: string }>;
+}) {
+  const { npc: focusNpcId } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -107,6 +117,7 @@ export default async function NpcsPage() {
         effectiveView={effectiveView}
         initialNpcs={initialNpcs}
         worldFactions={worldFactions}
+        focusNpcId={focusNpcId}
       />
     </AppShell>
   );

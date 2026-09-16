@@ -61,6 +61,12 @@ interface NpcClientWrapperProps {
   initialNpcs: NpcRow[];
   /** All factions in the active world — passed for the N:M picker. */
   worldFactions: FactionRow[];
+  /**
+   * Deep-link initial selection (feed-entity-tap-to-open, MVP #3.10) — from
+   * ?npc=<id> on /herramientas/npcs, seeded by the guild feed's NPC ref card
+   * (DM-only, this route self-gates with notFound() for players).
+   */
+  focusNpcId?: string;
   /** Optional action bundle for catalog/testing; defaults to real server actions. */
   actions?: NpcWrapperActions;
 }
@@ -70,6 +76,7 @@ export function NpcClientWrapper({
   effectiveView,
   initialNpcs,
   worldFactions,
+  focusNpcId,
   actions,
 }: NpcClientWrapperProps) {
   const a = actions ?? DEFAULT_NPC_ACTIONS;
@@ -156,6 +163,7 @@ export function NpcClientWrapper({
       renderDetail={renderDetail}
       renderForm={renderForm}
       onDelete={onDelete}
+      initialSelectionId={focusNpcId}
     />
   );
 }

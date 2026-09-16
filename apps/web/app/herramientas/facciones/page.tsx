@@ -21,8 +21,18 @@ import type { FactionRow } from '../actions';
  * Resolves active world + view preference in parallel (REQ-FAC-02).
  * SSR-fetches initial faction list; renders SubNav + FactionClientWrapper.
  * REQ-FAC-01, REQ-FAC-02, REQ-FAC-04, REQ-DMTOOLS-01, REQ-DMTOOLS-02.
+ *
+ * feed-entity-tap-to-open (MVP #3.10): an incoming ?faccion=<id> (from the guild
+ * bitácora feed's faction ref card, DM-only) seeds FactionClientWrapper's initial
+ * selection. Untrusted input — this route already self-gates DM-only above; the
+ * param only selects among rows the SSR fetch already returned. A miss opens nothing.
  */
-export default async function FaccionesPage() {
+export default async function FaccionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ faccion?: string }>;
+}) {
+  const { faccion: focusFactionId } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -103,6 +113,7 @@ export default async function FaccionesPage() {
         worldId={aw.id}
         effectiveView={effectiveView}
         initialFactions={initialFactions}
+        focusFactionId={focusFactionId}
       />
     </AppShell>
   );
