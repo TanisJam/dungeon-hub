@@ -2,6 +2,7 @@ import { and, arrayContains, desc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { worldEvents } from '../../infra/db/schema.js';
 import type { WorldAccess } from '../auth/get-world-access.js';
+import { buildFeedCursorCondition, FEED_SOURCE_RANK, type FeedCursor } from './feed-cursor.js';
 
 export type WorldEventVisibility = 'public' | 'dm-only';
 
@@ -29,6 +30,12 @@ export interface ListWorldEventsOptions {
   tag?: string;
   limit?: number;
   offset?: number;
+  /**
+   * feed-keyset-pagination: opaque cursor, already decoded, restricting the
+   * result to rows strictly after it in the shared feed total order. Additive
+   * — omitting it (existing callers) keeps the exact pre-existing behaviour.
+   */
+  cursor?: FeedCursor;
 }
 
 export async function listWorldEvents(opts: ListWorldEventsOptions): Promise<LoadedWorldEvent[]> {
@@ -37,6 +44,27 @@ export async function listWorldEvents(opts: ListWorldEventsOptions): Promise<Loa
   const conditions = [eq(worldEvents.worldId, opts.worldId)];
   if (opts.tag) conditions.push(arrayContains(worldEvents.tags, [opts.tag]));
 
+  if (opts.cursor) {
+    // Keyset path (feed-keyset-pagination): add the per-source cursor predicate
+    // and order by `occurredAt DESC, id DESC` so the limit+1 window is correct.
+    const cursorCondition = buildFeedCursorCondition(
+      opts.cursor,
+      FEED_SOURCE_RANK.evento,
+      worldEvents.occurredAt,
+      worldEvents.id,
+    );
+    if (cursorCondition) conditions.push(cursorCondition);
+
+    const rows = await db
+      .select()
+      .from(worldEvents)
+      .where(and(...conditions))
+      .orderBy(desc(worldEvents.occurredAt), desc(worldEvents.id))
+      .limit(limit);
+    return rows as LoadedWorldEvent[];
+  }
+
+  // Legacy offset path — behaviourally untouched.
   const rows = await db
     .select()
     .from(worldEvents)

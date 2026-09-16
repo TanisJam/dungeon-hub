@@ -2,6 +2,7 @@ import { and, arrayContains, desc, eq } from 'drizzle-orm';
 import { db } from '../../infra/db/client.js';
 import { journalEntries } from '../../infra/db/schema.js';
 import type { WorldAccess } from '../auth/get-world-access.js';
+import { buildFeedCursorCondition, FEED_SOURCE_RANK, type FeedCursor } from '../world/feed-cursor.js';
 
 export type JournalVisibility = 'public' | 'dm-only';
 
@@ -27,6 +28,12 @@ export interface ListJournalOptions {
   tag?: string;
   limit?: number;
   offset?: number;
+  /**
+   * feed-keyset-pagination: opaque cursor, already decoded, restricting the
+   * result to rows strictly after it in the shared feed total order. Additive
+   * — omitting it (existing callers) keeps the exact pre-existing behaviour.
+   */
+  cursor?: FeedCursor;
 }
 
 export async function listJournalEntries(opts: ListJournalOptions): Promise<LoadedJournalEntry[]> {
@@ -35,6 +42,27 @@ export async function listJournalEntries(opts: ListJournalOptions): Promise<Load
   const conditions = [eq(journalEntries.worldId, opts.worldId)];
   if (opts.tag) conditions.push(arrayContains(journalEntries.tags, [opts.tag]));
 
+  if (opts.cursor) {
+    // Keyset path (feed-keyset-pagination): add the per-source cursor predicate
+    // and order by `updatedAt DESC, id DESC` so the limit+1 window is correct.
+    const cursorCondition = buildFeedCursorCondition(
+      opts.cursor,
+      FEED_SOURCE_RANK.dm,
+      journalEntries.updatedAt,
+      journalEntries.id,
+    );
+    if (cursorCondition) conditions.push(cursorCondition);
+
+    const rows = await db
+      .select()
+      .from(journalEntries)
+      .where(and(...conditions))
+      .orderBy(desc(journalEntries.updatedAt), desc(journalEntries.id))
+      .limit(limit);
+    return rows as LoadedJournalEntry[];
+  }
+
+  // Legacy offset path — behaviourally untouched.
   const rows = await db
     .select()
     .from(journalEntries)
