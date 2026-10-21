@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+overrides:
+  # Next.js October 2026 advisory (CVE-2026-96889) requires sharp >= 0.35.5
+  sharp: ^0.35.5
